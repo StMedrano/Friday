@@ -1,30 +1,31 @@
 # Friday
 
-Friday is a two-site homelab control plane for VM 100. It combines a responsive operations UI with a small backend API that can safely read infrastructure state without exposing privileged credentials to the browser.
+Friday is a two-site homelab control plane for VM 100. It combines a responsive operations UI, a server-side infrastructure API, read-only live adapters, and an optional AI analysis boundary without exposing privileged credentials to the browser.
 
 ## Current MVP
 
 - Responsive dark operations dashboard
-- Site A + Site B visibility
-- Site-to-site VPN model
-- Docker inventory adapter for VM 100
+- Site A + Site B visibility and site-to-site VPN model
+- Unified Node 22 server for UI + API
+- Safe credential-free mock mode
+- Docker read-only inventory adapter
 - Proxmox read-only API adapter
 - HTTP/HTTPS endpoint health checks
-- Mock mode for safe development
-- Live mode with opt-in adapters
-- Alerts, activities and resource panels
-- Friday command composer backed by a preview-only API
-- Docker/Compose deployment on port `3010`
-- GitHub CI for tests, frontend build and container build
-- VM 100 bootstrap/update/verify scripts
-- Security, network and live-integration documentation
-- Codex and agent handoff instructions
+- Alerts, activity, resource and service panels
+- Deterministic preview-only command classifier
+- Optional server-side OpenAI Responses API analysis endpoint
+- Safe `compose.yaml` with no Docker socket
+- Explicit `compose.live.yaml` read-only socket override
+- VM100 preflight/bootstrap/update/verification scripts
+- Makefile build/deploy commands
+- GitHub CI for tests, build, Compose validation, script syntax, and Docker image build
+- Codex instructions, ordered finish queue, and repo-local skills
 
 ## Safety model
 
-Friday starts in `FRIDAY_MODE=mock`. The current API is read-only. Natural-language requests are resolved only to an allowlist of previewable health/status intents. No restart, delete, network-change, firewall-change, VLAN-change or device-adoption endpoint exists in this MVP.
+Friday starts in `FRIDAY_MODE=mock`. Read adapters cannot mutate infrastructure. The AI endpoint is advisory only and receives normalized Friday state, not Docker/Proxmox execution tools.
 
-Read `docs/security-model.md` before adding actions.
+No restart/delete/network/firewall/VLAN/device-adoption execution endpoint exists in this MVP. Infrastructure actions remain blocked until authentication/RBAC, durable audit logging, and approval workflow exist.
 
 ## Pull onto VM 100
 
@@ -37,67 +38,68 @@ git clone https://github.com/StMedrano/Friday.git friday
 cd friday
 cp .env.example .env
 
-docker compose config
-docker compose up -d --build
-sh scripts/verify.sh
+make preflight
+make up
+make health
 ```
 
-Open:
+Friday defaults to:
 
 ```text
 http://<VM100-IP>:3010
 ```
 
-For the current VM 100 address this is expected to be:
+## Enable live read-only data
 
-```text
-http://192.168.1.74:3010
+Edit `.env` and configure only the integrations you intend to use. Then run:
+
+```bash
+make preflight
+make live
+make health
 ```
+
+`make live` combines `compose.yaml` with `compose.live.yaml`; that explicit override is what adds the Docker socket as a read-only mount.
+
+See `docs/integrations.md` before enabling Proxmox, Docker, endpoint monitoring, or AI.
+
+## Optional Friday AI
+
+Friday AI is disabled by default. Configure server-side values only:
+
+```env
+FRIDAY_AI_ENABLED=true
+OPENAI_API_KEY=
+OPENAI_MODEL=gpt-5.6-terra
+```
+
+Never rename the API key to a `VITE_*` variable. Browser-visible environment variables must not contain infrastructure or provider secrets.
 
 ## Update Friday on VM 100
 
 ```bash
 cd /srv/infrastructure/apps/friday
-sh scripts/update-vm100.sh
+make update
 ```
 
-The updater uses a fast-forward-only pull, validates Compose, rebuilds the container and runs the verification script.
+The updater refuses a dirty Git tree, fast-forwards `main`, preserves `.env`, preserves mock/live runtime mode, rebuilds, and verifies the running service.
 
-## Enable live data
-
-Edit `.env` and enable only the adapters you are ready to use. Example:
-
-```env
-FRIDAY_MODE=live
-FRIDAY_DOCKER_ENABLED=true
-FRIDAY_PROXMOX_ENABLED=false
-FRIDAY_ENDPOINTS_ENABLED=false
-```
-
-Then:
+## Development / verification
 
 ```bash
-docker compose up -d --build
+make install
+make test
+make build
+make verify
 ```
 
-See `docs/live-integrations.md` for Proxmox tokens and endpoint monitoring.
-
-## Local development
+Useful commands:
 
 ```bash
-npm install
-npm test
-npm run build
-npm run dev
+make help
+make logs
+make health
 ```
-
-The production server is:
-
-```bash
-npm run start
-```
-
-It serves both the compiled UI and API from port `3010`.
 
 ## API
 
@@ -106,10 +108,19 @@ GET  /healthz
 GET  /api/health
 GET  /api/overview
 POST /api/commands/preview
+POST /api/assistant
 ```
 
-## Important architecture rule
+See `docs/codex/API_CONTRACT.md`.
 
-Do **not** give the browser direct credentials to Proxmox, Omada, Docker, AdGuard, or other infrastructure services. Secrets stay server-side and each system gets its own adapter with minimal permissions.
+## Codex start point
 
-Start Codex by reading `AGENTS.md`, `CODEX.md`, `docs/security-model.md`, and `docs/live-integrations.md`.
+Codex should begin with:
+
+1. `AGENTS.md`
+2. `CODEX.md`
+3. `docs/codex/BUILD_STATUS.md`
+4. `docs/codex/NEXT_STEPS.md`
+5. The relevant workflow under `skills/`
+
+A ready-to-paste prompt is in `docs/codex/START_HERE_PROMPT.md`.
