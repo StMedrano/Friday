@@ -15,15 +15,33 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
+
       - name: Install dependencies
         run: npm install --no-audit --no-fund
+
       - name: Test
         run: npm test
+
       - name: Build
         run: npm run build
+
+      - name: Validate shell scripts
+        run: |
+          for file in scripts/*.sh; do
+            echo "checking $file"
+            sh -n "$file"
+          done
+
+      - name: Validate safe Compose
+        run: docker compose config >/dev/null
+
+      - name: Validate live Compose override
+        run: docker compose -f compose.yaml -f compose.live.yaml config >/dev/null
+
       - name: Build container
         run: docker build -t friday-ci .
