@@ -46,7 +46,7 @@ Port `3010` was selected to avoid the existing Homepage deployment on port `3000
 ## Verify
 
 ```bash
-./scripts/verify.sh
+sh scripts/verify.sh
 ```
 
 ## Architecture rule
