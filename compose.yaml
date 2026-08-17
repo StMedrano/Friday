@@ -1,20 +1,36 @@
 services:
-  friday-ui:
+  friday:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: friday-ui
+    container_name: friday
     restart: unless-stopped
     ports:
-      - "${FRIDAY_UI_PORT:-3010}:80"
+      - "${FRIDAY_UI_PORT:-3010}:3010"
     environment:
-      TZ: America/Chicago
+      TZ: ${TZ:-America/Chicago}
+      FRIDAY_PORT: 3010
+      FRIDAY_MODE: ${FRIDAY_MODE:-mock}
+      FRIDAY_DOCKER_ENABLED: ${FRIDAY_DOCKER_ENABLED:-false}
+      FRIDAY_DOCKER_SOCKET: /var/run/docker.sock
+      FRIDAY_PROXMOX_ENABLED: ${FRIDAY_PROXMOX_ENABLED:-false}
+      FRIDAY_PROXMOX_URL: ${FRIDAY_PROXMOX_URL:-}
+      FRIDAY_PROXMOX_TOKEN_ID: ${FRIDAY_PROXMOX_TOKEN_ID:-}
+      FRIDAY_PROXMOX_TOKEN_SECRET: ${FRIDAY_PROXMOX_TOKEN_SECRET:-}
+      FRIDAY_PROXMOX_INSECURE: ${FRIDAY_PROXMOX_INSECURE:-false}
+      FRIDAY_ENDPOINTS_ENABLED: ${FRIDAY_ENDPOINTS_ENABLED:-false}
+      FRIDAY_ENDPOINT_URLS: ${FRIDAY_ENDPOINT_URLS:-}
+      FRIDAY_AI_ENABLED: ${FRIDAY_AI_ENABLED:-false}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-5.6-terra}
+    volumes:
+      - friday_data:/data
     networks:
       - friday_frontend
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3010/healthz"]
       interval: 30s
-      timeout: 3s
+      timeout: 4s
       retries: 3
       start_period: 10s
     security_opt:
@@ -23,3 +39,7 @@ services:
 networks:
   friday_frontend:
     name: friday_frontend
+
+volumes:
+  friday_data:
+    name: friday_data

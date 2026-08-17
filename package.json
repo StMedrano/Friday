@@ -1,13 +1,16 @@
 {
   "name": "friday-control-plane",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.2.0",
   "type": "module",
   "scripts": {
     "dev": "vite --host 0.0.0.0",
+    "dev:server": "node --watch server/index.mjs",
     "build": "tsc -b && vite build",
+    "start": "node server/index.mjs",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "vitest run",
+    "test": "vitest run && node --test server/*.test.mjs",
+    "test:server": "node --test server/*.test.mjs",
     "test:watch": "vitest"
   },
   "dependencies": {

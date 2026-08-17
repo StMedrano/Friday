@@ -1,0 +1,8 @@
+services:
+  friday:
+    environment:
+      FRIDAY_MODE: live
+      FRIDAY_DOCKER_ENABLED: ${FRIDAY_DOCKER_ENABLED:-true}
+    volumes:
+      - friday_data:/data
+      - /var/run/docker.sock:/var/run/docker.sock:ro
