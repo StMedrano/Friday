@@ -10,19 +10,33 @@ fi
 
 cd "$APP_DIR"
 
-echo "Fetching Friday updates..."
-git fetch origin main
+if [ -n "$(git status --porcelain)" ]; then
+  echo "Friday working tree has local changes; refusing to update." >&2
+  git status --short >&2
+  exit 2
+fi
 
-echo "Fast-forwarding main..."
+[ -f .env ] || cp .env.example .env
+sh scripts/preflight-vm100.sh
+
+MODE=$(grep '^FRIDAY_MODE=' .env 2>/dev/null | tail -1 | cut -d= -f2- || true)
+
+printf '%s\n' 'Fetching Friday updates...'
+git fetch origin main
+printf '%s\n' 'Fast-forwarding main...'
 git checkout main
 git pull --ff-only origin main
 
-[ -f .env ] || cp .env.example .env
-
-echo "Validating Compose configuration..."
-docker compose config >/dev/null
-
-echo "Building and restarting Friday..."
-docker compose up -d --build
+if [ "$MODE" = 'live' ]; then
+  echo 'Validating live Compose configuration...'
+  docker compose -f compose.yaml -f compose.live.yaml config >/dev/null
+  echo 'Building and restarting Friday in live mode...'
+  docker compose -f compose.yaml -f compose.live.yaml up -d --build
+else
+  echo 'Validating safe/mock Compose configuration...'
+  docker compose config >/dev/null
+  echo 'Building and restarting Friday in safe/mock mode...'
+  docker compose up -d --build
+fi
 
 sh scripts/verify.sh
