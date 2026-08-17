@@ -1,0 +1,25 @@
+services:
+  friday-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: friday-ui
+    restart: unless-stopped
+    ports:
+      - "${FRIDAY_UI_PORT:-3010}:80"
+    environment:
+      TZ: America/Chicago
+    networks:
+      - friday_frontend
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+    security_opt:
+      - no-new-privileges:true
+
+networks:
+  friday_frontend:
+    name: friday_frontend
