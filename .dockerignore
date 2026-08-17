@@ -1,0 +1,15 @@
+# Never send runtime secrets into the Docker build context.
+.env
+.env.*
+!.env.example
+
+.git
+.github
+node_modules
+dist
+coverage
+*.log
+.DS_Store
+
+# Runtime/persistent data belongs in the Docker volume, not the image.
+data
