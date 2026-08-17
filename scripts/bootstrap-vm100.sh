@@ -26,4 +26,4 @@ cd "$APP_DIR"
 
 docker compose config >/dev/null
 docker compose up -d --build
-./scripts/verify.sh
+sh ./scripts/verify.sh
