@@ -24,5 +24,10 @@ export function getConfig(env = process.env) {
         .map((item) => item.trim())
         .filter(Boolean),
     },
+    ai: {
+      enabled: enabled(env.FRIDAY_AI_ENABLED),
+      apiKey: env.OPENAI_API_KEY || '',
+      model: env.OPENAI_MODEL || 'gpt-5.6-terra',
+    },
   }
 }
