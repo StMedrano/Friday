@@ -80,7 +80,7 @@ npm test
 npm run build
 docker compose config
 docker compose up -d --build
-./scripts/verify.sh
+sh scripts/verify.sh
 ```
 
 ## Important docs
