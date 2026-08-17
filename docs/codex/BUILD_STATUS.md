@@ -2,6 +2,9 @@
 
 This is the source-of-truth handoff ledger for coding agents. Update it when a major capability changes.
 
+## Verification status
+The current `build/friday-core-mvp` branch has passed Friday CI end-to-end: frontend/backend tests, TypeScript/Vite production build, shell-script syntax validation, safe Compose validation, live Compose override validation, and Docker image build.
+
 ## Implemented in the repository
 
 ### Application shell
@@ -28,21 +31,24 @@ This is the source-of-truth handoff ledger for coding agents. Update it when a m
 - OpenAI Responses API adapter using server-side `OPENAI_API_KEY` only.
 - AI disabled by default.
 - Default model configuration is `gpt-5.6-terra` and is environment-overridable.
-- AI receives normalized Friday state; it has no infrastructure execution tools.
+- AI receives normalized infrastructure state; it has no infrastructure execution tools.
 
 ### Deployment and verification
 - Multi-stage Docker image.
+- `.dockerignore` excludes runtime secrets and local data from image build context.
 - Safe/mock `compose.yaml` with no Docker socket mount.
 - Explicit `compose.live.yaml` override with read-only Docker socket.
 - Persistent `friday_data` volume reserved for future audit/state data.
 - `Makefile`, VM100 preflight, update, bootstrap, and verification scripts.
-- GitHub Actions tests, TypeScript/Vite build, and Docker image build.
+- GitHub Actions tests, TypeScript/Vite build, Compose validation, shell checks, and Docker image build.
 - Node 22 declared in `.nvmrc` and `.node-version`.
 
 ### Agent handoff
 - `AGENTS.md` dispatcher.
 - `CODEX.md` architecture and safety brief.
+- Ordered Codex finish queue and API contract under `docs/codex/`.
 - Repo-local deployment, adapter, and UI skills under `skills/`.
+- Ready-to-paste Codex start prompt.
 
 ## Requires the real VM100 / network environment
 - Validate Docker inventory against VM100's real container set.
