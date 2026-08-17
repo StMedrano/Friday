@@ -1,17 +1,27 @@
 # Friday
 
-Friday is a two-site homelab control plane for VM 100. It combines a responsive operations UI, a server-side infrastructure API, read-only live adapters, and an optional AI analysis boundary without exposing privileged credentials to the browser.
+Friday is a two-site homelab control plane for VM 100. It combines the authoritative **FRIDAY UI v3 command center**, a server-side infrastructure API, read-only live adapters, and an optional AI analysis boundary without exposing privileged credentials to the browser.
+
+## Authoritative build
+
+`main` is the canonical FRIDAY build and deployment source.
+
+The production UI is the React/TypeScript implementation under `src/`, with `src/pages/Dashboard.tsx` and `src/styles.css` carrying the approved FRIDAY UI v3 command-center experience. Standalone HTML prototypes and older dashboard designs are reference artifacts only and must not replace the React control plane.
+
+VM 100 should deploy and update FRIDAY by pulling `main` from this repository and using the repository's Makefile/Compose workflow.
 
 ## Current MVP
 
-- Responsive dark operations dashboard
+- FRIDAY UI v3 command-center interface
+- Narrow operations rail, FRIDAY command surface, system health, infrastructure, applications, agents, and operational detail views
+- Responsive React + TypeScript + Vite frontend
 - Site A + Site B visibility and site-to-site VPN model
 - Unified Node 22 server for UI + API
 - Safe credential-free mock mode
 - Docker read-only inventory adapter
 - Proxmox read-only API adapter
 - HTTP/HTTPS endpoint health checks
-- Alerts, activity, resource and service panels
+- Alerts, activity, resource and service data
 - Deterministic preview-only command classifier
 - Optional server-side OpenAI Responses API analysis endpoint
 - Safe `compose.yaml` with no Docker socket
@@ -122,5 +132,7 @@ Codex should begin with:
 3. `docs/codex/BUILD_STATUS.md`
 4. `docs/codex/NEXT_STEPS.md`
 5. The relevant workflow under `skills/`
+
+Codex must treat the current React UI on `main` as authoritative and improve it in place rather than restoring an older dashboard or standalone prototype.
 
 A ready-to-paste prompt is in `docs/codex/START_HERE_PROMPT.md`.
