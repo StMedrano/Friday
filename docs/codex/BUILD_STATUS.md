@@ -2,16 +2,26 @@
 
 This is the source-of-truth handoff ledger for coding agents. Update it when a major capability changes.
 
+## Authoritative branch and UI
+
+- `main` is the authoritative FRIDAY build and VM100 deployment source.
+- The approved frontend is **FRIDAY UI v3**, implemented in the React/TypeScript control plane under `src/`.
+- `src/pages/Dashboard.tsx` is the primary command-center composition and `src/styles.css` contains the v3 visual system.
+- Older dashboard implementations and standalone HTML prototypes are reference artifacts only. Do not restore them over the React v3 interface.
+- Future UI work must evolve the v3 React interface in place while preserving the server/API safety boundary.
+
 ## Verification status
-The current `build/friday-core-mvp` branch has passed Friday CI end-to-end: frontend/backend tests, TypeScript/Vite production build, shell-script syntax validation, safe Compose validation, live Compose override validation, and Docker image build.
+The FRIDAY core MVP has passed Friday CI end-to-end: frontend/backend tests, TypeScript/Vite production build, shell-script syntax validation, safe Compose validation, live Compose override validation, and Docker image build. UI v3 also has a dashboard regression test covering the authoritative command surface and read-only status messaging.
 
 ## Implemented in the repository
 
 ### Application shell
-- React + TypeScript + Vite dashboard.
-- Responsive operations layout and typed infrastructure domain model.
-- Site, service, resource, alert, and activity views.
-- Friday command composer with preview-only command classification.
+- FRIDAY UI v3 React + TypeScript + Vite command center.
+- Responsive narrow operations rail and command-center layout.
+- Primary FRIDAY assistant command surface.
+- System-health summary, infrastructure nodes, VM telemetry, application health, agent mesh, and operational detail views.
+- Typed infrastructure domain model backed by the existing overview API.
+- Friday command composer remains non-mutating in the current MVP.
 
 ### Friday server
 - Node 22 HTTP server serving the production UI and API from one container.
