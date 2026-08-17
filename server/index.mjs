@@ -6,6 +6,7 @@ import { dirname } from 'node:path'
 import { getConfig } from './config.mjs'
 import { previewCommand } from './core.mjs'
 import { buildOverview } from './overview.mjs'
+import { answerAssistant } from './assistant.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -70,7 +71,7 @@ const server = createServer(async (request, response) => {
   }
 
   if (request.method === 'GET' && url.pathname === '/api/health') {
-    return json(response, 200, { status: 'ok', mode: config.mode, time: new Date().toISOString() })
+    return json(response, 200, { status: 'ok', mode: config.mode, ai: config.ai.enabled, time: new Date().toISOString() })
   }
 
   if (request.method === 'GET' && url.pathname === '/api/overview') {
@@ -84,6 +85,17 @@ const server = createServer(async (request, response) => {
       return json(response, result.accepted ? 200 : 400, result)
     } catch (error) {
       return json(response, 400, { accepted: false, mode: 'preview', reason: error.message })
+    }
+  }
+
+  if (request.method === 'POST' && url.pathname === '/api/assistant') {
+    try {
+      const body = await readBody(request)
+      const overview = await buildOverview(config)
+      const result = await answerAssistant({ config, prompt: body.prompt, overview })
+      return json(response, result.available ? 200 : 503, result)
+    } catch (error) {
+      return json(response, 502, { available: false, error: 'assistant-failed', detail: error.message })
     }
   }
 
