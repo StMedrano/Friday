@@ -18,7 +18,7 @@ function requestObserver(config) {
       response.on('data', (chunk) => { body += chunk })
       response.on('end', () => {
         if ((response.statusCode ?? 500) >= 400) {
-          reject(new Error(`VM100 observer ${response.statusCode}`))
+          reject(new Error(`VM100 observer HTTP ${response.statusCode}`))
           return
         }
         try { resolve(JSON.parse(body)) } catch (error) { reject(error) }
@@ -45,7 +45,7 @@ export async function getVm100ObserverServices(config, requestImpl = requestObse
     id: `vm100-observer-${String(container.id || 'unknown')}`,
     name: String(container.name || container.id || 'unknown'),
     category: 'container',
-    host: String(container.host || config.hostName || payload.host || 'VM 100'),
+    host: String(config.hostName || container.host || payload.host || 'VM 100'),
     site: 'Site A',
     status: stateToStatus(container.state),
     detail: String(container.image || 'Docker container'),
