@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { sanitizeContainer } from './docker.mjs'
@@ -36,4 +37,12 @@ test('sanitizes Docker container fields and allow-lists labels', () => {
     host: 'VM 100',
     observedAt,
   })
+})
+
+test('Docker observer source is fixed to the read-only container list endpoint', () => {
+  const source = readFileSync(new URL('./docker.mjs', import.meta.url), 'utf8')
+  assert.match(source, /path:\s*'\/containers\/json\?all=1'/)
+  assert.match(source, /method:\s*'GET'/)
+  assert.doesNotMatch(source, /\/containers\/.*\/(start|stop|restart|kill|exec)/i)
+  assert.doesNotMatch(source, /\/images\/create|\/volumes|\/networks\//i)
 })
