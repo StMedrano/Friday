@@ -37,6 +37,22 @@ jobs:
             sh -n "$file"
           done
 
+      - name: Verify observer security boundary
+        run: |
+          grep -qx '.env' observer/.dockerignore
+          if grep -RniE '/containers/.*/(start|stop|restart|kill|exec)|/images/create|/volumes|/networks/.*/(connect|disconnect)' observer/config.mjs observer/docker.mjs observer/server.mjs; then
+            echo 'Observer mutation API path detected.' >&2
+            exit 1
+          fi
+          if grep -Rni 'FRIDAY_VM100_OBSERVER_TOKEN' src; then
+            echo 'Observer token reference detected in frontend source.' >&2
+            exit 1
+          fi
+          if grep -RniE 'VITE_.*OBSERVER' . --exclude-dir=.git; then
+            echo 'Browser-visible observer secret variable detected.' >&2
+            exit 1
+          fi
+
       - name: Validate controller Compose
         run: docker compose config >/dev/null
 
