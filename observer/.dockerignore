@@ -1,0 +1,8 @@
+.env
+.env.*
+!.env.example
+*.test.mjs
+README.md
+compose.yaml
+.git
+.gitignore
