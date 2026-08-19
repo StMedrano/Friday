@@ -33,6 +33,43 @@ test('maps sanitized VM100 observer containers into Friday services', async () =
   }])
 })
 
+test('controller host label overrides observer-supplied host values', async () => {
+  const services = await getVm100ObserverServices({
+    enabled: true,
+    baseUrl: 'http://192.168.1.74:3199',
+    token: 'secret',
+    hostName: 'VM 100',
+  }, async () => ({
+    host: 'spoofed-payload-host',
+    containers: [{
+      id: 'abcdef123456',
+      name: 'example',
+      image: 'example:latest',
+      state: 'running',
+      host: 'spoofed-container-host',
+    }],
+  }))
+
+  assert.equal(services[0].host, 'VM 100')
+})
+
+test('maps non-running Docker states conservatively', async () => {
+  const services = await getVm100ObserverServices({
+    enabled: true,
+    baseUrl: 'http://192.168.1.74:3199',
+    token: 'secret',
+    hostName: 'VM 100',
+  }, async () => ({
+    containers: [
+      { id: 'paused', name: 'paused', image: 'x', state: 'paused' },
+      { id: 'restarting', name: 'restarting', image: 'x', state: 'restarting' },
+      { id: 'exited', name: 'exited', image: 'x', state: 'exited' },
+    ],
+  }))
+
+  assert.deepEqual(services.map((service) => service.status), ['degraded', 'degraded', 'offline'])
+})
+
 test('observer adapter is inert when disabled', async () => {
   assert.deepEqual(await getVm100ObserverServices({ enabled: false }), [])
 })
