@@ -2,47 +2,52 @@
 
 Work from top to bottom. Do not skip safety prerequisites to reach action features sooner.
 
-## P0 — Validate and deploy the current MVP
-1. Run `make verify`.
-2. On VM100 run `make preflight`.
-3. Deploy with `make up` in mock mode.
-4. Verify `make health` and the dashboard at port 3010.
-5. Configure Nginx Proxy Manager for the chosen internal hostname/TLS.
-6. Confirm rollback: `docker compose down` followed by `make up` returns Friday to healthy state.
+## P0 — Complete and deploy the VM100 observer
+1. Finish PR #3 verification: controller tests, adapter tests, observer tests, production build, shell syntax, Compose validation, and both container builds.
+2. Merge only after verification is clean.
+3. On VM102 (`192.168.1.64`) pull `main`, run `make preflight`, update/recreate the controller, and confirm `make health` with the existing Proxmox integration.
+4. On VM100 (`192.168.1.74`) verify port `3199` is unused before deploying the observer.
+5. Deploy `observer/` with a dedicated bearer token and `.env` mode `600`.
+6. From VM102 prove unauthenticated inventory returns `401` and authenticated inventory returns sanitized real VM100 containers.
+7. Enable `FRIDAY_VM100_OBSERVER_ENABLED=true` on VM102 while keeping `FRIDAY_DOCKER_ENABLED=false`.
+8. Recreate FRIDAY with base `compose.yaml`, then verify Proxmox + VM100 inventory together.
+9. Stop only the observer temporarily and prove FRIDAY remains healthy with an `Integration degraded` warning; restart observer afterward.
 
-## P1 — Enable real read-only state
-1. Docker: use `make live`; confirm container inventory and health.
-2. Proxmox: create a dedicated read-only API token and populate `.env`.
-3. Endpoint checks: add known service URLs for both sites.
-4. Compare live output to the actual Proxmox/Docker inventory; fix normalization errors before adding new providers.
+## P1 — Complete real read-only visibility
+1. Keep Proxmox on the dedicated read-only token.
+2. Use the VM100 observer as the authoritative path for VM100 Docker inventory.
+3. Use `make live` only if local VM102 Docker visibility is explicitly needed; it must never be mistaken for VM100 inventory.
+4. Add approved HTTP endpoint checks for both sites.
+5. Compare FRIDAY output to actual infrastructure and fix normalization errors before adding more providers.
 
 ## P2 — Finish the Friday assistant experience
 1. Connect the command composer to `/api/assistant` when AI is enabled.
 2. Keep `/api/commands/preview` as the deterministic no-AI fallback and safety classifier.
-3. Add an assistant response panel/history in memory first; do not add a database until the UX is stable.
+3. Add assistant response/history UX without granting execution authority.
 4. Add tests proving AI output cannot claim execution status.
 5. Add explicit UI labels for advisory/proposed actions.
 
-## P3 — Complete the network/service read adapters
-1. Omada read-only site/device/health adapter using the controller's supported API for the installed controller version.
+## P3 — Complete network/service read adapters
+1. Omada read-only site/device/health adapter using the installed controller's supported API.
 2. AdGuard Home status and DNS statistics adapter.
-3. Monitoring adapter: prefer existing Prometheus/Uptime Kuma data over duplicating probes where practical.
-4. Add integration health to `/api/overview` without making one provider failure fatal.
+3. Prefer existing Prometheus/Uptime Kuma monitoring data over duplicate probes where practical.
+4. Keep every provider failure non-fatal to `/api/overview`.
 
-## P4 — Authentication, roles, and audit
+## P4 — Authentication, roles, approval, and audit
 Implement before any write operation:
-- Authentication for Friday itself or a documented trusted reverse-proxy identity boundary.
+- Authentication for FRIDAY or a documented trusted reverse-proxy identity boundary.
 - Roles: Viewer, Operator, Administrator, Friday Agent.
-- Durable append-only audit events in `/data` or a small database.
+- Durable append-only audit events.
 - Action request IDs and lifecycle states: proposed, awaiting-approval, approved, rejected, executing, succeeded, failed.
+- Explicit approval workflow and global automation kill switch.
 
 ## P5 — Controlled actions
-Start with low-risk actions only after P4 is complete:
-1. Run a health check.
-2. Restart an allowlisted Docker container.
+Only after P4 is complete and tested:
+1. Read-only health checks.
+2. Restart one explicitly allowlisted container through a dedicated action service.
 3. Start/stop an allowlisted VM only after separate Proxmox action-policy review.
 
-Every action must be explicit, allowlisted, auditable, and approval-gated by default. Never expose arbitrary shell execution through Friday.
+Every action must be explicit, allowlisted, auditable, and approval-gated by default. Never expose arbitrary shell execution or the native Docker API through FRIDAY.
 
 ## P6 — Multi-site operations polish
 - Site A/Site B filtering and topology view.
@@ -53,4 +58,4 @@ Every action must be explicit, allowlisted, auditable, and approval-gated by def
 - Notification routing.
 
 ## When blocked by missing credentials or hardware
-Do not invent provider responses or weaken authentication. Leave the adapter disabled, document the exact missing prerequisite, and continue on work that can be verified locally.
+Do not invent provider responses or weaken authentication. Leave the adapter disabled, document the exact missing prerequisite, and continue on work that can be verified safely.

@@ -4,44 +4,23 @@
 Browser
    |
    v
-Friday UI (VM 100, port 3010)
+FRIDAY UI/API — VM 102 (192.168.1.64:3010)
    |
-   | future HTTPS/API only
-   v
-Friday API / Policy Layer
-   |
-   +--> Proxmox adapter
-   +--> Docker adapter
-   +--> Omada adapter
-   +--> Monitoring adapter
-   +--> AdGuard adapter
+   +--> Proxmox read-only API — 192.168.1.211:8006
+   +--> VM100 observer — 192.168.1.74:3199
+   +--> HTTP endpoint checks
+   +--> optional local VM102 Docker adapter
    |
    v
-Audit + approval layer
+Future policy / approval / audit layer
 ```
 
-The initial repository implements only the browser UI. Keeping credentials behind a backend boundary is intentional.
+VM 102 is the authoritative FRIDAY controller. VM 100 is managed infrastructure and hosts the standalone read-only Docker observer; VM 110 remains the media/Umbrel workload.
 
-## Frontend boundaries
+## Safety boundaries
 
-`src/lib/infrastructure.ts` defines the normalized domain types. `src/data/mock.ts` provides development data. Components consume these domain types. Future API clients should map backend responses into the same shapes.
+The controller base Compose does not mount the Docker socket. Proxmox and the VM100 observer are network read-only integrations. Local VM102 Docker observation is an explicit opt-in through the live override.
 
-## Infrastructure model
+The VM100 observer uses the local Unix socket but exposes only `GET /health` and authenticated `GET /api/v1/containers`. Docker's native TCP API is never published.
 
-```text
-Proxmox
-├── VM 100 Infrastructure
-│   ├── Friday UI
-│   ├── Omada Controller
-│   ├── AdGuard Home
-│   ├── Nginx Proxy Manager
-│   ├── Arcane
-│   ├── Homepage
-│   ├── Uptime Kuma
-│   └── Monitoring / apps
-└── VM 110 Umbrel
-    ├── Emby
-    └── SABnzbd
-```
-
-Friday should observe both VMs while remaining isolated from privileged control surfaces until the backend/policy layer exists.
+No infrastructure mutation endpoints exist in the current controller or observer.

@@ -22,8 +22,9 @@ test('previewCommand never marks commands destructive', () => {
 })
 
 test('integrationSummary keeps integrations disabled unless explicitly true', () => {
-  const result = integrationSummary({ docker: true })
-  assert.equal(result[0].enabled, true)
-  assert.equal(result[1].enabled, false)
-  assert.equal(result[2].enabled, false)
+  const result = integrationSummary({ docker: true, vm100Observer: true })
+  assert.equal(result.find((item) => item.id === 'docker').enabled, true)
+  assert.equal(result.find((item) => item.id === 'proxmox').enabled, false)
+  assert.equal(result.find((item) => item.id === 'vm100-observer').enabled, true)
+  assert.equal(result.find((item) => item.id === 'endpoints').enabled, false)
 })

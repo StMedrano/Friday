@@ -54,6 +54,7 @@ export function integrationSummary(config = {}) {
   return [
     { id: 'docker', enabled: config.docker === true, mode: config.docker ? 'live' : 'mock' },
     { id: 'proxmox', enabled: config.proxmox === true, mode: config.proxmox ? 'live' : 'mock' },
+    { id: 'vm100-observer', enabled: config.vm100Observer === true, mode: config.vm100Observer ? 'live' : 'mock' },
     { id: 'endpoints', enabled: config.endpoints === true, mode: config.endpoints ? 'live' : 'mock' },
   ]
 }

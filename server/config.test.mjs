@@ -19,3 +19,22 @@ test('AI config requires explicit enable flag', () => {
   assert.equal(config.ai.apiKey, 'secret')
   assert.equal(config.ai.model, 'gpt-5.6-sol')
 })
+
+test('VM100 observer config is disabled by default and stays server-side', () => {
+  const defaults = getConfig({})
+  assert.equal(defaults.vm100Observer.enabled, false)
+  assert.equal(defaults.vm100Observer.baseUrl, '')
+  assert.equal(defaults.vm100Observer.token, '')
+  assert.equal(defaults.vm100Observer.hostName, 'VM 100')
+
+  const config = getConfig({
+    FRIDAY_VM100_OBSERVER_ENABLED: 'true',
+    FRIDAY_VM100_OBSERVER_URL: 'http://192.168.1.74:3199',
+    FRIDAY_VM100_OBSERVER_TOKEN: 'observer-secret',
+    FRIDAY_VM100_OBSERVER_HOST_NAME: 'VM 100',
+  })
+  assert.equal(config.vm100Observer.enabled, true)
+  assert.equal(config.vm100Observer.baseUrl, 'http://192.168.1.74:3199')
+  assert.equal(config.vm100Observer.token, 'observer-secret')
+  assert.equal(config.vm100Observer.hostName, 'VM 100')
+})

@@ -2,72 +2,79 @@
 
 This is the source-of-truth handoff ledger for coding agents. Update it when a major capability changes.
 
-## Authoritative branch and UI
+## Authoritative branch, host, and UI
 
-- `main` is the authoritative FRIDAY build and VM100 deployment source.
-- The approved frontend is **FRIDAY UI v3**, implemented in the React/TypeScript control plane under `src/`.
-- `src/pages/Dashboard.tsx` is the primary command-center composition and `src/styles.css` contains the v3 visual system.
-- Older dashboard implementations and standalone HTML prototypes are reference artifacts only. Do not restore them over the React v3 interface.
-- Future UI work must evolve the v3 React interface in place while preserving the server/API safety boundary.
+- `main` is the authoritative FRIDAY build source after reviewed feature work is merged.
+- VM 102 (`friday-controller`, `192.168.1.64`) is the authoritative FRIDAY controller host.
+- VM 100 (`192.168.1.74`) is managed infrastructure and hosts the separate read-only Docker observer; it is not the FRIDAY controller.
+- The approved frontend is **FRIDAY UI v3**, implemented in React/TypeScript under `src/`.
+- Older dashboards and standalone prototypes are reference artifacts only.
 
-## Verification status
-The FRIDAY core MVP has passed Friday CI end-to-end: frontend/backend tests, TypeScript/Vite production build, shell-script syntax validation, safe Compose validation, live Compose override validation, and Docker image build. UI v3 also has a dashboard regression test covering the authoritative command surface and read-only status messaging.
+## Current deployed baseline
 
-## Implemented in the repository
+VM 102 has a healthy FRIDAY v3 deployment on port `3010` with Docker/Compose enabled, QEMU guest agent healthy, and a live read-only Proxmox integration to `192.168.1.211:8006`. Local VM102 Docker observation remains disabled.
 
-### Application shell
+The VM100 observer feature is developed on `feature/vm100-observer` / PR #3 until verification and merge are complete. Do not treat unmerged observer code as deployed production state.
+
+## Implemented controller capabilities
+
 - FRIDAY UI v3 React + TypeScript + Vite command center.
-- Responsive narrow operations rail and command-center layout.
-- Primary FRIDAY assistant command surface.
-- System-health summary, infrastructure nodes, VM telemetry, application health, agent mesh, and operational detail views.
-- Typed infrastructure domain model backed by the existing overview API.
-- Friday command composer remains non-mutating in the current MVP.
+- Node 22 HTTP server for UI + API.
+- `GET /healthz`, `GET /api/health`, `GET /api/overview`.
+- `POST /api/commands/preview` with read-only intent classification.
+- Optional `POST /api/assistant` advisory AI boundary.
+- Mock adapter, Proxmox read-only API adapter, local Docker adapter, and endpoint checks.
+- Adapter failures degrade integrations without taking down the overview.
+- No infrastructure mutation endpoints.
 
-### Friday server
-- Node 22 HTTP server serving the production UI and API from one container.
-- `GET /healthz` and `GET /api/health`.
-- `GET /api/overview` normalized aggregation.
-- `POST /api/commands/preview` with a read-only command allowlist.
-- Optional `POST /api/assistant` provider boundary for server-side AI analysis.
+## VM100 observer architecture
 
-### Read-only adapters
-- Mock adapter for credential-free development.
-- Docker Engine inventory through the local Unix socket.
-- Proxmox VE API inventory through a token.
-- Generic HTTP/HTTPS endpoint health checks.
-- Adapter failures degrade their integration instead of taking down the whole overview.
+Target topology:
 
-### AI boundary
-- OpenAI Responses API adapter using server-side `OPENAI_API_KEY` only.
-- AI disabled by default.
-- Default model configuration is `gpt-5.6-terra` and is environment-overridable.
-- AI receives normalized infrastructure state; it has no infrastructure execution tools.
+```text
+Proxmox 192.168.1.211
+  ├─ VM100 192.168.1.74
+  │    └─ friday-observer :3199 -> local Docker inventory, GET-only
+  └─ VM102 192.168.1.64
+       └─ FRIDAY controller :3010
+            ├─ Proxmox read-only adapter
+            └─ VM100 observer adapter
+```
 
-### Deployment and verification
-- Multi-stage Docker image.
-- `.dockerignore` excludes runtime secrets and local data from image build context.
-- Safe/mock `compose.yaml` with no Docker socket mount.
-- Explicit `compose.live.yaml` override with read-only Docker socket.
-- Persistent `friday_data` volume reserved for future audit/state data.
-- `Makefile`, VM100 preflight, update, bootstrap, and verification scripts.
-- GitHub Actions tests, TypeScript/Vite build, Compose validation, shell checks, and Docker image build.
-- Node 22 declared in `.nvmrc` and `.node-version`.
+The observer is token-authenticated and exposes only:
 
-### Agent handoff
-- `AGENTS.md` dispatcher.
-- `CODEX.md` architecture and safety brief.
-- Ordered Codex finish queue and API contract under `docs/codex/`.
-- Repo-local deployment, adapter, and UI skills under `skills/`.
-- Ready-to-paste Codex start prompt.
+```text
+GET /health
+GET /api/v1/containers
+```
 
-## Requires the real VM100 / network environment
-- Validate Docker inventory against VM100's real container set.
-- Create and test the dedicated Proxmox read-only token.
-- Configure actual Site A/Site B endpoint URLs.
-- Verify reverse proxy hostname/TLS through Nginx Proxy Manager.
-- Confirm site-to-site VPN routing before enabling remote-site health checks.
+Docker's native TCP API must never be exposed. The observer must never gain restart, stop, exec, remove, image, volume, network, or daemon mutation routes.
+
+## Docker semantics
+
+- VM100 inventory comes through the VM100 observer.
+- `FRIDAY_DOCKER_ENABLED` refers only to local Docker on the controller host.
+- `FRIDAY_DOCKER_HOST_NAME` defaults to `VM 102`.
+- `make live` is only for intentionally mounting VM102's local Docker socket read-only.
+- Normal Proxmox + VM100-observer live operation uses the base `compose.yaml` with `FRIDAY_DOCKER_ENABLED=false`.
+
+## AI boundary
+
+- AI is disabled by default.
+- Provider credentials remain server-side only.
+- AI receives normalized infrastructure state and no infrastructure execution tools.
+
+## Deployment and verification
+
+- FRIDAY controller repository: `/srv/infrastructure/apps/friday` on VM102.
+- VM100 observer deployment path: `/srv/infrastructure/friday-observer`.
+- Observer port: `3199`, and rollout must abort if already occupied.
+- `make preflight` and `make update` are controller-oriented.
+- Legacy `preflight-vm100.sh` and `update-vm100.sh` names are compatibility wrappers only.
+- CI must run frontend tests, top-level server tests, server adapter tests, observer tests, production build, shell syntax, both controller Compose variants, observer Compose validation, and both Docker image builds.
 
 ## Not implemented yet
+
 - Omada authenticated read-only API adapter.
 - AdGuard authenticated read-only API adapter/statistics.
 - Uptime Kuma/Prometheus/Grafana native adapters.
@@ -80,4 +87,5 @@ The FRIDAY core MVP has passed Friday CI end-to-end: frontend/backend tests, Typ
 - Voice input pipeline.
 
 ## Safety gate
+
 Do not implement infrastructure-changing actions until authentication, role policy, approval, and durable audit logging exist and are tested.
