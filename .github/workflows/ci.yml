@@ -44,7 +44,7 @@ jobs:
         run: docker compose -f compose.yaml -f compose.live.yaml config >/dev/null
 
       - name: Validate VM100 observer Compose
-        run: FRIDAY_OBSERVER_TOKEN=ci-test docker compose -f observer/compose.yaml config >/dev/null
+        run: FRIDAY_OBSERVER_TOKEN=ci-test FRIDAY_OBSERVER_BIND_ADDRESS=127.0.0.1 docker compose -f observer/compose.yaml config >/dev/null
 
       - name: Build controller container
         run: docker build -t friday-ci .
