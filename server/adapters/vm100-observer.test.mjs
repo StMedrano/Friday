@@ -1,14 +1,26 @@
+import http from 'node:http'
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getVm100ObserverServices } from './vm100-observer.mjs'
 
-test('maps sanitized VM100 observer containers into Friday services', async () => {
-  const services = await getVm100ObserverServices({
+async function listen(t, handler) {
+  const server = http.createServer(handler)
+  await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve))
+  t.after(() => new Promise((resolve) => server.close(resolve)))
+  return `http://127.0.0.1:${server.address().port}`
+}
+
+function config(baseUrl) {
+  return {
     enabled: true,
-    baseUrl: 'http://192.168.1.74:3199',
+    baseUrl,
     token: 'secret',
     hostName: 'VM 100',
-  }, async () => ({
+  }
+}
+
+test('maps sanitized VM100 observer containers into Friday services', async () => {
+  const services = await getVm100ObserverServices(config('http://192.168.1.74:3199'), async () => ({
     host: 'VM 100',
     observedAt: '2026-08-19T12:00:00.000Z',
     containers: [{
@@ -34,12 +46,7 @@ test('maps sanitized VM100 observer containers into Friday services', async () =
 })
 
 test('controller host label overrides observer-supplied host values', async () => {
-  const services = await getVm100ObserverServices({
-    enabled: true,
-    baseUrl: 'http://192.168.1.74:3199',
-    token: 'secret',
-    hostName: 'VM 100',
-  }, async () => ({
+  const services = await getVm100ObserverServices(config('http://192.168.1.74:3199'), async () => ({
     host: 'spoofed-payload-host',
     containers: [{
       id: 'abcdef123456',
@@ -54,12 +61,7 @@ test('controller host label overrides observer-supplied host values', async () =
 })
 
 test('maps non-running Docker states conservatively', async () => {
-  const services = await getVm100ObserverServices({
-    enabled: true,
-    baseUrl: 'http://192.168.1.74:3199',
-    token: 'secret',
-    hostName: 'VM 100',
-  }, async () => ({
+  const services = await getVm100ObserverServices(config('http://192.168.1.74:3199'), async () => ({
     containers: [
       { id: 'paused', name: 'paused', image: 'x', state: 'paused' },
       { id: 'restarting', name: 'restarting', image: 'x', state: 'restarting' },
@@ -74,14 +76,32 @@ test('observer adapter is inert when disabled', async () => {
   assert.deepEqual(await getVm100ObserverServices({ enabled: false }), [])
 })
 
+test('observer adapter reports HTTP authentication failures', async (t) => {
+  const baseUrl = await listen(t, (_request, response) => {
+    response.writeHead(401, { 'content-type': 'application/json' })
+    response.end('{"error":"unauthorized"}')
+  })
+
+  await assert.rejects(getVm100ObserverServices(config(baseUrl)), /VM100 observer HTTP 401/)
+})
+
+test('observer adapter rejects malformed JSON', async (t) => {
+  const baseUrl = await listen(t, (_request, response) => {
+    response.writeHead(200, { 'content-type': 'application/json' })
+    response.end('{not-json')
+  })
+
+  await assert.rejects(getVm100ObserverServices(config(baseUrl)), /JSON|Unexpected|property name/i)
+})
+
+test('observer adapter times out safely', { timeout: 7000 }, async (t) => {
+  const baseUrl = await listen(t, () => {})
+  await assert.rejects(getVm100ObserverServices(config(baseUrl)), /VM100 observer timeout/)
+})
+
 test('observer adapter rejects malformed inventory', async () => {
   await assert.rejects(
-    getVm100ObserverServices({
-      enabled: true,
-      baseUrl: 'http://192.168.1.74:3199',
-      token: 'secret',
-      hostName: 'VM 100',
-    }, async () => ({ containers: 'not-an-array' })),
+    getVm100ObserverServices(config('http://192.168.1.74:3199'), async () => ({ containers: 'not-an-array' })),
     /invalid container inventory/i,
   )
 })
