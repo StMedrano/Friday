@@ -1,53 +1,42 @@
 # VM 100 Integration
 
-## Initial deployment location
-Recommended path:
+VM 100 (`192.168.1.74`) is managed infrastructure. FRIDAY itself runs on VM 102. VM 100 hosts only the standalone read-only Docker observer for FRIDAY.
+
+## Observer deployment location
 
 ```text
-/srv/infrastructure/apps/friday
+/srv/infrastructure/friday-observer
 ```
 
-## Clone and start
+## Observer port
+
+```text
+192.168.1.74:3199
+```
+
+Before deployment:
 
 ```bash
-sudo mkdir -p /srv/infrastructure/apps
-sudo chown -R "$USER":"$USER" /srv/infrastructure/apps
-cd /srv/infrastructure/apps
-git clone https://github.com/StMedrano/Friday.git friday
-cd friday
-cp .env.example .env
-docker compose config
+ss -ltn | grep ':3199 ' && { echo 'Port 3199 is occupied; STOP'; exit 1; } || true
+docker info >/dev/null
+test -S /var/run/docker.sock
+```
+
+## Deploy
+
+Use the files under `observer/`. Copy `.env.example` to `.env`, set a strong `FRIDAY_OBSERVER_TOKEN`, run `chmod 600 .env`, validate Compose, and start the observer.
+
+```bash
+docker compose config >/dev/null
 docker compose up -d --build
+docker compose ps
+curl -fsS http://192.168.1.74:3199/health
 ```
 
-## Default port
-Friday publishes `3010/tcp` on VM 100.
+From VM 102, a request without a bearer token must return `401`; a request with the configured token may read sanitized container inventory from `/api/v1/containers`.
 
-Before changing that port:
+## Security
 
-```bash
-sudo ss -tulpn | grep ':3010 ' || true
-docker ps --format 'table {{.Names}}\t{{.Ports}}'
-```
+Do not expose Docker's native TCP API. Do not add SSH-based Docker execution. The observer has no mutation routes. Existing VM100 application Compose projects remain independent from the observer project.
 
-## Reverse proxy
-Once Friday is healthy locally, add it to Nginx Proxy Manager using the chosen internal hostname. Proxy to VM 100 port 3010. Do not publish the development Vite server.
-
-## Health
-
-```bash
-curl -fsS http://127.0.0.1:3010/healthz
-docker inspect --format '{{json .State.Health}}' friday-ui
-```
-
-## Updating
-
-```bash
-cd /srv/infrastructure/apps/friday
-git pull --ff-only
-docker compose up -d --build
-./scripts/verify.sh
-```
-
-## Rollback
-Use Git tags or a known-good commit, rebuild, and verify. Avoid deleting Docker state as a troubleshooting shortcut.
+See `observer/README.md` for the full install/update procedure.
