@@ -1,8 +1,8 @@
 import http from 'node:http'
 
-function requestJson(socketPath, path) {
+function requestJson(socketPath) {
   return new Promise((resolve, reject) => {
-    const request = http.request({ socketPath, path, method: 'GET' }, (response) => {
+    const request = http.request({ socketPath, path: '/containers/json?all=1', method: 'GET' }, (response) => {
       let body = ''
       response.setEncoding('utf8')
       response.on('data', (chunk) => { body += chunk })
@@ -30,14 +30,14 @@ function stateToStatus(state) {
   return 'offline'
 }
 
-export async function getDockerServices(config) {
+export async function getDockerServices(config, requestImpl = requestJson) {
   if (!config.enabled) return []
-  const containers = await requestJson(config.socketPath, '/containers/json?all=1')
+  const containers = await requestImpl(config.socketPath)
   return containers.map((container) => ({
     id: `docker-${container.Id.slice(0, 12)}`,
     name: String(container.Names?.[0] || container.Id).replace(/^\//, ''),
     category: 'container',
-    host: 'VM 100',
+    host: config.hostName || 'VM 102',
     site: 'Site A',
     status: stateToStatus(container.State),
     detail: container.Image || 'Docker container',
