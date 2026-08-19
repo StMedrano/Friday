@@ -37,6 +37,14 @@ fi
 
 if [ -f .env ]; then
   echo 'ok   .env               present'
+  ENV_MODE=$(stat -c '%a' .env 2>/dev/null || true)
+  case "$ENV_MODE" in
+    600|400) echo "ok   .env permissions   $ENV_MODE" ;;
+    *)
+      echo "FAIL .env permissions   ${ENV_MODE:-unknown}; run: chmod 600 .env" >&2
+      FAILED=1
+      ;;
+  esac
 else
   echo 'WARN .env               missing; copy .env.example before deployment'
 fi
