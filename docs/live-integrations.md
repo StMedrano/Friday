@@ -2,48 +2,38 @@
 
 Friday starts in `mock` mode. Live integrations are opt-in and read-only.
 
-## Docker on VM 100
+## Proxmox on VM102
 
-1. Set `FRIDAY_MODE=live`.
-2. Set `FRIDAY_DOCKER_ENABLED=true`.
-3. Keep the Compose mount `/var/run/docker.sock:/var/run/docker.sock:ro`.
-4. Rebuild with `docker compose up -d --build`.
+Set `FRIDAY_MODE=live` and configure the dedicated read-only Proxmox token in VM102's `.env`. Proxmox uses the base `compose.yaml`; no Docker socket mount is required.
 
-Friday reads Docker inventory through the Engine HTTP API over the Unix socket. It does not expose write endpoints.
+## VM100 Docker observer
 
-## Proxmox
-
-Create a dedicated Proxmox API token with the minimum read-only permissions needed to inspect nodes and guest resources. Do not reuse a root password.
-
-Configure:
+Deploy `observer/` on VM100 (`192.168.1.74`) after confirming port `3199` is unused. Configure a strong bearer token in VM100's observer `.env`, then configure the same token server-side on VM102:
 
 ```env
-FRIDAY_MODE=live
-FRIDAY_PROXMOX_ENABLED=true
-FRIDAY_PROXMOX_URL=https://<proxmox-ip>:8006
-FRIDAY_PROXMOX_TOKEN_ID=<user@realm!token-name>
-FRIDAY_PROXMOX_TOKEN_SECRET=<secret>
+FRIDAY_VM100_OBSERVER_ENABLED=true
+FRIDAY_VM100_OBSERVER_URL=http://192.168.1.74:3199
+FRIDAY_VM100_OBSERVER_TOKEN=
+FRIDAY_VM100_OBSERVER_HOST_NAME=VM 100
 ```
 
-Prefer a trusted certificate. `FRIDAY_PROXMOX_INSECURE=true` exists only for a controlled bootstrap period with a self-signed certificate.
+Recreate FRIDAY with the base Compose file. The controller queries only the observer API; Docker's native TCP API is not exposed.
+
+## Optional local Docker on VM102
+
+Local Docker observation is separate from VM100 inventory. Enable it only when intentionally needed:
+
+```env
+FRIDAY_DOCKER_ENABLED=true
+FRIDAY_DOCKER_HOST_NAME=VM 102
+```
+
+Then use `make live`, which adds the read-only local socket mount. Keep this disabled for the normal Proxmox + VM100 observer architecture.
 
 ## HTTP endpoint checks
 
-Friday can monitor approved HTTP/HTTPS endpoints without credentials:
-
-```env
-FRIDAY_ENDPOINTS_ENABLED=true
-FRIDAY_ENDPOINT_URLS=http://service-a/healthz,https://service-b.example/health
-```
-
-Keep management interfaces off this list if checking them would expose authentication data or if they are not intended to be queried by Friday.
-
-## Omada
-
-The current MVP represents Omada in the domain model and endpoint-health layer but does not yet store Omada administrator credentials or execute Omada actions. Add a dedicated read-only Omada adapter before enabling controller data beyond HTTP health checks.
+`FRIDAY_ENDPOINTS_ENABLED=true` enables approved read-only health URLs. Do not embed credentials in URLs.
 
 ## Actions
 
-`POST /api/commands/preview` only resolves allowlisted read-only intents. It cannot restart, stop, delete, modify firewall rules, change VLANs, adopt devices, or change VM/container state.
-
-Future write actions must use a separate approval service and an explicit per-action allowlist.
+`POST /api/commands/preview` remains preview-only. Neither the controller nor VM100 observer implements restart, stop, delete, exec, firewall, VLAN, or other infrastructure mutation endpoints.
