@@ -23,14 +23,28 @@ sudo chown -R "$USER:$USER" /srv/infrastructure/friday-observer
 cd /srv/infrastructure/friday-observer
 ```
 
-Copy the `observer/` directory from the FRIDAY repository into this directory, then:
+Copy the `observer/` directory from the authoritative FRIDAY repository into this directory, then:
 
 ```bash
 cp .env.example .env
 chmod 600 .env
 ```
 
-Edit `.env` and set a strong random `FRIDAY_OBSERVER_TOKEN`. Keep the bind address `192.168.1.74` and port `3199` unless the approved architecture changes.
+Generate a 256-bit observer token without putting the token itself in shell history:
+
+```bash
+TOKEN=$(openssl rand -hex 32)
+sed -i "s/^FRIDAY_OBSERVER_TOKEN=.*/FRIDAY_OBSERVER_TOKEN=$TOKEN/" .env
+unset TOKEN
+```
+
+Confirm the secret is present without printing it:
+
+```bash
+grep -qE '^FRIDAY_OBSERVER_TOKEN=.{64}$' .env && echo 'Observer token configured'
+```
+
+Keep `FRIDAY_OBSERVER_BIND_ADDRESS=192.168.1.74`, `FRIDAY_OBSERVER_PORT=3199`, and `FRIDAY_OBSERVER_HOST_NAME=VM 100` unless the approved architecture changes.
 
 Validate and start:
 
@@ -41,14 +55,7 @@ docker compose ps
 curl -fsS http://192.168.1.74:3199/health
 ```
 
-Test authentication from VM 102:
-
-```bash
-curl -i http://192.168.1.74:3199/api/v1/containers
-curl -fsS -H 'Authorization: Bearer YOUR_TOKEN' http://192.168.1.74:3199/api/v1/containers | jq
-```
-
-The first request must return `401`; the authenticated request must return sanitized container inventory.
+Test authentication from VM 102. The unauthenticated request must return `401`; the authenticated request must return sanitized inventory. Read the token privately from the VM100 `.env` when transferring it to VM102—do not paste it into chat or commit it to Git.
 
 ## Update
 
