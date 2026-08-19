@@ -17,15 +17,14 @@ Do not continue if port `3199` is already listening.
 
 ## Install
 
-```bash
-sudo mkdir -p /srv/infrastructure/friday-observer
-sudo chown -R "$USER:$USER" /srv/infrastructure/friday-observer
-cd /srv/infrastructure/friday-observer
-```
-
-Copy the `observer/` directory from the authoritative FRIDAY repository into this directory, then:
+Clone the authoritative FRIDAY repository into its own VM100 observer checkout:
 
 ```bash
+sudo mkdir -p /srv/infrastructure
+sudo chown "$USER:$USER" /srv/infrastructure
+cd /srv/infrastructure
+git clone https://github.com/StMedrano/Friday.git friday-observer
+cd /srv/infrastructure/friday-observer/observer
 cp .env.example .env
 chmod 600 .env
 ```
@@ -59,14 +58,19 @@ Test authentication from VM 102. The unauthenticated request must return `401`; 
 
 ## Update
 
-Replace the observer source with the version from the authoritative FRIDAY `main` branch, preserve `.env`, then run:
-
 ```bash
+cd /srv/infrastructure/friday-observer
+git status --short
+git checkout main
+git pull --ff-only origin main
+cd observer
 docker compose config >/dev/null
 docker compose up -d --build
 docker compose ps
 curl -fsS http://192.168.1.74:3199/health
 ```
+
+The `.env` file under `observer/` is ignored runtime configuration and must be preserved locally with mode `600`.
 
 ## Security boundary
 
