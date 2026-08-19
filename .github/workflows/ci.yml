@@ -37,11 +37,17 @@ jobs:
             sh -n "$file"
           done
 
-      - name: Validate safe Compose
+      - name: Validate controller Compose
         run: docker compose config >/dev/null
 
-      - name: Validate live Compose override
+      - name: Validate local Docker live override
         run: docker compose -f compose.yaml -f compose.live.yaml config >/dev/null
 
-      - name: Build container
+      - name: Validate VM100 observer Compose
+        run: FRIDAY_OBSERVER_TOKEN=ci-test docker compose -f observer/compose.yaml config >/dev/null
+
+      - name: Build controller container
         run: docker build -t friday-ci .
+
+      - name: Build VM100 observer container
+        run: docker build -t friday-observer-ci observer
