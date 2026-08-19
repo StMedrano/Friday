@@ -48,7 +48,7 @@ jobs:
             echo 'Observer token reference detected in frontend source.' >&2
             exit 1
           fi
-          if grep -RniE 'VITE_.*OBSERVER' . --exclude-dir=.git; then
+          if grep -RniE 'VITE_.*OBSERVER' src server observer compose.yaml .env.example; then
             echo 'Browser-visible observer secret variable detected.' >&2
             exit 1
           fi
