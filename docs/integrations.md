@@ -2,45 +2,38 @@
 
 Friday integrations are server-side and read-only unless a future action adapter is explicitly introduced after authentication, approval, and audit controls exist.
 
-## Docker Engine
-- Current adapter: `server/adapters/docker.mjs`
+## VM100 Docker observer
+- Controller adapter: `server/adapters/vm100-observer.mjs`
+- Observer service: `observer/`
+- Transport: token-authenticated HTTP from VM102 to VM100 on `192.168.1.74:3199`.
+- Observer Docker access: local Unix socket only.
+- Exposed routes: `GET /health` and `GET /api/v1/containers` only.
+- Purpose: sanitized VM100 container inventory.
+- Never expose Docker's native TCP API.
+
+## Local Docker Engine on VM102
+- Adapter: `server/adapters/docker.mjs`
 - Transport: local Unix socket.
-- Deployment: socket is mounted read-only only by `compose.live.yaml`.
-- Purpose: container inventory/health.
-- Do not expose Docker TCP without authenticated TLS and a separate architecture review.
+- Disabled by default.
+- Host label defaults to `VM 102` through `FRIDAY_DOCKER_HOST_NAME`.
+- Use the explicit Compose live override only when local controller Docker inventory is intentionally required.
 
 ## Proxmox VE
-- Current adapter: `server/adapters/proxmox.mjs`
+- Adapter: `server/adapters/proxmox.mjs`
 - Authentication: dedicated API token.
 - Use the smallest read-only role that can list nodes, VMs/CTs, and status.
 - Never reuse the root password or a broad administrator token.
-- `FRIDAY_PROXMOX_INSECURE=true` is a bootstrap exception for a trusted self-signed certificate, not the desired end state.
+- `FRIDAY_PROXMOX_INSECURE=true` is a bootstrap exception for a trusted self-signed certificate.
 
 ## HTTP endpoint checks
-- Current adapter: `server/adapters/endpoints.mjs`
+- Adapter: `server/adapters/endpoints.mjs`
 - Purpose: read-only availability checks of known HTTP/HTTPS services.
 - Do not place credentials in `FRIDAY_ENDPOINT_URLS` query strings.
 
 ## OpenAI
-- Current adapter: `server/ai/openai.mjs`
-- API key: `OPENAI_API_KEY` on the Friday server/container only.
-- Enable with `FRIDAY_AI_ENABLED=true`.
-- Default model: `gpt-5.6-terra`, configurable with `OPENAI_MODEL`.
-- Friday sends normalized infrastructure state for advisory analysis.
-- No Docker, Proxmox, shell, or network mutation tools are exposed to the model.
-
-## Planned adapters
-- Omada controller: site/device/health only first.
-- AdGuard Home: status/statistics only first.
-- Prometheus/Uptime Kuma/Grafana: consume existing monitoring data where possible.
+- Adapter: `server/ai/openai.mjs`
+- API key: `OPENAI_API_KEY` on the FRIDAY server/container only.
+- AI remains advisory and receives no Docker, Proxmox, shell, or network mutation tools.
 
 ## Adapter checklist
-For every provider:
-1. Explicit disabled-by-default configuration.
-2. Dedicated least-privilege credential.
-3. Timeout and degraded-state handling.
-4. Provider response normalization.
-5. Tests without real credentials.
-6. `.env.example` names with empty secrets.
-7. Documentation of minimum permissions.
-8. Mock mode still passes all tests with no credentials.
+Every provider must have explicit opt-in configuration, least-privilege credentials, timeouts, degraded-state handling, normalized responses, tests without real credentials, server-side secrets, and a working credential-free mock mode.
