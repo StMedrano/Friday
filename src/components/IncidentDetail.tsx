@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { AlertTriangle, ArrowLeft, FileSearch, ShieldCheck } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, FileSearch, RefreshCw, ShieldCheck } from 'lucide-react'
 import {
   fetchIncidentDiagnostics,
   fetchIncidentLogs,
+  rerunIncidentDiagnostics,
   type DiagnosticLogsResponse,
   type DiagnosticReport,
   type FridayIncident,
@@ -17,6 +18,8 @@ function displayTime(value: string | null | undefined) {
 export default function IncidentDetail({ incident, onBack }: { incident: FridayIncident; onBack?: () => void }) {
   const [diagnostic, setDiagnostic] = useState<DiagnosticReport | null>(null)
   const [diagnosticError, setDiagnosticError] = useState<string | null>(null)
+  const [rerunLoading, setRerunLoading] = useState(false)
+  const [rerunError, setRerunError] = useState<string | null>(null)
   const [logs, setLogs] = useState<DiagnosticLogsResponse | null>(null)
   const [logsError, setLogsError] = useState<string | null>(null)
   const [logsLoading, setLogsLoading] = useState(false)
@@ -25,6 +28,8 @@ export default function IncidentDetail({ incident, onBack }: { incident: FridayI
     const controller = new AbortController()
     setDiagnostic(null)
     setDiagnosticError(null)
+    setRerunLoading(false)
+    setRerunError(null)
     setLogs(null)
     setLogsError(null)
     setLogsLoading(false)
@@ -39,6 +44,22 @@ export default function IncidentDetail({ incident, onBack }: { incident: FridayI
 
     return () => controller.abort()
   }, [incident.id])
+
+  async function rerunDiagnosis() {
+    const controller = new AbortController()
+    setRerunLoading(true)
+    setRerunError(null)
+    try {
+      const refreshed = await rerunIncidentDiagnostics(incident.id, controller.signal)
+      setDiagnostic(refreshed)
+      setLogs(null)
+      setLogsError(null)
+    } catch {
+      setRerunError('Diagnosis refresh failed. No infrastructure action was attempted.')
+    } finally {
+      setRerunLoading(false)
+    }
+  }
 
   async function inspectLogs() {
     const controller = new AbortController()
@@ -58,6 +79,7 @@ export default function IncidentDetail({ incident, onBack }: { incident: FridayI
   const likelyCauses = diagnostic?.likelyCauses ?? []
   const recommendations = diagnostic?.recommendations ?? []
   const notSupported = diagnostic?.status === 'not-supported'
+  const canRerunDiagnosis = !diagnosticError && !notSupported && diagnostic !== null
   const canInspectLogs = !diagnosticError && !notSupported && diagnostic?.logsAvailable === true
 
   return <section className="v3-diagnostic-detail" aria-label={`Diagnosis for ${incident.serviceName || incident.title}`}>
@@ -69,6 +91,8 @@ export default function IncidentDetail({ incident, onBack }: { incident: FridayI
         <span className={`v3-severity ${incident.severity}`}>{incident.severity.toUpperCase()}</span>
       </div>
       <div className="v3-diagnostic-context"><span>{incident.host || incident.source}</span><span>{incident.type.replaceAll('-', ' ')}</span><span>First seen {displayTime(incident.firstSeen)}</span></div>
+      {canRerunDiagnosis && <button className="v3-readonly-action" disabled={rerunLoading} onClick={rerunDiagnosis}><RefreshCw size={14}/>{rerunLoading ? 'Re-running Diagnosis…' : 'Re-run Diagnosis · Read Only'}</button>}
+      {rerunError && <p className="v3-diagnostic-error">{rerunError}</p>}
     </div>
 
     {!diagnostic && !diagnosticError && <div className="v3-diagnostic-state"><FileSearch size={17}/><span>Collecting approved read-only diagnostic metadata…</span></div>}

@@ -233,6 +233,70 @@ export function createMonitoringRuntime({
     }
   }
 
+  async function rerunDiagnostic(incidentId) {
+    const incident = (monitoringState.incidents || []).find((item) => item.id === incidentId)
+    if (!incident) return { statusCode: 404, body: { error: 'incident-not-found' } }
+    if (!diagnosticsConfig.enabled) return { statusCode: 409, body: { error: 'diagnostics-disabled' } }
+    const target = supportedDiagnosticTarget(incident)
+    if (!target) return { statusCode: 409, body: { error: 'diagnostics-not-supported' } }
+
+    if (!monitoringState.diagnostics || typeof monitoringState.diagnostics !== 'object' || Array.isArray(monitoringState.diagnostics)) {
+      monitoringState.diagnostics = {}
+    }
+
+    const timestamp = now().toISOString()
+    const previousDiagnostic = monitoringState.diagnostics[incident.id]
+      ? structuredClone(monitoringState.diagnostics[incident.id])
+      : undefined
+    const priorHistory = structuredClone(monitoringState.history || [])
+
+    try {
+      const report = await collectDiagnosticImpl({
+        config: config.vm100Observer || {},
+        incident: structuredClone(incident),
+        overview: structuredClone(latestOverview || { services: [] }),
+        containerId: target.containerId,
+        now: timestamp,
+      })
+      if (!report || typeof report !== 'object' || report.incidentId !== incident.id) {
+        throw new Error('Invalid diagnostic report')
+      }
+
+      const refreshed = structuredClone(report)
+      refreshed.lastLogInspectionAt = previousDiagnostic?.lastLogInspectionAt ?? refreshed.lastLogInspectionAt ?? null
+      monitoringState.diagnostics[incident.id] = refreshed
+      appendHistory(monitoringState, {
+        id: safeId(`diagnostic-rerun:${incident.id}:${timestamp}`),
+        type: 'diagnostic-rerun',
+        at: timestamp,
+        source: 'diagnostics',
+        host: incident.host || undefined,
+        serviceId: incident.serviceId,
+        serviceName: incident.serviceName,
+        detail: 'Read-only diagnostic metadata re-run completed; no remediation executed.',
+      }, monitoringConfig.historyLimit || 2000)
+
+      await persistState()
+      return { statusCode: 200, body: structuredClone(refreshed) }
+    } catch (error) {
+      if (previousDiagnostic === undefined) delete monitoringState.diagnostics[incident.id]
+      else monitoringState.diagnostics[incident.id] = structuredClone(previousDiagnostic)
+      monitoringState.history = priorHistory
+      appendHistory(monitoringState, {
+        id: safeId(`diagnostic-rerun-failed:${incident.id}:${timestamp}`),
+        type: 'diagnostic-rerun-failed',
+        at: timestamp,
+        source: 'diagnostics',
+        host: incident.host || undefined,
+        serviceId: incident.serviceId,
+        serviceName: incident.serviceName,
+        detail: `Read-only diagnostic refresh failed: ${sanitizeError(error)}`,
+      }, monitoringConfig.historyLimit || 2000)
+      try { await persistState() } catch {}
+      return { statusCode: 502, body: { error: 'diagnostic-rerun-unavailable' } }
+    }
+  }
+
   async function getIncidentLogs(incidentId) {
     const incident = (monitoringState.incidents || []).find((item) => item.id === incidentId)
     if (!incident) return { statusCode: 404, body: { error: 'incident-not-found' } }
@@ -298,6 +362,7 @@ export function createMonitoringRuntime({
     getHistory() { return { events: [...(monitoringState.history || [])].reverse().map((event) => ({ ...event })) } },
     getSummary() { return monitoringSummary(monitoringState, meta) },
     getDiagnostic,
+    rerunDiagnostic,
     getIncidentLogs,
   }
 }
