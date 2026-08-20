@@ -20,4 +20,11 @@ describe('FRIDAY mobile CSS contract', () => {
     expect(mobileCss).toContain('.v3-mobile-more-sheet')
     expect(mobileCss).toContain('.v3-diagnostic-logs')
   })
+
+  it('keeps diagnostic log lines unwrapped and confines horizontal scrolling to the log panel', () => {
+    const rule = mobileCss.match(/\.v3-phone-shell \.v3-diagnostic-logs\{([^}]*)\}/)?.[1] ?? ''
+    expect(rule).toMatch(/white-space\s*:\s*pre(?:;|$)/)
+    expect(rule).toMatch(/overflow-x\s*:\s*auto/)
+    expect(rule).not.toMatch(/pre-wrap/)
+  })
 })
