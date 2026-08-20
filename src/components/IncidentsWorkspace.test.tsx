@@ -56,8 +56,8 @@ describe('IncidentsWorkspace', () => {
     render(<IncidentsWorkspace incidents={[active, resolved]} monitoring={monitoring} history={history} />)
 
     expect(screen.getByRole('heading', { name: /active incidents/i })).toBeInTheDocument()
-    expect(screen.getByText('nginx-proxy-manager')).toBeInTheDocument()
-    expect(screen.getByText('HIGH')).toBeInTheDocument()
+    expect(screen.getAllByText('nginx-proxy-manager').length).toBeGreaterThan(0)
+    expect(screen.getAllByText('HIGH').length).toBeGreaterThan(0)
     expect(screen.getByText(/monitoring ok/i)).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /recently resolved/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /health history/i })).toBeInTheDocument()

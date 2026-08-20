@@ -2,6 +2,48 @@ import { useEffect, useState } from 'react'
 import type { ActivityItem, AlertItem, ResourceMetric, Service, Site } from './infrastructure'
 import { activities, alerts, resources, services, sites } from '../data/mock'
 
+export type FridayIncident = {
+  id: string
+  fingerprint?: string
+  type: string
+  title: string
+  detail: string
+  severity: 'high' | 'warning' | 'info'
+  status: 'open' | 'resolved'
+  source: string
+  host: string
+  serviceId?: string
+  serviceName?: string
+  firstSeen: string
+  lastSeen: string
+  openedAt: string
+  resolvedAt: string | null
+  recommendedAction: string
+  evidence: string[]
+}
+
+export type MonitoringSummary = {
+  enabled: boolean
+  status: 'disabled' | 'starting' | 'ok' | 'degraded'
+  lastPollAt: string | null
+  lastSuccessAt: string | null
+  lastError: string | null
+  activeIncidents: number
+  openHigh: number
+  openWarning: number
+}
+
+export type MonitoringEvent = {
+  id: string
+  type: string
+  at: string
+  source: string
+  host?: string
+  serviceId?: string
+  serviceName?: string
+  detail: string
+}
+
 export type FridayOverview = {
   mode: 'mock' | 'live'
   generatedAt?: string
@@ -11,6 +53,8 @@ export type FridayOverview = {
   resources: ResourceMetric[]
   activities: ActivityItem[]
   integrations?: Array<{ id: string; enabled: boolean; mode: string }>
+  incidents?: FridayIncident[]
+  monitoring?: MonitoringSummary | null
 }
 
 const fallback: FridayOverview = {
@@ -20,6 +64,8 @@ const fallback: FridayOverview = {
   alerts,
   resources,
   activities,
+  incidents: [],
+  monitoring: null,
 }
 
 export function useFridayOverview() {
@@ -42,6 +88,13 @@ export function useFridayOverview() {
   }, [])
 
   return { overview, connected }
+}
+
+export async function fetchMonitoringHistory(signal?: AbortSignal) {
+  const response = await fetch('/api/monitoring/history', { signal })
+  if (!response.ok) throw new Error(`Friday monitoring history ${response.status}`)
+  const body = await response.json() as { events?: MonitoringEvent[] }
+  return Array.isArray(body.events) ? body.events : []
 }
 
 export async function previewFridayCommand(message: string) {

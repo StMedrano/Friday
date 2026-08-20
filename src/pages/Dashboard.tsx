@@ -1,6 +1,9 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Command, Cpu, Database, Gauge, HardDrive, Home, MemoryStick, Network, Search, Server, Settings, ShieldCheck, Sparkles, TerminalSquare } from 'lucide-react'
-import { useFridayOverview } from '../lib/api'
+import { fetchMonitoringHistory, useFridayOverview, type MonitoringEvent } from '../lib/api'
+import ActiveIncidents from '../components/ActiveIncidents'
+import IncidentsWorkspace from '../components/IncidentsWorkspace'
+import '../monitoring.css'
 
 const nav = [
   ['Overview', Home], ['FRIDAY', Sparkles], ['Infrastructure', Server], ['Applications', AppWindow],
@@ -14,9 +17,28 @@ export default function Dashboard() {
   const [automation, setAutomation] = useState(true)
   const [query, setQuery] = useState('')
   const [reply, setReply] = useState('Everything critical is operating normally. I am ready to inspect your infrastructure.')
+  const [history, setHistory] = useState<MonitoringEvent[]>([])
+  const [historyError, setHistoryError] = useState<string | null>(null)
   const online = overview.services.filter(s => s.status === 'online').length
   const health = Math.round((online / Math.max(overview.services.length, 1)) * 100)
+  const incidents = overview.incidents ?? []
+  const activeIncidents = overview.monitoring?.activeIncidents ?? incidents.filter((incident) => incident.status === 'open').length
   const metrics = useMemo(() => overview.resources.slice(0, 3), [overview.resources])
+
+  useEffect(() => {
+    if (active !== 'Incidents') return
+    const controller = new AbortController()
+    setHistoryError(null)
+    fetchMonitoringHistory(controller.signal)
+      .then(setHistory)
+      .catch((error) => {
+        if (error?.name !== 'AbortError') {
+          setHistory([])
+          setHistoryError('History unavailable')
+        }
+      })
+    return () => controller.abort()
+  }, [active])
 
   function askFriday(e: React.FormEvent) {
     e.preventDefault()
@@ -30,7 +52,7 @@ export default function Dashboard() {
     <div className="v3-shell">
       <aside className="v3-rail">
         <button className="v3-logo" onClick={() => setActive('Overview')} aria-label="FRIDAY home"><span /></button>
-        <nav>{nav.map(([label, Icon]) => <button key={label} className={active === label ? 'active' : ''} onClick={() => setActive(label)} title={label}><Icon size={19}/>{label === 'Approvals' && <i>2</i>}</button>)}</nav>
+        <nav>{nav.map(([label, Icon]) => <button key={label} className={active === label ? 'active' : ''} onClick={() => setActive(label)} title={label}><Icon size={19}/>{label === 'Approvals' && <i>2</i>}{label === 'Incidents' && activeIncidents > 0 && <i>{activeIncidents}</i>}</button>)}</nav>
         <div className="v3-avatar">SM</div>
       </aside>
 
@@ -59,12 +81,14 @@ export default function Dashboard() {
               </div>
               <div className="v3-health">
                 <span className="v3-kicker">SYSTEM HEALTH</span>
-                <div className="v3-health-score"><strong>{health}%</strong><span>NOMINAL</span></div>
+                <div className="v3-health-score"><strong>{health}%</strong><span>{activeIncidents > 0 ? 'ATTENTION' : 'NOMINAL'}</span></div>
                 <div className="v3-health-row"><span>Services</span><b>{online}/{overview.services.length}</b></div>
-                <div className="v3-health-row"><span>Alerts</span><b>{overview.alerts.length}</b></div>
+                <div className="v3-health-row"><span>Active incidents</span><b>{activeIncidents}</b></div>
                 <div className="v3-health-row"><span>Sites</span><b>{overview.sites.length}</b></div>
               </div>
             </section>
+
+            <ActiveIncidents incidents={incidents}/>
 
             <section className="v3-section">
               <div className="v3-section-head"><div><span className="v3-kicker">SYSTEM</span><h2>Infrastructure</h2></div><button onClick={() => setActive('Infrastructure')}>View topology <ChevronRight size={15}/></button></div>
@@ -96,7 +120,7 @@ export default function Dashboard() {
               <div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><span>{online} online</span></div>
               <div className="v3-services">{overview.services.map(s => <button key={s.id} onClick={() => setActive('Applications')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span><em>{s.updated}</em></button>)}</div>
             </section>
-          </> : <DetailView active={active} overview={overview} />}
+          </> : active === 'Incidents' ? <IncidentsWorkspace incidents={incidents} monitoring={overview.monitoring} history={history} historyError={historyError}/> : <DetailView active={active} overview={overview} />}
         </main>
       </div>
     </div>
@@ -105,7 +129,7 @@ export default function Dashboard() {
 
 function DetailView({ active, overview }: { active: string, overview: ReturnType<typeof useFridayOverview>['overview'] }) {
   return <section className="v3-detail">
-    <div className="v3-detail-hero"><div className="v3-node-icon large">{active === 'Infrastructure' ? <Server/> : active === 'Applications' ? <AppWindow/> : active === 'Agents' ? <Bot/> : active === 'Incidents' ? <AlertTriangle/> : <TerminalSquare/>}</div><div><span className="v3-kicker">FRIDAY CONTROL PLANE</span><h2>{active}</h2><p>Operational view backed by the existing FRIDAY read-only API boundary.</p></div></div>
+    <div className="v3-detail-hero"><div className="v3-node-icon large">{active === 'Infrastructure' ? <Server/> : active === 'Applications' ? <AppWindow/> : active === 'Agents' ? <Bot/> : <TerminalSquare/>}</div><div><span className="v3-kicker">FRIDAY CONTROL PLANE</span><h2>{active}</h2><p>Operational view backed by the existing FRIDAY read-only API boundary.</p></div></div>
     <div className="v3-detail-grid">
       <article><Gauge/><strong>{overview.services.length}</strong><span>Tracked services</span></article>
       <article><ShieldCheck/><strong>{overview.mode.toUpperCase()}</strong><span>Control mode</span></article>
