@@ -43,6 +43,9 @@ export function getConfig(env = process.env) {
       statePath: env.FRIDAY_MONITORING_STATE_PATH || '/data/monitoring-state.json',
       historyLimit: positiveNumber(env.FRIDAY_MONITORING_HISTORY_LIMIT, 2000),
     },
+    diagnostics: {
+      enabled: enabled(env.FRIDAY_DIAGNOSTICS_ENABLED),
+    },
     ai: {
       enabled: enabled(env.FRIDAY_AI_ENABLED),
       apiKey: env.OPENAI_API_KEY || '',
