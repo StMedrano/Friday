@@ -70,15 +70,28 @@ jobs:
 
       - name: Verify diagnostics safety boundary
         run: |
-          if grep -RniE '/containers/.*/(start|stop|restart|kill|exec)|/images/create|/volumes|/networks/.*/(connect|disconnect)|/archive' observer/config.mjs observer/docker.mjs observer/server.mjs server/diagnostics server/adapters/vm100-observer-diagnostics.mjs; then
+          if grep -RniE '/containers/.*/(start|stop|restart|kill|exec)|/images/create|/volumes|/networks/.*/(connect|disconnect)|/archive' observer/config.mjs observer/docker.mjs observer/server.mjs server/diagnostics server/adapters/vm100-observer-diagnostics.mjs server/monitoring/runtime.mjs; then
             echo 'Diagnostics mutation API path detected.' >&2
             exit 1
           fi
-          if grep -RniE "request\.method === '(POST|PUT|PATCH|DELETE)'.*(diagnostic|/api/incidents/.*/logs)" server/http.mjs observer/server.mjs; then
-            echo 'Diagnostics write route detected.' >&2
+
+          controller_diagnostic_writes="$(grep -niE "request\.method === '(POST|PUT|PATCH|DELETE)'.*(diagnostic|/api/incidents/.*/logs)" server/http.mjs || true)"
+          unexpected_controller_writes="$(printf '%s\n' "$controller_diagnostic_writes" | grep -vF "request.method === 'POST' && diagnosticRerunRoute" || true)"
+          if [ -n "$unexpected_controller_writes" ]; then
+            printf '%s\n' "$unexpected_controller_writes" >&2
+            echo 'Unexpected diagnostics write route detected.' >&2
             exit 1
           fi
-          if grep -RniE 'child_process|execFile\(|spawn\(|ssh ' server/diagnostics server/adapters/vm100-observer-diagnostics.mjs observer/config.mjs observer/docker.mjs observer/server.mjs; then
+          if ! printf '%s\n' "$controller_diagnostic_writes" | grep -qF "request.method === 'POST' && diagnosticRerunRoute"; then
+            echo 'Expected read-only diagnostic rerun route boundary is missing.' >&2
+            exit 1
+          fi
+          if grep -niE "request\.method === '(POST|PUT|PATCH|DELETE)'.*(diagnostic|/api/incidents/.*/logs)" observer/server.mjs; then
+            echo 'Observer diagnostics write route detected.' >&2
+            exit 1
+          fi
+
+          if grep -RniE 'child_process|execFile\(|spawn\(|ssh ' server/diagnostics server/adapters/vm100-observer-diagnostics.mjs server/monitoring/runtime.mjs observer/config.mjs observer/docker.mjs observer/server.mjs; then
             echo 'Shell or SSH diagnostics path detected.' >&2
             exit 1
           fi
