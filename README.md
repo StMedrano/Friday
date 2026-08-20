@@ -27,7 +27,7 @@ Production currently has:
 - safe base Compose with no controller Docker socket mount
 - no infrastructure mutation endpoints
 
-The Incident Diagnostics work on PR #5 is a **candidate**, not part of the deployed baseline until it is reviewed, merged, and explicitly rolled out.
+The Incident Diagnostics and Mobile Dashboard work on PR #5 are **candidates**, not part of the deployed baseline until reviewed, merged, and explicitly rolled out.
 
 ## Safety model
 
@@ -125,6 +125,30 @@ GET /api/incidents/:incidentId/logs
 There is no diagnostic remediation endpoint.
 
 See `observer/README.md` and `docs/live-integrations.md` for the observer-first rollout and validation commands.
+
+## Mobile Dashboard candidate
+
+PR #5 includes a purpose-built phone operations shell at the exact `(max-width: 700px)` boundary. It does not shrink the desktop rail onto a phone; React renders a separate phone shell while desktop FRIDAY UI v3 remains the layout above 700px.
+
+Phone navigation is:
+
+```text
+Home | FRIDAY | Infrastructure | Incidents | More
+```
+
+`More` exposes Applications, Agents, Tasks, Approvals, Memory, Audit, and Settings.
+
+Mobile Home priority is:
+
+```text
+Incident attention -> Health -> FRIDAY -> Infrastructure -> Services
+```
+
+Active incidents therefore appear before the command surface. `View Diagnosis` opens the selected incident detail. Diagnostic metadata loads read-only; raw logs remain explicit-request only through `Inspect Logs · Read Only`. There are no restart, repair, execute, stop, or start-container controls.
+
+The phone shell includes safe-area-aware fixed bottom navigation, 44px minimum primary touch targets, width/overflow containment, reduced-motion handling, and single-column diagnostic/log containment. Automated JSDOM/component/CSS contract tests cover the 700px routing contract and desktop regression.
+
+**Visual acceptance is still required before merge or rollout.** This implementation session does not have a browser/device runner that can reach the private VM102 address, so true rendering at 360px, 390px, 430px, and desktop 1440px has not been claimed. Validate those widths on VM102 or a real device before production rollout.
 
 ## Deploy/update the VM100 observer
 
