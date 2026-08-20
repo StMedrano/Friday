@@ -36,7 +36,10 @@ export function buildDiagnosticReport({ incident, inspect, overview, now }) {
     addUnique(likelyCauses, 'Memory pressure caused the container termination.')
     addUnique(recommendations, 'Inspect host/container memory pressure and recent workload changes before considering remediation.')
   } else if (state === 'exited' && exitCode !== null && exitCode !== 0) {
-    if (runtimeMs !== null && runtimeMs >= startupWindowMs) {
+    if (runtimeMs === null) {
+      addUnique(findings, 'The container exited with a non-zero code without evidence of an OOM termination; runtime duration was unavailable.')
+      addUnique(likelyCauses, 'An application or configuration failure is likely, but startup versus runtime timing cannot be determined.')
+    } else if (runtimeMs >= startupWindowMs) {
       addUnique(findings, 'The container exited after running for at least five minutes, which is more consistent with a runtime/application failure than a startup failure.')
       addUnique(likelyCauses, 'A runtime application failure is likely.')
     } else {
