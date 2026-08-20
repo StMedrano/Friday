@@ -7,6 +7,7 @@ import IncidentsWorkspace from '../components/IncidentsWorkspace'
 import MobileHome from '../components/MobileHome'
 import MobileNavigation from '../components/MobileNavigation'
 import '../monitoring.css'
+import '../mobile.css'
 
 const nav = [
   ['Overview', Home], ['FRIDAY', Sparkles], ['Infrastructure', Server], ['Applications', AppWindow],
