@@ -149,12 +149,12 @@ The observer must never gain restart, stop, kill, exec, remove, image creation, 
 
 ## Verification status for PR #5
 
-Diagnostics and mobile implementation verification is green through Friday CI #186 on candidate head `064f58b8ca3b12af31c427d6e5a930163a2d7973` before the final documentation-only commits.
+Merge-gate verification is always tied to the **exact current PR head SHA**. Before any merge decision, the Friday CI run associated with that exact head must be successful; do not reuse an older green run after the head moves.
 
-That run passed:
+The required Friday CI pipeline includes:
 
-- 38/38 Vitest frontend tests;
-- 101/101 Node/server/observer/monitoring/diagnostics tests;
+- all Vitest frontend tests, including mobile CSS and no-remediation assertions;
+- all Node/server/observer/monitoring/diagnostics tests;
 - production TypeScript/Vite build;
 - shell validation;
 - observer security boundary;
@@ -164,7 +164,7 @@ That run passed:
 - controller image build;
 - VM100 observer image build.
 
-A **new exact-head Friday CI run is still required after these documentation commits**. Do not use CI #186 as the final merge-gate evidence if the PR head has moved.
+In addition to automated CI, real-browser visual acceptance at 360px, 390px, 430px, and desktop 1440px remains a separate pre-merge/rollout requirement.
 
 ## Not implemented yet
 
