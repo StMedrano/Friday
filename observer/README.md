@@ -1,6 +1,6 @@
 # FRIDAY VM100 Observer
 
-The VM100 observer is a deliberately read-only Docker inventory service for VM 100 (`192.168.1.74`). It exposes only `GET /health` and token-authenticated `GET /api/v1/containers`; it never exposes Docker's native TCP API.
+The VM100 observer is a deliberately read-only Docker inventory service for VM 100 (`192.168.1.124`). It exposes only `GET /health` and token-authenticated `GET /api/v1/containers`; it never exposes Docker's native TCP API.
 
 ## Preflight on VM 100
 
@@ -17,13 +17,12 @@ Do not continue if port `3199` is already listening.
 
 ## Install
 
-Clone the authoritative FRIDAY repository into its own VM100 observer checkout:
+Create a dedicated checkout without changing ownership of other infrastructure projects:
 
 ```bash
-sudo mkdir -p /srv/infrastructure
-sudo chown "$USER:$USER" /srv/infrastructure
-cd /srv/infrastructure
-git clone https://github.com/StMedrano/Friday.git friday-observer
+sudo mkdir -p /srv/infrastructure/friday-observer
+sudo chown "$USER:$USER" /srv/infrastructure/friday-observer
+git clone https://github.com/StMedrano/Friday.git /srv/infrastructure/friday-observer
 cd /srv/infrastructure/friday-observer/observer
 cp .env.example .env
 chmod 600 .env
@@ -43,7 +42,7 @@ Confirm the secret is present without printing it:
 grep -qE '^FRIDAY_OBSERVER_TOKEN=.{64}$' .env && echo 'Observer token configured'
 ```
 
-Keep `FRIDAY_OBSERVER_BIND_ADDRESS=192.168.1.74`, `FRIDAY_OBSERVER_PORT=3199`, and `FRIDAY_OBSERVER_HOST_NAME=VM 100` unless the approved architecture changes.
+Keep `FRIDAY_OBSERVER_BIND_ADDRESS=192.168.1.124`, `FRIDAY_OBSERVER_PORT=3199`, and `FRIDAY_OBSERVER_HOST_NAME=VM 100` unless the approved architecture changes.
 
 Validate and start:
 
@@ -51,7 +50,7 @@ Validate and start:
 docker compose config >/dev/null
 docker compose up -d --build
 docker compose ps
-curl -fsS http://192.168.1.74:3199/health
+curl -fsS http://192.168.1.124:3199/health
 ```
 
 Test authentication from VM 102. The unauthenticated request must return `401`; the authenticated request must return sanitized inventory. Read the token privately from the VM100 `.env` when transferring it to VM102—do not paste it into chat or commit it to Git.
@@ -67,7 +66,7 @@ cd observer
 docker compose config >/dev/null
 docker compose up -d --build
 docker compose ps
-curl -fsS http://192.168.1.74:3199/health
+curl -fsS http://192.168.1.124:3199/health
 ```
 
 The `.env` file under `observer/` is ignored runtime configuration and must be preserved locally with mode `600`.

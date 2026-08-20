@@ -6,7 +6,7 @@ services:
     container_name: friday-observer
     restart: unless-stopped
     ports:
-      - "${FRIDAY_OBSERVER_BIND_ADDRESS:-192.168.1.74}:${FRIDAY_OBSERVER_PORT:-3199}:3199"
+      - "${FRIDAY_OBSERVER_BIND_ADDRESS:-192.168.1.124}:${FRIDAY_OBSERVER_PORT:-3199}:3199"
     environment:
       FRIDAY_OBSERVER_PORT: 3199
       FRIDAY_OBSERVER_BIND_ADDRESS: 0.0.0.0

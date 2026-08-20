@@ -13,6 +13,25 @@ async function safe(label, fn) {
   }
 }
 
+export function decorateOverviewWithMonitoring(overview, { incidents = [], summary = null } = {}) {
+  const incidentAlerts = incidents
+    .filter((incident) => incident?.status === 'open')
+    .map((incident) => ({
+      id: `incident-${incident.id}`,
+      title: String(incident.title || 'Monitoring incident'),
+      detail: String(incident.detail || ''),
+      severity: incident.severity || 'warning',
+      source: 'monitoring',
+    }))
+
+  return {
+    ...overview,
+    alerts: [...(overview.alerts || []).map((alert) => ({ ...alert })), ...incidentAlerts],
+    incidents: incidents.map((incident) => ({ ...incident })),
+    monitoring: summary ? { ...summary } : null,
+  }
+}
+
 export async function buildOverview(config, adapters = {}) {
   const getDockerServices = adapters.getDockerServices || defaultGetDockerServices
   const getProxmoxServices = adapters.getProxmoxServices || defaultGetProxmoxServices

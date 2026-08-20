@@ -2,6 +2,11 @@ function enabled(value) {
   return String(value ?? '').toLowerCase() === 'true'
 }
 
+function positiveNumber(value, fallback) {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
 export function getConfig(env = process.env) {
   return {
     port: Number(env.FRIDAY_PORT || 3010),
@@ -30,6 +35,13 @@ export function getConfig(env = process.env) {
         .split(',')
         .map((item) => item.trim())
         .filter(Boolean),
+    },
+    monitoring: {
+      enabled: enabled(env.FRIDAY_MONITORING_ENABLED),
+      pollSeconds: positiveNumber(env.FRIDAY_MONITORING_POLL_SECONDS, 30),
+      offlineGraceSeconds: positiveNumber(env.FRIDAY_MONITORING_OFFLINE_GRACE_SECONDS, 300),
+      statePath: env.FRIDAY_MONITORING_STATE_PATH || '/data/monitoring-state.json',
+      historyLimit: positiveNumber(env.FRIDAY_MONITORING_HISTORY_LIMIT, 2000),
     },
     ai: {
       enabled: enabled(env.FRIDAY_AI_ENABLED),
