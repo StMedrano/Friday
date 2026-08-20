@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import userEvent from '@testing-library/user-event'
+import { describe, expect, it, vi } from 'vitest'
 import ActiveIncidents from './ActiveIncidents'
 
 const incident = {
@@ -37,5 +38,19 @@ describe('ActiveIncidents', () => {
   it('renders a safe empty state when monitoring data is absent', () => {
     render(<ActiveIncidents incidents={[]} />)
     expect(screen.getByText(/no active incidents/i)).toBeInTheDocument()
+  })
+
+  it('offers View Diagnosis only when a selection handler is provided', async () => {
+    const onSelectIncident = vi.fn()
+    const user = userEvent.setup()
+    render(<ActiveIncidents incidents={[incident]} onSelectIncident={onSelectIncident} />)
+
+    await user.click(screen.getByRole('button', { name: /view diagnosis/i }))
+    expect(onSelectIncident).toHaveBeenCalledWith(incident)
+  })
+
+  it('does not add a diagnosis action to legacy read-only callers', () => {
+    render(<ActiveIncidents incidents={[incident]} />)
+    expect(screen.queryByRole('button', { name: /view diagnosis/i })).not.toBeInTheDocument()
   })
 })

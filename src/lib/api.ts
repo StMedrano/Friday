@@ -44,6 +44,42 @@ export type MonitoringEvent = {
   detail: string
 }
 
+export type DiagnosticFact = {
+  id: string
+  label: string
+  value: string
+}
+
+export type DiagnosticReport = {
+  id?: string
+  incidentId: string
+  source?: string
+  host?: string
+  serviceId?: string
+  serviceName?: string
+  collectedAt?: string
+  status: 'pending' | 'available' | 'degraded' | 'unavailable' | 'not-supported'
+  metadata?: Record<string, unknown> | null
+  facts?: DiagnosticFact[]
+  findings?: string[]
+  likelyCauses?: string[]
+  recommendations?: string[]
+  logsAvailable?: boolean
+  lastLogInspectionAt?: string | null
+  error?: string | null
+  reason?: string
+}
+
+export type DiagnosticLogsResponse = {
+  incidentId: string
+  serviceName?: string
+  host?: string
+  tail: number
+  logs: string
+  truncated: boolean
+  observedAt?: string
+}
+
 export type FridayOverview = {
   mode: 'mock' | 'live'
   generatedAt?: string
@@ -95,6 +131,28 @@ export async function fetchMonitoringHistory(signal?: AbortSignal) {
   if (!response.ok) throw new Error(`Friday monitoring history ${response.status}`)
   const body = await response.json() as { events?: MonitoringEvent[] }
   return Array.isArray(body.events) ? body.events : []
+}
+
+function incidentPath(id: string, suffix: 'diagnostics' | 'logs') {
+  return `/api/incidents/${encodeURIComponent(id)}/${suffix}`
+}
+
+export async function fetchIncidentDiagnostics(incidentId: string, signal?: AbortSignal) {
+  const response = await fetch(incidentPath(incidentId, 'diagnostics'), { method: 'GET', signal })
+  const body = await response.json() as DiagnosticReport | { error?: string }
+  if (!response.ok) {
+    throw new Error('error' in body && body.error ? body.error : `Friday diagnostics ${response.status}`)
+  }
+  return body as DiagnosticReport
+}
+
+export async function fetchIncidentLogs(incidentId: string, signal?: AbortSignal) {
+  const response = await fetch(incidentPath(incidentId, 'logs'), { method: 'GET', signal })
+  const body = await response.json() as DiagnosticLogsResponse | { error?: string }
+  if (!response.ok) {
+    throw new Error('error' in body && body.error ? body.error : `Friday diagnostic logs ${response.status}`)
+  }
+  return body as DiagnosticLogsResponse
 }
 
 export async function previewFridayCommand(message: string) {

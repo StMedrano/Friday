@@ -1,7 +1,12 @@
 import http from 'node:http'
 import { pathToFileURL } from 'node:url'
 import { getObserverConfig } from './config.mjs'
-import { getSanitizedContainers } from './docker.mjs'
+import {
+  getSanitizedContainerInspect,
+  getSanitizedContainerLogs,
+  getSanitizedContainers,
+  normalizeLogTail,
+} from './docker.mjs'
 
 function json(response, statusCode, body) {
   response.writeHead(statusCode, {
@@ -12,7 +17,23 @@ function json(response, statusCode, body) {
   response.end(JSON.stringify(body))
 }
 
-export function createObserverServer({ config, getContainers = getSanitizedContainers }) {
+function sanitizeError(error) {
+  return String(error?.message || error || 'Docker unavailable')
+    .replace(/(Bearer\s+)[^\s,;]+/gi, '$1[redacted]')
+    .replace(/((?:token|secret|password)\s*[=:]\s*)[^\s,;]+/gi, '$1[redacted]')
+    .slice(0, 160)
+}
+
+function isContainerLookupError(error) {
+  return /^(unknown|ambiguous|invalid) container id$/i.test(String(error?.message || error || ''))
+}
+
+export function createObserverServer({
+  config,
+  getContainers = getSanitizedContainers,
+  getInspect = getSanitizedContainerInspect,
+  getLogs = getSanitizedContainerLogs,
+}) {
   return http.createServer(async (request, response) => {
     const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
 
@@ -35,7 +56,40 @@ export function createObserverServer({ config, getContainers = getSanitizedConta
         const observedAt = new Date().toISOString()
         return json(response, 200, { host: config.hostName, observedAt, containers })
       } catch (error) {
-        return json(response, 503, { error: 'docker-unavailable', detail: error.message })
+        return json(response, 503, { error: 'docker-unavailable', detail: sanitizeError(error) })
+      }
+    }
+
+    const inspectMatch = url.pathname.match(/^\/api\/v1\/containers\/([a-fA-F0-9]{12,64})\/inspect$/)
+    if (request.method === 'GET' && inspectMatch) {
+      if (request.headers.authorization !== `Bearer ${config.token}`) {
+        return json(response, 401, { error: 'unauthorized' })
+      }
+
+      try {
+        return json(response, 200, await getInspect(config, inspectMatch[1]))
+      } catch (error) {
+        if (isContainerLookupError(error)) {
+          return json(response, 404, { error: 'container-not-found' })
+        }
+        return json(response, 503, { error: 'docker-unavailable', detail: sanitizeError(error) })
+      }
+    }
+
+    const logsMatch = url.pathname.match(/^\/api\/v1\/containers\/([a-fA-F0-9]{12,64})\/logs$/)
+    if (request.method === 'GET' && logsMatch) {
+      if (request.headers.authorization !== `Bearer ${config.token}`) {
+        return json(response, 401, { error: 'unauthorized' })
+      }
+
+      try {
+        const tail = normalizeLogTail(url.searchParams.get('tail'))
+        return json(response, 200, await getLogs(config, logsMatch[1], tail))
+      } catch (error) {
+        if (isContainerLookupError(error)) {
+          return json(response, 404, { error: 'container-not-found' })
+        }
+        return json(response, 503, { error: 'docker-unavailable', detail: sanitizeError(error) })
       }
     }
 

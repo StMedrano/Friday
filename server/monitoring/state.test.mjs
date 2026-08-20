@@ -6,6 +6,7 @@ import {
   createEmptyMonitoringState,
   incidentList,
   monitoringSummary,
+  normalizeMonitoringState,
 } from './state.mjs'
 
 test('monitoring config is safe and disabled by default', () => {
@@ -45,13 +46,54 @@ test('monitoring config rejects zero and invalid numeric values', () => {
   assert.equal(config.monitoring.historyLimit, 2000)
 })
 
-test('empty monitoring state uses schema version one', () => {
+test('empty monitoring state uses schema version two with diagnostics map', () => {
   assert.deepEqual(createEmptyMonitoringState(), {
-    schemaVersion: 1,
+    schemaVersion: 2,
     observations: {},
     incidents: [],
     history: [],
+    diagnostics: {},
   })
+})
+
+test('legacy v1 monitoring state upgrades without losing incidents or history', () => {
+  const legacy = {
+    schemaVersion: 1,
+    observations: { svc: { status: 'offline' } },
+    incidents: [{ id: 'i1', status: 'open' }],
+    history: [{ id: 'h1', type: 'incident-opened' }],
+  }
+  const upgraded = normalizeMonitoringState(legacy)
+  assert.equal(upgraded.schemaVersion, 2)
+  assert.deepEqual(upgraded.observations, legacy.observations)
+  assert.deepEqual(upgraded.incidents, legacy.incidents)
+  assert.deepEqual(upgraded.history, legacy.history)
+  assert.deepEqual(upgraded.diagnostics, {})
+})
+
+test('existing diagnostics survive state normalization', () => {
+  const diagnostic = { id: 'd1', incidentId: 'i1', status: 'available' }
+  const upgraded = normalizeMonitoringState({
+    schemaVersion: 2,
+    observations: {},
+    incidents: [{ id: 'i1', status: 'open' }],
+    history: [],
+    diagnostics: { i1: diagnostic },
+  })
+  assert.deepEqual(upgraded.diagnostics, { i1: diagnostic })
+})
+
+test('malformed diagnostics field is normalized without discarding monitoring data', () => {
+  const upgraded = normalizeMonitoringState({
+    schemaVersion: 2,
+    observations: {},
+    incidents: [{ id: 'i1', status: 'open' }],
+    history: [{ id: 'h1', type: 'incident-opened' }],
+    diagnostics: ['not-a-map'],
+  })
+  assert.deepEqual(upgraded.diagnostics, {})
+  assert.equal(upgraded.incidents[0].id, 'i1')
+  assert.equal(upgraded.history[0].id, 'h1')
 })
 
 test('history is oldest-first capped at configured size', () => {

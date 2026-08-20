@@ -1,6 +1,10 @@
 import { render, screen } from '@testing-library/react'
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import IncidentsWorkspace from './IncidentsWorkspace'
+
+vi.mock('./IncidentDetail', () => ({
+  default: ({ incident }: { incident: { serviceName?: string } }) => <div data-testid="incident-detail">Diagnosis for {incident.serviceName}</div>,
+}))
 
 const active = {
   id: 'npm-offline-1',
@@ -70,5 +74,22 @@ describe('IncidentsWorkspace', () => {
     expect(screen.getByText('nginx-proxy-manager')).toBeInTheDocument()
     expect(screen.getByText(/monitoring degraded/i)).toBeInTheDocument()
     expect(screen.getByText(/history unavailable/i)).toBeInTheDocument()
+  })
+
+  it('shows selected incident detail before recovery and history sections', () => {
+    render(<IncidentsWorkspace
+      incidents={[active, resolved]}
+      monitoring={monitoring}
+      history={history}
+      selectedIncident={active}
+      onSelectIncident={() => {}}
+      onClearSelection={() => {}}
+    />)
+
+    const detail = screen.getByTestId('incident-detail')
+    const recoveryHeading = screen.getByRole('heading', { name: /recently resolved/i })
+    expect(detail).toHaveTextContent(/diagnosis for nginx-proxy-manager/i)
+    expect(detail.compareDocumentPosition(recoveryHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(screen.getByRole('button', { name: /back to incidents/i })).toBeInTheDocument()
   })
 })

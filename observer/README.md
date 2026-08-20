@@ -1,10 +1,29 @@
 # FRIDAY VM100 Observer
 
-The VM100 observer is a deliberately read-only Docker inventory service for VM 100 (`192.168.1.124`). It exposes only `GET /health` and token-authenticated `GET /api/v1/containers`; it never exposes Docker's native TCP API.
+The VM100 observer is FRIDAY's deliberately read-only Docker visibility service for VM 100 (`192.168.1.124`). It never publishes Docker's native TCP API and never exposes start, stop, restart, exec, remove, image, volume, network, archive, or daemon mutation operations.
 
-## Preflight on VM 100
+## Exposed HTTP contract
 
-Run these before deployment:
+```text
+GET /health
+GET /api/v1/containers                         bearer-authenticated
+GET /api/v1/containers/:id/inspect             bearer-authenticated
+GET /api/v1/containers/:id/logs?tail=100       bearer-authenticated
+```
+
+The two diagnostic routes are read-only. `:id` must be a known 12-64 character hexadecimal container ID obtained from the observer's sanitized inventory. The observer re-reads local inventory, resolves the ID to one known full Docker ID, and rejects unknown or ambiguous IDs. It is not a generic Docker proxy.
+
+Allowed local Docker Engine requests are limited to:
+
+```text
+GET /containers/json?all=1
+GET /containers/{validated-id}/json
+GET /containers/{validated-id}/logs?stdout=1&stderr=1&timestamps=1&tail=N
+```
+
+Inspect output is allowlisted. Environment variables, command arguments, bind paths, arbitrary labels, health-check output text, and raw Docker inspect JSON never cross the observer boundary. Logs are sanitized, default to 100 requested lines, cap requested tail at 200, and return no more than 64 KiB of sanitized text with a `truncated` marker when needed.
+
+## Preflight on VM100
 
 ```bash
 ip -4 addr
@@ -13,11 +32,9 @@ docker info >/dev/null
 test -S /var/run/docker.sock
 ```
 
-Do not continue if port `3199` is already listening.
+Do not continue with a new installation if port `3199` is already occupied by an unknown service.
 
 ## Install
-
-Create a dedicated checkout without changing ownership of other infrastructure projects:
 
 ```bash
 sudo mkdir -p /srv/infrastructure/friday-observer
@@ -28,21 +45,22 @@ cp .env.example .env
 chmod 600 .env
 ```
 
-Generate a 256-bit observer token without putting the token itself in shell history:
+Generate a 256-bit observer token without committing or displaying it:
 
 ```bash
 TOKEN=$(openssl rand -hex 32)
 sed -i "s/^FRIDAY_OBSERVER_TOKEN=.*/FRIDAY_OBSERVER_TOKEN=$TOKEN/" .env
 unset TOKEN
-```
-
-Confirm the secret is present without printing it:
-
-```bash
 grep -qE '^FRIDAY_OBSERVER_TOKEN=.{64}$' .env && echo 'Observer token configured'
 ```
 
-Keep `FRIDAY_OBSERVER_BIND_ADDRESS=192.168.1.124`, `FRIDAY_OBSERVER_PORT=3199`, and `FRIDAY_OBSERVER_HOST_NAME=VM 100` unless the approved architecture changes.
+Keep these deployment values unless the approved architecture changes:
+
+```env
+FRIDAY_OBSERVER_BIND_ADDRESS=192.168.1.124
+FRIDAY_OBSERVER_PORT=3199
+FRIDAY_OBSERVER_HOST_NAME=VM 100
+```
 
 Validate and start:
 
@@ -50,12 +68,45 @@ Validate and start:
 docker compose config >/dev/null
 docker compose up -d --build
 docker compose ps
-curl -fsS http://192.168.1.124:3199/health
+curl -fsS http://192.168.1.124:3199/health | jq
 ```
 
-Test authentication from VM 102. The unauthenticated request must return `401`; the authenticated request must return sanitized inventory. Read the token privately from the VM100 `.env` when transferring it to VM102—do not paste it into chat or commit it to Git.
+The `.env` file is ignored runtime configuration and must remain mode `600`.
 
-## Update
+## Read-only validation
+
+Set `TOKEN` privately in your shell from the observer `.env`; do not paste the token into chat or commit it.
+
+Inventory remains the source of valid container IDs:
+
+```bash
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  http://192.168.1.124:3199/api/v1/containers | jq
+```
+
+For a known container such as Nginx Proxy Manager, obtain its sanitized ID from inventory:
+
+```bash
+CONTAINER_ID=$(curl -fsS -H "Authorization: Bearer $TOKEN" \
+  http://192.168.1.124:3199/api/v1/containers \
+  | jq -r '.containers[] | select(.name=="nginx-proxy-manager") | .id')
+```
+
+Then use only that returned ID:
+
+```bash
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  "http://192.168.1.124:3199/api/v1/containers/$CONTAINER_ID/inspect" | jq
+
+curl -fsS -H "Authorization: Bearer $TOKEN" \
+  "http://192.168.1.124:3199/api/v1/containers/$CONTAINER_ID/logs?tail=100" | jq
+```
+
+Do not replace `CONTAINER_ID` with a Docker API path, shell expression, container name, file path, or arbitrary query string.
+
+## Update / Phase 1 diagnostics rollout
+
+After the feature is merged and rollout is explicitly approved, upgrade the observer **before** enabling diagnostics on VM102:
 
 ```bash
 cd /srv/infrastructure/friday-observer
@@ -64,13 +115,20 @@ git checkout main
 git pull --ff-only origin main
 cd observer
 docker compose config >/dev/null
-docker compose up -d --build
+docker compose up -d --build --force-recreate
 docker compose ps
-curl -fsS http://192.168.1.124:3199/health
+curl -fsS http://192.168.1.124:3199/health | jq
 ```
 
-The `.env` file under `observer/` is ignored runtime configuration and must be preserved locally with mode `600`.
+Verify inventory, inspect, and logs using the commands above. Finally prove the validation target was not changed:
+
+```bash
+docker ps -a --filter name=nginx-proxy-manager \
+  --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
+```
+
+For the current validation case, Nginx Proxy Manager must remain in its pre-validation `Exited (255)` state.
 
 ## Security boundary
 
-The observer container mounts `/var/run/docker.sock` read-only, but Docker socket access is still highly privileged. The observer source therefore contains only the fixed Docker request `GET /containers/json?all=1`, and the network API exposes no mutation routes. Do not publish the native Docker socket over TCP and do not add restart, exec, remove, image, volume, or network mutation endpoints.
+Mounting `/var/run/docker.sock` read-only does not make Docker API access inherently safe; the code-level fixed-request allowlist is the observer's primary boundary. Keep the observer bearer token server-side, do not publish Docker TCP `2375/2376`, and do not add mutation routes or generic Docker path forwarding.

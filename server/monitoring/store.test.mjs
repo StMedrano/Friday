@@ -18,6 +18,22 @@ test('missing monitoring state loads as empty state', async () => {
   assert.deepEqual(await store.load(), createEmptyMonitoringState())
 })
 
+test('legacy monitoring state is normalized on load without losing incidents or history', async () => {
+  const statePath = await tempStatePath()
+  await writeFile(statePath, JSON.stringify({
+    schemaVersion: 1,
+    observations: { service: { status: 'offline' } },
+    incidents: [{ id: 'i1', status: 'open' }],
+    history: [{ id: 'h1', type: 'incident-opened' }],
+  }), 'utf8')
+  const store = createFileMonitoringStore({ statePath })
+  const loaded = await store.load()
+  assert.equal(loaded.schemaVersion, 2)
+  assert.deepEqual(loaded.diagnostics, {})
+  assert.equal(loaded.incidents[0].id, 'i1')
+  assert.equal(loaded.history[0].id, 'h1')
+})
+
 test('monitoring state survives save and load round trip', async () => {
   const statePath = await tempStatePath()
   const store = createFileMonitoringStore({ statePath })
@@ -25,6 +41,7 @@ test('monitoring state survives save and load round trip', async () => {
   state.observations.service = { serviceId: 'service', status: 'offline' }
   state.incidents.push({ id: 'x', status: 'open' })
   state.history.push({ id: 'h', type: 'incident-opened' })
+  state.diagnostics.x = { id: 'd1', incidentId: 'x', status: 'available' }
   await store.save(state)
   assert.deepEqual(await store.load(), state)
   const mode = (await stat(statePath)).mode & 0o777
@@ -69,7 +86,7 @@ test('save writes a unique temp file in the same directory then renames it', asy
 test('store serializes only the supplied monitoring state', async () => {
   const statePath = await tempStatePath()
   const store = createFileMonitoringStore({ statePath })
-  const state = { schemaVersion: 1, observations: {}, incidents: [], history: [], marker: 'safe-state-only' }
+  const state = { schemaVersion: 2, observations: {}, incidents: [], history: [], diagnostics: {}, marker: 'safe-state-only' }
   await store.save(state)
   const contents = await readFile(statePath, 'utf8')
   assert.match(contents, /safe-state-only/)

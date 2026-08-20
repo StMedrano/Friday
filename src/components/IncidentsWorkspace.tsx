@@ -1,6 +1,7 @@
-import { Activity, CheckCircle2, Radar, ShieldCheck } from 'lucide-react'
+import { Activity, ArrowLeft, CheckCircle2, Radar, ShieldCheck } from 'lucide-react'
 import type { FridayIncident, MonitoringEvent, MonitoringSummary } from '../lib/api'
 import ActiveIncidents from './ActiveIncidents'
+import IncidentDetail from './IncidentDetail'
 
 function displayTime(value: string | null | undefined) {
   if (!value) return 'Not available'
@@ -13,11 +14,17 @@ export default function IncidentsWorkspace({
   monitoring,
   history,
   historyError,
+  selectedIncident,
+  onSelectIncident,
+  onClearSelection,
 }: {
   incidents: FridayIncident[]
   monitoring?: MonitoringSummary | null
   history: MonitoringEvent[]
   historyError?: string | null
+  selectedIncident?: FridayIncident | null
+  onSelectIncident?: (incident: FridayIncident) => void
+  onClearSelection?: () => void
 }) {
   const resolved = incidents.filter((incident) => incident.status === 'resolved').slice().sort((a, b) => String(b.resolvedAt || '').localeCompare(String(a.resolvedAt || '')))
   const monitoringStatus = monitoring?.status || 'disabled'
@@ -34,7 +41,12 @@ export default function IncidentsWorkspace({
       <article><CheckCircle2/><span><b>{resolved.length} resolved</b><small>Resolution history is retained in FRIDAY-owned monitoring state.</small></span></article>
     </div>
 
-    <ActiveIncidents incidents={incidents}/>
+    <ActiveIncidents incidents={incidents} onSelectIncident={onSelectIncident}/>
+
+    {selectedIncident && <section className="v3-selected-diagnosis" aria-label="Selected incident diagnosis">
+      {onClearSelection && <button className="v3-readonly-action v3-diagnostic-back" onClick={onClearSelection}><ArrowLeft size={15}/> Back to incidents</button>}
+      <IncidentDetail incident={selectedIncident}/>
+    </section>}
 
     <section className="v3-section">
       <div className="v3-section-head"><div><span className="v3-kicker">RECOVERY</span><h2>Recently resolved</h2></div><span>{resolved.length} recorded</span></div>
