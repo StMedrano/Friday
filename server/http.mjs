@@ -72,6 +72,15 @@ function parseIncidentDiagnosticRoute(pathname) {
   return { invalid: false, incidentId, kind: match[2] }
 }
 
+function parseIncidentDiagnosticRerunRoute(pathname) {
+  const match = String(pathname || '').match(/^\/api\/incidents\/([^/]+)\/diagnostics\/rerun$/)
+  if (!match) return null
+  let incidentId
+  try { incidentId = decodeURIComponent(match[1]) } catch { return { invalid: true } }
+  if (!SAFE_INCIDENT_ID.test(incidentId)) return { invalid: true }
+  return { invalid: false, incidentId }
+}
+
 async function currentOverview({ config, monitoringRuntime, buildOverviewImpl }) {
   const cached = monitoringRuntime?.getOverview?.()
   if (config.monitoring?.enabled && cached) {
@@ -117,6 +126,19 @@ export function createFridayServer({
 
     if (request.method === 'GET' && url.pathname === '/api/monitoring/history') {
       return json(response, 200, monitoringRuntime?.getHistory?.() || { events: [] })
+    }
+
+    const diagnosticRerunRoute = parseIncidentDiagnosticRerunRoute(url.pathname)
+    if (request.method === 'POST' && diagnosticRerunRoute) {
+      if (diagnosticRerunRoute.invalid) return json(response, 400, { error: 'invalid-incident-id' })
+      const handler = monitoringRuntime?.rerunDiagnostic
+      if (typeof handler !== 'function') return json(response, 503, { error: 'diagnostics-unavailable' })
+      try {
+        const result = await handler.call(monitoringRuntime, diagnosticRerunRoute.incidentId)
+        return json(response, result.statusCode, result.body)
+      } catch {
+        return json(response, 502, { error: 'diagnostics-failed' })
+      }
     }
 
     const diagnosticRoute = parseIncidentDiagnosticRoute(url.pathname)
