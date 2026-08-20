@@ -2,7 +2,7 @@
 
 Date: 2026-08-19
 Branch: `feature/incident-diagnostics-mobile`
-Status: Approved design, implementation not started
+Status: Design approved in chat; written spec awaiting final user review
 
 ## 1. Purpose
 
@@ -69,6 +69,18 @@ Mobile Home is incident/system-health first:
 
 Desktop FRIDAY V3 remains authoritative and must not regress.
 
+### 2.5 Diagnostics rollout flag
+
+The VM102 controller diagnostics subsystem is opt-in at rollout:
+
+```env
+FRIDAY_DIAGNOSTICS_ENABLED=false
+```
+
+The feature is merged disabled by default. Production rollout explicitly sets it to `true` only after the expanded VM100 observer is healthy. Disabling diagnostics must leave existing monitoring and incident detection operating normally.
+
+The mobile responsive layout does not require a feature flag.
+
 ## 3. Existing system boundary
 
 FRIDAY currently uses:
@@ -110,7 +122,7 @@ VM102 — 192.168.1.64
 │                                         │
 │ Monitoring Runtime                      │
 │      │                                  │
-│      └─ incident opened                 │
+│      └─ incident opened/backfill        │
 │             │                           │
 │             ▼                           │
 │ Diagnostics Engine                      │
@@ -194,7 +206,8 @@ Allowed fields initially include:
 - restart count
 - started timestamp
 - finished timestamp
-- health status and bounded recent health summary where available
+- health status
+- at most the three most recent health-check entries containing timestamp and exit code only; health-check output text is excluded from automatic metadata
 - restart policy name and bounded retry count
 - published ports
 - Compose project label
@@ -207,6 +220,7 @@ Excluded by default:
 
 - environment variables
 - full `Config.Env`
+- health-check output text
 - mounted secret contents
 - Docker auth data
 - registry credentials
@@ -232,11 +246,10 @@ Initial log request behavior:
 
 - default tail: 100 lines
 - maximum allowed tail: 200 lines
-- enforce a response byte ceiling in the observer
-- truncate safely when the ceiling is reached
+- maximum observer response payload for log text: 64 KiB after sanitization; larger output is truncated with an explicit `truncated: true` marker
 - no arbitrary `since`, `until`, timestamps, file paths, Docker query parameters, or shell expressions supplied by the client
 
-The controller may expose a future fixed-size selector, but arbitrary Docker query pass-through is prohibited.
+The controller may request only the fixed bounded tail count. Arbitrary Docker query pass-through is prohibited.
 
 ### 6.3 Sanitization
 
@@ -271,7 +284,7 @@ Do not persist raw log text.
 
 Each supported incident may reference one FRIDAY-owned diagnostic report.
 
-Suggested normalized model:
+Normalized model:
 
 ```text
 DiagnosticReport
@@ -295,7 +308,7 @@ DiagnosticReport
 
 ### 7.1 Status values
 
-Use explicit states such as:
+Use these states:
 
 - `pending`
 - `available`
@@ -320,7 +333,7 @@ FRIDAY must distinguish observed evidence from inference.
 
 - failure appears isolated to this service
 - process is running but health check is failing
-- repeated restarts indicate a crash loop
+- the container has restarted multiple times
 
 **Recommendations** are non-executing next steps, for example:
 
@@ -332,7 +345,7 @@ The UI must label these categories clearly.
 
 ## 8. Automatic diagnostic trigger
 
-When the monitoring engine opens a supported container incident, FRIDAY should queue a single safe metadata collection attempt.
+When diagnostics are enabled and the monitoring engine opens a supported container incident, FRIDAY queues a single safe metadata collection attempt.
 
 Supported initial incident types:
 
@@ -348,11 +361,17 @@ For a given incident occurrence:
 
 - do not repeatedly fetch inspect metadata on every 30-second monitoring poll
 - collect on initial incident open
-- optionally allow a user-requested metadata refresh through a future endpoint, but do not add that write-like control in this milestone unless it remains an idempotent read fetch and is separately specified in the implementation plan
+- no manual metadata-refresh endpoint is part of this milestone
 
 ### 8.2 Recurrence
 
 If an incident resolves and a later recurrence creates a new incident ID, the new occurrence gets a new diagnostic snapshot.
+
+### 8.3 Existing incident backfill
+
+At diagnostics startup, detect existing open supported incidents that lack a diagnostic report and perform one safe metadata collection attempt for each. Once a report exists, normal polling must not repeatedly backfill it.
+
+This requirement allows the already-open Nginx Proxy Manager incident to be the production validation case without closing or recreating it.
 
 ## 9. Initial deterministic diagnostic rules
 
@@ -400,26 +419,17 @@ Recommendation:
 Inspect recent sanitized application logs and recent configuration/deployment changes.
 ```
 
-### 9.3 Crash/restart loop
+### 9.3 Restart evidence and flapping
 
-Condition:
+If `restartCount >= 3`, FRIDAY may state as a fact/finding that the container has restarted multiple times. It must not label this alone as a timed crash loop because Docker's historical restart count does not establish when those restarts occurred.
 
-- restart count is meaningfully elevated, or
-- monitoring already has a flapping incident and inspect metadata supports repeated restarts
-
-Finding:
-
-```text
-The service is repeatedly restarting or changing runtime state.
-```
+A stronger `repeatedly restarting/changing state` finding requires the existing `service-flapping` incident or equivalent recent FRIDAY transition evidence.
 
 Recommendation:
 
 ```text
 Inspect recent logs and dependency/configuration health before any restart action.
 ```
-
-Avoid pretending a single historical Docker restart count proves timing or frequency without supporting timestamps.
 
 ### 9.4 Running but unhealthy
 
@@ -439,7 +449,7 @@ The container process is running, but its configured health check is failing.
 Recommendation:
 
 ```text
-Inspect health-check output, service dependencies, and recent logs.
+Inspect health-check status, service dependencies, and recent logs.
 ```
 
 ### 9.5 Isolated service failure
@@ -448,7 +458,7 @@ Condition:
 
 - affected service is unhealthy
 - observer integration is available
-- multiple neighboring VM100 services remain online
+- at least two other VM100 services are online in the same normalized overview
 
 Finding:
 
@@ -477,15 +487,18 @@ If the incident exists but diagnostics are unsupported, return `not-supported`.
 
 If collection failed, return `unavailable` or `degraded` with a sanitized error.
 
+When `FRIDAY_DIAGNOSTICS_ENABLED=false`, return a normalized disabled/not-supported response without calling the observer.
+
 ### 10.2 Logs response
 
 The controller must:
 
-1. verify the incident exists
-2. verify it maps to a supported VM100 container
-3. call the observer log endpoint with a bounded fixed tail
-4. return sanitized ephemeral logs
-5. record only log-inspection audit metadata
+1. verify diagnostics are enabled
+2. verify the incident exists
+3. verify it maps to a supported VM100 container
+4. call the observer log endpoint using the fixed default tail of 100 lines
+5. return sanitized ephemeral logs plus `truncated` metadata
+6. record only log-inspection audit metadata
 
 Unknown incident IDs return 404.
 
@@ -505,12 +518,13 @@ The state remains versioned and atomic-file persisted.
 
 Requirements:
 
-- preserve backward compatibility with the current schema where practical
-- add schema normalization/migration logic if the schema version changes
-- do not corrupt or discard current incident/history data during upgrade
+- preserve existing incident/history data during schema upgrade
+- add explicit normalization/migration behavior for pre-diagnostics state
 - persist only sanitized metadata/findings/recommendations
 - do not persist raw logs
 - preserve existing bounded monitoring history behavior
+
+If the schema version changes, startup must normalize prior state rather than discard it.
 
 ## 12. Error handling
 
@@ -536,13 +550,14 @@ Diagnostics are subordinate to monitoring.
 - do not fabricate diagnostics
 - affected diagnostic report may be unavailable
 
-### Corrupt diagnostic persistence
+### Corrupt/legacy diagnostic persistence
 
 Use the same safe-state philosophy as monitoring:
 
 - controller must continue running
-- avoid losing unrelated incident/history state
-- recover to a safe normalized structure
+- preserve unrelated incident/history state
+- normalize missing diagnostics fields to an empty diagnostics structure
+- never discard the whole monitoring state merely because diagnostics fields are absent or malformed
 
 ## 13. Mobile dashboard goals
 
@@ -592,7 +607,7 @@ Expose lower-frequency areas:
 - Audit
 - Settings
 
-The More experience may be a sheet, drawer, or dedicated menu screen, but it must be phone-friendly and keyboard/accessibility compatible.
+The More experience may be a sheet, drawer, or dedicated menu screen, but it must be phone-friendly and keyboard/accessibility compatible. The implementation plan may choose among those presentation forms without changing the information architecture.
 
 ## 14. Mobile Home information hierarchy
 
@@ -610,7 +625,7 @@ VM 100 · Offline
 [View Diagnosis]
 ```
 
-If no incidents exist, show a concise nominal system-health state instead of an empty red/alert container.
+If no incidents exist, show a concise nominal system-health state instead of an empty alert container.
 
 ### 14.2 System health summary
 
@@ -706,7 +721,7 @@ Requirements:
 
 Tablet behavior may retain the desktop rail until the phone breakpoint if that produces the cleanest layout.
 
-The implementation plan should choose and test an explicit breakpoint based on the current CSS structure rather than introducing many overlapping breakpoints.
+The implementation plan should choose and test one explicit phone breakpoint based on the current CSS structure rather than introducing many overlapping breakpoints.
 
 ## 17. Accessibility and interaction requirements
 
@@ -717,7 +732,7 @@ The implementation plan should choose and test an explicit breakpoint based on t
 - bottom bar controls have accessible names
 - `More` can be operated by keyboard where applicable
 - log output uses readable monospaced formatting and wraps/scrolls internally without breaking page width
-- reduced-motion preference should not require animated FRIDAY core effects
+- reduced-motion preference disables or reduces decorative FRIDAY core rotation/pulsing
 
 ## 18. Security requirements
 
@@ -749,9 +764,10 @@ Cover:
 - unknown container -> safe 404
 - non-GET methods -> 404
 - inspect allowlist excludes env/raw sensitive fields
-- bounded ports/health/network output
+- automatic health metadata excludes health output text
+- bounded ports/network output
 - tail defaults and maximum enforcement
-- response byte cap
+- 64 KiB log-response cap and explicit truncation flag
 - log secret redaction
 - no arbitrary Docker query pass-through
 - source-level absence of Docker mutation API paths
@@ -760,14 +776,16 @@ Cover:
 
 Cover:
 
+- diagnostics disabled is inert and does not call the observer
 - automatic diagnostic collection when supported incident opens
+- one-time backfill of supported existing open incidents
 - no repeated inspect fetch on every monitoring poll
 - new diagnostic snapshot for later incident recurrence
 - unsupported incident behavior
 - observer failure -> diagnostic unavailable while monitoring remains healthy
-- deterministic rules for OOM, non-zero exit, unhealthy health check, and supported isolation inference
+- deterministic rules for OOM, non-zero exit, restart evidence, unhealthy health check, and supported isolation inference
 - fact/finding/recommendation separation
-- diagnostic state persistence and reload
+- diagnostic state migration/persistence/reload
 - raw logs never appear in persisted monitoring state
 - unknown incident logs request -> 404
 - log observer failure remains non-mutating
@@ -799,7 +817,7 @@ Cover:
 - nominal Home when no active incidents
 - desktop navigation/layout remains present at desktop behavior
 
-Use component-level tests and layout-class/state assertions suitable for JSDOM; use browser/e2e or screenshot validation if available in the repository/tooling for true responsive overflow checks.
+Use component-level tests and layout-class/state assertions suitable for JSDOM. Use browser/e2e or screenshot validation if available in the repository/tooling for true responsive overflow checks.
 
 ## 20. CI verification
 
@@ -843,54 +861,45 @@ On VM102:
 1. pull merged `main`
 2. preserve current live `.env`
 3. run preflight
-4. rebuild/recreate only FRIDAY with base Compose
+4. rebuild/recreate only FRIDAY with base Compose while `FRIDAY_DIAGNOSTICS_ENABLED=false`
 5. keep `FRIDAY_DOCKER_ENABLED=false`
 6. keep monitoring enabled
-7. verify Proxmox + observer integrations
-8. verify current incident survives state upgrade
-9. verify automatic diagnostic report appears for the NPM incident or perform the explicitly designed migration/backfill behavior from the implementation plan
-10. verify manual logs display
-11. verify mobile dashboard at phone width/device
+7. verify Proxmox + observer integrations and existing monitoring incident remain healthy
+8. set `FRIDAY_DIAGNOSTICS_ENABLED=true`
+9. recreate only FRIDAY with base Compose
+10. verify the existing open NPM incident receives its one-time backfilled diagnostic report
+11. verify manual logs display
+12. verify NPM remains exited and untouched
+13. verify mobile dashboard at phone width/device
 
 Do not restart Nginx Proxy Manager during validation.
 
-## 22. Existing-incident backfill requirement
+## 22. Rollback
 
-The production NPM incident already exists before this milestone deploys.
+Controller rollback:
 
-Therefore the implementation must explicitly handle existing open supported incidents after rollout. Recommended behavior:
+```env
+FRIDAY_DIAGNOSTICS_ENABLED=false
+```
 
-- after diagnostics subsystem startup, detect open supported incidents that do not yet have a diagnostic report
-- collect one safe metadata snapshot for each such incident
-- mark the report available/degraded/unavailable
-- do not repeatedly backfill once a report exists
+Then recreate only FRIDAY with base Compose. Existing monitoring, incidents, and monitoring state remain intact. Persisted sanitized diagnostic reports may remain in state for inspection.
 
-This lets the existing NPM incident become the production validation case without closing/recreating the incident or changing VM100 container state.
+Observer rollback:
 
-## 23. Rollback
+- redeploy the previous known-good observer revision if necessary
+- preserve observer `.env` and bearer token
+- the inventory endpoint remains the minimum production contract
+- controller diagnostics must degrade safely if inspect/log routes are unavailable
 
-Rollback must not require deleting monitoring state.
+Rollback never requires changing the NPM container or other managed infrastructure.
 
-If controller diagnostics cause problems:
-
-- deploy the previous known-good controller revision or disable the diagnostics integration if an explicit feature flag is added in implementation
-- preserve monitoring state for inspection
-- do not modify infrastructure providers
-
-If the observer expansion causes problems:
-
-- redeploy the previous known-good observer revision
-- inventory endpoint remains the production minimum contract
-- controller must degrade diagnostics gracefully
-
-The implementation plan should prefer a server-side diagnostics feature flag if it materially improves rollback without complicating the design.
-
-## 24. Non-goals
+## 23. Non-goals
 
 Not part of this milestone:
 
 - automatic restart/repair
 - approval execution
+- manual diagnostic metadata refresh endpoint
 - arbitrary shell access
 - SSH diagnostics
 - Docker exec
@@ -906,25 +915,27 @@ Not part of this milestone:
 - authentication/RBAC redesign
 - desktop-wide visual redesign unrelated to incident diagnostics/mobile behavior
 
-## 25. Success criteria
+## 24. Success criteria
 
 The milestone is successful when all of the following are true:
 
 1. VM100 observer exposes only the approved additional authenticated GET inspect/log routes.
 2. Raw Docker inspect payloads are never forwarded to VM102.
-3. Automatic safe metadata collection occurs once for a supported incident, including existing open incidents after rollout.
-4. FRIDAY persists sanitized diagnostic facts/findings/recommendations tied to the incident.
-5. Manual `Inspect Logs` returns bounded sanitized logs without persisting raw log text.
-6. The existing NPM incident receives a real diagnostic report without changing its `Exited (255)` container state.
-7. FRIDAY clearly separates observed facts from deterministic findings and recommendations.
-8. No diagnostic path can start, stop, restart, exec, remove, deploy, or otherwise mutate infrastructure.
-9. Phone Home is incident/system-health first.
-10. Phone navigation uses the approved bottom command bar and removes the fixed left rail.
-11. Mobile incident detail exposes diagnosis and manual log inspection cleanly at 360–430 px widths without horizontal page overflow.
-12. Desktop V3 behavior remains intact.
-13. Full CI verification passes on the exact PR head before merge.
+3. Automatic safe metadata collection occurs once for a newly opened supported incident.
+4. Existing open supported incidents receive one safe diagnostic backfill after diagnostics is enabled.
+5. FRIDAY persists sanitized diagnostic facts/findings/recommendations tied to the incident.
+6. Manual `Inspect Logs` returns at most 100 requested lines and no more than 64 KiB of sanitized log text, with truncation indicated when needed.
+7. Raw log text is never persisted.
+8. The existing NPM incident receives a real diagnostic report without changing its `Exited (255)` container state.
+9. FRIDAY clearly separates observed facts from deterministic findings and recommendations.
+10. No diagnostic path can start, stop, restart, exec, remove, deploy, or otherwise mutate infrastructure.
+11. Phone Home is incident/system-health first.
+12. Phone navigation uses the approved bottom command bar and removes the fixed left rail.
+13. Mobile incident detail exposes diagnosis and manual log inspection cleanly at 360–430 px widths without horizontal page overflow.
+14. Desktop V3 behavior remains intact.
+15. Full CI verification passes on the exact PR head before merge.
 
-## 26. Desired operational result
+## 25. Desired operational result
 
 For the current production incident, the target experience is:
 
@@ -935,7 +946,7 @@ VM100 nginx-proxy-manager remains Exited (255)
 FRIDAY incident already open
         │
         ▼
-automatic safe inspect metadata
+automatic one-time safe inspect backfill
         │
         ▼
 Facts
