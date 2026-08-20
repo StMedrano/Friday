@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import mobileCss from './mobile.css?inline'
+import diagnosticsPolishCss from './diagnostics-polish.css?inline'
 
 describe('FRIDAY mobile CSS contract', () => {
   it('contains the phone breakpoint and safe-area command bar protections', () => {
@@ -22,7 +23,7 @@ describe('FRIDAY mobile CSS contract', () => {
   })
 
   it('keeps diagnostic log lines unwrapped and confines horizontal scrolling to the log panel', () => {
-    const rule = mobileCss.match(/\.v3-phone-shell \.v3-diagnostic-logs\{([^}]*)\}/)?.[1] ?? ''
+    const rule = diagnosticsPolishCss.match(/\.v3-phone-shell \.v3-diagnostic-logs\s*\{([^}]*)\}/)?.[1] ?? ''
     expect(rule).toMatch(/white-space\s*:\s*pre(?:;|$)/)
     expect(rule).toMatch(/overflow-x\s*:\s*auto/)
     expect(rule).not.toMatch(/pre-wrap/)
