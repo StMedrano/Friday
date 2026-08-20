@@ -1,6 +1,6 @@
 import * as fs from 'node:fs/promises'
 import { dirname } from 'node:path'
-import { createEmptyMonitoringState } from './state.mjs'
+import { createEmptyMonitoringState, normalizeMonitoringState } from './state.mjs'
 
 export function createFileMonitoringStore({ statePath, fsImpl = fs }) {
   if (!statePath) throw new Error('Monitoring state path is required')
@@ -16,7 +16,7 @@ export function createFileMonitoringStore({ statePath, fsImpl = fs }) {
       }
 
       try {
-        return JSON.parse(raw)
+        return normalizeMonitoringState(JSON.parse(raw))
       } catch {
         const corruptPath = `${statePath}.corrupt-${Date.now()}`
         await fsImpl.rename(statePath, corruptPath).catch(() => {})
