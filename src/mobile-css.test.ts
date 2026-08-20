@@ -20,4 +20,9 @@ describe('FRIDAY mobile CSS contract', () => {
     expect(mobileCss).toContain('.v3-mobile-more-sheet')
     expect(mobileCss).toContain('.v3-diagnostic-logs')
   })
+
+  it('keeps diagnostic log lines intact while scrolling only inside the log panel', () => {
+    expect(mobileCss).toMatch(/\.v3-phone-shell \.v3-diagnostic-logs\{[^}]*white-space:pre(?:;|})/)
+    expect(mobileCss).toMatch(/\.v3-phone-shell \.v3-diagnostic-logs\{[^}]*overflow-x:auto/)
+  })
 })
