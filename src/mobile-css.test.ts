@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import mobileCss from './mobile.css?raw'
+import mobileCss from './mobile.css?inline'
 
 describe('FRIDAY mobile CSS contract', () => {
   it('contains the phone breakpoint and safe-area command bar protections', () => {
