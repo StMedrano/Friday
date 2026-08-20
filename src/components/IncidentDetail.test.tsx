@@ -83,6 +83,20 @@ describe('IncidentDetail', () => {
     expect(await screen.findByText(/safe application log/i)).toBeInTheDocument()
   })
 
+  it('renders log output as intact lines with horizontal scrolling inside the log panel', async () => {
+    vi.mocked(api.fetchIncidentDiagnostics).mockResolvedValue({
+      incidentId: 'i1', status: 'available', facts: [], findings: [], recommendations: [], logsAvailable: true,
+    })
+    vi.mocked(api.fetchIncidentLogs).mockResolvedValue({
+      incidentId: 'i1', tail: 100, logs: 'one very long diagnostic log line', truncated: false,
+    })
+    const user = userEvent.setup()
+    render(<IncidentDetail incident={incident} />)
+    await user.click(await screen.findByRole('button', { name: /inspect logs.*read only/i }))
+    const logPanel = await screen.findByText(/one very long diagnostic log line/i)
+    expect(logPanel).toHaveStyle({ whiteSpace: 'pre', overflowX: 'auto' })
+  })
+
   it('renders pending and not-supported states without remediation controls', async () => {
     vi.mocked(api.fetchIncidentDiagnostics).mockResolvedValue({ incidentId: 'i1', status: 'not-supported', reason: 'incident-not-supported' })
     render(<IncidentDetail incident={incident} />)
