@@ -7,8 +7,8 @@ This is the source-of-truth handoff ledger for coding agents. Update it when a m
 - `main` is the authoritative deployed FRIDAY build after reviewed feature work is merged.
 - VM 102 (`friday-controller`, `192.168.1.64`) is the authoritative controller host.
 - VM 100 (`192.168.1.124`) is managed infrastructure and hosts the separate read-only Docker observer.
-- The approved frontend is **FRIDAY UI v3** in React/TypeScript under `src/`.
-- PR #5 branch `feature/incident-diagnostics-mobile` contains the current Incident Diagnostics + Mobile Dashboard candidate and is not deployed until merged and explicitly rolled out.
+- The approved deployed frontend is **FRIDAY UI v3** in React/TypeScript under `src/`.
+- PR #5 branch `feature/incident-diagnostics-mobile` contains the completed Incident Diagnostics + Mobile Dashboard candidate and is not deployed until merged and explicitly rolled out.
 
 ## Current deployed baseline
 
@@ -37,7 +37,7 @@ Implemented behavior:
 - cached monitoring-aware overview;
 - no restart/repair/execute endpoint.
 
-## Incident Diagnostics — PR #5 candidate
+## Incident Diagnostics — PR #5 candidate implemented
 
 The diagnostics backend is implemented on `feature/incident-diagnostics-mobile` but is **not merged or deployed**.
 
@@ -72,6 +72,45 @@ GET /api/v1/containers/:id/logs?tail=100
 ```
 
 There are no diagnostic POST/PUT/PATCH/DELETE routes and no arbitrary Docker proxy, SSH, shell, exec, or remediation path.
+
+## Mobile Dashboard — PR #5 candidate implemented
+
+The mobile dashboard is implemented on the same PR #5 branch and remains **unmerged and undeployed**.
+
+Phone layout boundary:
+
+```text
+(max-width: 700px)
+```
+
+Phone navigation:
+
+```text
+Home | FRIDAY | Infrastructure | Incidents | More
+```
+
+`More` contains Applications, Agents, Tasks, Approvals, Memory, Audit, and Settings.
+
+Mobile Home priority:
+
+```text
+Incident attention -> Health -> FRIDAY -> Infrastructure -> Services
+```
+
+Implemented behavior:
+
+- phone React shell replaces the desktop rail at or below 700px instead of shrinking it;
+- desktop FRIDAY UI v3 remains the render path above 700px;
+- active incidents are prioritized above the command surface;
+- `View Diagnosis` shares incident selection with the Incidents workspace;
+- diagnosis shows read-only facts, findings, likely causes, and recommendations;
+- `Inspect Logs · Read Only` is the only log-fetch control and logs are not requested before explicit activation;
+- mobile command bar has five primary destinations plus a More sheet;
+- safe-area-aware fixed bottom navigation and minimum 44px primary touch targets are styled;
+- width containment, log-panel containment, and reduced-motion treatment are present;
+- frontend tests explicitly reject restart/repair/execute/stop/start-container diagnostic controls.
+
+Automated tests prove the 700px routing behavior and desktop component regression, but this connector session has no browser/device runner that can reach private VM102. True visual acceptance at 360px, 390px, 430px, and desktop 1440px remains required before merge or rollout; JSDOM is not being treated as proof of pixel-level overflow/clipping.
 
 ## Diagnostics rollout contract
 
@@ -110,17 +149,26 @@ The observer must never gain restart, stop, kill, exec, remove, image creation, 
 
 ## Verification status for PR #5
 
-Completed diagnostics verification milestones include successful GitHub Actions runs for schema/config, observer primitives/routes, controller adapter/analyzer, automatic diagnostics/backfill, explicit log inspection, HTTP diagnostics APIs, and the diagnostics safety gate.
+Diagnostics and mobile implementation verification is green through Friday CI #186 on candidate head `064f58b8ca3b12af31c427d6e5a930163a2d7973` before the final documentation-only commits.
 
-Final exact-head verification must be re-run after all diagnostics documentation and mobile-dashboard implementation are complete. An older green run must not be used as evidence for a newer head.
+That run passed:
 
-## Mobile Dashboard candidate
+- 38/38 Vitest frontend tests;
+- 101/101 Node/server/observer/monitoring/diagnostics tests;
+- production TypeScript/Vite build;
+- shell validation;
+- observer security boundary;
+- monitoring safety boundary;
+- diagnostics safety boundary;
+- controller/local-Docker/VM100-observer Compose validation;
+- controller image build;
+- VM100 observer image build.
 
-The mobile-dashboard portion of PR #5 is the next implementation phase. Until its TDD tasks are completed, the existing FRIDAY UI v3 remains authoritative and no mobile feature should be described as deployed.
+A **new exact-head Friday CI run is still required after these documentation commits**. Do not use CI #186 as the final merge-gate evidence if the PR head has moved.
 
 ## Not implemented yet
 
-- Mobile incident-first dashboard from the approved PR #5 plan.
+- Real-device/browser visual acceptance of PR #5 at 360/390/430px and desktop 1440px.
 - Omada authenticated read-only API adapter.
 - AdGuard authenticated read-only API/statistics adapter.
 - Uptime Kuma/Prometheus/Grafana native adapters.
