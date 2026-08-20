@@ -1,3 +1,5 @@
+const STARTUP_FAILURE_WINDOW_MS = 5 * 60 * 1000
+
 function addUnique(list, value) {
   if (value && !list.includes(value)) list.push(value)
 }
@@ -8,6 +10,13 @@ function onlineNeighbors(overview, incident) {
     && service?.id !== incident?.serviceId
     && service?.status === 'online'
   ))
+}
+
+function runtimeDurationMs(startedAt, finishedAt) {
+  const started = Date.parse(String(startedAt || ''))
+  const finished = Date.parse(String(finishedAt || ''))
+  if (!Number.isFinite(started) || !Number.isFinite(finished) || finished < started) return null
+  return finished - started
 }
 
 export function buildDiagnosticReport({ incident, inspect, overview, now }) {
@@ -21,14 +30,20 @@ export function buildDiagnosticReport({ incident, inspect, overview, now }) {
   const exitCode = inspect.exitCode == null || !Number.isFinite(Number(inspect.exitCode)) ? null : Number(inspect.exitCode)
   const healthStatus = String(inspect.health?.status || 'unavailable')
   const state = String(inspect.state || 'unknown')
+  const runtimeMs = runtimeDurationMs(inspect.startedAt, inspect.finishedAt)
 
   if (inspect.oomKilled === true) {
     addUnique(findings, 'The container was terminated by the kernel due to memory pressure.')
     addUnique(likelyCauses, 'Memory pressure caused the container termination.')
     addUnique(recommendations, 'Inspect host/container memory pressure and recent workload changes before considering remediation.')
   } else if (state === 'exited' && exitCode !== null && exitCode !== 0) {
-    addUnique(findings, 'The container exited with an application/startup failure rather than an OOM termination.')
-    addUnique(likelyCauses, 'Application or startup configuration failure is likely.')
+    if (runtimeMs !== null && runtimeMs >= STARTUP_FAILURE_WINDOW_MS) {
+      addUnique(findings, 'The container exited with a runtime/application failure rather than an OOM termination.')
+      addUnique(likelyCauses, 'A runtime application or dependency failure is likely.')
+    } else {
+      addUnique(findings, 'The container exited with an application/startup failure rather than an OOM termination.')
+      addUnique(likelyCauses, 'Application or startup configuration failure is likely.')
+    }
     addUnique(recommendations, 'Inspect recent sanitized application logs and recent configuration/deployment changes.')
   }
 
