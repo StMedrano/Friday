@@ -8,6 +8,7 @@ import { answerAssistant } from './assistant.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
+const SAFE_INCIDENT_ID = /^[A-Za-z0-9_.-]{1,256}$/
 
 const mime = {
   '.html': 'text/html; charset=utf-8',
@@ -44,7 +45,9 @@ function readBody(request) {
 }
 
 function serveStatic(requestPath, response) {
-  const clean = normalize(decodeURIComponent(requestPath)).replace(/^(\.\.(\/|\\|$))+/, '')
+  let decoded
+  try { decoded = decodeURIComponent(requestPath) } catch { return false }
+  const clean = normalize(decoded).replace(/^(\.\.(\/|\\|$))+/, '')
   let path = join(publicDir, clean === '/' ? 'index.html' : clean)
   if (!path.startsWith(publicDir)) return false
   if (!existsSync(path) || statSync(path).isDirectory()) path = join(publicDir, 'index.html')
@@ -58,6 +61,15 @@ function serveStatic(requestPath, response) {
   })
   createReadStream(path).pipe(response)
   return true
+}
+
+function parseIncidentDiagnosticRoute(pathname) {
+  const match = String(pathname || '').match(/^\/api\/incidents\/([^/]+)\/(diagnostics|logs)$/)
+  if (!match) return null
+  let incidentId
+  try { incidentId = decodeURIComponent(match[1]) } catch { return { invalid: true } }
+  if (!SAFE_INCIDENT_ID.test(incidentId)) return { invalid: true }
+  return { invalid: false, incidentId, kind: match[2] }
 }
 
 async function currentOverview({ config, monitoringRuntime, buildOverviewImpl }) {
@@ -105,6 +117,21 @@ export function createFridayServer({
 
     if (request.method === 'GET' && url.pathname === '/api/monitoring/history') {
       return json(response, 200, monitoringRuntime?.getHistory?.() || { events: [] })
+    }
+
+    const diagnosticRoute = parseIncidentDiagnosticRoute(url.pathname)
+    if (request.method === 'GET' && diagnosticRoute) {
+      if (diagnosticRoute.invalid) return json(response, 400, { error: 'invalid-incident-id' })
+      const handler = diagnosticRoute.kind === 'diagnostics'
+        ? monitoringRuntime?.getDiagnostic
+        : monitoringRuntime?.getIncidentLogs
+      if (typeof handler !== 'function') return json(response, 503, { error: 'diagnostics-unavailable' })
+      try {
+        const result = await handler.call(monitoringRuntime, diagnosticRoute.incidentId)
+        return json(response, result.statusCode, result.body)
+      } catch {
+        return json(response, 502, { error: 'diagnostics-failed' })
+      }
     }
 
     if (request.method === 'POST' && url.pathname === '/api/commands/preview') {
