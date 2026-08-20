@@ -58,6 +58,6 @@ describe('incident diagnostics API', () => {
 
     await expect(fetchIncidentDiagnostics('i1')).rejects.toThrow('diagnostics-disabled')
     expect(fetchMock).toHaveBeenCalledTimes(1)
-    expect(fetchMock.mock.calls[0]?.[1]).toEqual(expect.objectContaining({ method: 'GET' }))
+    expect(fetchMock).toHaveBeenCalledWith('/api/incidents/i1/diagnostics', expect.objectContaining({ method: 'GET' }))
   })
 })
