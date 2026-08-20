@@ -1,0 +1,9 @@
+@media(max-width:700px){
+  .v3-phone-shell .v3-diagnostic-logs{
+    overflow-x:auto;
+    overflow-y:auto;
+    white-space:pre;
+    overflow-wrap:normal;
+    word-break:normal;
+  }
+}
