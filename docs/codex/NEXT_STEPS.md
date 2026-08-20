@@ -39,11 +39,11 @@ Completed candidate outcomes:
 - diagnosis/log UI remains read-only and tests reject restart/repair/execute/stop/start-container controls;
 - safe-area bottom navigation, 44px primary touch targets, overflow containment, and reduced-motion treatment are implemented.
 
-Automated verification reached a full green Friday CI #186 on implementation head `064f58b8ca3b12af31c427d6e5a930163a2d7973` before final documentation-only commits. Because the head moved afterward, require a new exact-head Friday CI success before considering the branch review-ready.
+Merge-gate automation rule: the Friday CI run associated with the **exact current PR head SHA** must be green. Never reuse an older successful run after the branch head moves. Required gates include frontend/Node tests, production build, observer/monitoring/diagnostics safety checks, all Compose variants, and both container image builds.
 
 Remaining merge-gate work, in order:
 
-1. Complete exact-head GitHub Actions verification after all docs/PR metadata are final.
+1. Require exact-current-head Friday CI success.
 2. Perform real browser/device visual acceptance at 360px, 390px, 430px, and desktop 1440px. This connector session cannot reach private VM102 with browser tooling, so JSDOM must not be treated as proof of no visual clipping/overflow.
 3. At phone widths verify no desktop rail, no horizontal page scrollbar, incident attention above FRIDAY command, fully visible bottom bar, unclipped More sheet, working View Diagnosis, contained Inspect Logs output, and non-cramped touch controls.
 4. At desktop width verify V3 rail/topbar/large command-center hero/infrastructure/telemetry/agents/services/Incidents remain present and no mobile bottom bar renders.
