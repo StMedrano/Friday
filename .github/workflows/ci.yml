@@ -68,6 +68,29 @@ jobs:
             exit 1
           fi
 
+      - name: Verify diagnostics safety boundary
+        run: |
+          if grep -RniE '/containers/.*/(start|stop|restart|kill|exec)|/images/create|/volumes|/networks/.*/(connect|disconnect)|/archive' observer/config.mjs observer/docker.mjs observer/server.mjs server/diagnostics server/adapters/vm100-observer-diagnostics.mjs; then
+            echo 'Diagnostics mutation API path detected.' >&2
+            exit 1
+          fi
+          if grep -RniE "request\.method === '(POST|PUT|PATCH|DELETE)'.*(diagnostic|/api/incidents/.*/logs)" server/http.mjs observer/server.mjs; then
+            echo 'Diagnostics write route detected.' >&2
+            exit 1
+          fi
+          if grep -RniE 'child_process|execFile\(|spawn\(|ssh ' server/diagnostics server/adapters/vm100-observer-diagnostics.mjs observer/config.mjs observer/docker.mjs observer/server.mjs; then
+            echo 'Shell or SSH diagnostics path detected.' >&2
+            exit 1
+          fi
+          if grep -RniE 'VITE_.*(TOKEN|SECRET|OBSERVER|DIAGNOSTIC)' src server observer compose.yaml .env.example; then
+            echo 'Browser-visible diagnostics secret variable detected.' >&2
+            exit 1
+          fi
+          if grep -RniE 'Config\.Env|\.Env\b' observer/docker.mjs observer/server.mjs; then
+            echo 'Raw Docker environment forwarding detected in diagnostics source.' >&2
+            exit 1
+          fi
+
       - name: Validate controller Compose
         run: docker compose config >/dev/null
 
