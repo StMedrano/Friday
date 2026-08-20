@@ -48,7 +48,7 @@ function overview(otherOnline = 2) {
   }
 }
 
-test('non-zero exit becomes observed facts plus deterministic application failure and isolation findings', () => {
+test('non-zero exit within five minutes is classified as startup/configuration failure', () => {
   const report = buildDiagnosticReport({
     incident: incident(),
     inspect: inspect(),
@@ -60,12 +60,39 @@ test('non-zero exit becomes observed facts plus deterministic application failur
   assert.equal(report.metadata.exitCode, 255)
   assert.ok(report.facts.some((fact) => fact.id === 'exit-code' && fact.value === '255'))
   assert.ok(report.facts.some((fact) => fact.id === 'oom-killed' && fact.value === 'No'))
-  assert.ok(report.findings.includes('The container exited with an application/startup failure rather than an OOM termination.'))
+  assert.ok(report.findings.includes('The container exited within five minutes with a likely startup/configuration failure rather than an OOM termination.'))
   assert.ok(report.findings.includes('The failure appears isolated to this service rather than a host-wide Docker outage.'))
-  assert.ok(report.likelyCauses.includes('Application or startup configuration failure is likely.'))
+  assert.ok(report.likelyCauses.includes('A startup or early configuration failure is likely.'))
   assert.ok(report.recommendations.includes('Inspect recent sanitized application logs and recent configuration/deployment changes.'))
   assert.equal(report.logsAvailable, true)
   assert.equal(report.lastLogInspectionAt, null)
+})
+
+test('non-zero exit after at least five minutes is classified as runtime/application failure', () => {
+  const report = buildDiagnosticReport({
+    incident: incident(),
+    inspect: inspect({
+      startedAt: '2026-08-10T17:35:51.097Z',
+      finishedAt: '2026-08-17T12:10:16.128Z',
+    }),
+    overview: overview(2),
+    now: '2026-08-20T01:00:00.000Z',
+  })
+  assert.ok(report.findings.includes('The container exited after running for at least five minutes, which is more consistent with a runtime/application failure than a startup failure.'))
+  assert.ok(report.likelyCauses.includes('A runtime application failure is likely.'))
+  assert.equal(report.findings.some((value) => /startup\/configuration failure/i.test(value)), false)
+})
+
+test('non-zero exit with unavailable runtime timestamps stays neutral about startup versus runtime', () => {
+  const report = buildDiagnosticReport({
+    incident: incident(),
+    inspect: inspect({ startedAt: '', finishedAt: '' }),
+    overview: overview(2),
+    now: '2026-08-20T01:00:00.000Z',
+  })
+  assert.ok(report.findings.includes('The container exited with a non-zero code without evidence of an OOM termination; runtime duration was unavailable.'))
+  assert.ok(report.likelyCauses.includes('An application or configuration failure is likely, but startup versus runtime timing cannot be determined.'))
+  assert.equal(report.findings.some((value) => /within five minutes|at least five minutes/i.test(value)), false)
 })
 
 test('OOM termination is diagnosed from the explicit OOM flag', () => {
@@ -78,7 +105,7 @@ test('OOM termination is diagnosed from the explicit OOM flag', () => {
   assert.ok(report.findings.includes('The container was terminated by the kernel due to memory pressure.'))
   assert.ok(report.likelyCauses.includes('Memory pressure caused the container termination.'))
   assert.ok(report.recommendations.includes('Inspect host/container memory pressure and recent workload changes before considering remediation.'))
-  assert.equal(report.findings.some((value) => /application\/startup failure/i.test(value)), false)
+  assert.equal(report.findings.some((value) => /startup|runtime\/application/i.test(value)), false)
 })
 
 test('restart count of three reports historical restart evidence without claiming a timed crash loop', () => {
