@@ -1,15 +1,26 @@
 # Friday Integrations
 
-Friday integrations are server-side and read-only unless a future action adapter is explicitly introduced after authentication, approval, and audit controls exist.
+Friday integrations are server-side and read-only unless a future action adapter is explicitly introduced after authentication, approval, and durable action-audit controls exist.
 
 ## VM100 Docker observer
 - Controller adapter: `server/adapters/vm100-observer.mjs`
 - Observer service: `observer/`
-- Transport: token-authenticated HTTP from VM102 to VM100 on `192.168.1.74:3199`.
+- Transport: token-authenticated HTTP from VM102 to VM100 on `192.168.1.124:3199`.
 - Observer Docker access: local Unix socket only.
 - Exposed routes: `GET /health` and `GET /api/v1/containers` only.
 - Purpose: sanitized VM100 container inventory.
 - Never expose Docker's native TCP API.
+
+## Monitoring & Incidents
+- Runtime: `server/monitoring/runtime.mjs`
+- Rules: `server/monitoring/incidents.mjs`
+- Durable store: `server/monitoring/store.mjs`
+- State: FRIDAY-owned `/data/monitoring-state.json` in the `friday_data` volume.
+- Inputs: normalized read-only overview from configured adapters.
+- Outputs: current incidents, bounded health history, monitoring summary, incident-derived alerts.
+- APIs: `GET /api/incidents` and `GET /api/monitoring/history` only.
+- Monitoring does not add provider write permissions and does not extend the VM100 observer API.
+- Recommended remediation is advisory; infrastructure execution remains unavailable.
 
 ## Local Docker Engine on VM102
 - Adapter: `server/adapters/docker.mjs`

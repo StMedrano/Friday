@@ -1,12 +1,12 @@
 # Friday
 
-Friday is a two-site homelab control plane hosted on **VM 102 (`friday-controller`, `192.168.1.64`)**. It combines the authoritative **FRIDAY UI v3 command center**, a server-side infrastructure API, read-only live adapters, and an optional AI analysis boundary without exposing privileged credentials to the browser.
+Friday is a two-site homelab control plane hosted on **VM 102 (`friday-controller`, `192.168.1.64`)**. It combines the authoritative **FRIDAY UI v3 command center**, a server-side infrastructure API, read-only live adapters, durable monitoring/incidents, and an optional AI analysis boundary without exposing privileged credentials to the browser.
 
 ## Authoritative build
 
-`main` is the canonical FRIDAY build and deployment source.
+`main` is the canonical FRIDAY build and deployment source after reviewed feature work is merged.
 
-The production UI is the React/TypeScript implementation under `src/`, with `src/pages/Dashboard.tsx` and `src/styles.css` carrying the approved FRIDAY UI v3 command-center experience. Standalone HTML prototypes and older dashboard designs are reference artifacts only.
+The production UI is the React/TypeScript implementation under `src/`, with `src/pages/Dashboard.tsx`, `src/styles.css`, and the focused monitoring styles under `src/monitoring.css` carrying the approved FRIDAY UI v3 command-center experience. Standalone HTML prototypes and older dashboard designs are reference artifacts only.
 
 VM 102 deploys and updates FRIDAY by pulling `main` and using the repository Makefile/Compose workflow. VM 100 is managed infrastructure and hosts a separate read-only Docker observer; it is not the FRIDAY controller.
 
@@ -19,19 +19,22 @@ VM 102 deploys and updates FRIDAY by pulling `main` and using the repository Mak
 - Proxmox read-only API adapter
 - VM100 token-authenticated read-only Docker observer
 - Optional local VM102 Docker inventory adapter, disabled by default
+- Durable FRIDAY-owned monitoring state and health history
+- Deterministic offline/degraded/integration/flapping incident rules
+- Read-only Incidents workspace with recommended next steps
 - HTTP/HTTPS endpoint health checks
 - Deterministic preview-only command classifier
 - Optional server-side OpenAI analysis endpoint
 - Safe base Compose with no Docker socket mount
 - Explicit local-Docker override only when intentionally requested
 - VM102 controller preflight/update/verification scripts
-- GitHub CI for controller + observer tests, builds, Compose validation, and shell syntax
+- GitHub CI for controller + observer tests, builds, Compose validation, shell syntax, and monitoring safety checks
 
 ## Safety model
 
-Friday starts in `FRIDAY_MODE=mock`. Read adapters cannot mutate infrastructure. The AI endpoint is advisory only and receives normalized Friday state, not Docker/Proxmox execution tools.
+Friday starts in `FRIDAY_MODE=mock`. Read adapters cannot mutate infrastructure. Monitoring writes only FRIDAY-owned state under the persistent `/data` volume. The AI endpoint is advisory only and receives normalized Friday state, not Docker/Proxmox execution tools.
 
-No restart/delete/network/firewall/VLAN/device-adoption execution endpoint exists in this MVP. Infrastructure actions remain blocked until authentication/RBAC, durable audit logging, and approval workflow exist.
+No restart/delete/network/firewall/VLAN/device-adoption execution endpoint exists in this MVP. Infrastructure actions remain blocked until authentication/RBAC, durable action audit logging, and approval workflow exist.
 
 The VM100 observer exposes only:
 
@@ -73,7 +76,7 @@ Example observer settings on VM102:
 
 ```env
 FRIDAY_VM100_OBSERVER_ENABLED=true
-FRIDAY_VM100_OBSERVER_URL=http://192.168.1.74:3199
+FRIDAY_VM100_OBSERVER_URL=http://192.168.1.124:3199
 FRIDAY_VM100_OBSERVER_TOKEN=
 FRIDAY_VM100_OBSERVER_HOST_NAME=VM 100
 ```
@@ -88,6 +91,37 @@ make health
 
 `make live` is reserved for the explicit case where you intentionally enable **local VM102 Docker observation** with `FRIDAY_DOCKER_ENABLED=true`; it mounts VM102's Docker socket read-only.
 
+## Enable Monitoring & Incidents
+
+Monitoring is disabled by default. After the monitoring milestone is reviewed, merged, and pulled onto VM102, enable it server-side:
+
+```env
+FRIDAY_MONITORING_ENABLED=true
+FRIDAY_MONITORING_POLL_SECONDS=30
+FRIDAY_MONITORING_OFFLINE_GRACE_SECONDS=300
+FRIDAY_MONITORING_STATE_PATH=/data/monitoring-state.json
+FRIDAY_MONITORING_HISTORY_LIMIT=2000
+```
+
+Use the base Compose file:
+
+```bash
+docker compose up -d --force-recreate
+make health
+```
+
+FRIDAY immediately starts a single non-overlapping read-only poll loop, persists FRIDAY-owned observation/incident/history state in the existing `friday_data` volume, and exposes active/recent incidents through the UI and GET-only APIs. An offline/degraded service must remain unhealthy for the configured grace period before a service incident opens; integration loss opens immediately.
+
+Monitoring does **not** restart, stop, start, exec into, or modify containers or Proxmox guests. Recommended actions are advisory and visibly require approval to act.
+
+Rollback is:
+
+```env
+FRIDAY_MONITORING_ENABLED=false
+```
+
+then recreate FRIDAY with base Compose. Leave `/data/monitoring-state.json` untouched so the history remains available for later inspection.
+
 ## Deploy the VM100 observer
 
 The observer source and exact deployment guide are under `observer/`.
@@ -95,7 +129,7 @@ The observer source and exact deployment guide are under `observer/`.
 Target:
 
 ```text
-VM 100: 192.168.1.74
+VM 100: 192.168.1.124
 Port:   3199
 Path:   /srv/infrastructure/friday-observer
 ```
@@ -132,7 +166,7 @@ make build
 make verify
 ```
 
-`make verify` validates the controller Compose files and the standalone VM100 observer Compose project.
+`make verify` validates the controller Compose files and the standalone VM100 observer Compose project. GitHub CI also verifies monitoring route/security boundaries and builds both images.
 
 ## API
 
@@ -142,9 +176,13 @@ FRIDAY controller:
 GET  /healthz
 GET  /api/health
 GET  /api/overview
+GET  /api/incidents
+GET  /api/monitoring/history
 POST /api/commands/preview
 POST /api/assistant
 ```
+
+There are no POST/PUT/PATCH/DELETE incident or monitoring action endpoints.
 
 VM100 observer:
 
