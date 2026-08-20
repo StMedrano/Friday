@@ -20,35 +20,37 @@ Work from top to bottom. Do not skip safety prerequisites to reach action featur
 - Monitoring history recorded the incident opening.
 - VM100 proof confirmed NPM remained `Exited (255)`; monitoring did not mutate it.
 
-## P2 — Finish Incident Diagnostics candidate on PR #5
+## P2 — Incident Diagnostics + Mobile Dashboard candidate — implementation complete, merge gate pending
 
-1. Keep the feature isolated on `feature/incident-diagnostics-mobile`.
-2. Finish diagnostics documentation and exact-head GitHub Actions verification.
-3. Require the diagnostics safety gate to pass on the exact final head.
-4. Confirm observer inspect/log routes remain fixed GET-only endpoints with sanitized inventory-derived IDs.
-5. Confirm raw logs are explicit-request only and absent from persisted state/history.
-6. Keep `FRIDAY_DIAGNOSTICS_ENABLED=false` by default.
-7. Do not merge or deploy until the owner explicitly approves.
-8. After merge approval, roll out observer first and controller second using `docs/live-integrations.md`.
-9. Use the existing NPM outage only as a read-only validation target; do not restart or repair it during diagnostics validation.
+PR #5 branch `feature/incident-diagnostics-mobile` now contains both approved candidate milestones. It remains draft, unmerged, and undeployed.
 
-## P3 — Implement the approved Mobile Dashboard on PR #5
+Completed candidate outcomes:
 
-Use the approved mobile implementation plan and TDD sequence. The target is an incident-first operations view rather than a shrunken desktop dashboard.
+- diagnostics stay disabled by default with `FRIDAY_DIAGNOSTICS_ENABLED=false`;
+- observer inspect/log routes are fixed bearer-authenticated GET-only endpoints using sanitized inventory-derived IDs;
+- inspect metadata is allowlisted and logs are bounded/sanitized;
+- raw logs are explicit-request only and absent from persisted monitoring state/history;
+- deterministic incident diagnosis separates facts, findings, likely causes, and recommendations;
+- supported incidents receive one metadata-only diagnostic report/backfill, not recurring log collection;
+- phone layout uses exact `(max-width: 700px)` routing;
+- phone navigation is `Home | FRIDAY | Infrastructure | Incidents | More`;
+- Mobile Home priority is `Incident attention -> Health -> FRIDAY -> Infrastructure -> Services`;
+- the desktop FRIDAY UI v3 rail and command-center render path remains intact above 700px;
+- diagnosis/log UI remains read-only and tests reject restart/repair/execute/stop/start-container controls;
+- safe-area bottom navigation, 44px primary touch targets, overflow containment, and reduced-motion treatment are implemented.
 
-Required outcomes:
+Automated verification reached a full green Friday CI #186 on implementation head `064f58b8ca3b12af31c427d6e5a930163a2d7973` before final documentation-only commits. Because the head moved afterward, require a new exact-head Friday CI success before considering the branch review-ready.
 
-- mobile Home prioritizes active incidents and infrastructure attention state;
-- bottom navigation replaces desktop rail behavior on narrow viewports;
-- diagnosis view presents facts, findings, likely causes, recommendations, and explicit log inspection access;
-- existing desktop FRIDAY UI v3 remains intact;
-- no mobile remediation/restart/repair controls are introduced;
-- responsive behavior is tested around the approved narrow breakpoint;
-- full frontend/server/security/build CI remains green.
+Remaining merge-gate work, in order:
 
-Stop at the PR merge gate after exact-head verification.
+1. Complete exact-head GitHub Actions verification after all docs/PR metadata are final.
+2. Perform real browser/device visual acceptance at 360px, 390px, 430px, and desktop 1440px. This connector session cannot reach private VM102 with browser tooling, so JSDOM must not be treated as proof of no visual clipping/overflow.
+3. At phone widths verify no desktop rail, no horizontal page scrollbar, incident attention above FRIDAY command, fully visible bottom bar, unclipped More sheet, working View Diagnosis, contained Inspect Logs output, and non-cramped touch controls.
+4. At desktop width verify V3 rail/topbar/large command-center hero/infrastructure/telemetry/agents/services/Incidents remain present and no mobile bottom bar renders.
+5. Keep PR #5 unmerged and undeployed until the owner explicitly approves merge.
+6. Use the existing NPM outage only as a read-only validation target; do not restart or repair it during validation.
 
-## P4 — Production rollout of PR #5
+## P3 — Production rollout of PR #5
 
 Only after explicit merge and rollout approval:
 
@@ -62,9 +64,9 @@ Only after explicit merge and rollout approval:
 8. Validate the existing NPM incident receives one metadata-only backfill.
 9. Explicitly request logs through the controller and verify they are not persisted.
 10. Confirm NPM still remains in its pre-validation state.
-11. Validate the mobile dashboard on phone-width and desktop-width clients.
+11. Re-run mobile dashboard visual acceptance on the deployed VM102 build before declaring rollout complete.
 
-## P5 — Complete real read-only visibility
+## P4 — Complete real read-only visibility
 
 1. Keep Proxmox on the dedicated read-only token.
 2. Keep the VM100 observer authoritative for VM100 Docker visibility.
@@ -72,7 +74,7 @@ Only after explicit merge and rollout approval:
 4. Add approved HTTP endpoint checks for both sites.
 5. Compare FRIDAY output to actual infrastructure and fix normalization errors before adding more providers.
 
-## P6 — Finish the Friday assistant experience
+## P5 — Finish the Friday assistant experience
 
 1. Connect the command composer to `/api/assistant` when AI is enabled.
 2. Keep `/api/commands/preview` as the deterministic no-AI fallback and safety classifier.
@@ -80,14 +82,14 @@ Only after explicit merge and rollout approval:
 4. Add tests proving AI output cannot claim execution status.
 5. Keep advisory/proposed-action labels explicit.
 
-## P7 — Complete network/service read adapters
+## P6 — Complete network/service read adapters
 
 1. Omada read-only site/device/health adapter using the installed controller's supported API.
 2. AdGuard Home status and DNS statistics adapter.
 3. Prefer existing Prometheus/Uptime Kuma monitoring data over duplicate probes where practical.
 4. Keep every provider failure non-fatal to `/api/overview` and visible to monitoring as an integration incident.
 
-## P8 — Authentication, roles, approval, and durable action audit
+## P7 — Authentication, roles, approval, and durable action audit
 
 Implement before any infrastructure write operation:
 
@@ -97,9 +99,9 @@ Implement before any infrastructure write operation:
 - action request IDs and lifecycle states: proposed, awaiting-approval, approved, rejected, executing, succeeded, failed;
 - explicit approval workflow and global automation kill switch.
 
-## P9 — Controlled actions
+## P8 — Controlled actions
 
-Only after P8 is complete and tested:
+Only after P7 is complete and tested:
 
 1. Read-only health checks remain always safe.
 2. Restart one explicitly allowlisted container through a dedicated action service.
@@ -107,7 +109,7 @@ Only after P8 is complete and tested:
 
 Every action must be explicit, allowlisted, auditable, and approval-gated by default. Never expose arbitrary shell execution or the native Docker API through FRIDAY.
 
-## P10 — Multi-site operations polish
+## P9 — Multi-site operations polish
 
 - Site A/Site B filtering and topology view.
 - VPN status/latency history.
