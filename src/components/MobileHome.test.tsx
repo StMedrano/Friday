@@ -54,7 +54,7 @@ describe('MobileHome', () => {
     expect(sections[3]).toHaveAttribute('data-mobile-section', 'infrastructure')
     expect(sections[4]).toHaveAttribute('data-mobile-section', 'services')
 
-    expect(screen.getByText('nginx-proxy-manager')).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 1, name: 'nginx-proxy-manager' })).toBeInTheDocument()
     expect(screen.getByText(/1 HIGH INCIDENT/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /view diagnosis/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /ask friday/i })).toBeInTheDocument()
