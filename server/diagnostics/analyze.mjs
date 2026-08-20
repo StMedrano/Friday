@@ -10,6 +10,13 @@ function onlineNeighbors(overview, incident) {
   ))
 }
 
+function containerRuntimeMs(inspect) {
+  const started = Date.parse(String(inspect?.startedAt || ''))
+  const finished = Date.parse(String(inspect?.finishedAt || ''))
+  if (!Number.isFinite(started) || !Number.isFinite(finished) || finished < started) return null
+  return finished - started
+}
+
 export function buildDiagnosticReport({ incident, inspect, overview, now }) {
   if (!incident?.id) throw new Error('Incident id is required')
   if (!inspect || typeof inspect !== 'object') throw new Error('Diagnostic inspect metadata is required')
@@ -21,14 +28,21 @@ export function buildDiagnosticReport({ incident, inspect, overview, now }) {
   const exitCode = inspect.exitCode == null || !Number.isFinite(Number(inspect.exitCode)) ? null : Number(inspect.exitCode)
   const healthStatus = String(inspect.health?.status || 'unavailable')
   const state = String(inspect.state || 'unknown')
+  const runtimeMs = containerRuntimeMs(inspect)
+  const startupWindowMs = 5 * 60 * 1000
 
   if (inspect.oomKilled === true) {
     addUnique(findings, 'The container was terminated by the kernel due to memory pressure.')
     addUnique(likelyCauses, 'Memory pressure caused the container termination.')
     addUnique(recommendations, 'Inspect host/container memory pressure and recent workload changes before considering remediation.')
   } else if (state === 'exited' && exitCode !== null && exitCode !== 0) {
-    addUnique(findings, 'The container exited with an application/startup failure rather than an OOM termination.')
-    addUnique(likelyCauses, 'Application or startup configuration failure is likely.')
+    if (runtimeMs !== null && runtimeMs >= startupWindowMs) {
+      addUnique(findings, 'The container exited after running for at least five minutes, which is more consistent with a runtime/application failure than a startup failure.')
+      addUnique(likelyCauses, 'A runtime application failure is likely.')
+    } else {
+      addUnique(findings, 'The container exited within five minutes with a likely startup/configuration failure rather than an OOM termination.')
+      addUnique(likelyCauses, 'A startup or early configuration failure is likely.')
+    }
     addUnique(recommendations, 'Inspect recent sanitized application logs and recent configuration/deployment changes.')
   }
 
