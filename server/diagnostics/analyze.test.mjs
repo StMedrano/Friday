@@ -83,6 +83,18 @@ test('non-zero exit after at least five minutes is classified as runtime/applica
   assert.equal(report.findings.some((value) => /startup\/configuration failure/i.test(value)), false)
 })
 
+test('non-zero exit with unavailable runtime timestamps stays neutral about startup versus runtime', () => {
+  const report = buildDiagnosticReport({
+    incident: incident(),
+    inspect: inspect({ startedAt: '', finishedAt: '' }),
+    overview: overview(2),
+    now: '2026-08-20T01:00:00.000Z',
+  })
+  assert.ok(report.findings.includes('The container exited with a non-zero code without evidence of an OOM termination; runtime duration was unavailable.'))
+  assert.ok(report.likelyCauses.includes('An application or configuration failure is likely, but startup versus runtime timing cannot be determined.'))
+  assert.equal(report.findings.some((value) => /within five minutes|at least five minutes/i.test(value)), false)
+})
+
 test('OOM termination is diagnosed from the explicit OOM flag', () => {
   const report = buildDiagnosticReport({
     incident: incident(),
