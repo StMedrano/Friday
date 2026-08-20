@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Command, Cpu, Database, Gauge, HardDrive, Home, MemoryStick, Network, Search, Server, Settings, ShieldCheck, Sparkles, TerminalSquare } from 'lucide-react'
-import { fetchMonitoringHistory, useFridayOverview, type MonitoringEvent } from '../lib/api'
+import { fetchMonitoringHistory, useFridayOverview, type FridayIncident, type MonitoringEvent } from '../lib/api'
+import { usePhoneLayout } from '../hooks/usePhoneLayout'
 import ActiveIncidents from '../components/ActiveIncidents'
 import IncidentsWorkspace from '../components/IncidentsWorkspace'
+import MobileHome from '../components/MobileHome'
+import MobileNavigation from '../components/MobileNavigation'
 import '../monitoring.css'
 
 const nav = [
@@ -13,15 +16,18 @@ const nav = [
 
 export default function Dashboard() {
   const { overview, connected } = useFridayOverview()
+  const isPhone = usePhoneLayout()
   const [active, setActive] = useState('Overview')
   const [automation, setAutomation] = useState(true)
   const [query, setQuery] = useState('')
   const [reply, setReply] = useState('Everything critical is operating normally. I am ready to inspect your infrastructure.')
   const [history, setHistory] = useState<MonitoringEvent[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
+  const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null)
   const online = overview.services.filter(s => s.status === 'online').length
   const health = Math.round((online / Math.max(overview.services.length, 1)) * 100)
   const incidents = overview.incidents ?? []
+  const selectedIncident = incidents.find((incident) => incident.id === selectedIncidentId) ?? null
   const activeIncidents = overview.monitoring?.activeIncidents ?? incidents.filter((incident) => incident.status === 'open').length
   const metrics = useMemo(() => overview.resources.slice(0, 3), [overview.resources])
 
@@ -48,11 +54,53 @@ export default function Dashboard() {
     setQuery('')
   }
 
+  function navigate(destination: string) {
+    setActive(destination)
+    if (destination !== 'Incidents') setSelectedIncidentId(null)
+  }
+
+  function viewDiagnosis(incident: FridayIncident) {
+    setSelectedIncidentId(incident.id)
+    setActive('Incidents')
+  }
+
+  if (isPhone) {
+    return <div className="v3-shell v3-phone-shell">
+      <div className="v3-workspace">
+        <header className="v3-mobile-header">
+          <div className="v3-mobile-brand"><span className="v3-live-dot"/><strong>FRIDAY</strong><small>AI OPERATIONS</small></div>
+          <div className={`v3-mobile-status ${connected ? 'online' : 'warning'}`}><i/>{connected ? 'LIVE' : 'SAFE'}</div>
+        </header>
+        <main className="v3-main">
+          {active === 'Overview' ? <MobileHome
+            overview={overview}
+            connected={connected}
+            query={query}
+            reply={reply}
+            onQueryChange={setQuery}
+            onSubmit={askFriday}
+            onNavigate={navigate}
+            onSelectIncident={viewDiagnosis}
+          /> : active === 'Incidents' ? <IncidentsWorkspace
+            incidents={incidents}
+            monitoring={overview.monitoring}
+            history={history}
+            historyError={historyError}
+            selectedIncident={selectedIncident}
+            onSelectIncident={viewDiagnosis}
+            onClearSelection={() => setSelectedIncidentId(null)}
+          /> : <DetailView active={active} overview={overview}/>} 
+        </main>
+      </div>
+      <MobileNavigation active={active} activeIncidents={activeIncidents} onNavigate={navigate}/>
+    </div>
+  }
+
   return (
     <div className="v3-shell">
       <aside className="v3-rail">
-        <button className="v3-logo" onClick={() => setActive('Overview')} aria-label="FRIDAY home"><span /></button>
-        <nav>{nav.map(([label, Icon]) => <button key={label} className={active === label ? 'active' : ''} onClick={() => setActive(label)} title={label}><Icon size={19}/>{label === 'Approvals' && <i>2</i>}{label === 'Incidents' && activeIncidents > 0 && <i>{activeIncidents}</i>}</button>)}</nav>
+        <button className="v3-logo" onClick={() => navigate('Overview')} aria-label="FRIDAY home"><span /></button>
+        <nav>{nav.map(([label, Icon]) => <button key={label} className={active === label ? 'active' : ''} onClick={() => navigate(label)} title={label}><Icon size={19}/>{label === 'Approvals' && <i>2</i>}{label === 'Incidents' && activeIncidents > 0 && <i>{activeIncidents}</i>}</button>)}</nav>
         <div className="v3-avatar">SM</div>
       </aside>
 
@@ -88,10 +136,10 @@ export default function Dashboard() {
               </div>
             </section>
 
-            <ActiveIncidents incidents={incidents}/>
+            <ActiveIncidents incidents={incidents} onSelectIncident={viewDiagnosis}/>
 
             <section className="v3-section">
-              <div className="v3-section-head"><div><span className="v3-kicker">SYSTEM</span><h2>Infrastructure</h2></div><button onClick={() => setActive('Infrastructure')}>View topology <ChevronRight size={15}/></button></div>
+              <div className="v3-section-head"><div><span className="v3-kicker">SYSTEM</span><h2>Infrastructure</h2></div><button onClick={() => navigate('Infrastructure')}>View topology <ChevronRight size={15}/></button></div>
               <div className="v3-infra">
                 {overview.services.slice(0, 3).map((service, idx) => <article key={service.id}>
                   <div className="v3-node-icon">{idx === 0 ? <Server/> : idx === 1 ? <Boxes/> : <Network/>}</div>
@@ -118,9 +166,17 @@ export default function Dashboard() {
 
             <section className="v3-section">
               <div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><span>{online} online</span></div>
-              <div className="v3-services">{overview.services.map(s => <button key={s.id} onClick={() => setActive('Applications')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span><em>{s.updated}</em></button>)}</div>
+              <div className="v3-services">{overview.services.map(s => <button key={s.id} onClick={() => navigate('Applications')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span><em>{s.updated}</em></button>)}</div>
             </section>
-          </> : active === 'Incidents' ? <IncidentsWorkspace incidents={incidents} monitoring={overview.monitoring} history={history} historyError={historyError}/> : <DetailView active={active} overview={overview} />}
+          </> : active === 'Incidents' ? <IncidentsWorkspace
+            incidents={incidents}
+            monitoring={overview.monitoring}
+            history={history}
+            historyError={historyError}
+            selectedIncident={selectedIncident}
+            onSelectIncident={viewDiagnosis}
+            onClearSelection={() => setSelectedIncidentId(null)}
+          /> : <DetailView active={active} overview={overview} />}
         </main>
       </div>
     </div>
