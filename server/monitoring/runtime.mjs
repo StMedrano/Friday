@@ -1,6 +1,6 @@
 import { appendHistory, createEmptyMonitoringState, incidentList, monitoringSummary } from './state.mjs'
 import { evaluateMonitoring } from './incidents.mjs'
-import { containerIdFromServiceId, getVm100ContainerDiagnostic } from '../adapters/vm100-observer-diagnostics.mjs'
+import { containerIdFromServiceId, getVm100ContainerDiagnostic, getVm100ContainerLogs } from '../adapters/vm100-observer-diagnostics.mjs'
 import { buildDiagnosticReport } from '../diagnostics/analyze.mjs'
 
 function sanitizeError(error) {
@@ -8,6 +8,10 @@ function sanitizeError(error) {
     .replace(/Bearer\s+[^\s,;]+/gi, 'Bearer [redacted]')
     .replace(/(token|secret|password)=([^\s,;]+)/gi, '$1=[redacted]')
     .slice(0, 240)
+}
+
+function safeId(value) {
+  return String(value).replace(/[^a-zA-Z0-9_.-]+/g, '-')
 }
 
 function incidentSummary(state) {
@@ -58,6 +62,7 @@ export function createMonitoringRuntime({
   collectOverview,
   store,
   collectDiagnosticImpl = collectVm100Diagnostic,
+  fetchLogsImpl = getVm100ContainerLogs,
   now = () => new Date(),
   setIntervalImpl = setInterval,
   clearIntervalImpl = clearInterval,
@@ -228,6 +233,62 @@ export function createMonitoringRuntime({
     }
   }
 
+  async function getIncidentLogs(incidentId) {
+    const incident = (monitoringState.incidents || []).find((item) => item.id === incidentId)
+    if (!incident) return { statusCode: 404, body: { error: 'incident-not-found' } }
+    if (!diagnosticsConfig.enabled) return { statusCode: 409, body: { error: 'diagnostics-disabled' } }
+    const target = supportedDiagnosticTarget(incident)
+    if (!target) return { statusCode: 409, body: { error: 'diagnostics-not-supported' } }
+
+    const timestamp = now().toISOString()
+    try {
+      const result = await fetchLogsImpl(config.vm100Observer || {}, target.containerId, 100)
+      if (!result || typeof result !== 'object' || typeof result.logs !== 'string') {
+        throw new Error('Invalid diagnostic logs response')
+      }
+
+      const report = monitoringState.diagnostics?.[incident.id]
+      if (report && typeof report === 'object') report.lastLogInspectionAt = timestamp
+      appendHistory(monitoringState, {
+        id: safeId(`diagnostic-logs-inspected:${incident.id}:${timestamp}`),
+        type: 'diagnostic-logs-inspected',
+        at: timestamp,
+        source: 'diagnostics',
+        host: incident.host || undefined,
+        serviceId: incident.serviceId,
+        serviceName: incident.serviceName,
+        detail: `Read-only diagnostic logs inspected (tail ${Number(result.tail) || 100}${result.truncated ? ', truncated' : ''})`,
+      }, monitoringConfig.historyLimit || 2000)
+      await persistState()
+
+      return {
+        statusCode: 200,
+        body: {
+          incidentId: incident.id,
+          serviceName: incident.serviceName,
+          host: incident.host,
+          tail: Number(result.tail) || 100,
+          logs: result.logs,
+          truncated: result.truncated === true,
+          observedAt: result.observedAt,
+        },
+      }
+    } catch (error) {
+      appendHistory(monitoringState, {
+        id: safeId(`diagnostic-logs-failed:${incident.id}:${timestamp}`),
+        type: 'diagnostic-logs-failed',
+        at: timestamp,
+        source: 'diagnostics',
+        host: incident.host || undefined,
+        serviceId: incident.serviceId,
+        serviceName: incident.serviceName,
+        detail: `Read-only diagnostic log inspection failed: ${sanitizeError(error)}`,
+      }, monitoringConfig.historyLimit || 2000)
+      try { await persistState() } catch {}
+      return { statusCode: 502, body: { error: 'diagnostic-logs-unavailable' } }
+    }
+  }
+
   return {
     start,
     stop,
@@ -237,5 +298,6 @@ export function createMonitoringRuntime({
     getHistory() { return { events: [...(monitoringState.history || [])].reverse().map((event) => ({ ...event })) } },
     getSummary() { return monitoringSummary(monitoringState, meta) },
     getDiagnostic,
+    getIncidentLogs,
   }
 }
