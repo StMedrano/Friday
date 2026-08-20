@@ -1,9 +1,22 @@
 export function createEmptyMonitoringState() {
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
     observations: {},
     incidents: [],
     history: [],
+    diagnostics: {},
+  }
+}
+
+export function normalizeMonitoringState(value) {
+  const input = value && typeof value === 'object' && !Array.isArray(value) ? value : {}
+  const objectOrEmpty = (candidate) => candidate && typeof candidate === 'object' && !Array.isArray(candidate) ? structuredClone(candidate) : {}
+  return {
+    schemaVersion: 2,
+    observations: objectOrEmpty(input.observations),
+    incidents: Array.isArray(input.incidents) ? structuredClone(input.incidents) : [],
+    history: Array.isArray(input.history) ? structuredClone(input.history) : [],
+    diagnostics: objectOrEmpty(input.diagnostics),
   }
 }
 
