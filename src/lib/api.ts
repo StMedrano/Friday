@@ -146,6 +146,15 @@ export async function fetchIncidentDiagnostics(incidentId: string, signal?: Abor
   return body as DiagnosticReport
 }
 
+export async function rerunIncidentDiagnostics(incidentId: string, signal?: AbortSignal) {
+  const response = await fetch(`${incidentPath(incidentId, 'diagnostics')}/rerun`, { method: 'POST', signal })
+  const body = await response.json() as DiagnosticReport | { error?: string }
+  if (!response.ok) {
+    throw new Error('error' in body && body.error ? body.error : `Friday diagnostic rerun ${response.status}`)
+  }
+  return body as DiagnosticReport
+}
+
 export async function fetchIncidentLogs(incidentId: string, signal?: AbortSignal) {
   const response = await fetch(incidentPath(incidentId, 'logs'), { method: 'GET', signal })
   const body = await response.json() as DiagnosticLogsResponse | { error?: string }
