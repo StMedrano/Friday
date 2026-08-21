@@ -7,6 +7,7 @@ import { spawnSync } from 'node:child_process'
 import test from 'node:test'
 
 const script = fileURLToPath(new URL('./friday-backend-guard.sh', import.meta.url))
+const service = fileURLToPath(new URL('./friday-backend-guard.service', import.meta.url))
 
 async function fakeIptables() {
   const dir = await mkdtemp(join(tmpdir(), 'friday-iptables-'))
@@ -92,4 +93,13 @@ test('remove deletes only the two named rules', async () => {
   const calls = await readFile(fake.log, 'utf8')
   assert.match(calls, /-D DOCKER-USER .*friday-backend-guard-allow/)
   assert.match(calls, /-D DOCKER-USER .*friday-backend-guard-drop/)
+})
+
+test('systemd reapplies policy when Docker restarts and never removes it automatically', async () => {
+  const text = await readFile(service, 'utf8')
+  assert.match(text, /^After=docker\.service network-online\.target$/m)
+  assert.match(text, /^Requires=docker\.service$/m)
+  assert.match(text, /^PartOf=docker\.service$/m)
+  assert.match(text, /^ExecStart=\/usr\/local\/sbin\/friday-backend-guard apply$/m)
+  assert.doesNotMatch(text, /^ExecStop=/m)
 })
