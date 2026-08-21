@@ -48,13 +48,14 @@ This design intentionally does not add authentication, Supabase integration, bre
 2. FRIDAY uses the single canonical URL `https://friday.mytechtactics.com` on both LAN and Twingate.
 3. AdGuard Home provides private DNS on the LAN and resolves `friday.mytechtactics.com` to VM100 (`192.168.1.124`).
 4. Cloudflare is used for the public authoritative zone and DNS-01 certificate validation only. It does not proxy or route user traffic to FRIDAY.
-5. NPM obtains a publicly trusted Let's Encrypt certificate for `friday.mytechtactics.com` using a least-privilege Cloudflare API token scoped to the `mytechtactics.com` zone.
+5. NPM obtains a publicly trusted Let's Encrypt certificate for `friday.mytechtactics.com` using a dedicated Cloudflare API token limited to `Zone:DNS:Edit` for the `mytechtactics.com` zone.
 6. NPM moves from host HTTPS port `4443` to standard host HTTPS port `443`.
-7. NPM admin TCP/81 remains private and is available only from the LAN and authorized Twingate access. It is never publicly forwarded.
+7. NPM admin TCP/81 remains private. It is reachable on the LAN and, for remote administration, only through a separate Twingate Resource limited to VM100 TCP/81 and assigned to authorized administrators. It is never publicly forwarded.
 8. VM102 TCP/3010 becomes a backend-only service path. VM100 (`192.168.1.124`) is the only permitted remote source.
 9. VM102 uses UFW for host policy plus Docker-aware filtering because Docker-published ports can bypass ordinary UFW input rules.
 10. Twingate exposes the FRIDAY FQDN as a private Resource. Twingate's Connector resolves the FQDN inside the remote network using private DNS; remote clients do not require direct access to the AdGuard resolver for normal FRIDAY use.
 11. There will be no public router forwarding to FRIDAY, NPM TCP/81, or VM102 TCP/3010.
+12. No public A/AAAA/CNAME record for `friday.mytechtactics.com` is required for normal access. DNS-01 uses transient `_acme-challenge` TXT records for certificate validation.
 
 ## 4. Target Architecture
 
@@ -105,6 +106,19 @@ FRIDAY - VM102
 
 The browser sees one URL and one trusted certificate in both cases.
 
+NPM administration over Twingate is a separate path and permission boundary:
+
+```text
+Authorized administrator
+    |
+    v
+Twingate Client
+    |
+    | admin-only Resource: 192.168.1.124 TCP/81
+    v
+NPM admin UI
+```
+
 ## 5. Component Responsibilities
 
 ### 5.1 AdGuard Home
@@ -121,13 +135,17 @@ AdGuard must prove ordinary upstream resolution before LAN DHCP is changed to us
 
 For Twingate, the Connector must be able to resolve `friday.mytechtactics.com` through private DNS. Normal remote users do not need to send DNS queries directly to AdGuard; Twingate performs Resource interception and Connector-side resolution.
 
+If the Connector host is not currently using AdGuard/private DNS, implementation must explicitly establish and validate a private DNS path from the Connector to AdGuard before enabling the FRIDAY FQDN Resource. The exact method must follow the inspected Twingate Connector host configuration rather than being assumed in advance.
+
 ### 5.2 Cloudflare
 
 Cloudflare remains authoritative for the public `mytechtactics.com` zone.
 
-Its role in this design is certificate validation only. The implementation uses a dedicated API token with the minimum DNS permissions required for the DNS-01 challenge and scopes that token to the `mytechtactics.com` zone.
+Its role in this design is certificate validation only. The implementation uses a dedicated API token with `Zone:DNS:Edit` restricted to the `mytechtactics.com` zone, matching Certbot's documented Cloudflare DNS plugin requirement. A Global API Key is not used.
 
-The token must not be stored in FRIDAY frontend code, `VITE_*` variables, git, shell history, screenshots, or documentation.
+The token must not be stored in FRIDAY frontend code, `VITE_*` variables, git, shell history, screenshots, or documentation. NPM/certbot stores the credential only in its server-side certificate configuration.
+
+The DNS-01 process creates and removes transient `_acme-challenge.friday.mytechtactics.com` TXT records. A public A/AAAA/CNAME record for FRIDAY is not needed for issuance.
 
 No public Cloudflare proxy route to FRIDAY is created as part of this spec.
 
@@ -163,7 +181,7 @@ WebSocket support: enabled when required by FRIDAY
 
 TCP/80 is retained on the private network for normal HTTP-to-HTTPS behavior and NPM operation. The design does not require public TCP/80 exposure because certificate validation uses DNS-01.
 
-TCP/81 is an administrative surface and must remain private.
+TCP/81 is an administrative surface and must remain private. Remote administration uses a separate Twingate Resource constrained to VM100 TCP/81 and an administrator-only access group; it is not bundled with the normal FRIDAY Resource.
 
 ### 5.4 VM102 Host Firewall
 
@@ -178,7 +196,8 @@ Required effective policy:
 other LAN IPs -> VM102:3010    DROP
 Twingate direct -> VM102:3010  DROP
 LAN/Twingate -> VM100:443      ALLOW via private routing
-LAN/Twingate -> VM100:81       ALLOW only as administrative access
+LAN -> VM100:81                ALLOW as private administration
+Twingate admin Resource -> VM100:81  ALLOW for authorized administrators
 Internet -> VM100:81           NOT EXPOSED
 Internet -> FRIDAY             NOT EXPOSED
 ```
@@ -189,11 +208,13 @@ The Docker daemon firewall behavior must not be disabled globally. In particular
 
 ### 5.5 Twingate
 
-FRIDAY is represented as a private FQDN Resource for `friday.mytechtactics.com`, with access granted only to the intended Twingate users/groups.
+FRIDAY is represented as a private FQDN Resource for `friday.mytechtactics.com`, with access granted only to the intended Twingate users/groups and limited to the application ports required for FRIDAY access.
 
 The Connector must be able to resolve the FQDN inside the private network and route to VM100 TCP/443. Twingate performs remote client Resource interception; the remote client does not need the real `192.168.1.124` address and does not need direct access to AdGuard for ordinary browser access.
 
-The design keeps one canonical FRIDAY URL. No separate remote hostname is introduced.
+NPM administration is represented separately as an admin-only Resource for `192.168.1.124` TCP/81. It is granted only to the administrative group, so access to FRIDAY does not imply access to the NPM admin UI.
+
+The design keeps one canonical FRIDAY URL. No separate remote FRIDAY hostname is introduced.
 
 ## 6. Rollout Sequence
 
@@ -204,7 +225,7 @@ Implementation must proceed in the following order and stop at the first failed 
 3. Change NPM host HTTPS mapping from `4443:443` to `443:443` only.
 4. Recreate only the NPM container without pulling a new image unless a separate upgrade is explicitly approved.
 5. Verify NPM TCP/80, TCP/81, TCP/443, admin UI, database, existing proxy hosts, outbound DNS, and container networking.
-6. Create a least-privilege Cloudflare DNS API token for `mytechtactics.com` without exposing the token in logs or shell history.
+6. Create a dedicated Cloudflare API token with `Zone:DNS:Edit` limited to `mytechtactics.com`, without exposing the token in logs or shell history.
 7. Obtain the trusted certificate for `friday.mytechtactics.com` using NPM DNS-01.
 8. Create the NPM proxy host to `http://192.168.1.64:3010`.
 9. Validate the NPM-to-FRIDAY path while VM102 direct access is still available.
@@ -216,9 +237,12 @@ Implementation must proceed in the following order and stop at the first failed 
 15. Validate AdGuard upstream DNS and the FRIDAY private rewrite through explicit queries.
 16. Move one test LAN client to AdGuard DNS and validate ordinary Internet DNS plus FRIDAY HTTPS.
 17. Change LAN DHCP/DNS to use AdGuard only after the test client passes.
-18. Define/validate the Twingate private FQDN Resource and confirm Connector-side resolution reaches VM100.
-19. Validate FRIDAY HTTPS from a remote Twingate client.
-20. Run final FRIDAY regression checks through the canonical HTTPS URL.
+18. Inspect the Twingate Connector's current DNS resolution path and prove it can resolve the private FRIDAY FQDN through AdGuard/private DNS.
+19. Define/validate the Twingate FRIDAY FQDN Resource for authorized users and VM100 TCP/443.
+20. Define/validate the separate NPM admin Resource for `192.168.1.124` TCP/81 and grant it only to the administrative group.
+21. Validate FRIDAY HTTPS from a remote Twingate client.
+22. Validate NPM admin access from an authorized remote administrator and rejection for a non-admin Twingate user where a test identity is available.
+23. Run final FRIDAY regression checks through the canonical HTTPS URL.
 
 ## 7. Fail-Closed Rules
 
@@ -247,6 +271,7 @@ Implementation must proceed in the following order and stop at the first failed 
 
 - Do not expose FRIDAY publicly to compensate for Twingate or private-DNS failure.
 - If the FQDN Resource does not resolve at the Connector, fix Connector-side/private DNS resolution rather than adding a public FRIDAY record that reveals the private destination.
+- Do not use the FRIDAY application Resource to grant NPM administrative access. TCP/81 stays a separate administrator-only Resource.
 
 ## 8. Acceptance Criteria
 
@@ -269,6 +294,9 @@ Direct backend
 
 Gateway management
   PASS NPM admin TCP/81 remains private
+  PASS NPM admin works from LAN
+  PASS NPM admin works remotely only through the admin-only Twingate Resource
+  PASS FRIDAY-only Twingate access does not imply NPM admin access
   PASS no public router forwarding exists for NPM TCP/81
   PASS no public router forwarding exists for VM102 TCP/3010
 
@@ -276,6 +304,7 @@ DNS
   PASS AdGuard resolves friday.mytechtactics.com to 192.168.1.124 on LAN
   PASS ordinary upstream DNS continues to resolve
   PASS Twingate Connector resolves the private FRIDAY FQDN to the private destination path
+  PASS no public FRIDAY A/AAAA/CNAME record is required for application routing
 
 FRIDAY regression
   PASS /healthz through NPM
@@ -305,8 +334,10 @@ Network policy must be verified from the relevant trust boundaries, not inferred
 - VM102 tests local FRIDAY health and confirms firewall state.
 - A normal LAN client tests direct TCP/3010 rejection and HTTPS success through NPM.
 - A Twingate client tests the canonical HTTPS URL remotely.
+- An authorized Twingate administrator tests the separate TCP/81 management Resource.
 - NPM is verified for TCP/80, TCP/81, TCP/443, certificate state, proxy-host state, and existing configuration preservation.
 - AdGuard is tested directly before any DHCP change and then from a single test client before network-wide rollout.
+- The Twingate Connector's own resolver path is tested before the FRIDAY FQDN Resource is treated as production-ready.
 
 ## 10. Security Invariants
 
@@ -315,8 +346,8 @@ Spec 1 must preserve the following invariants:
 - FRIDAY remains an infrastructure control plane with no public Internet exposure.
 - NPM is the only normal user-facing path to FRIDAY.
 - VM102 TCP/3010 is not a general LAN service after rollout.
-- Cloudflare credentials remain server-side and least-privilege.
-- NPM administrative access remains private.
+- Cloudflare credentials remain server-side, zone-scoped, and least-privilege.
+- NPM administrative access remains private and separately authorized from FRIDAY application access.
 - Docker socket authority is not expanded.
 - Observer authority remains read-only.
 - Proxmox authority remains read-only.
@@ -333,6 +364,7 @@ Implementation must capture enough pre-change state to return to these known-goo
 - Previous LAN DHCP/DNS configuration before AdGuard becomes authoritative.
 - VM102 pre-change UFW and Docker-aware firewall state.
 - Existing FRIDAY Compose deployment and health behavior.
+- Existing Twingate Resource configuration before adding FRIDAY or NPM-admin Resources.
 
 Rollback must be component-local. A failure in DNS, NPM, Twingate, or VM102 filtering must not trigger unrelated service changes.
 
@@ -353,3 +385,4 @@ No follow-on authority should be implemented before this routing foundation pass
 - Twingate DNS resolution flow: https://www.twingate.com/docs/how-dns-works-with-twingate
 - Twingate private DNS best practices: https://www.twingate.com/docs/private-dns-best-practices
 - Cloudflare API token creation and zone scoping: https://developers.cloudflare.com/fundamentals/api/get-started/create-token/
+- Certbot Cloudflare DNS plugin token requirement: https://certbot-dns-cloudflare.readthedocs.io/en/stable/
