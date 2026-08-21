@@ -45,6 +45,25 @@ esac
   return { binary, log, state }
 }
 
+async function fakeMissingChainIptables() {
+  const dir = await mkdtemp(join(tmpdir(), 'friday-iptables-missing-chain-'))
+  const binary = join(dir, 'iptables')
+  const log = join(dir, 'calls.log')
+  const state = join(dir, 'state')
+  await writeFile(state, '')
+  await writeFile(binary, `#!/bin/sh
+set -eu
+printf '%s\\n' "$*" >> "$IPTABLES_LOG"
+case "$1" in
+  -S) exit 1 ;;
+  -I|-D) exit 99 ;;
+  *) exit 1 ;;
+esac
+`)
+  await chmod(binary, 0o755)
+  return { binary, log, state }
+}
+
 function run(command, fake) {
   return spawnSync('sh', [script, command], {
     encoding: 'utf8',
@@ -83,6 +102,16 @@ test('check fails when rules are absent and passes after apply', async () => {
   assert.notEqual(run('check', fake).status, 0)
   assert.equal(run('apply', fake).status, 0)
   assert.equal(run('check', fake).status, 0)
+})
+
+test('apply fails closed and changes no rules when DOCKER-USER is absent', async () => {
+  const fake = await fakeMissingChainIptables()
+  const result = run('apply', fake)
+  assert.notEqual(result.status, 0)
+  assert.match(result.stderr, /DOCKER-USER is unavailable; no rules changed/)
+  const calls = await readFile(fake.log, 'utf8')
+  assert.doesNotMatch(calls, /^-I /m)
+  assert.doesNotMatch(calls, /^-D /m)
 })
 
 test('remove deletes only the two named rules', async () => {
