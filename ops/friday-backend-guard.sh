@@ -12,12 +12,12 @@ DROP_COMMENT='friday-backend-guard-drop'
 chain_exists() { "$IPTABLES_BIN" -S "$CHAIN" >/dev/null 2>&1; }
 allow_exists() {
   "$IPTABLES_BIN" -C "$CHAIN" -p tcp -s "$PROXY_IP" \
-    -m conntrack --ctorigdst "$BACKEND_IP" --ctorigdstport "$BACKEND_PORT" \
+    -m conntrack --ctdir ORIGINAL --ctorigdst "$BACKEND_IP" --ctorigdstport "$BACKEND_PORT" \
     -m comment --comment "$ALLOW_COMMENT" -j ACCEPT >/dev/null 2>&1
 }
 drop_exists() {
   "$IPTABLES_BIN" -C "$CHAIN" -p tcp \
-    -m conntrack --ctorigdst "$BACKEND_IP" --ctorigdstport "$BACKEND_PORT" \
+    -m conntrack --ctdir ORIGINAL --ctorigdst "$BACKEND_IP" --ctorigdstport "$BACKEND_PORT" \
     -m comment --comment "$DROP_COMMENT" -j DROP >/dev/null 2>&1
 }
 require_chain() {
@@ -27,10 +27,10 @@ check_rules() { require_chain; allow_exists && drop_exists; }
 apply_rules() {
   require_chain
   drop_exists || "$IPTABLES_BIN" -I "$CHAIN" 1 -p tcp \
-    -m conntrack --ctorigdst "$BACKEND_IP" --ctorigdstport "$BACKEND_PORT" \
+    -m conntrack --ctdir ORIGINAL --ctorigdst "$BACKEND_IP" --ctorigdstport "$BACKEND_PORT" \
     -m comment --comment "$DROP_COMMENT" -j DROP
   allow_exists || "$IPTABLES_BIN" -I "$CHAIN" 1 -p tcp -s "$PROXY_IP" \
-    -m conntrack --ctorigdst "$BACKEND_IP" --ctorigdstport "$BACKEND_PORT" \
+    -m conntrack --ctdir ORIGINAL --ctorigdst "$BACKEND_IP" --ctorigdstport "$BACKEND_PORT" \
     -m comment --comment "$ALLOW_COMMENT" -j ACCEPT
   check_rules
   echo "FRIDAY backend guard active: $PROXY_IP -> $BACKEND_IP:$BACKEND_PORT only."
@@ -39,12 +39,12 @@ remove_rules() {
   require_chain
   while allow_exists; do
     "$IPTABLES_BIN" -D "$CHAIN" -p tcp -s "$PROXY_IP" \
-      -m conntrack --ctorigdst "$BACKEND_IP" --ctorigdstport "$BACKEND_PORT" \
+      -m conntrack --ctdir ORIGINAL --ctorigdst "$BACKEND_IP" --ctorigdstport "$BACKEND_PORT" \
       -m comment --comment "$ALLOW_COMMENT" -j ACCEPT
   done
   while drop_exists; do
     "$IPTABLES_BIN" -D "$CHAIN" -p tcp \
-      -m conntrack --ctorigdst "$BACKEND_IP" --ctorigdstport "$BACKEND_PORT" \
+      -m conntrack --ctdir ORIGINAL --ctorigdst "$BACKEND_IP" --ctorigdstport "$BACKEND_PORT" \
       -m comment --comment "$DROP_COMMENT" -j DROP
   done
   echo 'FRIDAY backend guard rules removed.'
