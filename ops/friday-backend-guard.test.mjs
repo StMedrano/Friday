@@ -79,14 +79,27 @@ function run(command, fake) {
   })
 }
 
-test('apply inserts drop first then allow at position 1, yielding allow-before-drop final order', async () => {
+test('apply inserts original-direction drop first then allow at position 1, yielding allow-before-drop final order', async () => {
   const fake = await fakeIptables()
   const result = run('apply', fake)
   assert.equal(result.status, 0, result.stderr)
   const inserts = (await readFile(fake.log, 'utf8')).split('\n').filter((line) => line.startsWith('-I DOCKER-USER'))
   assert.equal(inserts.length, 2)
-  assert.match(inserts[0], /--comment friday-backend-guard-drop -j DROP/)
-  assert.match(inserts[1], /-I DOCKER-USER 1 .* -s 192\.168\.1\.124 .*--ctorigdst 192\.168\.1\.64 .*--ctorigdstport 3010 .*--comment friday-backend-guard-allow -j ACCEPT/)
+  assert.match(inserts[0], /--ctdir ORIGINAL .*--comment friday-backend-guard-drop -j DROP/)
+  assert.match(inserts[1], /-I DOCKER-USER 1 .* -s 192\.168\.1\.124 .*--ctdir ORIGINAL .*--ctorigdst 192\.168\.1\.64 .*--ctorigdstport 3010 .*--comment friday-backend-guard-allow -j ACCEPT/)
+})
+
+test('guard rules only match ORIGINAL direction so reply traffic is not dropped', async () => {
+  const fake = await fakeIptables()
+  const result = run('apply', fake)
+  assert.equal(result.status, 0, result.stderr)
+  const calls = await readFile(fake.log, 'utf8')
+  const inserts = calls.split('\n').filter((line) => line.startsWith('-I DOCKER-USER'))
+  assert.equal(inserts.length, 2)
+  for (const line of inserts) {
+    assert.match(line, /--ctdir ORIGINAL/)
+    assert.doesNotMatch(line, /--ctdir REPLY/)
+  }
 })
 
 test('apply is idempotent', async () => {
