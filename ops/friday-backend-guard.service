@@ -1,0 +1,14 @@
+[Unit]
+Description=FRIDAY VM102 Docker published-port backend guard
+After=docker.service network-online.target
+Requires=docker.service
+PartOf=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/friday-backend-guard apply
+ExecReload=/usr/local/sbin/friday-backend-guard apply
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target

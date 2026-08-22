@@ -32,10 +32,21 @@ jobs:
 
       - name: Validate shell scripts
         run: |
-          for file in scripts/*.sh; do
+          for file in scripts/*.sh ops/*.sh; do
             echo "checking $file"
             sh -n "$file"
           done
+
+      - name: Verify privileged ops isolation
+        run: |
+          if grep -RniE 'friday-backend-guard|DOCKER-USER|ctorigdst|iptables' server src compose.yaml compose.live.yaml package.json; then
+            echo 'Privileged host-routing helper referenced by FRIDAY runtime/browser code.' >&2
+            exit 1
+          fi
+          if grep -RniE 'VITE_.*(CLOUDFLARE|DNS|PROXY|FIREWALL)' src server compose.yaml .env.example; then
+            echo 'Browser-visible private-routing secret/config variable detected.' >&2
+            exit 1
+          fi
 
       - name: Verify observer security boundary
         run: |
