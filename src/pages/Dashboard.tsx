@@ -9,6 +9,7 @@ import MobileHome from '../components/MobileHome'
 import MobileNavigation from '../components/MobileNavigation'
 import '../monitoring.css'
 import '../mobile.css'
+import '../assistant.css'
 
 const nav = [
   ['Overview', Home], ['FRIDAY', Sparkles], ['Infrastructure', Server], ['Applications', AppWindow],
