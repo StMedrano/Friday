@@ -2,6 +2,24 @@ import { useEffect, useState } from 'react'
 import type { ActivityItem, AlertItem, ResourceMetric, Service, Site } from './infrastructure'
 import { activities, alerts, resources, services, sites } from '../data/mock'
 
+export type FridayAssistantMode = 'cloud-ai' | 'local-ai' | 'local-analysis'
+
+export type FridayAssistantAttempt = {
+  provider: string
+  outcome: string
+}
+
+export type FridayAssistantResponse = {
+  available: boolean
+  mode?: FridayAssistantMode
+  provider?: string
+  model?: string | null
+  text?: string
+  reason?: string
+  fallbackUsed?: boolean
+  attempts?: FridayAssistantAttempt[]
+}
+
 export type FridayIncident = {
   id: string
   fingerprint?: string
@@ -124,6 +142,18 @@ export function useFridayOverview() {
   }, [])
 
   return { overview, connected }
+}
+
+export async function askFridayAssistant(prompt: string, signal?: AbortSignal): Promise<FridayAssistantResponse> {
+  const response = await fetch('/api/assistant', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+    signal,
+  })
+  const body = await response.json() as FridayAssistantResponse
+  if (!response.ok) throw new Error(body.reason || 'Friday assistant unavailable')
+  return body
 }
 
 export async function fetchMonitoringHistory(signal?: AbortSignal) {
