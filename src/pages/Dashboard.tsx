@@ -1,13 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Command, Cpu, Database, Gauge, HardDrive, Home, MemoryStick, Network, Search, Server, Settings, ShieldCheck, Sparkles, TerminalSquare } from 'lucide-react'
-import { fetchMonitoringHistory, useFridayOverview, type FridayIncident, type MonitoringEvent } from '../lib/api'
+import { askFridayAssistant, fetchMonitoringHistory, useFridayOverview, type FridayIncident, type MonitoringEvent } from '../lib/api'
 import { usePhoneLayout } from '../hooks/usePhoneLayout'
 import ActiveIncidents from '../components/ActiveIncidents'
+import AssistantReply, { type AssistantReplyState } from '../components/AssistantReply'
 import IncidentsWorkspace from '../components/IncidentsWorkspace'
 import MobileHome from '../components/MobileHome'
 import MobileNavigation from '../components/MobileNavigation'
 import '../monitoring.css'
 import '../mobile.css'
+import '../assistant.css'
 
 const nav = [
   ['Overview', Home], ['FRIDAY', Sparkles], ['Infrastructure', Server], ['Applications', AppWindow],
@@ -21,7 +23,11 @@ export default function Dashboard() {
   const [active, setActive] = useState('Overview')
   const [automation, setAutomation] = useState(true)
   const [query, setQuery] = useState('')
-  const [reply, setReply] = useState('Everything critical is operating normally. I am ready to inspect your infrastructure.')
+  const [assistant, setAssistant] = useState<AssistantReplyState>({
+    text: 'Everything critical is operating normally. I am ready to inspect your infrastructure.',
+    loading: false,
+    error: null,
+  })
   const [history, setHistory] = useState<MonitoringEvent[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null)
@@ -47,12 +53,30 @@ export default function Dashboard() {
     return () => controller.abort()
   }, [active])
 
-  function askFriday(e: React.FormEvent) {
+  async function askFriday(e: React.FormEvent) {
     e.preventDefault()
     const text = query.trim()
-    if (!text) return
-    setReply(`I received “${text}”. This control plane is currently ${overview.mode === 'live' ? 'using live read-only adapters' : 'in safe mock mode'}. No infrastructure-changing action was executed.`)
-    setQuery('')
+    if (!text || assistant.loading) return
+
+    setAssistant((current) => ({ ...current, loading: true, error: null }))
+    try {
+      const result = await askFridayAssistant(text)
+      setAssistant({
+        text: result.text || result.reason || 'Friday returned no response text.',
+        mode: result.mode,
+        provider: result.provider,
+        model: result.model,
+        loading: false,
+        error: null,
+      })
+      setQuery('')
+    } catch (error) {
+      setAssistant((current) => ({
+        ...current,
+        loading: false,
+        error: error instanceof Error ? error.message : 'Friday assistant unavailable',
+      }))
+    }
   }
 
   function navigate(destination: string) {
@@ -77,7 +101,7 @@ export default function Dashboard() {
             overview={overview}
             connected={connected}
             query={query}
-            reply={reply}
+            assistant={assistant}
             onQueryChange={setQuery}
             onSubmit={askFriday}
             onNavigate={navigate}
@@ -125,8 +149,8 @@ export default function Dashboard() {
                 <span className="v3-kicker">FRIDAY / ONLINE</span>
                 <h2>What would you like me to handle?</h2>
                 <p>Ask about servers, applications, incidents, deployments, networking, logs, or system health.</p>
-                <form onSubmit={askFriday}><Command size={18}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Ask FRIDAY anything…"/><button aria-label="Send command"><ChevronRight size={18}/></button></form>
-                <div className="v3-reply"><Sparkles size={16}/><p>{reply}</p></div>
+                <form onSubmit={askFriday}><Command size={18}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Ask FRIDAY anything…" disabled={assistant.loading}/><button aria-label="Send command" disabled={assistant.loading}><ChevronRight size={18}/></button></form>
+                <AssistantReply state={assistant} />
               </div>
               <div className="v3-health">
                 <span className="v3-kicker">SYSTEM HEALTH</span>

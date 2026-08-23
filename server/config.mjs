@@ -1,3 +1,5 @@
+const AI_PROVIDER_IDS = new Set(['openai', 'anthropic', 'gemini', 'ollama'])
+
 function enabled(value) {
   return String(value ?? '').toLowerCase() === 'true'
 }
@@ -5,6 +7,20 @@ function enabled(value) {
 function positiveNumber(value, fallback) {
   const parsed = Number(value)
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
+}
+
+function providerOrder(value) {
+  const seen = new Set()
+  const parsed = String(value || 'openai,anthropic,gemini,ollama')
+    .split(',')
+    .map((item) => item.trim().toLowerCase())
+    .filter((item) => AI_PROVIDER_IDS.has(item))
+    .filter((item) => {
+      if (seen.has(item)) return false
+      seen.add(item)
+      return true
+    })
+  return parsed.length ? parsed : ['openai', 'anthropic', 'gemini', 'ollama']
 }
 
 export function getConfig(env = process.env) {
@@ -48,8 +64,28 @@ export function getConfig(env = process.env) {
     },
     ai: {
       enabled: enabled(env.FRIDAY_AI_ENABLED),
-      apiKey: env.OPENAI_API_KEY || '',
-      model: env.OPENAI_MODEL || 'gpt-5.6-terra',
+      providerOrder: providerOrder(env.FRIDAY_AI_PROVIDER_ORDER),
+      timeoutMs: positiveNumber(env.FRIDAY_AI_REQUEST_TIMEOUT_MS, 20000),
+      providers: {
+        openai: {
+          apiKey: env.OPENAI_API_KEY || '',
+          model: env.OPENAI_MODEL || 'gpt-5.6-terra',
+        },
+        anthropic: {
+          apiKey: env.ANTHROPIC_API_KEY || '',
+          model: env.ANTHROPIC_MODEL || '',
+        },
+        gemini: {
+          apiKey: env.GEMINI_API_KEY || '',
+          model: env.GEMINI_MODEL || '',
+        },
+        ollama: {
+          enabled: enabled(env.FRIDAY_LOCAL_AI_ENABLED),
+          baseUrl: env.FRIDAY_LOCAL_AI_URL || 'http://ollama:11434',
+          model: env.FRIDAY_LOCAL_AI_MODEL || 'qwen3:4b',
+          context: positiveNumber(env.FRIDAY_LOCAL_AI_CONTEXT, 8192),
+        },
+      },
     },
   }
 }

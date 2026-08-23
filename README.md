@@ -162,15 +162,50 @@ Path:   /srv/infrastructure/friday-observer
 
 See `observer/README.md` for preflight, update, authentication, diagnostic validation, and the Docker-socket security boundary.
 
-## Optional Friday AI
+## Friday multi-provider assistant
 
-Friday AI is disabled by default. Configure provider values server-side only:
+Friday AI is disabled by default and remains advisory/read-only when enabled. Provider credentials stay server-side. The configured provider order is sequential and can fall through to deterministic local analysis:
+
+```text
+OpenAI -> Anthropic -> Gemini -> private Ollama -> deterministic local analysis
+```
+
+Start from the checked-in environment template:
+
+```bash
+cp .env.example .env
+```
+
+Configure one or more providers in `.env`. For example:
 
 ```env
 FRIDAY_AI_ENABLED=true
+FRIDAY_AI_PROVIDER_ORDER=openai,anthropic,gemini,ollama
+FRIDAY_AI_REQUEST_TIMEOUT_MS=20000
+
 OPENAI_API_KEY=
 OPENAI_MODEL=gpt-5.6-terra
+
+ANTHROPIC_API_KEY=
+ANTHROPIC_MODEL=
+
+GEMINI_API_KEY=
+GEMINI_MODEL=
+
+FRIDAY_LOCAL_AI_ENABLED=true
+FRIDAY_LOCAL_AI_URL=http://ollama:11434
+FRIDAY_LOCAL_AI_MODEL=qwen3:4b
+FRIDAY_LOCAL_AI_CONTEXT=8192
 ```
+
+To start the private local model runtime and pull the configured model:
+
+```bash
+docker compose --profile local-ai up -d
+./scripts/pull-local-model.sh
+```
+
+The `ollama` service has **no host/LAN-published port**. Friday reaches it only by the private Docker service name on `friday_frontend`. The model receives the same normalized read-only Friday overview and shared assistant safety policy as cloud providers; it receives no Docker, Proxmox, shell, or infrastructure mutation tools.
 
 Never place provider or infrastructure secrets in `VITE_*` variables.
 

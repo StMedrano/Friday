@@ -170,9 +170,11 @@ export function createFridayServer({
         const body = await readBody(request)
         const overview = await currentOverview({ config, monitoringRuntime, buildOverviewImpl })
         const result = await answerAssistantImpl({ config, prompt: body.prompt, overview })
-        return json(response, result.available ? 200 : 503, result)
-      } catch (error) {
-        return json(response, 502, { available: false, error: 'assistant-failed', detail: error.message })
+        if (result.available) return json(response, 200, result)
+        if (result.error === 'invalid-prompt') return json(response, 400, result)
+        return json(response, 503, result)
+      } catch {
+        return json(response, 502, { available: false, error: 'assistant-failed' })
       }
     }
 

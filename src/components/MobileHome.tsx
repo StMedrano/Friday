@@ -1,6 +1,7 @@
 import type { FormEventHandler } from 'react'
-import { AlertTriangle, ChevronRight, Command, Server, ShieldCheck, Sparkles } from 'lucide-react'
+import { AlertTriangle, ChevronRight, Command, Server, ShieldCheck } from 'lucide-react'
 import type { FridayIncident, FridayOverview } from '../lib/api'
+import AssistantReply, { type AssistantReplyState } from './AssistantReply'
 
 const severityRank = { high: 0, warning: 1, info: 2 } as const
 const statusRank = { offline: 0, degraded: 1, maintenance: 2, online: 3 } as const
@@ -14,7 +15,7 @@ type MobileHomeProps = {
   overview: FridayOverview
   connected: boolean
   query: string
-  reply: string
+  assistant: AssistantReplyState
   onQueryChange: (value: string) => void
   onSubmit: FormEventHandler<HTMLFormElement>
   onNavigate: (destination: string) => void
@@ -25,7 +26,7 @@ export default function MobileHome({
   overview,
   connected,
   query,
-  reply,
+  assistant,
   onQueryChange,
   onSubmit,
   onNavigate,
@@ -73,8 +74,8 @@ export default function MobileHome({
     <section className="v3-mobile-friday" data-mobile-section="friday">
       <div className="v3-mobile-core" aria-hidden="true"><span/></div>
       <div className="v3-mobile-command-copy"><span className="v3-kicker">FRIDAY / {overview.mode.toUpperCase()}</span><h2>Ask FRIDAY</h2><p>{connected ? `API connected · ${overview.mode} mode` : 'Local preview data · safe read-only interface'}</p></div>
-      <form className="v3-mobile-command-form" onSubmit={onSubmit}><Command size={17}/><input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Ask about infrastructure…"/><button aria-label="Send command"><ChevronRight size={17}/></button></form>
-      <div className="v3-mobile-reply"><Sparkles size={14}/><p>{reply}</p></div>
+      <form className="v3-mobile-command-form" onSubmit={onSubmit}><Command size={17}/><input value={query} onChange={(event) => onQueryChange(event.target.value)} placeholder="Ask about infrastructure…" disabled={assistant.loading}/><button aria-label="Send command" disabled={assistant.loading}><ChevronRight size={17}/></button></form>
+      <AssistantReply state={assistant} compact />
     </section>
 
     <section className="v3-mobile-infrastructure" data-mobile-section="infrastructure">

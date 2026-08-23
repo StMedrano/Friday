@@ -36,7 +36,14 @@ const overview: FridayOverview = {
 const baseProps = {
   connected: true,
   query: '',
-  reply: 'FRIDAY is ready.',
+  assistant: {
+    text: 'FRIDAY is ready.',
+    mode: 'local-ai' as const,
+    provider: 'ollama',
+    model: 'qwen3:4b',
+    loading: false,
+    error: null,
+  },
   onQueryChange: vi.fn(),
   onSubmit: vi.fn(),
   onNavigate: vi.fn(),
@@ -58,6 +65,12 @@ describe('MobileHome', () => {
     expect(screen.getByText(/1 HIGH INCIDENT/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /view diagnosis/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /ask friday/i })).toBeInTheDocument()
+  })
+
+  it('renders the shared local AI provenance in the mobile command surface', () => {
+    render(<MobileHome overview={overview} {...baseProps}/>)
+    expect(screen.getByText('FRIDAY LOCAL AI')).toBeInTheDocument()
+    expect(screen.getByText(/ollama · qwen3:4b/i)).toBeInTheDocument()
   })
 
   it('selects the highest-priority incident from the attention card', async () => {
