@@ -50,6 +50,14 @@ async function withServer(options, fn) {
   }
 }
 
+async function postAssistant(base, prompt = 'what is wrong?') {
+  return fetch(`${base}/api/assistant`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+  })
+}
+
 test('GET monitoring routes return runtime data', async () => {
   const monitoringRuntime = runtime()
   await withServer({ config: baseConfig(true), monitoringRuntime }, async (base) => {
@@ -130,12 +138,67 @@ test('assistant receives the same monitoring-aware overview as the UI', async ()
     answerAssistantImpl: async ({ overview }) => { seenOverview = overview; return { available: true, text: 'advisory only' } },
   }, async (base) => {
     const uiOverview = await (await fetch(`${base}/api/overview`)).json()
-    const response = await fetch(`${base}/api/assistant`, {
-      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt: 'what is wrong?' }),
-    })
+    const response = await postAssistant(base)
     assert.equal(response.status, 200)
     assert.ok(seenOverview)
     assert.deepEqual(seenOverview.incidents, uiOverview.incidents)
     assert.deepEqual(seenOverview.monitoring, uiOverview.monitoring)
+  })
+})
+
+test('assistant API returns 200 for an available cloud local or deterministic answer', async () => {
+  await withServer({
+    config: baseConfig(true),
+    monitoringRuntime: runtime(),
+    answerAssistantImpl: async () => ({ available: true, mode: 'cloud-ai', provider: 'openai', model: 'model', text: 'answer', attempts: [] }),
+  }, async (base) => {
+    const response = await postAssistant(base)
+    assert.equal(response.status, 200)
+    assert.equal((await response.json()).provider, 'openai')
+  })
+})
+
+test('assistant API returns 400 for invalid prompt results', async () => {
+  await withServer({
+    config: baseConfig(true),
+    monitoringRuntime: runtime(),
+    answerAssistantImpl: async () => ({ available: false, error: 'invalid-prompt', reason: 'A prompt is required.' }),
+  }, async (base) => {
+    const response = await postAssistant(base, '')
+    assert.equal(response.status, 400)
+    assert.deepEqual(await response.json(), { available: false, error: 'invalid-prompt', reason: 'A prompt is required.' })
+  })
+})
+
+test('assistant API returns 503 for exhausted provider chain', async () => {
+  const exhausted = {
+    available: false,
+    mode: 'local-analysis',
+    provider: 'deterministic',
+    model: null,
+    reason: 'No configured AI provider was available and the request did not map to a supported local analysis command.',
+    fallbackUsed: true,
+    attempts: [{ provider: 'openai', outcome: 'upstream' }],
+  }
+  await withServer({
+    config: baseConfig(true),
+    monitoringRuntime: runtime(),
+    answerAssistantImpl: async () => exhausted,
+  }, async (base) => {
+    const response = await postAssistant(base)
+    assert.equal(response.status, 503)
+    assert.deepEqual(await response.json(), exhausted)
+  })
+})
+
+test('assistant API sanitizes unexpected server faults and returns 502', async () => {
+  await withServer({
+    config: baseConfig(true),
+    monitoringRuntime: runtime(),
+    answerAssistantImpl: async () => { throw new Error('provider secret or internal network detail') },
+  }, async (base) => {
+    const response = await postAssistant(base)
+    assert.equal(response.status, 502)
+    assert.deepEqual(await response.json(), { available: false, error: 'assistant-failed' })
   })
 })
