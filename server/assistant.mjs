@@ -17,6 +17,13 @@ function timeoutSignal(timeoutMs) {
   return AbortSignal.timeout(timeoutMs)
 }
 
+function providerTimeoutMs(ai = {}, providerId) {
+  if (providerId === 'ollama') {
+    return ai.localTimeoutMs || ai.timeoutMs || 30000
+  }
+  return ai.cloudTimeoutMs || ai.timeoutMs || 15000
+}
+
 export async function answerAssistant({
   config,
   prompt,
@@ -49,7 +56,7 @@ export async function answerAssistant({
           prompt: text,
           overview,
           systemPrompt,
-          signal: signalFactory(ai.timeoutMs || 20000),
+          signal: signalFactory(providerTimeoutMs(ai, providerId)),
         })
         return {
           available: true,
