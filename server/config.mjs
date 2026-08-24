@@ -28,7 +28,7 @@ export function getConfig(env = process.env) {
   const legacyAiTimeoutProvided = String(env.FRIDAY_AI_REQUEST_TIMEOUT_MS ?? '').trim() !== ''
   const legacyAiTimeoutMs = positiveNumber(env.FRIDAY_AI_REQUEST_TIMEOUT_MS, 20000)
   const cloudTimeoutFallback = legacyAiTimeoutProvided ? legacyAiTimeoutMs : 15000
-  const localTimeoutFallback = legacyAiTimeoutProvided ? legacyAiTimeoutMs : 30000
+  const localTimeoutFallback = legacyAiTimeoutProvided ? legacyAiTimeoutMs : 45000
 
   return {
     port: Number(env.FRIDAY_PORT || 3010),
