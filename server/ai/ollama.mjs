@@ -14,6 +14,8 @@ export async function askOllama({
   const model = String(providerConfig.model || '').trim()
   const parsedContext = Number(providerConfig.context)
   const context = Number.isFinite(parsedContext) && parsedContext > 0 ? parsedContext : 8192
+  const parsedMaxTokens = Number(providerConfig.maxTokens)
+  const maxTokens = Number.isFinite(parsedMaxTokens) && parsedMaxTokens > 0 ? parsedMaxTokens : 512
 
   if (!enabled || !baseUrl || !model || typeof fetchImpl !== 'function') {
     throw providerFailure('ollama', 'configuration')
@@ -32,7 +34,10 @@ export async function askOllama({
           { role: 'system', content: systemPrompt },
           { role: 'user', content: fridayUserPrompt(prompt, overview) },
         ],
-        options: { num_ctx: context },
+        options: {
+          num_ctx: context,
+          num_predict: maxTokens,
+        },
       }),
     })
   } catch (error) {
