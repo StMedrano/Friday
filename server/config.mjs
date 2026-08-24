@@ -1,4 +1,5 @@
-const AI_PROVIDER_IDS = new Set(['openai', 'anthropic', 'gemini', 'ollama'])
+const DEFAULT_AI_PROVIDER_ORDER = ['groq', 'gemini', 'ollama']
+const AI_PROVIDER_IDS = new Set(['groq', 'gemini', 'ollama', 'openai', 'anthropic'])
 
 function enabled(value) {
   return String(value ?? '').toLowerCase() === 'true'
@@ -11,7 +12,7 @@ function positiveNumber(value, fallback) {
 
 function providerOrder(value) {
   const seen = new Set()
-  const parsed = String(value || 'openai,anthropic,gemini,ollama')
+  const parsed = String(value || DEFAULT_AI_PROVIDER_ORDER.join(','))
     .split(',')
     .map((item) => item.trim().toLowerCase())
     .filter((item) => AI_PROVIDER_IDS.has(item))
@@ -20,10 +21,15 @@ function providerOrder(value) {
       seen.add(item)
       return true
     })
-  return parsed.length ? parsed : ['openai', 'anthropic', 'gemini', 'ollama']
+  return parsed.length ? parsed : [...DEFAULT_AI_PROVIDER_ORDER]
 }
 
 export function getConfig(env = process.env) {
+  const legacyAiTimeoutProvided = String(env.FRIDAY_AI_REQUEST_TIMEOUT_MS ?? '').trim() !== ''
+  const legacyAiTimeoutMs = positiveNumber(env.FRIDAY_AI_REQUEST_TIMEOUT_MS, 20000)
+  const cloudTimeoutFallback = legacyAiTimeoutProvided ? legacyAiTimeoutMs : 15000
+  const localTimeoutFallback = legacyAiTimeoutProvided ? legacyAiTimeoutMs : 30000
+
   return {
     port: Number(env.FRIDAY_PORT || 3010),
     mode: env.FRIDAY_MODE === 'live' ? 'live' : 'mock',
@@ -65,15 +71,13 @@ export function getConfig(env = process.env) {
     ai: {
       enabled: enabled(env.FRIDAY_AI_ENABLED),
       providerOrder: providerOrder(env.FRIDAY_AI_PROVIDER_ORDER),
-      timeoutMs: positiveNumber(env.FRIDAY_AI_REQUEST_TIMEOUT_MS, 20000),
+      timeoutMs: legacyAiTimeoutMs,
+      cloudTimeoutMs: positiveNumber(env.FRIDAY_CLOUD_AI_TIMEOUT_MS, cloudTimeoutFallback),
+      localTimeoutMs: positiveNumber(env.FRIDAY_LOCAL_AI_TIMEOUT_MS, localTimeoutFallback),
       providers: {
-        openai: {
-          apiKey: env.OPENAI_API_KEY || '',
-          model: env.OPENAI_MODEL || 'gpt-5.6-terra',
-        },
-        anthropic: {
-          apiKey: env.ANTHROPIC_API_KEY || '',
-          model: env.ANTHROPIC_MODEL || '',
+        groq: {
+          apiKey: env.GROQ_API_KEY || '',
+          model: env.GROQ_MODEL || '',
         },
         gemini: {
           apiKey: env.GEMINI_API_KEY || '',
@@ -82,8 +86,17 @@ export function getConfig(env = process.env) {
         ollama: {
           enabled: enabled(env.FRIDAY_LOCAL_AI_ENABLED),
           baseUrl: env.FRIDAY_LOCAL_AI_URL || 'http://ollama:11434',
-          model: env.FRIDAY_LOCAL_AI_MODEL || 'qwen3:4b',
+          model: env.FRIDAY_LOCAL_AI_MODEL || 'qwen3:4b-instruct',
           context: positiveNumber(env.FRIDAY_LOCAL_AI_CONTEXT, 8192),
+          maxTokens: positiveNumber(env.FRIDAY_LOCAL_AI_MAX_TOKENS, 512),
+        },
+        openai: {
+          apiKey: env.OPENAI_API_KEY || '',
+          model: env.OPENAI_MODEL || 'gpt-5.6-terra',
+        },
+        anthropic: {
+          apiKey: env.ANTHROPIC_API_KEY || '',
+          model: env.ANTHROPIC_MODEL || '',
         },
       },
     },

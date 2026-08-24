@@ -164,10 +164,10 @@ See `observer/README.md` for preflight, update, authentication, diagnostic valid
 
 ## Friday multi-provider assistant
 
-Friday AI is disabled by default and remains advisory/read-only when enabled. Provider credentials stay server-side. The configured provider order is sequential and can fall through to deterministic local analysis:
+Friday AI is disabled by default and remains advisory/read-only when enabled. Provider credentials stay server-side. The preferred provider order is sequential and falls through to deterministic local analysis:
 
 ```text
-OpenAI -> Anthropic -> Gemini -> private Ollama -> deterministic local analysis
+Groq -> Gemini -> CT108 GPU Ollama -> deterministic local analysis
 ```
 
 Start from the checked-in environment template:
@@ -176,36 +176,43 @@ Start from the checked-in environment template:
 cp .env.example .env
 ```
 
-Configure one or more providers in `.env`. For example:
+Configure one or more providers in `.env`. The current VM102/CT108 deployment uses:
 
 ```env
 FRIDAY_AI_ENABLED=true
-FRIDAY_AI_PROVIDER_ORDER=openai,anthropic,gemini,ollama
-FRIDAY_AI_REQUEST_TIMEOUT_MS=20000
+FRIDAY_AI_PROVIDER_ORDER=groq,gemini,ollama
+FRIDAY_CLOUD_AI_TIMEOUT_MS=15000
+FRIDAY_LOCAL_AI_TIMEOUT_MS=30000
 
-OPENAI_API_KEY=
-OPENAI_MODEL=gpt-5.6-terra
-
-ANTHROPIC_API_KEY=
-ANTHROPIC_MODEL=
+GROQ_API_KEY=
+GROQ_MODEL=
 
 GEMINI_API_KEY=
 GEMINI_MODEL=
 
 FRIDAY_LOCAL_AI_ENABLED=true
-FRIDAY_LOCAL_AI_URL=http://ollama:11434
-FRIDAY_LOCAL_AI_MODEL=qwen3:4b
+FRIDAY_LOCAL_AI_URL=http://192.168.1.70:11434
+FRIDAY_LOCAL_AI_MODEL=qwen3:4b-instruct
 FRIDAY_LOCAL_AI_CONTEXT=8192
+FRIDAY_LOCAL_AI_MAX_TOKENS=512
 ```
 
-To start the private local model runtime and pull the configured model:
+`FRIDAY_AI_REQUEST_TIMEOUT_MS` remains available as a backward-compatible single timeout. Leave it blank when using the split cloud/local timeout budgets.
+
+OpenAI and Anthropic adapters are retained for compatibility but are no longer in the default provider order. Groq and Gemini models must be selected explicitly in `.env`.
+
+CT108 (`192.168.1.70`) runs native Ollama on the AMD Radeon 780M through RADV/Vulkan. Its firewall should permit TCP/11434 only from VM102 (`192.168.1.64`). `qwen3:4b-instruct` is the recommended local model for routine Friday summaries and the local output budget is bounded by `FRIDAY_LOCAL_AI_MAX_TOKENS`.
+
+The Compose `local-ai` Ollama service remains an optional private development/recovery path. To start it and pull the configured model:
 
 ```bash
 docker compose --profile local-ai up -d
 ./scripts/pull-local-model.sh
 ```
 
-The `ollama` service has **no host/LAN-published port**. Friday reaches it only by the private Docker service name on `friday_frontend`. The model receives the same normalized read-only Friday overview and shared assistant safety policy as cloud providers; it receives no Docker, Proxmox, shell, or infrastructure mutation tools.
+That Compose Ollama service has **no host/LAN-published port**. Friday receives no Docker, Proxmox, shell, or infrastructure mutation tools regardless of provider.
+
+See `docs/ai-providers.md` for provider behavior, timeout semantics, and the CT108 GPU deployment.
 
 Never place provider or infrastructure secrets in `VITE_*` variables.
 
