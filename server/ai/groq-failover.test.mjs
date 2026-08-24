@@ -22,7 +22,7 @@ test('default AI chain is Groq then Gemini then Ollama with separate timeout bud
 
   assert.deepEqual(config.ai.providerOrder, ['groq', 'gemini', 'ollama'])
   assert.equal(config.ai.cloudTimeoutMs, 15000)
-  assert.equal(config.ai.localTimeoutMs, 30000)
+  assert.equal(config.ai.localTimeoutMs, 45000)
   assert.deepEqual(config.ai.providers.groq, { apiKey: 'groq-secret', model: 'groq-model' })
   assert.equal(config.ai.providers.ollama.model, 'qwen3:4b-instruct')
   assert.equal(config.ai.providers.ollama.maxTokens, 512)
