@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import { readFile } from 'node:fs/promises'
 import { getConfig } from '../config.mjs'
 import { answerAssistant } from '../assistant.mjs'
 import { ProviderUnavailableError } from './errors.mjs'
@@ -40,6 +41,12 @@ test('legacy timeout remains a fallback while explicit cloud and local timeouts 
   })
   assert.equal(explicit.ai.cloudTimeoutMs, 12000)
   assert.equal(explicit.ai.localTimeoutMs, 34000)
+})
+
+test('Compose leaves split timeout variables unset by default so legacy timeout fallback survives deployment', async () => {
+  const compose = await readFile(new URL('../../compose.yaml', import.meta.url), 'utf8')
+  assert.match(compose, /FRIDAY_CLOUD_AI_TIMEOUT_MS:\s*\$\{FRIDAY_CLOUD_AI_TIMEOUT_MS:-\}/)
+  assert.match(compose, /FRIDAY_LOCAL_AI_TIMEOUT_MS:\s*\$\{FRIDAY_LOCAL_AI_TIMEOUT_MS:-\}/)
 })
 
 test('assistant fails over Groq to Gemini to Ollama and uses provider-specific timeouts', async () => {
