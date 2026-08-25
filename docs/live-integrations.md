@@ -33,19 +33,17 @@ FRIDAY_MONITORING_HISTORY_LIMIT=2000
 
 Use base `compose.yaml` and keep `FRIDAY_DOCKER_ENABLED=false` for the normal VM100-observer architecture. Monitoring state is persisted in FRIDAY's existing `/data` volume.
 
-## Incident Diagnostics rollout
+## Incident Diagnostics validation
 
-Diagnostics are merged/deployed disabled by default:
+Incident Diagnostics is part of merged `main` and remains environment-gated:
 
 ```env
 FRIDAY_DIAGNOSTICS_ENABLED=false
 ```
 
-Roll out in two phases and do not reverse the order.
+Do not infer VM100 observer diagnostic-route deployment from the VM102 controller version. Before relying on diagnostics operationally, validate the observer first and preserve the inspected container state.
 
-### Phase 1 — upgrade the VM100 observer
-
-After merge and explicit rollout approval:
+### Phase 1 — validate/update the VM100 observer
 
 ```bash
 cd /srv/infrastructure/friday-observer
@@ -58,7 +56,7 @@ docker compose up -d --build --force-recreate
 curl -fsS http://192.168.1.124:3199/health | jq
 ```
 
-Privately load the existing observer token into `$TOKEN`, then confirm inventory still works and obtain the known NPM container ID from sanitized inventory:
+Privately load the existing observer token into `$TOKEN`, then confirm inventory works and obtain the target container ID from sanitized inventory:
 
 ```bash
 CONTAINER_ID=$(curl -fsS -H "Authorization: Bearer $TOKEN" \
@@ -74,50 +72,38 @@ curl -fsS -H "Authorization: Bearer $TOKEN" \
 
 Do not manually construct arbitrary Docker paths. `$CONTAINER_ID` must come from observer inventory.
 
-Confirm the observer validation changed nothing:
+Confirm observer validation changed nothing:
 
 ```bash
 docker ps -a --filter name=nginx-proxy-manager \
   --format 'table {{.Names}}\t{{.Status}}\t{{.Image}}'
 ```
 
-For the current validation target, Nginx Proxy Manager must remain `Exited (255)`.
+Use the actual pre-validation state as the comparison point. Do not restart or repair the target as part of diagnostics validation.
 
-### Phase 2 — enable VM102 diagnostics
+### Phase 2 — validate VM102 diagnostics
 
-Only after Phase 1 is healthy:
-
-```bash
-cd /srv/infrastructure/apps/friday
-git status --short
-git checkout main
-git pull --ff-only origin main
-make preflight
-docker compose up -d --build --force-recreate
-make health
-```
-
-First verify the live controller with:
+Only after Phase 1 is healthy, verify the live controller with:
 
 ```env
-FRIDAY_DIAGNOSTICS_ENABLED=false
 FRIDAY_DOCKER_ENABLED=false
 ```
 
-Confirm Proxmox, VM100 observer, monitoring, and the existing NPM incident are still present. Then change only:
+Confirm Proxmox, VM100 observer, and monitoring remain healthy. Then, if diagnostics are intentionally enabled, set:
 
 ```env
 FRIDAY_DIAGNOSTICS_ENABLED=true
 ```
 
-Recreate FRIDAY with base Compose:
+Recreate only FRIDAY with base Compose and validate health:
 
 ```bash
-docker compose up -d --force-recreate
+cd /srv/infrastructure/apps/friday
+docker compose up -d --force-recreate friday
 make health
 ```
 
-The existing open supported NPM incident should receive one metadata-only backfill. Validate:
+For an existing supported incident, validate:
 
 ```bash
 curl -fsS http://127.0.0.1:3010/api/incidents | jq
@@ -127,7 +113,7 @@ curl -fsS http://127.0.0.1:3010/api/incidents/INCIDENT_ID/logs | jq
 
 The final logs call is explicit read-only inspection. Raw logs are returned ephemerally and are not persisted.
 
-Finally repeat the VM100 `docker ps -a` proof and require NPM to remain in its pre-validation state.
+Finally repeat the VM100 container-state proof and require the target to remain in its pre-validation state.
 
 Rollback diagnostics by setting:
 
@@ -146,12 +132,36 @@ FRIDAY_DOCKER_ENABLED=true
 FRIDAY_DOCKER_HOST_NAME=VM 102
 ```
 
-Then use `make live`, which adds the read-only local socket mount. Keep this disabled for normal Proxmox + VM100 observer + monitoring + diagnostics operation.
+Then use the explicit live override. Keep this disabled for normal Proxmox + VM100 observer + monitoring + diagnostics operation.
 
 ## HTTP endpoint checks
 
 `FRIDAY_ENDPOINTS_ENABLED=true` enables approved read-only health URLs. Do not embed credentials in URLs.
 
+## Advisory AI on VM102
+
+The validated production provider order is:
+
+```text
+Groq -> Gemini -> CT108 GPU Ollama -> deterministic local analysis
+```
+
+Relevant server-side configuration:
+
+```env
+FRIDAY_AI_ENABLED=true
+FRIDAY_AI_PROVIDER_ORDER=groq,gemini,ollama
+FRIDAY_CLOUD_AI_TIMEOUT_MS=15000
+FRIDAY_LOCAL_AI_TIMEOUT_MS=45000
+FRIDAY_LOCAL_AI_ENABLED=true
+FRIDAY_LOCAL_AI_URL=http://192.168.1.70:11434
+FRIDAY_LOCAL_AI_MODEL=qwen3:4b-instruct
+FRIDAY_LOCAL_AI_CONTEXT=8192
+FRIDAY_LOCAL_AI_MAX_TOKENS=512
+```
+
+Provider credentials remain server-side. CT108 should allow TCP/11434 only from VM102. AI receives normalized state only and no infrastructure execution tools.
+
 ## Actions
 
-`POST /api/commands/preview` remains preview-only. Incident, monitoring, diagnostics, and log-inspection APIs are GET-only. Neither the controller nor VM100 observer implements restart, stop, delete, exec, firewall, VLAN, or other infrastructure mutation endpoints.
+`POST /api/commands/preview` remains preview-only. `/api/assistant` remains advisory-only. Incident, monitoring, diagnostics, and log-inspection APIs expose no infrastructure mutation path. Neither the controller nor VM100 observer implements restart, stop, delete, exec, firewall, VLAN, or other infrastructure mutation endpoints.
