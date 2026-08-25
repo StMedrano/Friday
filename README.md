@@ -27,6 +27,7 @@ The current `main` baseline includes:
 - merged purpose-built Mobile Dashboard from PR #5
 - multi-provider advisory AI from PR #11: Groq -> Gemini -> CT108 GPU Ollama -> deterministic local analysis
 - 45-second default local AI timeout and exact infrastructure identifier grounding from PR #12
+- one shared session-only Friday conversation across Overview, FRIDAY, and mobile surfaces
 - safe base Compose with no controller Docker socket mount
 - no infrastructure mutation endpoints
 
@@ -215,6 +216,21 @@ That Compose Ollama service has **no host/LAN-published port**. Friday receives 
 See `docs/ai-providers.md` for provider behavior, timeout semantics, and the CT108 GPU deployment.
 
 Never place provider or infrastructure secrets in `VITE_*` variables.
+
+### Friday assistant session UX
+
+The UI owns exactly one in-memory Friday conversation for the lifetime of the mounted Dashboard. The same session is reused by desktop Overview, the dedicated FRIDAY workspace, Mobile Home, and the mobile FRIDAY workspace.
+
+- Overview and Mobile Home show a compact transcript: the newest two completed exchanges plus any active trailing loading/error turn.
+- The FRIDAY workspace shows the full current client transcript and labels the boundary with `FRIDAY / SESSION` and `Advisory only · No actions executed`.
+- Each provider response keeps its provenance badge/model metadata. When fallback occurred, the response exposes normalized fallback-attempt details.
+- Up to the newest 10 completed exchanges are sent as context for the next AI-backed request.
+- `Clear session` clears only browser memory and is disabled while a request is in flight.
+- Refreshing, remounting, or opening a new browser session starts with an empty Friday transcript.
+- There is no localStorage, sessionStorage, IndexedDB, server-side conversation record, session ID, or `/data` assistant-history persistence.
+- There is no automatic retry and providers remain sequential rather than parallel.
+
+Fresh normalized Friday infrastructure state remains authoritative on every turn; conversation history is context, not evidence. Exact request/history limits are documented in `docs/codex/API_CONTRACT.md`.
 
 ## Update Friday on VM 102
 
