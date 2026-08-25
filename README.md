@@ -1,6 +1,6 @@
 # Friday
 
-Friday is a two-site homelab control plane hosted on **VM 102 (`friday-controller`, `192.168.1.64`)**. It combines the authoritative **FRIDAY UI v3 command center**, a server-side infrastructure API, read-only live adapters, durable monitoring/incidents, and optional advisory AI without exposing privileged credentials to the browser.
+Friday is a two-site homelab control plane hosted on **VM 102 (`friday-controller`, `192.168.1.64`)**. It combines the authoritative **FRIDAY UI v3 command center**, a server-side infrastructure API, read-only live adapters, durable monitoring/incidents, incident diagnostics, a purpose-built mobile operations shell, and optional advisory AI without exposing privileged credentials to the browser.
 
 ## Authoritative build
 
@@ -12,7 +12,7 @@ VM 102 deploys FRIDAY. VM 100 (`192.168.1.124`) is managed infrastructure and ho
 
 ## Current production baseline
 
-Production currently has:
+The current `main` baseline includes:
 
 - FRIDAY UI v3 command center
 - React + TypeScript + Vite frontend
@@ -20,14 +20,17 @@ Production currently has:
 - live read-only Proxmox integration
 - token-authenticated VM100 Docker inventory observer
 - local VM102 Docker observation disabled
-- durable monitoring and incidents enabled on VM102
+- durable monitoring and incidents
 - deterministic offline/degraded/integration/flapping incident rules
 - read-only Incidents workspace
-- existing `nginx-proxy-manager` service-offline incident on VM100
+- merged Incident Diagnostics from PR #5, gated by `FRIDAY_DIAGNOSTICS_ENABLED`
+- merged purpose-built Mobile Dashboard from PR #5
+- multi-provider advisory AI from PR #11: Groq -> Gemini -> CT108 GPU Ollama -> deterministic local analysis
+- 45-second default local AI timeout and exact infrastructure identifier grounding from PR #12
 - safe base Compose with no controller Docker socket mount
 - no infrastructure mutation endpoints
 
-The Incident Diagnostics and Mobile Dashboard work on PR #5 are **candidates**, not part of the deployed baseline until reviewed, merged, and explicitly rolled out.
+The VM102 controller was updated from `main` after PR #12 and validated healthy. Provider validation confirmed Groq primary, Gemini fallback, CT108 `qwen3:4b-instruct` local fallback, and exact `friday-ollama -> LXC 108` grounding. Production validation of VM100 observer diagnostic routes should still be treated as a separate observer-side check before relying on those routes operationally.
 
 ## Safety model
 
@@ -35,7 +38,7 @@ Friday read adapters cannot mutate infrastructure. Monitoring writes only FRIDAY
 
 No restart/delete/network/firewall/VLAN/device-adoption execution endpoint exists. Infrastructure-changing actions remain blocked until authentication/RBAC, durable action audit logging, and an approval workflow exist.
 
-The deployed VM100 observer currently provides sanitized inventory. The Incident Diagnostics candidate expands that observer only with fixed, token-authenticated GET routes:
+The VM100 observer diagnostics surface is limited to fixed, token-authenticated GET routes:
 
 ```text
 GET /health
@@ -86,7 +89,7 @@ Proxmox and the VM100 observer do **not** require the controller Docker socket. 
 
 ## Monitoring & Incidents
 
-Monitoring is already deployed on VM102. Current settings are server-side and use the persistent FRIDAY data volume:
+Monitoring is deployed on VM102. Current settings are server-side and use the persistent FRIDAY data volume:
 
 ```env
 FRIDAY_MONITORING_ENABLED=true
@@ -98,18 +101,13 @@ FRIDAY_MONITORING_HISTORY_LIMIT=2000
 
 Monitoring uses a non-overlapping poll loop, persists observations/incidents/history, and exposes GET-only incident/history APIs. It does **not** restart, stop, start, exec into, or modify containers or Proxmox guests.
 
-## Incident Diagnostics candidate
+## Incident Diagnostics
 
-Diagnostics are disabled by default even after the candidate is merged:
+Incident Diagnostics shipped in PR #5 and is part of `main`. The feature remains environment-gated:
 
 ```env
 FRIDAY_DIAGNOSTICS_ENABLED=false
 ```
-
-The rollout is intentionally two-phase:
-
-1. Upgrade and validate the VM100 observer first, keeping the existing Nginx Proxy Manager container unchanged.
-2. Upgrade VM102 with diagnostics still disabled; only after observer validation, set `FRIDAY_DIAGNOSTICS_ENABLED=true` and recreate FRIDAY with base Compose.
 
 When enabled, supported VM100 service incidents receive one metadata-only diagnostic snapshot. Existing open supported incidents without a report receive one startup backfill. Analysis is deterministic and separates observed facts, findings, likely causes, and recommendations.
 
@@ -124,11 +122,11 @@ GET /api/incidents/:incidentId/logs
 
 There is no diagnostic remediation endpoint.
 
-See `observer/README.md` and `docs/live-integrations.md` for the observer-first rollout and validation commands.
+Observer rollout and route validation remain observer-first: validate `/health`, authenticated inventory, fixed inspect, and bounded logs on VM100 before depending on controller diagnostics. See `observer/README.md` and `docs/live-integrations.md` for the validation commands.
 
-## Mobile Dashboard candidate
+## Mobile Dashboard
 
-PR #5 includes a purpose-built phone operations shell at the exact `(max-width: 700px)` boundary. It does not shrink the desktop rail onto a phone; React renders a separate phone shell while desktop FRIDAY UI v3 remains the layout above 700px.
+The Mobile Dashboard shipped in PR #5 and is part of `main`. It uses a purpose-built phone operations shell at the exact `(max-width: 700px)` boundary. It does not shrink the desktop rail onto a phone; React renders a separate phone shell while desktop FRIDAY UI v3 remains the layout above 700px.
 
 Phone navigation is:
 
@@ -148,7 +146,7 @@ Active incidents therefore appear before the command surface. `View Diagnosis` o
 
 The phone shell includes safe-area-aware fixed bottom navigation, 44px minimum primary touch targets, width/overflow containment, reduced-motion handling, and single-column diagnostic/log containment. Automated JSDOM/component/CSS contract tests cover the 700px routing contract and desktop regression.
 
-**Visual acceptance is still required before merge or rollout.** This implementation session does not have a browser/device runner that can reach the private VM102 address, so true rendering at 360px, 390px, 430px, and desktop 1440px has not been claimed. Validate those widths on VM102 or a real device before production rollout.
+Representative phone and desktop render paths were visually reviewed during PR #5. Exact 360px/390px/430px acceptance and a real incident-detail/log-panel pass remain useful production-polish checks and should not be represented as completed unless performed.
 
 ## Deploy/update the VM100 observer
 
@@ -256,7 +254,7 @@ POST /api/assistant
 
 Incident, monitoring, diagnostics, and diagnostic-log routes expose no POST/PUT/PATCH/DELETE action API.
 
-VM100 observer candidate contract:
+VM100 observer contract:
 
 ```text
 GET /health
