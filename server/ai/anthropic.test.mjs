@@ -3,10 +3,15 @@ import assert from 'node:assert/strict'
 import { askAnthropic } from './anthropic.mjs'
 import { ProviderUnavailableError } from './errors.mjs'
 
-test('Anthropic uses Messages API with the shared read-only policy', async () => {
+test('Anthropic uses Messages API with the shared read-only policy and recent context', async () => {
+  let providerText = ''
   const result = await askAnthropic({
     providerConfig: { apiKey: 'anthropic-secret', model: 'anthropic-model' },
     prompt: 'Check infrastructure',
+    history: [
+      { role: 'user', content: 'Check friday-ollama' },
+      { role: 'assistant', content: 'friday-ollama is LXC 108' },
+    ],
     overview: { mode: 'live', services: [] },
     fetchImpl: async (url, options) => {
       assert.equal(url, 'https://api.anthropic.com/v1/messages')
@@ -17,12 +22,15 @@ test('Anthropic uses Messages API with the shared read-only policy', async () =>
       assert.equal(body.model, 'anthropic-model')
       assert.equal(body.max_tokens, 1200)
       assert.match(body.system, /read-only infrastructure copilot/i)
-      assert.match(body.messages[0].content, /Check infrastructure/)
-      assert.match(body.messages[0].content, /Normalized Friday state/)
+      providerText = body.messages[0].content
       return new Response(JSON.stringify({ content: [{ type: 'text', text: 'Anthropic answer' }] }), { status: 200 })
     },
   })
 
+  assert.match(providerText, /Recent session context:/)
+  assert.match(providerText, /Check friday-ollama/)
+  assert.match(providerText, /Current operator request:\nCheck infrastructure/)
+  assert.match(providerText, /Authoritative normalized Friday state:/)
   assert.deepEqual(result, { provider: 'anthropic', model: 'anthropic-model', text: 'Anthropic answer' })
 })
 
