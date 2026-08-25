@@ -36,14 +36,21 @@ const overview: FridayOverview = {
 const baseProps = {
   connected: true,
   query: '',
-  assistant: {
-    text: 'FRIDAY is ready.',
-    mode: 'local-ai' as const,
-    provider: 'ollama',
-    model: 'qwen3:4b',
-    loading: false,
-    error: null,
-  },
+  messages: [
+    { id: 'u1', role: 'user' as const, text: 'Check service health', status: 'complete' as const },
+    {
+      id: 'a1',
+      role: 'assistant' as const,
+      text: 'All observed services are healthy.',
+      status: 'complete' as const,
+      mode: 'local-ai' as const,
+      provider: 'ollama',
+      model: 'qwen3:4b',
+      fallbackUsed: false,
+      attempts: [],
+    },
+  ],
+  loading: false,
   onQueryChange: vi.fn(),
   onSubmit: vi.fn(),
   onNavigate: vi.fn(),
@@ -67,10 +74,29 @@ describe('MobileHome', () => {
     expect(screen.getByRole('heading', { name: /ask friday/i })).toBeInTheDocument()
   })
 
-  it('renders the shared local AI provenance in the mobile command surface', () => {
-    render(<MobileHome overview={overview} {...baseProps}/>)
+  it('renders the shared compact Friday session and submits through parent callbacks', async () => {
+    const onQueryChange = vi.fn()
+    const onSubmit = vi.fn((event) => event.preventDefault())
+    const user = userEvent.setup()
+    render(<MobileHome overview={overview} {...baseProps} onQueryChange={onQueryChange} onSubmit={onSubmit}/>)
+
+    expect(screen.getByRole('region', { name: /friday conversation/i })).toBeInTheDocument()
+    expect(screen.getByText('Check service health')).toBeInTheDocument()
+    expect(screen.getByText('All observed services are healthy.')).toBeInTheDocument()
     expect(screen.getByText('FRIDAY LOCAL AI')).toBeInTheDocument()
     expect(screen.getByText(/ollama · qwen3:4b/i)).toBeInTheDocument()
+
+    const input = screen.getByPlaceholderText(/ask about infrastructure/i)
+    await user.type(input, 'x')
+    expect(onQueryChange).toHaveBeenCalled()
+    await user.click(screen.getByRole('button', { name: /send command/i }))
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+  })
+
+  it('disables the shared mobile composer while loading', () => {
+    render(<MobileHome overview={overview} {...baseProps} loading/>)
+    expect(screen.getByPlaceholderText(/ask about infrastructure/i)).toBeDisabled()
+    expect(screen.getByRole('button', { name: /send command/i })).toBeDisabled()
   })
 
   it('selects the highest-priority incident from the attention card', async () => {

@@ -33,30 +33,68 @@ describe('Dashboard assistant integration', () => {
     askFridayAssistant.mockReset()
   })
 
-  it('submits the real operator prompt and renders cloud provenance', async () => {
-    askFridayAssistant.mockResolvedValue({
-      available: true,
-      mode: 'cloud-ai',
-      provider: 'openai',
-      model: 'test-model',
-      text: 'All observed services are healthy.',
-      fallbackUsed: false,
-      attempts: [],
-    })
+  it('shares one session between Overview and FRIDAY and clears on remount', async () => {
+    askFridayAssistant
+      .mockResolvedValueOnce({
+        available: true,
+        mode: 'cloud-ai',
+        provider: 'groq',
+        model: 'test-groq',
+        text: 'friday-ollama is LXC 108',
+        fallbackUsed: false,
+        attempts: [],
+      })
+      .mockResolvedValueOnce({
+        available: true,
+        mode: 'cloud-ai',
+        provider: 'groq',
+        model: 'test-groq',
+        text: 'VM102 is the Friday controller.',
+        fallbackUsed: false,
+        attempts: [],
+      })
 
     const user = userEvent.setup()
-    render(<Dashboard />)
-    const input = screen.getByPlaceholderText(/ask friday anything/i)
-    await user.type(input, 'Check service health')
+    const view = render(<Dashboard />)
+
+    const overviewInput = screen.getByPlaceholderText(/ask friday anything/i)
+    await user.type(overviewInput, 'Check friday-ollama')
     await user.click(screen.getByRole('button', { name: /send command/i }))
 
-    expect(askFridayAssistant).toHaveBeenCalledWith('Check service health')
-    expect(await screen.findByText('All observed services are healthy.')).toBeInTheDocument()
-    expect(screen.getByText('FRIDAY CLOUD AI')).toBeInTheDocument()
-    expect(screen.getByText(/openai · test-model/i)).toBeInTheDocument()
+    expect(await screen.findByText('friday-ollama is LXC 108')).toBeInTheDocument()
+    expect(askFridayAssistant).toHaveBeenNthCalledWith(1, 'Check friday-ollama', { history: [] })
+
+    await user.click(screen.getByRole('button', { name: /^FRIDAY$/i }))
+    expect(screen.getByText('FRIDAY / SESSION')).toBeInTheDocument()
+    expect(screen.getByText('Advisory only · No actions executed')).toBeInTheDocument()
+    expect(screen.getByText('Check friday-ollama')).toBeInTheDocument()
+    expect(screen.getByText('friday-ollama is LXC 108')).toBeInTheDocument()
+
+    const fridayInput = screen.getByPlaceholderText(/ask friday anything/i)
+    await user.type(fridayInput, 'Compare it to VM102')
+    await user.click(screen.getByRole('button', { name: /send command/i }))
+
+    expect(await screen.findByText('VM102 is the Friday controller.')).toBeInTheDocument()
+    expect(askFridayAssistant).toHaveBeenNthCalledWith(2, 'Compare it to VM102', {
+      history: [
+        { role: 'user', content: 'Check friday-ollama' },
+        { role: 'assistant', content: 'friday-ollama is LXC 108' },
+      ],
+    })
+
+    await user.click(screen.getByRole('button', { name: /^Overview$/i }))
+    expect(screen.getByText('Check friday-ollama')).toBeInTheDocument()
+    expect(screen.getByText('friday-ollama is LXC 108')).toBeInTheDocument()
+    expect(screen.getByText('Compare it to VM102')).toBeInTheDocument()
+    expect(screen.getByText('VM102 is the Friday controller.')).toBeInTheDocument()
+
+    view.unmount()
+    render(<Dashboard />)
+    expect(screen.queryByText('Check friday-ollama')).not.toBeInTheDocument()
+    expect(screen.queryByText('friday-ollama is LXC 108')).not.toBeInTheDocument()
   })
 
-  it('disables input and send while Friday is analyzing', async () => {
+  it('disables the shared composer while Friday is analyzing', async () => {
     askFridayAssistant.mockImplementation(() => new Promise(() => {}))
 
     const user = userEvent.setup()
