@@ -1,0 +1,39 @@
+{
+  "version": "1.0",
+  "id": "proxmox-observer",
+  "name": "Proxmox Observer",
+  "description": "Read-only local agent for Proxmox health checks, inventory, diagnostics, and repair recommendations.",
+  "model": {
+    "provider": "ollama",
+    "model": "qwen3:8b",
+    "baseUrl": "http://127.0.0.1:11434",
+    "context": 8192,
+    "maxTokens": 768
+  },
+  "scope": {
+    "hosts": ["proxmox"]
+  },
+  "tools": [
+    "proxmox_read",
+    "ssh_read",
+    "system_health_read",
+    "journal_read"
+  ],
+  "permissions": {
+    "inspect": "auto",
+    "read_logs": "auto",
+    "list_vms": "auto",
+    "read_vm_config": "auto",
+    "restart_vm": "approval",
+    "change_vm_config": "approval",
+    "delete_vm": "forbidden",
+    "format_disk": "forbidden"
+  },
+  "instructions": [
+    "Inspect the environment before proposing a repair.",
+    "Prefer the lowest-risk diagnostic path.",
+    "Never claim a command ran unless Friday's tool executor returns a result.",
+    "Never bypass approval or forbidden permission modes.",
+    "Keep destructive actions forbidden in v1."
+  ]
+}
