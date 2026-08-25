@@ -80,7 +80,7 @@ describe('MobileHome', () => {
     const user = userEvent.setup()
     render(<MobileHome overview={overview} {...baseProps} onQueryChange={onQueryChange} onSubmit={onSubmit}/>)
 
-    expect(screen.getByRole('region', { name: /friday conversation/i })).toBeInTheDocument()
+    expect(screen.getByLabelText(/friday conversation/i)).toBeInTheDocument()
     expect(screen.getByText('Check service health')).toBeInTheDocument()
     expect(screen.getByText('All observed services are healthy.')).toBeInTheDocument()
     expect(screen.getByText('FRIDAY LOCAL AI')).toBeInTheDocument()
