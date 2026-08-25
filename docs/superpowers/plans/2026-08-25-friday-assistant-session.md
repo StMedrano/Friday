@@ -4,24 +4,24 @@
 
 **Goal:** Turn Friday's existing one-shot assistant into one shared, session-only multi-turn conversation across Overview and FRIDAY while preserving the current read-only/advisory safety boundary.
 
-**Architecture:** A new `useFridaySession` frontend hook owns the in-memory transcript and sends only the newest 10 completed exchanges as bounded history. `/api/assistant` stays stateless: the server sanitizes history, attaches fresh normalized infrastructure state on every request, and passes one shared context format through the existing Groq -> Gemini -> CT108 Ollama -> deterministic fallback chain.
+**Architecture:** A new `useFridaySession` hook owns the in-memory transcript and sends only the newest 10 completed exchanges as bounded history. `/api/assistant` remains stateless: it validates the current prompt, sanitizes history, builds fresh normalized infrastructure state on every request, then passes one shared context format through the existing sequential Groq -> Gemini -> CT108 Ollama -> deterministic fallback chain.
 
-**Tech Stack:** React 18.3.1, TypeScript 5.7.2, Vite 5.4.14, Vitest 2.1.8, Testing Library, Node.js built-in test runner, existing Friday Node HTTP server and AI provider adapters.
+**Tech Stack:** React 18.3.1, TypeScript 5.7.2, Vite 5.4.14, Vitest 2.1.8, Testing Library, Node.js built-in test runner, Friday's existing Node HTTP server and AI adapters.
 
 **Spec:** `docs/superpowers/specs/2026-08-24-friday-assistant-session-design.md`
 
 ## Global Constraints
 
-- Conversation history is session-only: no `localStorage`, `sessionStorage`, server storage, database storage, or `/data` persistence.
+- Conversation history is session-only: no `localStorage`, `sessionStorage`, IndexedDB, server storage, database storage, or `/data` persistence.
 - Overview and FRIDAY share one in-memory conversation.
 - Model context is capped at the 10 most recent completed exchanges / 20 historical messages.
-- Overview displays at most the two newest completed exchanges, while still showing the active loading/error exchange when one exists.
-- Current prompt maximum: 4,000 trimmed characters; reject longer prompts with `400 invalid-prompt` rather than truncating them.
-- Historical message maximum: 2,000 characters each; historical content maximum: 12,000 characters total; server retains newest valid content.
-- History roles are exactly `user` or `assistant`; malformed/empty history entries are discarded.
+- Overview displays at most the two newest completed exchanges and also displays the active trailing loading/error exchange.
+- Current prompt maximum: 4,000 trimmed characters; reject longer prompts with HTTP 400 / `invalid-prompt` rather than truncating them.
+- Historical message maximum: 2,000 characters each; historical content maximum: 12,000 characters total; retain newest valid content.
+- History roles are exactly `user` or `assistant`; malformed and empty entries are discarded.
 - Fresh normalized Friday state is authoritative for infrastructure facts on every turn; conversation history is contextual only.
 - Production provider order and sequential failover remain Groq -> Gemini -> CT108 Ollama -> deterministic local analysis.
-- Deterministic local analysis evaluates only the current prompt and does not resolve ambiguous references from history.
+- Deterministic local analysis receives only the current prompt and does not resolve ambiguous references from history.
 - Do not add Docker, Proxmox, shell, network, deployment, remediation, approval, HTTP-write, or other infrastructure mutation authority.
 - The FRIDAY workspace must visibly state `Advisory only · No actions executed`.
 - No automatic UI retry and no provider parallel fan-out.
@@ -34,36 +34,36 @@
 ### New files
 
 - `server/assistant-input.mjs` — pure prompt/history validation and bounding.
-- `server/assistant-input.test.mjs` — unit tests for input normalization limits.
-- `src/hooks/useFridaySession.ts` — sole owner of the in-memory assistant transcript and request lifecycle.
-- `src/hooks/useFridaySession.test.tsx` — hook-level TDD for transcript lifecycle and 10-exchange context selection.
-- `src/components/FridayComposer.tsx` — shared controlled composer used by Overview and FRIDAY.
-- `src/components/FridayConversation.tsx` — renders compact/full transcript without owning API state.
-- `src/components/FridayConversation.test.tsx` — compact/full transcript and fallback disclosure tests.
-- `src/components/FridayWorkspace.tsx` — dedicated desktop/mobile FRIDAY session workspace.
-- `src/components/FridayWorkspace.test.tsx` — safety copy, clear behavior, and full transcript tests.
+- `server/assistant-input.test.mjs` — input-limit unit tests.
+- `server/ai/groq.test.mjs` — direct Groq transport/history test.
+- `src/lib/api.assistant.test.ts` — direct browser API request-shape test.
+- `src/hooks/useFridaySession.ts` — in-memory transcript/request lifecycle owner.
+- `src/hooks/useFridaySession.test.tsx` — session state/history selection tests.
+- `src/components/FridayComposer.tsx` — shared controlled composer.
+- `src/components/FridayConversation.tsx` — compact/full transcript renderer.
+- `src/components/FridayConversation.test.tsx` — transcript selection tests.
+- `src/components/FridayWorkspace.tsx` — dedicated FRIDAY session workspace.
+- `src/components/FridayWorkspace.test.tsx` — workspace safety/clear tests.
 
 ### Existing files to modify
 
-- `server/http.mjs` — normalize `/api/assistant` input before `answerAssistant()` and forward sanitized history.
-- `server/http.test.mjs` — HTTP compatibility, prompt-size, history forwarding, and fresh-overview regression tests.
-- `server/assistant.mjs` — accept sanitized history and pass it only to AI providers.
-- `server/assistant.test.mjs` — history-through-failover and deterministic-current-prompt-only tests.
-- `server/ai/policy.mjs` — format recent context/current request/authoritative state and add non-authoritative-history rule.
-- `server/ai/policy.test.mjs` — grounding and formatter tests.
-- `server/ai/groq.mjs`, `server/ai/gemini.mjs`, `server/ai/ollama.mjs`, `server/ai/openai.mjs`, `server/ai/anthropic.mjs` — accept `history` and feed the shared formatter.
-- Matching provider tests under `server/ai/*.test.mjs` — assert history reaches provider payload without altering transport semantics.
-- `src/lib/api.ts` — add history request type and send `{ prompt, history }`.
-- `src/components/AssistantReply.tsx` — retain existing provenance and add `fallbackUsed`/`attempts` expandable disclosure.
-- `src/components/AssistantReply.test.tsx` — fallback disclosure accessibility and ordering.
-- `src/pages/Dashboard.tsx` — replace one-shot assistant state with one `useFridaySession()` instance; separate Overview from FRIDAY workspace.
-- `src/pages/Dashboard.assistant.test.tsx` — shared session/navigation integration tests.
-- `src/components/MobileHome.tsx` — consume shared session/composer and compact transcript instead of one reply state.
-- `src/components/MobileHome.test.tsx` — compact mobile conversation regression tests.
-- `src/assistant.css` — transcript/workspace/fallback/composer styles and responsive rules.
-- `src/mobile.css` only if the new workspace requires phone-shell-specific layout not expressible in `assistant.css`.
-- `docs/codex/API_CONTRACT.md` — document optional assistant `history`, limits, response provenance, and statelessness.
-- `README.md` — document session-only conversational behavior and read-only safety copy.
+- `server/http.mjs`, `server/http.test.mjs`
+- `server/assistant.mjs`, `server/assistant.test.mjs`
+- `server/ai/policy.mjs`, `server/ai/policy.test.mjs`
+- `server/ai/groq.mjs`
+- `server/ai/gemini.mjs`, `server/ai/gemini.test.mjs`
+- `server/ai/ollama.mjs`, `server/ai/ollama.test.mjs`
+- `server/ai/openai.mjs`, `server/ai/openai.test.mjs`
+- `server/ai/anthropic.mjs`, `server/ai/anthropic.test.mjs`
+- `src/lib/api.ts`
+- `src/components/AssistantReply.tsx`, `src/components/AssistantReply.test.tsx`
+- `src/pages/Dashboard.tsx`, `src/pages/Dashboard.assistant.test.tsx`
+- `src/components/MobileHome.tsx`, `src/components/MobileHome.test.tsx`
+- `src/assistant.css`
+- `docs/codex/API_CONTRACT.md`
+- `README.md`
+
+`src/mobile.css`, Compose files, observer code, monitoring code, diagnostics code, and deployment scripts are not feature-edit targets for this milestone.
 
 ---
 
@@ -74,20 +74,29 @@
 - Create: `server/assistant-input.test.mjs`
 
 **Interfaces:**
-- Produces: `validateAssistantPrompt(value) -> { ok: true, prompt: string } | { ok: false, result: { available: false, error: 'invalid-prompt', reason: string } }`
-- Produces: `normalizeAssistantHistory(value) -> Array<{ role: 'user' | 'assistant', content: string }>`
-- Constants owned by this module: `MAX_PROMPT_CHARS = 4000`, `MAX_HISTORY_MESSAGES = 20`, `MAX_HISTORY_MESSAGE_CHARS = 2000`, `MAX_HISTORY_TOTAL_CHARS = 12000`.
+- Produces `validateAssistantPrompt(value)` returning either `{ ok: true, prompt }` or `{ ok: false, result }`.
+- Produces `normalizeAssistantHistory(value)` returning `Array<{ role: 'user' | 'assistant', content: string }>`.
+- Owns constants `MAX_PROMPT_CHARS=4000`, `MAX_HISTORY_MESSAGES=20`, `MAX_HISTORY_MESSAGE_CHARS=2000`, `MAX_HISTORY_TOTAL_CHARS=12000`.
 
-- [ ] **Step 1: Write failing unit tests for prompt validation**
-
-Add tests that assert whitespace-only prompt is invalid, a 4,000-character trimmed prompt is accepted unchanged, and a 4,001-character prompt is rejected rather than truncated.
+- [ ] **Step 1: Write failing prompt-limit tests**
 
 ```js
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import { validateAssistantPrompt } from './assistant-input.mjs'
+import { normalizeAssistantHistory, validateAssistantPrompt } from './assistant-input.mjs'
 
-test('validateAssistantPrompt rejects prompt longer than 4000 chars', () => {
+test('validateAssistantPrompt rejects whitespace-only input', () => {
+  const result = validateAssistantPrompt('   ')
+  assert.equal(result.ok, false)
+  assert.equal(result.result.error, 'invalid-prompt')
+})
+
+test('validateAssistantPrompt accepts exactly 4000 trimmed characters', () => {
+  const prompt = 'x'.repeat(4000)
+  assert.deepEqual(validateAssistantPrompt(prompt), { ok: true, prompt })
+})
+
+test('validateAssistantPrompt rejects 4001 characters without truncation', () => {
   const result = validateAssistantPrompt('x'.repeat(4001))
   assert.equal(result.ok, false)
   assert.equal(result.result.error, 'invalid-prompt')
@@ -95,9 +104,9 @@ test('validateAssistantPrompt rejects prompt longer than 4000 chars', () => {
 })
 ```
 
-- [ ] **Step 2: Write failing unit tests for history sanitization**
+- [ ] **Step 2: Write failing history-normalization tests**
 
-Cover non-array input, invalid roles, empty content, per-message truncation, newest-20 retention, 12,000-total-character retention, and preserved order.
+Include tests for non-array input, invalid roles, empty content, per-message truncation, newest-20 retention, 12,000-total-character retention, and order preservation.
 
 ```js
 test('normalizeAssistantHistory keeps newest 20 valid messages', () => {
@@ -114,17 +123,31 @@ test('normalizeAssistantHistory keeps newest 20 valid messages', () => {
 
 - [ ] **Step 3: Run the new tests and verify RED**
 
-Run:
 ```bash
 node --test server/assistant-input.test.mjs
 ```
-Expected: FAIL because `server/assistant-input.mjs` or its exports do not exist yet.
 
-- [ ] **Step 4: Implement minimal pure normalization**
+Expected: FAIL because the module does not exist.
 
-Use no filesystem, environment, logging, persistence, or network access. Build the newest-first bounding by sanitizing entries, slicing to the newest 20, then dropping oldest entries until total content length is `<= 12000`.
+- [ ] **Step 4: Implement the pure helper**
 
 ```js
+export const MAX_PROMPT_CHARS = 4000
+export const MAX_HISTORY_MESSAGES = 20
+export const MAX_HISTORY_MESSAGE_CHARS = 2000
+export const MAX_HISTORY_TOTAL_CHARS = 12000
+
+export function validateAssistantPrompt(value) {
+  const prompt = String(value ?? '').trim()
+  if (!prompt) {
+    return { ok: false, result: { available: false, error: 'invalid-prompt', reason: 'A prompt is required.' } }
+  }
+  if (prompt.length > MAX_PROMPT_CHARS) {
+    return { ok: false, result: { available: false, error: 'invalid-prompt', reason: `Prompt is too long. Maximum ${MAX_PROMPT_CHARS} characters.` } }
+  }
+  return { ok: true, prompt }
+}
+
 export function normalizeAssistantHistory(value) {
   if (!Array.isArray(value)) return []
   let messages = value.flatMap((entry) => {
@@ -134,20 +157,24 @@ export function normalizeAssistantHistory(value) {
     return [{ role: entry.role, content: content.slice(0, MAX_HISTORY_MESSAGE_CHARS) }]
   }).slice(-MAX_HISTORY_MESSAGES)
 
-  while (messages.reduce((sum, item) => sum + item.content.length, 0) > MAX_HISTORY_TOTAL_CHARS) {
+  let total = messages.reduce((sum, item) => sum + item.content.length, 0)
+  while (messages.length && total > MAX_HISTORY_TOTAL_CHARS) {
+    total -= messages[0].content.length
     messages = messages.slice(1)
   }
   return messages
 }
 ```
 
-- [ ] **Step 5: Run the unit tests and verify GREEN**
+No filesystem, environment, logging, persistence, or network imports are allowed in this module.
 
-Run:
+- [ ] **Step 5: Run tests and verify GREEN**
+
 ```bash
 node --test server/assistant-input.test.mjs
 ```
-Expected: PASS, zero failures.
+
+Expected: PASS with zero failures.
 
 - [ ] **Step 6: Commit Task 1**
 
@@ -158,44 +185,55 @@ git commit -m "feat: bound Friday assistant input"
 
 ---
 
-### Task 2: Enforce the Contract at `/api/assistant`
+### Task 2: Enforce the Input Contract at `/api/assistant`
 
 **Files:**
-- Modify: `server/http.mjs` in the `/api/assistant` POST handler and imports.
-- Modify: `server/http.test.mjs` assistant-route tests.
+- Modify: `server/http.mjs` imports and `/api/assistant` POST handler.
+- Modify: `server/http.test.mjs` assistant-route coverage.
 
 **Interfaces:**
-- Consumes: `validateAssistantPrompt()` and `normalizeAssistantHistory()` from Task 1.
-- Produces: `answerAssistantImpl({ config, prompt, history, overview })` receives a validated prompt and sanitized history.
+- Consumes Task 1 helpers.
+- Produces `answerAssistantImpl({ config, prompt, history, overview })` with validated prompt and sanitized history.
 
-- [ ] **Step 1: Add failing HTTP tests for request compatibility and history forwarding**
+- [ ] **Step 1: Add failing HTTP tests**
 
-Add one test proving `{ prompt }` still forwards `history: []`, and one proving valid history reaches the injected `answerAssistantImpl` exactly as sanitized.
+Add tests proving:
+- `{ prompt }` remains backward compatible and forwards `history: []`;
+- valid history reaches `answerAssistantImpl` unchanged after normalization;
+- invalid roles are removed before forwarding;
+- 4,001-character prompt returns HTTP 400 / `invalid-prompt`;
+- valid assistant requests still build fresh overview every time.
+
+Use a captured call object:
 
 ```js
-assert.deepEqual(seen.history, [
-  { role: 'user', content: 'Check friday-ollama' },
-  { role: 'assistant', content: 'friday-ollama is LXC 108' },
-])
+let seen
+const answerAssistantImpl = async (input) => {
+  seen = input
+  return { available: true, mode: 'local-analysis', provider: 'deterministic', model: null, text: 'ok', fallbackUsed: false, attempts: [] }
+}
 ```
 
-- [ ] **Step 2: Add failing HTTP tests for overlong prompt and fresh overview**
+- [ ] **Step 2: Run focused tests and verify RED**
 
-Assert a 4,001-character prompt returns HTTP 400 with `error: 'invalid-prompt'`. Preserve or add a counter-based test showing `buildOverviewImpl` is invoked for every valid assistant request, including requests containing history.
-
-- [ ] **Step 3: Run focused HTTP tests and verify RED**
-
-Run:
 ```bash
 node --test server/http.test.mjs
 ```
-Expected: FAIL on the new history/length assertions.
 
-- [ ] **Step 4: Modify the assistant route**
+Expected: FAIL on new history/prompt-limit assertions.
 
-Normalize immediately after `readBody(request)`:
+- [ ] **Step 3: Modify the route**
+
+Add:
 
 ```js
+import { normalizeAssistantHistory, validateAssistantPrompt } from './assistant-input.mjs'
+```
+
+Inside the existing `/api/assistant` handler, replace direct `body.prompt` forwarding with:
+
+```js
+const body = await readBody(request)
 const promptResult = validateAssistantPrompt(body.prompt)
 if (!promptResult.ok) return json(response, 400, promptResult.result)
 const history = normalizeAssistantHistory(body.history)
@@ -206,19 +244,22 @@ const result = await answerAssistantImpl({
   history,
   overview,
 })
+if (result.available) return json(response, 200, result)
+if (result.error === 'invalid-prompt') return json(response, 400, result)
+return json(response, 503, result)
 ```
 
-Do not add any history storage, cookies, session IDs, file writes, or new endpoints.
+Keep the existing route-level catch returning HTTP 502 / `assistant-failed`.
 
-- [ ] **Step 5: Run focused tests and verify GREEN**
+- [ ] **Step 4: Run focused tests and verify GREEN**
 
-Run:
 ```bash
 node --test server/assistant-input.test.mjs server/http.test.mjs
 ```
-Expected: PASS, zero failures.
 
-- [ ] **Step 6: Commit Task 2**
+Expected: PASS with zero failures.
+
+- [ ] **Step 5: Commit Task 2**
 
 ```bash
 git add server/http.mjs server/http.test.mjs
@@ -227,64 +268,65 @@ git commit -m "feat: accept bounded assistant history"
 
 ---
 
-### Task 3: Pass History Through Sequential AI Failover Only
+### Task 3: Carry Sanitized History Through Sequential AI Failover
 
 **Files:**
-- Modify: `server/assistant.mjs` `answerAssistant()` arguments/provider invocation.
-- Modify: `server/assistant.test.mjs`.
+- Modify: `server/assistant.mjs`
+- Modify: `server/assistant.test.mjs`
 
 **Interfaces:**
-- Consumes: sanitized `history` from Task 2.
-- Produces: each configured AI provider receives `{ providerConfig, prompt, history, overview, systemPrompt, signal }`.
-- Preserves: `previewImpl({ message: text })` receives only the current prompt.
+- Consumes sanitized `history`.
+- AI providers receive `{ providerConfig, prompt, history, overview, systemPrompt, signal }`.
+- Deterministic `previewImpl` continues receiving only `{ message: currentPrompt }`.
 
-- [ ] **Step 1: Write a failing successful-provider history test**
+- [ ] **Step 1: Add failing orchestration tests**
 
-Inject a fake provider, capture its arguments, and assert `history` is forwarded unchanged.
+Add three tests:
+1. successful provider receives history;
+2. first provider fails and second receives identical history while `attempts`/`fallbackUsed` remain correct;
+3. deterministic fallback spy is called exactly with `{ message: 'current prompt' }` and no history property.
 
-- [ ] **Step 2: Write a failing failover history test**
+- [ ] **Step 2: Run focused tests and verify RED**
 
-Configure two fake providers: first throws `ProviderUnavailableError`, second succeeds. Assert the second provider receives the same history and the result retains `fallbackUsed: true` plus the first provider's failed attempt.
-
-- [ ] **Step 3: Write/retain deterministic fallback test**
-
-Inject `previewImpl` and assert its only semantic input is `{ message: currentPrompt }`; it must not receive or resolve history.
-
-- [ ] **Step 4: Run focused orchestration tests and verify RED**
-
-Run:
 ```bash
 node --test server/assistant.test.mjs
 ```
-Expected: FAIL because history is not currently passed to providers.
 
-- [ ] **Step 5: Add `history = []` to `answerAssistant()` and provider calls**
+Expected: FAIL because providers do not yet receive history.
+
+- [ ] **Step 3: Add the history parameter and provider field**
+
+Change the function header to include `history = []`:
 
 ```js
-export async function answerAssistant({ config, prompt, history = [], overview, ...rest } = {}) {
-  // existing prompt validation and provider loop
-  const result = await provider({
-    providerConfig,
-    prompt: text,
-    history,
-    overview,
-    systemPrompt,
-    signal: signalFactory(providerTimeoutMs(ai, providerId)),
-  })
-}
+export async function answerAssistant({
+  config,
+  prompt,
+  history = [],
+  overview,
+  providers = defaultProviders,
+  previewImpl = previewCommand,
+  signalFactory = timeoutSignal,
+} = {}) {
 ```
 
-Do not change provider order, timeout selection, attempt classification, deterministic fallback text, or output schema.
+Add exactly one field to each AI provider invocation:
 
-- [ ] **Step 6: Run focused orchestration tests and verify GREEN**
+```js
+history,
+```
 
-Run:
+Do not pass `history` to `previewImpl`; retain `previewImpl({ message: text })`.
+
+- [ ] **Step 4: Run tests and verify GREEN**
+
 ```bash
 node --test server/assistant.test.mjs
 ```
-Expected: PASS, zero failures.
 
-- [ ] **Step 7: Commit Task 3**
+Expected: PASS with zero failures.
+
+- [ ] **Step 5: Commit Task 3**
 
 ```bash
 git add server/assistant.mjs server/assistant.test.mjs
@@ -293,55 +335,62 @@ git commit -m "feat: carry context through AI failover"
 
 ---
 
-### Task 4: Make Conversation Context Non-Authoritative in the Shared AI Policy
+### Task 4: Make Conversation Context Explicitly Non-Authoritative
 
 **Files:**
-- Modify: `server/ai/policy.mjs`.
-- Modify: `server/ai/policy.test.mjs`.
+- Modify: `server/ai/policy.mjs`
+- Modify: `server/ai/policy.test.mjs`
 
 **Interfaces:**
-- Produces: `fridayUserPrompt(prompt, overview, history = [])`.
-- Preserves: `fridaySystemPrompt()` exact identifier rules.
-- Adds: explicit rule that previous conversation is context, not infrastructure evidence.
+- Produces `fridayUserPrompt(prompt, overview, history = [])`.
+- Preserves existing exact infrastructure identifier rules.
+- Adds history-vs-state authority rule.
 
 - [ ] **Step 1: Write failing policy tests**
 
-Assert `fridaySystemPrompt()` contains the non-authoritative-history rule and still contains exact identifier preservation language.
-
-Assert `fridayUserPrompt('Compare it to VM102', overview, history)` contains sections in this order:
+Test `fridaySystemPrompt()` for the exact sentence:
 
 ```text
-Recent session context:
-[user] Check friday-ollama
-[assistant] friday-ollama is LXC 107
-
-Current operator request:
-Compare it to VM102
-
-Authoritative normalized Friday state:
-..."friday-ollama"...108...
+Previous conversation is context, not infrastructure evidence. Resolve infrastructure facts and identifiers from the current normalized Friday state.
 ```
 
-The test intentionally puts a wrong historical ID (`107`) next to correct current state (`108`) and verifies both are serialized distinctly; the state is labeled authoritative.
+Test `fridayUserPrompt()` with deliberately stale history:
+
+```js
+const history = [
+  { role: 'user', content: 'Check friday-ollama' },
+  { role: 'assistant', content: 'friday-ollama is LXC 107' },
+]
+const overview = { services: [{ name: 'friday-ollama', host: 'LXC 108' }] }
+const text = fridayUserPrompt('Compare it to VM102', overview, history)
+assert.ok(text.indexOf('Recent session context:') < text.indexOf('Current operator request:'))
+assert.ok(text.indexOf('Current operator request:') < text.indexOf('Authoritative normalized Friday state:'))
+assert.match(text, /LXC 107/)
+assert.match(text, /LXC 108/)
+```
 
 - [ ] **Step 2: Run policy tests and verify RED**
 
-Run:
 ```bash
 node --test server/ai/policy.test.mjs
 ```
-Expected: FAIL on missing history sections/authority rule.
 
-- [ ] **Step 3: Implement the shared formatter**
+Expected: FAIL on missing history/authority text.
 
-Keep history serialization simple and deterministic:
+- [ ] **Step 3: Implement shared formatting**
+
+Add:
 
 ```js
 function formatHistory(history = []) {
   if (!history.length) return 'Recent session context:\n(none)'
   return `Recent session context:\n${history.map(({ role, content }) => `[${role}] ${content}`).join('\n')}`
 }
+```
 
+Change `fridayUserPrompt` to:
+
+```js
 export function fridayUserPrompt(prompt, overview, history = []) {
   return [
     formatHistory(history),
@@ -351,15 +400,15 @@ export function fridayUserPrompt(prompt, overview, history = []) {
 }
 ```
 
-Add to the system prompt: `Previous conversation is context, not infrastructure evidence. Resolve infrastructure facts and identifiers from the current normalized Friday state.`
+Add the non-authoritative-history sentence to `fridaySystemPrompt()` without removing the existing exact-ID rules.
 
-- [ ] **Step 4: Run policy tests and verify GREEN**
+- [ ] **Step 4: Run tests and verify GREEN**
 
-Run:
 ```bash
 node --test server/ai/policy.test.mjs
 ```
-Expected: PASS, zero failures.
+
+Expected: PASS with zero failures.
 
 - [ ] **Step 5: Commit Task 4**
 
@@ -370,60 +419,75 @@ git commit -m "feat: ground conversational assistant context"
 
 ---
 
-### Task 5: Feed the Same History Format to Every AI Adapter
+### Task 5: Feed the Shared Context Format to Every AI Adapter
 
 **Files:**
-- Modify: `server/ai/groq.mjs`, `server/ai/groq-failover.test.mjs` or existing Groq adapter coverage.
-- Modify: `server/ai/gemini.mjs`, `server/ai/gemini.test.mjs`.
-- Modify: `server/ai/ollama.mjs`, `server/ai/ollama.test.mjs`.
-- Modify: `server/ai/openai.mjs`, `server/ai/openai.test.mjs`.
-- Modify: `server/ai/anthropic.mjs`, `server/ai/anthropic.test.mjs`.
+- Modify: `server/ai/groq.mjs`
+- Create: `server/ai/groq.test.mjs`
+- Modify: `server/ai/gemini.mjs`, `server/ai/gemini.test.mjs`
+- Modify: `server/ai/ollama.mjs`, `server/ai/ollama.test.mjs`
+- Modify: `server/ai/openai.mjs`, `server/ai/openai.test.mjs`
+- Modify: `server/ai/anthropic.mjs`, `server/ai/anthropic.test.mjs`
 
 **Interfaces:**
-- Consumes: provider argument `history = []` from Task 3.
-- Consumes: `fridayUserPrompt(prompt, overview, history)` from Task 4.
-- Produces: provider transport payload containing one shared, identically structured Friday context string.
+- Every adapter accepts `history = []`.
+- Every adapter calls `fridayUserPrompt(prompt, overview, history)`.
+- Provider endpoints, auth headers, model fields, token limits, timeout signals, and error classification stay unchanged.
 
-- [ ] **Step 1: Add failing adapter assertions for preferred providers**
+- [ ] **Step 1: Add failing adapter tests**
 
-For Groq, Gemini, and Ollama, provide history to the adapter and inspect the mocked outbound JSON. Assert it contains `Recent session context`, the historical messages, `Current operator request`, and `Authoritative normalized Friday state`.
-
-Do not snapshot entire provider payloads; assert only the shared Friday content plus provider-specific fields already covered by existing tests.
-
-- [ ] **Step 2: Add failing compatibility-adapter assertions**
-
-Repeat the shared-context assertion for OpenAI and Anthropic so explicit compatibility provider behavior cannot silently diverge.
-
-- [ ] **Step 3: Run all AI adapter tests and verify RED**
-
-Run:
-```bash
-node --test server/ai/groq-failover.test.mjs server/ai/gemini.test.mjs server/ai/ollama.test.mjs server/ai/openai.test.mjs server/ai/anthropic.test.mjs
-```
-Expected: FAIL because adapters do not yet forward history to `fridayUserPrompt()`.
-
-- [ ] **Step 4: Update all adapter signatures minimally**
-
-Use the same pattern in each adapter:
+For each adapter, pass:
 
 ```js
-export async function askGroq({ providerConfig = {}, prompt, history = [], overview, systemPrompt = fridaySystemPrompt(), fetchImpl = globalThis.fetch, signal } = {}) {
-  // existing transport
-  { role: 'user', content: fridayUserPrompt(prompt, overview, history) }
-}
+history: [
+  { role: 'user', content: 'Check friday-ollama' },
+  { role: 'assistant', content: 'friday-ollama is LXC 108' },
+]
 ```
 
-Apply the equivalent shared formatter call to Gemini, Ollama, OpenAI, and Anthropic without changing endpoint URLs, model fields, token limits, headers, or error classification.
+Inspect the mocked outbound JSON and assert the provider-facing user content contains all four markers:
+- `Recent session context:`
+- `Check friday-ollama`
+- `Current operator request:`
+- `Authoritative normalized Friday state:`
 
-- [ ] **Step 5: Run adapter and policy/orchestration tests and verify GREEN**
+For Groq, place this direct transport test in new `server/ai/groq.test.mjs`; keep `groq-failover.test.mjs` focused on orchestration/failover.
 
-Run:
+- [ ] **Step 2: Run adapter tests and verify RED**
+
 ```bash
-node --test server/assistant.test.mjs server/ai/policy.test.mjs server/ai/groq-failover.test.mjs server/ai/gemini.test.mjs server/ai/ollama.test.mjs server/ai/openai.test.mjs server/ai/anthropic.test.mjs
+node --test server/ai/groq.test.mjs server/ai/gemini.test.mjs server/ai/ollama.test.mjs server/ai/openai.test.mjs server/ai/anthropic.test.mjs
 ```
-Expected: PASS, zero failures.
 
-- [ ] **Step 6: Commit Task 5**
+Expected: FAIL because adapters do not forward history to the shared formatter.
+
+- [ ] **Step 3: Update adapter signatures**
+
+In each of these five functions—`askGroq`, `askGemini`, `askOllama`, `askOpenAI`, `askAnthropic`—add `history = []` next to `prompt` and `overview` in the destructured input object.
+
+In each adapter's provider-facing request body, change only the formatter call from:
+
+```js
+fridayUserPrompt(prompt, overview)
+```
+
+to:
+
+```js
+fridayUserPrompt(prompt, overview, history)
+```
+
+No other transport field changes in this task.
+
+- [ ] **Step 4: Run adapter + policy + orchestration tests and verify GREEN**
+
+```bash
+node --test server/assistant.test.mjs server/ai/policy.test.mjs server/ai/groq.test.mjs server/ai/groq-failover.test.mjs server/ai/gemini.test.mjs server/ai/ollama.test.mjs server/ai/openai.test.mjs server/ai/anthropic.test.mjs
+```
+
+Expected: PASS with zero failures.
+
+- [ ] **Step 5: Commit Task 5**
 
 ```bash
 git add server/ai
@@ -432,20 +496,59 @@ git commit -m "feat: share conversational context across AI providers"
 
 ---
 
-### Task 6: Extend the Frontend API Contract
+### Task 6: Extend the Browser API Request Contract
 
 **Files:**
-- Modify: `src/lib/api.ts`.
-- Add test coverage in: `src/hooks/useFridaySession.test.tsx` during Task 7 rather than creating a fetch-only test file.
+- Modify: `src/lib/api.ts`
+- Create: `src/lib/api.assistant.test.ts`
 
 **Interfaces:**
-- Produces: `FridayAssistantHistoryMessage = { role: 'user' | 'assistant'; content: string }`.
-- Produces: `FridayAssistantRequestOptions = { history?: FridayAssistantHistoryMessage[]; signal?: AbortSignal }`.
-- Produces: `askFridayAssistant(prompt: string, options?: FridayAssistantRequestOptions): Promise<FridayAssistantResponse>`.
+- Produces `FridayAssistantHistoryMessage`.
+- Produces `FridayAssistantRequestOptions`.
+- Produces `askFridayAssistant(prompt, options?)` sending `{ prompt, history }`.
 
-- [ ] **Step 1: Change the TypeScript API shape only after Task 7's first failing hook test exists**
+- [ ] **Step 1: Write a failing direct API test**
 
-Use an options object to avoid an ambiguous second positional parameter:
+Stub `globalThis.fetch`, call the API helper, and inspect the request body:
+
+```ts
+it('posts prompt and bounded history payload shape', async () => {
+  const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify({
+    available: true,
+    mode: 'cloud-ai',
+    provider: 'groq',
+    model: 'test-model',
+    text: 'ok',
+    fallbackUsed: false,
+    attempts: [],
+  }), { status: 200, headers: { 'content-type': 'application/json' } }))
+  vi.stubGlobal('fetch', fetchMock)
+
+  await askFridayAssistant('Compare it to VM102', {
+    history: [{ role: 'user', content: 'Check friday-ollama' }],
+  })
+
+  const [, init] = fetchMock.mock.calls[0]
+  expect(JSON.parse(String(init.body))).toEqual({
+    prompt: 'Compare it to VM102',
+    history: [{ role: 'user', content: 'Check friday-ollama' }],
+  })
+})
+```
+
+Also test that omitting options sends `history: []` and preserves one-shot compatibility.
+
+- [ ] **Step 2: Run the API test and verify RED**
+
+```bash
+npx vitest run src/lib/api.assistant.test.ts
+```
+
+Expected: FAIL because the helper does not accept/send history.
+
+- [ ] **Step 3: Implement the typed options contract**
+
+Add:
 
 ```ts
 export type FridayAssistantHistoryMessage = {
@@ -457,7 +560,11 @@ export type FridayAssistantRequestOptions = {
   history?: FridayAssistantHistoryMessage[]
   signal?: AbortSignal
 }
+```
 
+Change the helper signature/body to:
+
+```ts
 export async function askFridayAssistant(
   prompt: string,
   { history = [], signal }: FridayAssistantRequestOptions = {},
@@ -468,34 +575,39 @@ export async function askFridayAssistant(
     body: JSON.stringify({ prompt, history }),
     signal,
   })
-  // existing response handling
+  const body = await response.json() as FridayAssistantResponse
+  if (!response.ok) throw new Error(body.reason || 'Friday assistant unavailable')
+  return body
 }
 ```
 
-- [ ] **Step 2: Run TypeScript build to expose every call site needing migration**
+- [ ] **Step 4: Run API test and production build; verify GREEN**
 
-Run:
 ```bash
+npx vitest run src/lib/api.assistant.test.ts
 npm run build
 ```
-Expected at this intermediate point: FAIL only at old `askFridayAssistant(prompt)` mocks/signatures if TypeScript detects mismatches; record exact call sites for Task 7/Task 9. Do not repair unrelated errors.
 
-- [ ] **Step 3: Commit the API contract together with the first green hook implementation in Task 7**
+Expected: test PASS and build exit 0. Existing calls with only `prompt` remain valid because the options argument is optional.
 
-Do not create a standalone commit if the changed API has no consuming green behavior yet.
+- [ ] **Step 5: Commit Task 6**
+
+```bash
+git add src/lib/api.ts src/lib/api.assistant.test.ts
+git commit -m "feat: send Friday assistant history"
+```
 
 ---
 
 ### Task 7: Add the In-Memory `useFridaySession` State Machine
 
 **Files:**
-- Create: `src/hooks/useFridaySession.ts`.
-- Create: `src/hooks/useFridaySession.test.tsx`.
-- Modify: `src/lib/api.ts` as defined in Task 6.
+- Create: `src/hooks/useFridaySession.ts`
+- Create: `src/hooks/useFridaySession.test.tsx`
 
 **Interfaces:**
-- Consumes: `askFridayAssistant(prompt, { history })`.
-- Produces:
+- Consumes `askFridayAssistant(prompt, { history })` from Task 6.
+- Produces `FridaySessionMessage` and `FridaySession`.
 
 ```ts
 export type FridaySessionMessage = {
@@ -518,35 +630,41 @@ export type FridaySession = {
 }
 ```
 
-- [ ] **Step 1: Write failing hook test for immediate user/loading turns**
+- [ ] **Step 1: Write failing immediate-turn and lifecycle tests**
 
-Mock `askFridayAssistant` with a pending promise. Render a tiny harness using the hook; call `sendMessage('Check service health')`; assert one complete user message and one loading assistant message appear before the promise resolves.
+Use a hook harness. With a pending mocked assistant request, assert `sendMessage('Check service health')` immediately appends:
+- a complete user turn;
+- a loading assistant placeholder.
 
-- [ ] **Step 2: Write failing hook test for success/error replacement**
+Then resolve the mock and assert the placeholder becomes a complete assistant turn carrying `mode`, `provider`, `model`, `fallbackUsed`, and `attempts`.
 
-On success, assert the loading placeholder becomes a complete assistant message carrying `mode`, `provider`, `model`, `fallbackUsed`, and `attempts`. On rejection, assert it becomes `status: 'error'`, the user message remains, and no retry occurs.
+Add a rejection case: placeholder becomes `status: 'error'`, submitted user turn remains, and the mocked API is called exactly once.
 
-- [ ] **Step 3: Write failing history-selection tests**
+- [ ] **Step 2: Write failing bounded-history tests**
 
-Seed/drive more than 10 completed exchanges, then submit one more prompt. Assert the API receives exactly 20 historical messages representing the newest 10 completed exchanges, excludes the current prompt, and excludes any failed/loading exchange.
+Drive 11 completed exchanges followed by a new prompt. Assert the new API call receives exactly 20 historical messages from the newest 10 completed exchanges. Assert:
+- current prompt is not duplicated in history;
+- failed assistant exchanges are excluded;
+- loading placeholders are excluded.
 
-- [ ] **Step 4: Write failing clear/remount tests**
+- [ ] **Step 3: Write failing clear/remount tests**
 
-Assert `clearSession()` empties messages while idle; a new hook remount starts empty; clearing is ignored or disabled by consumers while `loading === true` so no pending response can reappear into a cleared transcript.
+Assert:
+- `clearSession()` empties messages while idle;
+- `clearSession()` is a no-op while `loading === true`;
+- unmount/remount starts empty because there is no persistence.
 
-- [ ] **Step 5: Run hook tests and verify RED**
+- [ ] **Step 4: Run hook tests and verify RED**
 
-Run:
 ```bash
 npx vitest run src/hooks/useFridaySession.test.tsx
 ```
+
 Expected: FAIL because the hook does not exist.
 
-- [ ] **Step 6: Implement the minimal hook and API options contract**
+- [ ] **Step 5: Implement completed-history selection**
 
-Use React state only. Do not touch `localStorage`, `sessionStorage`, IndexedDB, server storage, or `/data`.
-
-History construction must pair each completed user message with the following completed assistant message, then flatten the newest 10 pairs:
+Use this pure helper inside the hook file:
 
 ```ts
 function completedHistory(messages: FridaySessionMessage[]): FridayAssistantHistoryMessage[] {
@@ -554,7 +672,10 @@ function completedHistory(messages: FridaySessionMessage[]): FridayAssistantHist
   for (let index = 0; index < messages.length - 1; index += 1) {
     const user = messages[index]
     const assistant = messages[index + 1]
-    if (user.role === 'user' && user.status === 'complete' && assistant.role === 'assistant' && assistant.status === 'complete') {
+    if (
+      user.role === 'user' && user.status === 'complete' &&
+      assistant.role === 'assistant' && assistant.status === 'complete'
+    ) {
       pairs.push([
         { role: 'user', content: user.text },
         { role: 'assistant', content: assistant.text },
@@ -566,60 +687,77 @@ function completedHistory(messages: FridaySessionMessage[]): FridayAssistantHist
 }
 ```
 
-Generate frontend-only IDs with a deterministic increment/ref or `crypto.randomUUID()`; IDs are never sent as authorization/session state.
+- [ ] **Step 6: Implement request lifecycle with React state only**
+
+Before adding the current prompt, capture `const history = completedHistory(messages)`. Append user + loading turns, call `askFridayAssistant(text, { history })`, then replace the loading turn by ID on success/error. `clearSession()` returns immediately when loading and otherwise sets messages to `[]`.
+
+Use a `useRef` counter for frontend-only message IDs so tests remain deterministic. Do not use browser or server persistence APIs.
 
 - [ ] **Step 7: Run hook tests and build; verify GREEN**
 
-Run:
 ```bash
-npx vitest run src/hooks/useFridaySession.test.tsx
+npx vitest run src/hooks/useFridaySession.test.tsx src/lib/api.assistant.test.ts
 npm run build
 ```
-Expected: hook tests PASS; build may still reveal Dashboard integration work required by Task 9 only if an existing call signature was not yet migrated. If so, keep Task 7 focused and note the exact compiler errors for Task 9.
 
-- [ ] **Step 8: Commit Task 6 + Task 7**
+Expected: tests PASS and build exit 0.
+
+- [ ] **Step 8: Commit Task 7**
 
 ```bash
-git add src/lib/api.ts src/hooks/useFridaySession.ts src/hooks/useFridaySession.test.tsx
+git add src/hooks/useFridaySession.ts src/hooks/useFridaySession.test.tsx
 git commit -m "feat: add in-memory Friday assistant session"
 ```
 
 ---
 
-### Task 8: Build Transcript, Composer, and Fallback Provenance Components
+### Task 8: Build Transcript, Composer, and Fallback Provenance Presentation
 
 **Files:**
-- Create: `src/components/FridayComposer.tsx`.
-- Create: `src/components/FridayConversation.tsx`.
-- Create: `src/components/FridayConversation.test.tsx`.
-- Modify: `src/components/AssistantReply.tsx`.
-- Modify: `src/components/AssistantReply.test.tsx`.
-- Modify: `src/assistant.css`.
+- Create: `src/components/FridayComposer.tsx`
+- Create: `src/components/FridayConversation.tsx`
+- Create: `src/components/FridayConversation.test.tsx`
+- Modify: `src/components/AssistantReply.tsx`
+- Modify: `src/components/AssistantReply.test.tsx`
+- Modify: `src/assistant.css`
 
 **Interfaces:**
-- `FridayComposer` consumes `{ value, loading, placeholder, onChange, onSubmit }` and owns no session state.
+- `FridayComposer` consumes `{ value, loading, placeholder, onChange, onSubmit }` and owns no assistant state.
 - `FridayConversation` consumes `{ messages, compact?: boolean }` and owns no API state.
-- `AssistantReplyState` expands with optional `fallbackUsed?: boolean` and `attempts?: FridayAssistantAttempt[]`.
+- `AssistantReplyState` adds optional `fallbackUsed` and `attempts`.
 
-- [ ] **Step 1: Write failing `AssistantReply` fallback tests**
+- [ ] **Step 1: Write failing fallback disclosure tests**
 
-Assert no `Fallback used` control when false/undefined. When true, assert a button with `aria-expanded="false"`; click it and assert returned attempts appear in original order. Do not render a fabricated successful attempt.
+Assert:
+- no fallback control for false/undefined;
+- `fallbackUsed: true` renders a button with `aria-expanded="false"`;
+- clicking expands returned attempts in original order;
+- only `attempts` are listed—no fabricated successful provider attempt.
 
-- [ ] **Step 2: Write failing conversation compact/full tests**
+- [ ] **Step 2: Write failing compact/full transcript tests**
 
-Build a transcript with three completed exchanges plus a current loading or error exchange. Assert `compact` renders only the newest two completed exchanges plus the current active exchange; full mode renders the entire transcript.
+Build three completed exchanges plus a trailing current user/loading pair. Assert full mode renders every message. Assert compact mode renders the newest two completed exchanges plus the trailing current pair.
+
+Build a second compact case ending in user/error and assert the error pair remains visible.
 
 - [ ] **Step 3: Run component tests and verify RED**
 
-Run:
 ```bash
 npx vitest run src/components/AssistantReply.test.tsx src/components/FridayConversation.test.tsx
 ```
-Expected: FAIL on missing fallback and conversation components.
 
-- [ ] **Step 4: Extend `AssistantReply` minimally**
+Expected: FAIL on missing fallback/transcript behavior.
 
-Keep existing cloud/local/deterministic badge behavior. Add a real button for fallback details:
+- [ ] **Step 4: Extend `AssistantReplyState` and disclosure**
+
+Add:
+
+```ts
+fallbackUsed?: boolean
+attempts?: FridayAssistantAttempt[]
+```
+
+Use component-local `expanded` state and a real button:
 
 ```tsx
 <button
@@ -632,28 +770,30 @@ Keep existing cloud/local/deterministic badge behavior. Add a real button for fa
 </button>
 ```
 
-Render only `state.attempts` entries; provider/model above the details remains the successful source.
+Render each attempt as `provider — outcome`. Keep existing mode/provider/model provenance above it.
 
-- [ ] **Step 5: Implement stateless conversation/composer components**
+- [ ] **Step 5: Implement `FridayConversation`**
 
-`FridayConversation` maps user messages to user bubbles and assistant messages through `AssistantReply`. It must not call `askFridayAssistant` directly.
+Create a pure selector for compact mode: collect completed user+assistant pairs, keep the newest two pairs, then append trailing messages after the last completed assistant so current loading/error state is visible. Render user messages as user rows. Render assistant messages by converting each `FridaySessionMessage` into an `AssistantReplyState`; set `error` to `message.text` only for `status === 'error'` and set `loading` for `status === 'loading'`.
 
-`FridayComposer` should use the existing command icon/chevron visual language, disable input/send when loading, trim emptiness at submission, and let the parent retain the controlled input value.
+- [ ] **Step 6: Implement `FridayComposer`**
 
-- [ ] **Step 6: Add focused styles**
+Keep it controlled. The component renders the existing command/chevron visual language, calls the supplied form `onSubmit`, calls `onChange` with input text, and disables input/send when `loading` is true. It does not call the assistant API.
 
-Add only assistant-session classes to `src/assistant.css`: transcript spacing, user/assistant distinction, compact mode, fallback details, composer, full workspace scrolling, and responsive sizing. Do not restyle unrelated dashboard panels.
+- [ ] **Step 7: Add assistant-session CSS only**
 
-- [ ] **Step 7: Run component tests and build; verify GREEN**
+Add classes to `src/assistant.css` for transcript rows, user/assistant distinction, compact mode, fallback detail panel, shared composer, full workspace scrolling, and `@media(max-width:700px)` responsive behavior. Do not edit unrelated dashboard/mobile layout files.
 
-Run:
+- [ ] **Step 8: Run tests and build; verify GREEN**
+
 ```bash
 npx vitest run src/components/AssistantReply.test.tsx src/components/FridayConversation.test.tsx
 npm run build
 ```
-Expected: PASS / build exit 0 except any known Task 9 Dashboard signature migration, which must be resolved in Task 9 before its commit.
 
-- [ ] **Step 8: Commit Task 8**
+Expected: tests PASS and build exit 0.
+
+- [ ] **Step 9: Commit Task 8**
 
 ```bash
 git add src/components/AssistantReply.tsx src/components/AssistantReply.test.tsx src/components/FridayComposer.tsx src/components/FridayConversation.tsx src/components/FridayConversation.test.tsx src/assistant.css
@@ -662,60 +802,65 @@ git commit -m "feat: render Friday conversation provenance"
 
 ---
 
-### Task 9: Add the Dedicated FRIDAY Workspace and Share It with Overview/Mobile
+### Task 9: Share One Session Across Overview, FRIDAY, and Mobile
 
 **Files:**
-- Create: `src/components/FridayWorkspace.tsx`.
-- Create: `src/components/FridayWorkspace.test.tsx`.
-- Modify: `src/pages/Dashboard.tsx`.
-- Modify: `src/pages/Dashboard.assistant.test.tsx`.
-- Modify: `src/components/MobileHome.tsx`.
-- Modify: `src/components/MobileHome.test.tsx`.
-- Modify: `src/assistant.css` and, only if necessary, `src/mobile.css`.
+- Create: `src/components/FridayWorkspace.tsx`
+- Create: `src/components/FridayWorkspace.test.tsx`
+- Modify: `src/pages/Dashboard.tsx`
+- Modify: `src/pages/Dashboard.assistant.test.tsx`
+- Modify: `src/components/MobileHome.tsx`
+- Modify: `src/components/MobileHome.test.tsx`
+- Modify: `src/assistant.css`
 
 **Interfaces:**
 - `Dashboard` owns exactly one `useFridaySession()` instance.
-- `FridayWorkspace` consumes `session`, controlled composer value/callbacks, and renders full transcript.
-- `MobileHome` consumes shared session data and renders compact transcript.
+- `FridayWorkspace` consumes the same session, controlled input state, and submit/change callbacks used by Overview.
+- `MobileHome` consumes the same session and compact renderer; it does not create another session.
 
-- [ ] **Step 1: Write failing workspace tests**
+- [ ] **Step 1: Write failing `FridayWorkspace` tests**
 
-Assert the workspace renders `FRIDAY / SESSION`, `Advisory only · No actions executed`, `Context: up to 10 recent exchanges`, the full supplied transcript, and `Clear session`. Assert Clear invokes the callback only while not loading and is disabled while loading.
+Assert the workspace renders:
+- `FRIDAY / SESSION`;
+- `Advisory only · No actions executed`;
+- `Context: up to 10 recent exchanges`;
+- full supplied transcript;
+- `Clear session` button.
 
-- [ ] **Step 2: Rewrite/add Dashboard assistant integration tests before production code**
+Assert Clear calls `session.clearSession()` when idle and is disabled while `session.loading`.
 
-Use the real hook with a mocked `askFridayAssistant`. Test this sequence:
+- [ ] **Step 2: Rewrite Dashboard assistant integration tests before production changes**
 
-1. Start on Overview.
-2. Submit `Check friday-ollama`.
-3. Resolve response `friday-ollama is LXC 108` with Groq provenance.
-4. Navigate to FRIDAY.
-5. Assert both user and assistant turns remain visible.
-6. Submit `Compare it to VM102` from FRIDAY.
-7. Assert mock API receives the first completed exchange in `history`.
-8. Navigate back to Overview and assert compact conversation remains.
+Use the real `useFridaySession` and mock only `askFridayAssistant`. Test this full sequence:
+1. Overview submits `Check friday-ollama`.
+2. Mock resolves `friday-ollama is LXC 108` with Groq provenance.
+3. Navigate to FRIDAY.
+4. Both turns are still visible.
+5. Submit `Compare it to VM102`.
+6. Mock receives `{ history: [{role:'user',...},{role:'assistant',...}] }` containing the first completed exchange.
+7. Navigate back to Overview.
+8. Compact transcript remains visible.
+9. Unmount/remount starts with no transcript.
 
-Also assert a fresh unmount/remount starts with no transcript.
+- [ ] **Step 3: Update MobileHome tests before production changes**
 
-- [ ] **Step 3: Add/update MobileHome failing test**
+Assert mobile Overview receives shared `messages`/`loading`, renders `FridayConversation compact`, and submits through parent callbacks rather than maintaining a local assistant reply object.
 
-Assert the mobile Overview card renders the compact shared transcript and uses the shared composer callbacks; it must not own a separate assistant reply state.
+- [ ] **Step 4: Run focused tests and verify RED**
 
-- [ ] **Step 4: Run focused UI integration tests and verify RED**
-
-Run:
 ```bash
 npx vitest run src/components/FridayWorkspace.test.tsx src/pages/Dashboard.assistant.test.tsx src/components/MobileHome.test.tsx
 ```
+
 Expected: FAIL on missing workspace/shared-session wiring.
 
 - [ ] **Step 5: Implement `FridayWorkspace`**
 
-Use `FridayConversation` in full mode and `FridayComposer` at the bottom. Keep safety/context copy visible at the top. `Clear session` must call only `session.clearSession()` and never invoke a server endpoint.
+Render a header with the exact safety/context copy, `FridayConversation` in full mode, `FridayComposer`, and a clear button bound only to `session.clearSession()`. No server clear/delete request is allowed.
 
-- [ ] **Step 6: Replace Dashboard one-shot assistant state**
+- [ ] **Step 6: Replace Dashboard's one-shot assistant state**
 
-Remove `assistant: AssistantReplyState`, old `askFriday()` one-shot orchestration, and duplicated Overview/FRIDAY hero behavior. Add:
+Remove the existing single `AssistantReplyState` and direct `askFridayAssistant` submit function. Add one hook instance:
 
 ```tsx
 const friday = useFridaySession()
@@ -730,50 +875,45 @@ async function submitFriday(event: React.FormEvent) {
 }
 ```
 
-Render:
-- `active === 'Overview'`: existing operational overview plus compact `FridayConversation` and `FridayComposer`, with `Continue conversation` navigating to `FRIDAY` when messages exist.
-- `active === 'FRIDAY'`: only the dedicated `FridayWorkspace` content for the assistant area, not the duplicated Overview infrastructure sections.
-- Other destinations unchanged.
+Routing/render rules:
+- `Overview`: retain current operational health/incidents/infrastructure sections; replace one-shot reply with `FridayConversation compact` + `FridayComposer`; show `Continue conversation` when `friday.messages.length > 0`, navigating to `FRIDAY`.
+- `FRIDAY`: render `FridayWorkspace` instead of repeating Overview infrastructure sections.
+- `Incidents` and all other destinations remain unchanged.
+- Keep the existing Automation toggle presentation unchanged and do not attach execution behavior to it.
 
-Keep the existing `Automation` toggle presentation unchanged; do not interpret it as permission to execute actions.
+- [ ] **Step 7: Migrate MobileHome to the shared session contract**
 
-- [ ] **Step 7: Migrate MobileHome props**
-
-Replace `assistant: AssistantReplyState` with the shared session/messages/loading contract needed for compact rendering. Reuse `FridayComposer` where practical; if mobile-specific markup is required, keep it controlled by the same parent state and session callbacks.
+Replace `assistant: AssistantReplyState` with props for shared messages/loading plus the existing controlled query callbacks. Render the same compact conversation component in the mobile FRIDAY card. Keep mobile health/incidents/infrastructure/service sections unchanged.
 
 - [ ] **Step 8: Run focused UI tests and build; verify GREEN**
 
-Run:
 ```bash
-npx vitest run src/components/FridayWorkspace.test.tsx src/pages/Dashboard.assistant.test.tsx src/components/MobileHome.test.tsx src/components/FridayConversation.test.tsx src/components/AssistantReply.test.tsx src/hooks/useFridaySession.test.tsx
+npx vitest run src/components/FridayWorkspace.test.tsx src/pages/Dashboard.assistant.test.tsx src/components/MobileHome.test.tsx src/components/FridayConversation.test.tsx src/components/AssistantReply.test.tsx src/hooks/useFridaySession.test.tsx src/lib/api.assistant.test.ts
 npm run build
 ```
-Expected: all selected tests PASS and build exits 0.
+
+Expected: all selected tests PASS and build exit 0.
 
 - [ ] **Step 9: Commit Task 9**
 
 ```bash
-git add src/pages/Dashboard.tsx src/pages/Dashboard.assistant.test.tsx src/components/FridayWorkspace.tsx src/components/FridayWorkspace.test.tsx src/components/MobileHome.tsx src/components/MobileHome.test.tsx src/assistant.css src/mobile.css
+git add src/pages/Dashboard.tsx src/pages/Dashboard.assistant.test.tsx src/components/FridayWorkspace.tsx src/components/FridayWorkspace.test.tsx src/components/MobileHome.tsx src/components/MobileHome.test.tsx src/assistant.css
 git commit -m "feat: add shared Friday conversation workspace"
 ```
 
-If `src/mobile.css` was not changed, omit it from `git add`.
-
 ---
 
-### Task 10: Document the Contract and Run Full Safety/Regression Gates
+### Task 10: Document the Contract and Run Complete Regression/Safety Gates
 
 **Files:**
-- Modify: `docs/codex/API_CONTRACT.md`.
-- Modify: `README.md`.
-- No runtime configuration, Compose, observer, or infrastructure files should change in this task.
+- Modify: `docs/codex/API_CONTRACT.md`
+- Modify: `README.md`
 
-**Interfaces:**
-- Documents request `{ prompt, history? }`, history limits, stateless session semantics, response provenance, and read-only behavior.
+No runtime configuration, Compose, observer, monitoring, diagnostics, or deployment files are changed in this task.
 
 - [ ] **Step 1: Update API contract documentation**
 
-Document:
+Document this optional-history request:
 
 ```json
 {
@@ -785,118 +925,181 @@ Document:
 }
 ```
 
-State exact limits: 4,000 current prompt; 2,000 per historical message; 12,000 total history characters; 20 historical messages / 10 completed exchanges at the UI context layer. State that history is optional and no server conversation is persisted.
+Document exact limits: 4,000 current prompt; 2,000 per historical message; 12,000 total history characters; 20 historical messages server-side; frontend context from newest 10 completed exchanges. State that `history` is optional and Friday persists no server conversation/session ID.
 
 - [ ] **Step 2: Update README operator behavior**
 
-Document Overview compact conversation, dedicated FRIDAY full current-session transcript, refresh/remount clearing, provider/fallback provenance, and `Advisory only · No actions executed`.
+Document Overview compact conversation, dedicated FRIDAY full current-session transcript, refresh/remount clearing, provider/fallback provenance, and exact safety copy `Advisory only · No actions executed`.
 
-- [ ] **Step 3: Run the full application test suite**
+- [ ] **Step 3: Run full tests and production build**
 
-Run:
 ```bash
 npm test
-```
-Expected: Vitest and all Node test groups PASS with zero failures.
-
-- [ ] **Step 4: Run the production build**
-
-Run:
-```bash
 npm run build
 ```
-Expected: exit 0.
 
-- [ ] **Step 5: Run CI-equivalent validation commands from the repository workflow**
+Expected: both commands exit 0 with zero test failures.
 
-Before execution, read `.github/workflows/*` on the implementation branch and run the same shell validation, observer security boundary, monitoring safety boundary, diagnostics safety boundary, controller Compose, local Docker override Compose, VM100 observer Compose, controller image build, and observer image build commands that Friday CI currently uses. Do not invent replacement commands; copy the exact workflow commands into the execution notes and run them unchanged.
+- [ ] **Step 4: Run exact Friday CI shell/security gates**
 
-Expected: every CI-equivalent gate exits 0.
+```bash
+for file in scripts/*.sh; do
+  echo "checking $file"
+  sh -n "$file"
+done
 
-- [ ] **Step 6: Run a persistence/mutation diff review**
+grep -qx '.env' observer/.dockerignore
+if grep -RniE '/containers/.*/(start|stop|restart|kill|exec)|/images/create|/volumes|/networks/.*/(connect|disconnect)' observer/config.mjs observer/docker.mjs observer/server.mjs; then
+  echo 'Observer mutation API path detected.' >&2
+  exit 1
+fi
+if grep -Rni 'FRIDAY_VM100_OBSERVER_TOKEN' src; then
+  echo 'Observer token reference detected in frontend source.' >&2
+  exit 1
+fi
+if grep -RniE 'VITE_.*OBSERVER' src server observer compose.yaml .env.example; then
+  echo 'Browser-visible observer secret variable detected.' >&2
+  exit 1
+fi
 
-Run:
+if grep -RniE "request\.method === '(POST|PUT|PATCH|DELETE)' && url\.pathname === '/api/(incidents|monitoring)" server; then
+  echo 'Monitoring mutation route detected.' >&2
+  exit 1
+fi
+if grep -RniE '/containers/.*/(start|stop|restart|kill|exec)|/images/create|/volumes|/networks/.*/(connect|disconnect)' server/monitoring server/http.mjs; then
+  echo 'Monitoring Docker mutation API path detected.' >&2
+  exit 1
+fi
+if grep -RniE 'VITE_.*(MONITOR|INCIDENT|OBSERVER)' src server observer compose.yaml .env.example; then
+  echo 'Browser-visible monitoring/observer secret variable detected.' >&2
+  exit 1
+fi
+
+if grep -RniE '/containers/.*/(start|stop|restart|kill|exec)|/images/create|/volumes|/networks/.*/(connect|disconnect)|/archive' observer/config.mjs observer/docker.mjs observer/server.mjs server/diagnostics server/adapters/vm100-observer-diagnostics.mjs server/monitoring/runtime.mjs; then
+  echo 'Diagnostics mutation API path detected.' >&2
+  exit 1
+fi
+controller_diagnostic_writes="$(grep -niE "request\.method === '(POST|PUT|PATCH|DELETE)'.*(diagnostic|/api/incidents/.*/logs)" server/http.mjs || true)"
+unexpected_controller_writes="$(printf '%s\n' "$controller_diagnostic_writes" | grep -vF "request.method === 'POST' && diagnosticRerunRoute" || true)"
+if [ -n "$unexpected_controller_writes" ]; then
+  printf '%s\n' "$unexpected_controller_writes" >&2
+  echo 'Unexpected diagnostics write route detected.' >&2
+  exit 1
+fi
+if ! printf '%s\n' "$controller_diagnostic_writes" | grep -qF "request.method === 'POST' && diagnosticRerunRoute"; then
+  echo 'Expected read-only diagnostic rerun route boundary is missing.' >&2
+  exit 1
+fi
+if grep -niE "request\.method === '(POST|PUT|PATCH|DELETE)'.*(diagnostic|/api/incidents/.*/logs)" observer/server.mjs; then
+  echo 'Observer diagnostics write route detected.' >&2
+  exit 1
+fi
+if grep -RniE 'child_process|execFile\(|spawn\(|ssh ' server/diagnostics server/adapters/vm100-observer-diagnostics.mjs server/monitoring/runtime.mjs observer/config.mjs observer/docker.mjs observer/server.mjs; then
+  echo 'Shell or SSH diagnostics path detected.' >&2
+  exit 1
+fi
+if grep -RniE 'VITE_.*(TOKEN|SECRET|OBSERVER|DIAGNOSTIC)' src server observer compose.yaml .env.example; then
+  echo 'Browser-visible diagnostics secret variable detected.' >&2
+  exit 1
+fi
+if grep -RniE 'Config\.Env|\.Env\b' observer/docker.mjs observer/server.mjs; then
+  echo 'Raw Docker environment forwarding detected in diagnostics source.' >&2
+  exit 1
+fi
+```
+
+Expected: entire block exits 0.
+
+- [ ] **Step 5: Run exact Friday CI Compose/container gates**
+
+```bash
+docker compose config >/dev/null
+docker compose -f compose.yaml -f compose.live.yaml config >/dev/null
+FRIDAY_OBSERVER_TOKEN=ci-test FRIDAY_OBSERVER_BIND_ADDRESS=127.0.0.1 docker compose -f observer/compose.yaml config >/dev/null
+docker build -t friday-ci .
+docker build -t friday-observer-ci observer
+```
+
+Expected: all five commands exit 0.
+
+- [ ] **Step 6: Run persistence/mutation diff review**
+
 ```bash
 git diff --name-only main...HEAD
 git diff main...HEAD -- src server compose.yaml observer scripts
 ```
 
-Verify:
-- no `localStorage`, `sessionStorage`, IndexedDB, database, `/data` assistant-history persistence;
-- no Docker socket enablement;
-- no Proxmox/network/shell write action;
-- no provider-order/timeout/model-token configuration change;
-- no unexpected Compose/observer mutation.
+Review the output and verify no assistant persistence, Docker socket enablement, Proxmox/network/shell write path, provider-order/timeout/model-token configuration change, Compose mutation, or observer mutation has been introduced. If any appears, stop and remove it before continuing.
 
-If any such change exists, stop and remove it before proceeding.
+- [ ] **Step 7: Perform representative UI acceptance**
 
-- [ ] **Step 7: Perform representative UI acceptance checks**
-
-On a local/dev build, verify desktop and phone widths already used by Friday's mobile acceptance process, including 360px, 390px, and 430px where available:
-
-- Overview shows compact two-exchange history plus active loading/error turn.
-- Continue conversation opens FRIDAY with the same transcript.
-- FRIDAY displays full session, safety copy, context copy, clear control, and composer.
-- Fallback details expand/collapse accessibly.
+Using the local/dev app, verify desktop plus 360px, 390px, and 430px phone widths:
+- Overview shows newest two completed exchanges plus active loading/error exchange.
+- Continue conversation opens FRIDAY with identical session state.
+- FRIDAY shows the full session, safety copy, context copy, Clear Session, and composer.
+- Fallback details expand/collapse with keyboard-accessible button state.
 - Clear while idle removes only transcript.
+- Clear is disabled while a request is in flight.
 - Refresh/remount clears transcript.
 
-Capture screenshots only if the existing project acceptance workflow expects them; do not add screenshot infrastructure solely for this feature.
+Record each check as pass/fail in the PR notes. Do not add screenshot infrastructure solely for this milestone.
 
 - [ ] **Step 8: Perform controlled live provider regression after automated gates**
 
-Against the approved Friday test/deployment environment, verify without permanently changing production provider order:
+In the approved Friday validation environment, without permanently changing production provider order:
+1. Groq primary answers a follow-up using supplied session history.
+2. A controlled cloud-provider failure produces a later successful provider response with `fallbackUsed: true` and returned failed-attempt details.
+3. CT108 Ollama receives multi-turn context and responds under the existing 45-second local timeout.
+4. Supply stale history claiming `friday-ollama = LXC 107`; fresh normalized state must still ground the answer to `friday-ollama = LXC 108`.
 
-1. Groq primary response with session history.
-2. A controlled cloud fallback showing returned failed-attempt provenance.
-3. CT108 Ollama response receives multi-turn context under the existing 45-second local timeout.
-4. Exact identifier grounding still resolves `friday-ollama = LXC 108` even if stale/wrong history is supplied.
+This step is validation only. It does not authorize Friday to execute infrastructure changes and does not authorize production deployment.
 
-This is validation only. Do not authorize Friday to make infrastructure changes and do not deploy to production until separately approved.
-
-- [ ] **Step 9: Commit documentation after all local code gates are green**
+- [ ] **Step 9: Commit documentation**
 
 ```bash
 git add docs/codex/API_CONTRACT.md README.md
 git commit -m "docs: document Friday assistant sessions"
 ```
 
-- [ ] **Step 10: Fresh final verification before PR creation**
+- [ ] **Step 10: Fresh final verification on the exact feature head**
 
-Run again on the exact final head:
 ```bash
 npm test
 npm run build
+git status --short
+git rev-parse HEAD
 ```
-Then confirm `git status --short` is empty and record the exact `git rev-parse HEAD` SHA. The PR body must cite the exact-head CI run after GitHub CI completes; do not claim CI success from an earlier commit.
+
+Expected: tests PASS; build exit 0; `git status --short` prints nothing; record the exact HEAD SHA. After opening the PR, wait for Friday CI on that exact SHA and record the run number/conclusion before requesting merge approval.
 
 ---
 
 ## Implementation Sequence and Review Gates
 
-Execute tasks strictly in order because later interfaces depend on earlier ones:
+Execute strictly in this order:
 
-1. Assistant input normalization.
+1. Pure input normalization.
 2. HTTP contract enforcement.
 3. Orchestration history propagation.
 4. Shared grounding/policy format.
 5. Provider adapter history plumbing.
-6-7. Frontend API + session state machine as one green deliverable.
-8. Presentation components and fallback disclosure.
-9. Dashboard/mobile shared workspace integration.
-10. Documentation and complete regression/safety verification.
+6. Browser API contract.
+7. In-memory session state machine.
+8. Transcript/composer/provenance presentation.
+9. Shared Overview/FRIDAY/mobile integration.
+10. Documentation and full regression/safety verification.
 
-After every task commit, review only that task's diff before continuing. If a task reveals architectural complexity outside the approved spec—especially persistence, authentication, action execution, provider orchestration changes, or server-side sessions—stop and return to design rather than expanding scope inside implementation.
+Every task ends in a green focused test/build state and its own commit. Review that task's diff before starting the next task. If implementation reveals a need for persistence, authentication, server-side sessions, action execution, provider-order changes, or another subsystem outside the approved design, stop and return to design instead of expanding scope.
 
 ## Definition of Done
 
 Implementation is ready for PR review only when:
 
-- all acceptance criteria in `docs/superpowers/specs/2026-08-24-friday-assistant-session-design.md` are implemented;
+- every acceptance criterion in `docs/superpowers/specs/2026-08-24-friday-assistant-session-design.md` is implemented;
 - `npm test` passes on the exact feature head;
 - `npm run build` passes on the exact feature head;
-- all Friday CI safety/Compose/container gates pass on the exact feature head;
-- desktop and phone session behavior is manually checked;
-- live Groq/fallback/CT108/identifier-grounding regression checks are recorded when the approved test environment is available;
-- final diff contains no assistant persistence or new infrastructure mutation authority;
+- all embedded Friday CI shell/security/Compose/container gates pass;
+- desktop and 360/390/430px session behavior is checked;
+- approved live Groq/fallback/CT108/identifier-grounding regression checks are recorded when the validation environment is available;
+- final diff contains no assistant persistence and no new infrastructure mutation authority;
 - the feature PR remains unmerged until explicit user approval.
