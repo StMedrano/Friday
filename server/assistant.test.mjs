@@ -44,6 +44,30 @@ test('first configured cloud provider succeeds without fallback', async () => {
   assert.equal(anthropicCalls, 0)
 })
 
+test('successful AI provider receives sanitized conversation history', async () => {
+  const history = [
+    { role: 'user', content: 'Check friday-ollama' },
+    { role: 'assistant', content: 'friday-ollama is LXC 108' },
+  ]
+  let seenHistory
+
+  const result = await answerAssistant({
+    config: assistantConfig({ order: ['openai'] }),
+    prompt: 'Compare it to VM102',
+    history,
+    overview: { mode: 'live' },
+    providers: {
+      openai: async (input) => {
+        seenHistory = input.history
+        return { provider: 'openai', model: 'openai-model', text: 'Comparison' }
+      },
+    },
+  })
+
+  assert.equal(result.provider, 'openai')
+  assert.deepEqual(seenHistory, history)
+})
+
 test('availability failure falls through sequentially and records only sanitized attempts', async () => {
   const result = await answerAssistant({
     config: assistantConfig({ order: ['openai', 'anthropic'] }),
@@ -59,6 +83,33 @@ test('availability failure falls through sequentially and records only sanitized
   assert.equal(result.mode, 'cloud-ai')
   assert.equal(result.fallbackUsed, true)
   assert.deepEqual(result.attempts, [{ provider: 'openai', outcome: 'rate-limited' }])
+})
+
+test('conversation history survives sequential provider failover unchanged', async () => {
+  const history = [
+    { role: 'user', content: 'Check VM102' },
+    { role: 'assistant', content: 'VM102 is online' },
+  ]
+  let secondProviderHistory
+
+  const result = await answerAssistant({
+    config: assistantConfig({ order: ['openai', 'anthropic'] }),
+    prompt: 'What about friday-ollama?',
+    history,
+    overview: { mode: 'live' },
+    providers: {
+      openai: unavailable('openai', 'timeout'),
+      anthropic: async (input) => {
+        secondProviderHistory = input.history
+        return { provider: 'anthropic', model: 'anthropic-model', text: 'Fallback answer' }
+      },
+    },
+  })
+
+  assert.equal(result.provider, 'anthropic')
+  assert.equal(result.fallbackUsed, true)
+  assert.deepEqual(result.attempts, [{ provider: 'openai', outcome: 'timeout' }])
+  assert.deepEqual(secondProviderHistory, history)
 })
 
 test('Ollama success is labeled local AI', async () => {
@@ -101,6 +152,30 @@ test('all AI providers unavailable falls back to deterministic local analysis wh
       { provider: 'ollama', outcome: 'network' },
     ],
   })
+})
+
+test('deterministic local analysis receives only the current prompt, not conversation history', async () => {
+  const history = [
+    { role: 'user', content: 'Check friday-ollama' },
+    { role: 'assistant', content: 'friday-ollama is LXC 108' },
+  ]
+  let previewInput
+
+  const result = await answerAssistant({
+    config: assistantConfig({ order: ['openai'] }),
+    prompt: 'show service status',
+    history,
+    overview: {},
+    providers: { openai: unavailable('openai', 'network') },
+    previewImpl: (input) => {
+      previewInput = input
+      return { accepted: true, mode: 'preview', command: 'service-status', destructive: false, requiresApproval: false, message: 'Preview only' }
+    },
+  })
+
+  assert.equal(result.mode, 'local-analysis')
+  assert.deepEqual(previewInput, { message: 'show service status' })
+  assert.equal(Object.hasOwn(previewInput, 'history'), false)
 })
 
 test('exhausted AI and unsupported deterministic intent returns unavailable', async () => {
