@@ -182,7 +182,7 @@ Configure one or more providers in `.env`. The current VM102/CT108 deployment us
 FRIDAY_AI_ENABLED=true
 FRIDAY_AI_PROVIDER_ORDER=groq,gemini,ollama
 FRIDAY_CLOUD_AI_TIMEOUT_MS=15000
-FRIDAY_LOCAL_AI_TIMEOUT_MS=30000
+FRIDAY_LOCAL_AI_TIMEOUT_MS=45000
 
 GROQ_API_KEY=
 GROQ_MODEL=
@@ -202,6 +202,8 @@ FRIDAY_LOCAL_AI_MAX_TOKENS=512
 OpenAI and Anthropic adapters are retained for compatibility but are no longer in the default provider order. Groq and Gemini models must be selected explicitly in `.env`.
 
 CT108 (`192.168.1.70`) runs native Ollama on the AMD Radeon 780M through RADV/Vulkan. Its firewall should permit TCP/11434 only from VM102 (`192.168.1.64`). `qwen3:4b-instruct` is the recommended local model for routine Friday summaries and the local output budget is bounded by `FRIDAY_LOCAL_AI_MAX_TOKENS`.
+
+The shared AI policy requires providers to preserve exact service IDs, VM/LXC numbers, host names, and service-name mappings from normalized Friday state rather than infer, renumber, merge, or substitute identifiers.
 
 The Compose `local-ai` Ollama service remains an optional private development/recovery path. To start it and pull the configured model:
 
