@@ -52,7 +52,7 @@ The history is bounded by `FRIDAY_MONITORING_HISTORY_LIMIT` and must not contain
 
 ## `GET /api/incidents/:incidentId/diagnostics`
 
-Returns the persisted safe diagnostic report for one existing incident. Diagnostics are opt-in with:
+Returns the persisted safe diagnostic report for one existing incident. Diagnostics are environment-gated with:
 
 ```env
 FRIDAY_DIAGNOSTICS_ENABLED=false
@@ -130,7 +130,47 @@ Response includes `accepted`, `mode:"preview"`, `command`, `destructive:false`, 
 
 ## `POST /api/assistant`
 
-Optional advisory AI analysis. Disabled unless `FRIDAY_AI_ENABLED=true` and a server-side API key is configured. The assistant receives normalized monitoring-aware state and no infrastructure execution tools.
+Optional advisory AI analysis. Disabled unless `FRIDAY_AI_ENABLED=true`. The assistant receives normalized monitoring-aware state and no infrastructure execution tools.
+
+Preferred sequential provider order:
+
+```text
+Groq -> Gemini -> CT108 Ollama -> deterministic local analysis
+```
+
+Representative successful cloud response:
+
+```json
+{
+  "available": true,
+  "mode": "cloud-ai",
+  "provider": "groq",
+  "model": "openai/gpt-oss-20b",
+  "text": "read-only advisory response",
+  "fallbackUsed": false,
+  "attempts": []
+}
+```
+
+Representative successful local response:
+
+```json
+{
+  "available": true,
+  "mode": "local-ai",
+  "provider": "ollama",
+  "model": "qwen3:4b-instruct",
+  "text": "read-only advisory response",
+  "fallbackUsed": false,
+  "attempts": []
+}
+```
+
+When one or more configured providers fail before a later provider succeeds, `fallbackUsed` is true and `attempts` contains normalized provider/outcome entries. Provider errors are sanitized; raw upstream exceptions and credentials are not returned.
+
+If no configured AI provider can answer, Friday can return deterministic local analysis with `mode:"local-analysis"`, `provider:"deterministic"`, and no execution authority.
+
+The shared assistant policy requires exact service IDs, VM/LXC numbers, host names, and service-name mappings from normalized state. AI output is advisory only and cannot claim or authorize successful infrastructure execution.
 
 ## VM100 observer contract
 
@@ -147,4 +187,4 @@ The observer accepts only a known hexadecimal container ID obtained from its san
 
 ## Future action APIs
 
-Do not add execution to the endpoints above. Action proposals, approvals, and execution must use separate policy-gated endpoints and durable action-audit IDs only after authentication/RBAC and the approval workflow exist.
+Do not add execution to the endpoints above. Action proposals, approvals, and execution must use separate policy-gated endpoints and durable action-audit IDs only after authentication/RBAC, approval workflow, and a global automation kill switch exist.
