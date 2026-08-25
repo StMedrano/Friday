@@ -14,6 +14,7 @@ function extractGeminiText(payload = {}) {
 export async function askGemini({
   providerConfig = {},
   prompt,
+  history = [],
   overview,
   systemPrompt = fridaySystemPrompt(),
   fetchImpl = globalThis.fetch,
@@ -37,7 +38,7 @@ export async function askGemini({
       signal,
       body: JSON.stringify({
         systemInstruction: { parts: [{ text: systemPrompt }] },
-        contents: [{ role: 'user', parts: [{ text: fridayUserPrompt(prompt, overview) }] }],
+        contents: [{ role: 'user', parts: [{ text: fridayUserPrompt(prompt, overview, history) }] }],
         generationConfig: { maxOutputTokens: 1200 },
       }),
     })

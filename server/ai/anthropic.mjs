@@ -14,6 +14,7 @@ function extractAnthropicText(payload = {}) {
 export async function askAnthropic({
   providerConfig = {},
   prompt,
+  history = [],
   overview,
   systemPrompt = fridaySystemPrompt(),
   fetchImpl = globalThis.fetch,
@@ -39,7 +40,7 @@ export async function askAnthropic({
         model,
         max_tokens: 1200,
         system: systemPrompt,
-        messages: [{ role: 'user', content: fridayUserPrompt(prompt, overview) }],
+        messages: [{ role: 'user', content: fridayUserPrompt(prompt, overview, history) }],
       }),
     })
   } catch (error) {

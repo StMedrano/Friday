@@ -22,6 +22,7 @@ export function extractResponseText(response = {}) {
 export async function askOpenAI({
   providerConfig = {},
   prompt,
+  history = [],
   overview,
   systemPrompt = fridaySystemPrompt(),
   fetchImpl = globalThis.fetch,
@@ -48,7 +49,7 @@ export async function askOpenAI({
         max_output_tokens: 1200,
         input: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: fridayUserPrompt(prompt, overview) },
+          { role: 'user', content: fridayUserPrompt(prompt, overview, history) },
         ],
       }),
     })

@@ -4,6 +4,7 @@ import { fridaySystemPrompt, fridayUserPrompt } from './policy.mjs'
 export async function askOllama({
   providerConfig = {},
   prompt,
+  history = [],
   overview,
   systemPrompt = fridaySystemPrompt(),
   fetchImpl = globalThis.fetch,
@@ -32,7 +33,7 @@ export async function askOllama({
         stream: false,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: fridayUserPrompt(prompt, overview) },
+          { role: 'user', content: fridayUserPrompt(prompt, overview, history) },
         ],
         options: {
           num_ctx: context,
