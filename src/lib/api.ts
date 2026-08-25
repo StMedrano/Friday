@@ -20,6 +20,16 @@ export type FridayAssistantResponse = {
   attempts?: FridayAssistantAttempt[]
 }
 
+export type FridayAssistantHistoryMessage = {
+  role: 'user' | 'assistant'
+  content: string
+}
+
+export type FridayAssistantRequestOptions = {
+  history?: FridayAssistantHistoryMessage[]
+  signal?: AbortSignal
+}
+
 export type FridayIncident = {
   id: string
   fingerprint?: string
@@ -144,11 +154,14 @@ export function useFridayOverview() {
   return { overview, connected }
 }
 
-export async function askFridayAssistant(prompt: string, signal?: AbortSignal): Promise<FridayAssistantResponse> {
+export async function askFridayAssistant(
+  prompt: string,
+  { history = [], signal }: FridayAssistantRequestOptions = {},
+): Promise<FridayAssistantResponse> {
   const response = await fetch('/api/assistant', {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify({ prompt, history }),
     signal,
   })
   const body = await response.json() as FridayAssistantResponse

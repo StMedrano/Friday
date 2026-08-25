@@ -27,7 +27,7 @@ describe('Friday assistant API', () => {
     expect(fetchMock).toHaveBeenCalledWith('/api/assistant', expect.objectContaining({
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ prompt: 'Check service health' }),
+      body: JSON.stringify({ prompt: 'Check service health', history: [] }),
     }))
   })
 
@@ -42,7 +42,7 @@ describe('Friday assistant API', () => {
     }), { status: 200, headers: { 'content-type': 'application/json' } }))
     vi.stubGlobal('fetch', fetchMock)
 
-    await askFridayAssistant('show service status', controller.signal)
+    await askFridayAssistant('show service status', { signal: controller.signal })
 
     expect(fetchMock).toHaveBeenCalledWith('/api/assistant', expect.objectContaining({ signal: controller.signal }))
   })
