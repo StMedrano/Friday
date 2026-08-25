@@ -3,146 +3,98 @@
 **Date:** 2026-08-24  
 **Status:** Approved design, awaiting written-spec review  
 **Repository:** `StMedrano/Friday`  
-**Target:** Friday controller UI/API on VM102  
+**Target:** Friday controller UI/API on VM102
 
 ## 1. Purpose
 
-This milestone turns the existing one-shot Friday assistant interaction into a shared, session-only conversational operations workspace without expanding Friday's mutation authority.
+This milestone evolves Friday's existing one-shot assistant interaction into a shared, session-only conversational operations workspace without expanding Friday's mutation authority.
 
-The current application already calls `POST /api/assistant`, renders assistant provenance, and supports the production provider chain. This design builds on that existing flow rather than replacing it.
+The application already calls `POST /api/assistant`, renders assistant provenance, and uses the production provider chain. This design extends that flow. The operator can ask from Overview, continue the same thread in FRIDAY, use bounded multi-turn context for follow-ups, inspect provider/fallback provenance, and clear the current UI session. Conversation state exists only in frontend memory and disappears on refresh/remount.
 
-The operator should be able to ask a question from Overview, continue the same conversation in the dedicated FRIDAY workspace, use follow-up references from recent conversation context, inspect provider/fallback provenance, and clear the current UI session. Conversation state exists only in frontend memory and disappears on page refresh or application remount.
+## 2. Approved decisions
 
-## 2. Approved product decisions
-
-The following decisions are fixed for this milestone:
-
-1. Conversation history is **session-only**. No browser storage, server storage, database storage, or `/data` persistence is added.
-2. Overview and the dedicated FRIDAY workspace share **one in-memory conversation**.
-3. Friday uses **true multi-turn context**, not visual-only history.
-4. Model context is limited to the **10 most recent completed exchanges** (20 historical messages maximum).
-5. Overview shows a **compact recent thread**, limited to the two most recent completed exchanges, while FRIDAY shows the full current-session transcript.
-6. Provider provenance is compact by default and exposes **expandable fallback details** when relevant.
-7. The assistant remains **advisory/read-only**. This milestone adds no Docker, Proxmox, shell, network, deployment, remediation, approval, or other infrastructure mutation authority.
+1. History is **session-only**: no `localStorage`, `sessionStorage`, server storage, database storage, or `/data` persistence.
+2. Overview and FRIDAY share **one in-memory conversation**.
+3. Friday uses **true multi-turn context**.
+4. Model context is capped at the **10 most recent completed exchanges** (20 historical messages maximum).
+5. Overview shows a **compact two-exchange view**; FRIDAY shows the full current-session transcript.
+6. Provenance stays compact and exposes **expandable fallback details** when fallback occurs.
+7. Friday remains **advisory/read-only**. No Docker, Proxmox, shell, network, deployment, remediation, approval, or other mutation authority is added.
 
 ## 3. Goals
 
-### 3.1 User goals
+The operator should be able to:
 
-- Ask Friday from Overview and continue the same thread in FRIDAY.
-- Ask natural follow-up questions such as "compare it to VM102" without restating the entire prior question.
-- See whether the answer came from cloud AI, local AI, or deterministic local analysis.
-- See provider/model information on each completed Friday response.
-- See when provider fallback occurred and expand the route to inspect provider outcomes.
-- Keep Overview operationally focused while using FRIDAY as the full conversation workspace.
-- Clear the assistant session without affecting monitoring, diagnostics, incidents, audit data, or infrastructure state.
+- ask Friday on Overview and continue seamlessly in FRIDAY;
+- ask follow-ups such as `compare it to VM102` without restating the prior question;
+- see cloud AI, local AI, or deterministic local-analysis provenance for each reply;
+- inspect provider/model information and failed fallback attempts;
+- clear only the assistant session without affecting monitoring, incidents, diagnostics, audit information, or infrastructure state.
 
-### 3.2 Engineering goals
-
-- Keep `/api/assistant` stateless with respect to conversation storage.
-- Reuse the existing normalized infrastructure overview on every request.
-- Introduce history at the common assistant/policy boundary so Groq, Gemini, Ollama, and compatibility providers receive the same normalized context format.
-- Enforce history bounds on the server even when the frontend already trims history.
-- Preserve the current sequential provider failover behavior.
-- Preserve deterministic local analysis as the final safe fallback.
-- Keep units small enough to test independently.
+Engineering goals are to keep `/api/assistant` stateless for conversation storage, attach fresh normalized infrastructure state on every turn, use one common history formatter across providers, preserve sequential failover, and make the new session behavior independently testable.
 
 ## 4. Non-goals
 
-This milestone does not add:
+This milestone does not add durable history, cross-device history, authentication/RBAC, server conversation IDs, semantic memory, embeddings, old-turn summarization, voice input, autonomous actions, command execution, infrastructure writes, automatic UI retries, parallel provider fan-out, provider-order changes, or prompt/response audit persistence.
 
-- durable conversation storage;
-- cross-device or cross-browser history;
-- user accounts, authentication, RBAC, per-user session ownership, or authorization policy;
-- server-created conversation IDs;
-- semantic memory, embeddings, retrieval-augmented conversation memory, or summarization of old turns;
-- autonomous actions;
-- command execution;
-- infrastructure writes;
-- automatic retries initiated by the UI after a failed turn;
-- parallel AI provider fan-out;
-- changes to the production provider order;
-- voice input implementation;
-- audit persistence of prompts or responses.
-
-Durable assistant history belongs after identity/RBAC because stored conversations need an owner and access policy.
+Durable history belongs after identity/RBAC, when stored conversations can have an owner and access policy.
 
 ## 5. Existing baseline
 
-Friday already has the main primitives needed for this milestone:
+Friday already provides the required foundation:
 
-- `src/lib/api.ts` exposes `askFridayAssistant()` and assistant response metadata including `mode`, `provider`, `model`, `fallbackUsed`, and `attempts`.
-- `src/pages/Dashboard.tsx` already submits the desktop assistant composer to `/api/assistant` and shares the same query/assistant state with mobile Overview.
-- `src/components/AssistantReply.tsx` already renders cloud/local/deterministic provenance labels plus provider/model metadata.
-- `src/components/MobileHome.tsx` already contains a compact assistant card for phone layouts.
-- `server/http.mjs` obtains a fresh normalized overview before invoking `answerAssistant()`.
-- `server/assistant.mjs` performs sequential provider failover and deterministic local-analysis fallback.
-- `server/ai/policy.mjs` centralizes the Friday system prompt and the user prompt that combines the operator request with normalized Friday state.
+- `src/lib/api.ts` exposes `askFridayAssistant()` plus `mode`, `provider`, `model`, `fallbackUsed`, and `attempts`.
+- `src/pages/Dashboard.tsx` already submits the real assistant request.
+- `src/components/AssistantReply.tsx` already renders cloud/local/deterministic provenance plus provider/model metadata.
+- `src/components/MobileHome.tsx` already has a compact phone assistant card.
+- `server/http.mjs` obtains fresh normalized state before invoking `answerAssistant()`.
+- `server/assistant.mjs` performs sequential failover and deterministic fallback.
+- `server/ai/policy.mjs` centralizes the shared Friday system/user prompt policy.
 
-The architecture should extend these units rather than introduce a separate assistant subsystem.
+The implementation should extend these boundaries rather than create a parallel assistant subsystem.
 
 ## 6. Architecture
 
-### 6.1 Recommended structure
+Use a frontend hook, `useFridaySession`, as the single owner of the current-page transcript and request lifecycle. A React context provider is unnecessary now because Overview and FRIDAY live in the same `Dashboard` tree. `Dashboard` creates one hook instance and passes it to the relevant views. If routing later splits those views into independent trees, the hook contract can be wrapped in context without changing the server API.
 
-Use a dedicated frontend hook, `useFridaySession`, as the single owner of the current-page assistant transcript and send lifecycle.
-
-A React context provider is not required for this milestone because Overview and FRIDAY are both rendered within the existing `Dashboard` tree. `Dashboard` can create one `useFridaySession()` instance and pass its state/actions to the relevant views. If routing is split into independent page trees in the future, the same hook contract can later be wrapped in context without changing the server API.
-
-The server remains stateless. The browser sends a bounded history array with each new prompt. The server validates and re-bounds that history before it is allowed into provider prompts.
-
-### 6.2 High-level flow
+The server remains stateless. The browser sends bounded prior history with each prompt; the server independently validates and bounds it before provider use.
 
 ```text
-Operator enters current prompt
-        |
-        v
+Operator prompt
+    |
+    v
 useFridaySession
-        |
-        |-- append visible user turn immediately
-        |-- create visible analyzing placeholder
-        |-- build history from prior completed exchanges only
-        v
-POST /api/assistant
-{
-  prompt,
-  history
-}
-        |
-        v
-HTTP validation and normalization
-        |
-        |-- prompt <= 4,000 chars
-        |-- valid roles only
-        |-- historical message <= 2,000 chars
-        |-- history <= 12,000 chars total
-        |-- newest 20 valid historical messages max
-        v
-currentOverview()
-        |
-        v
+    |-- capture prior completed exchanges for model history
+    |-- append visible user turn
+    |-- append visible analyzing placeholder
+    v
+POST /api/assistant { prompt, history }
+    |
+    v
+server history/prompt normalization
+    |
+    v
+fresh currentOverview()
+    |
+    v
 answerAssistant({ prompt, history, overview })
-        |
-        v
+    |
+    v
 shared Friday policy formatter
-        |
-        v
+    |
+    v
 Groq -> Gemini -> CT108 Ollama -> deterministic local analysis
-        |
-        v
-assistant response + provenance
-        |
-        v
-replace analyzing placeholder with completed/error turn
+    |
+    v
+response + provenance
+    |
+    v
+replace analyzing placeholder with complete/error turn
 ```
 
 ## 7. Frontend session model
 
-### 7.1 Transcript ownership
-
-`useFridaySession` owns the full current-page transcript in React memory.
-
-It should expose an interface equivalent to:
+A practical hook contract is:
 
 ```ts
 type FridaySession = {
@@ -153,9 +105,7 @@ type FridaySession = {
 }
 ```
 
-The exact internal shape may vary, but each visible message needs enough information to render role, text, lifecycle, and assistant provenance without consulting global dashboard state.
-
-A practical message shape is:
+Each visible message needs role, text, lifecycle, and per-reply provenance:
 
 ```ts
 type FridaySessionMessage = {
@@ -171,126 +121,88 @@ type FridaySessionMessage = {
 }
 ```
 
-`id` is a frontend rendering key only. It is not a durable conversation identifier and is never used as authorization or server state.
+`id` is only a frontend rendering key; it is not persisted and has no authorization meaning.
 
-### 7.2 Sending a turn
+### 7.1 Sending a turn
 
-When the operator submits a valid prompt:
+On submit:
 
-1. Prevent duplicate submission while a request is already in flight.
-2. Capture the prior transcript used for context before adding the current prompt to the model-history payload.
-3. Append the current user message to the visible transcript immediately.
-4. Append an assistant `loading` placeholder immediately after it.
-5. Send the current prompt plus bounded prior completed exchanges to `/api/assistant`.
-6. On success, replace the loading placeholder with the returned text and provenance.
-7. On failure, replace the placeholder with an error turn. Do not automatically resubmit.
+1. Ignore empty input and prevent duplicate sends while a request is active.
+2. Build the API history from the transcript as it existed **before** the current prompt.
+3. Append the current user message immediately.
+4. Append an assistant loading placeholder immediately.
+5. Send the current prompt separately from bounded prior history.
+6. On success, replace the placeholder with response text/provenance.
+7. On failure, replace it with an error turn; do not auto-retry.
 8. Re-enable the composer.
 
-The current prompt is sent in `prompt`; it must not also be duplicated inside `history`.
+The current prompt appears only in `prompt`; it is not duplicated in `history`.
 
-### 7.3 What counts as model history
+### 7.2 Model-history eligibility
 
-Only **prior completed exchanges** are eligible for the next model request.
+Only prior **completed exchanges** are eligible for model context. A completed exchange is a user message paired with a following assistant message whose status is `complete`, including cloud AI, local AI, or successful deterministic local analysis.
 
-A completed exchange is a user message paired with a following assistant message whose status is `complete`. This includes cloud AI, local AI, or successful deterministic local-analysis responses.
+Failed assistant turns and loading placeholders remain visible but are excluded from later model history. The frontend sends at most the newest 10 completed exchanges.
 
-Failed assistant turns remain visible in the current-session transcript but are excluded from model history. Loading placeholders are also excluded. This prevents transient provider errors from becoming conversational evidence.
+### 7.3 Clear session
 
-The frontend sends at most the 10 newest completed exchanges.
+`clearSession()` resets only the frontend transcript and assistant presentation. It must not clear overview data, incidents, monitoring history, diagnostics, audit information, or any server/infrastructure state, and it must not call a server delete endpoint.
 
-### 7.4 Session clearing
+Clear Session is disabled while a request is in flight so a late response cannot be appended into a newly cleared session. Cancellation is not required in this milestone.
 
-`clearSession()` removes only the frontend transcript and resets assistant loading/error presentation.
-
-It must not:
-
-- change `/api/overview` state;
-- clear incidents;
-- clear monitoring history;
-- remove diagnostics;
-- clear audit information;
-- modify infrastructure;
-- call a server-side delete endpoint.
-
-Refreshing/remounting naturally starts with an empty session because no persistence mechanism is added.
-
-## 8. UI design
+## 8. UI behavior
 
 ### 8.1 Overview
 
-Overview remains the operational command center. The assistant section should show:
+Overview remains the operational command center. Its Friday area keeps the existing visual treatment and shared composer, but shows only the **two most recent exchange groups**.
 
-- the existing Friday visual/core treatment;
-- the shared composer;
-- at most the two most recent completed exchanges;
-- compact provenance on assistant replies;
-- a `Continue conversation` control when conversation history exists.
+An exchange group means a user turn plus its corresponding Friday state, which may currently be `loading`, `complete`, or `error`. This guarantees that the operator sees the prompt they just sent and its current result even before the exchange is eligible for future model history.
 
-Selecting `Continue conversation` navigates to the existing FRIDAY navigation destination while preserving the same hook instance and transcript.
+When any session history exists, a `Continue conversation` control navigates to FRIDAY without resetting the hook instance.
 
-The Overview assistant should not expand into an unlimited scrolling transcript. Infrastructure health, incidents, and service state remain the dominant content on Overview.
+Overview must not become an unlimited chat transcript; infrastructure health and incidents remain dominant.
 
-### 8.2 Dedicated FRIDAY workspace
+### 8.2 FRIDAY workspace
 
-The FRIDAY destination becomes a dedicated conversation workspace instead of rendering the same Overview composition unchanged.
+The FRIDAY destination becomes the full conversational operations workspace and contains:
 
-It should contain:
+- `FRIDAY / SESSION` header;
+- persistent `Advisory only · No actions executed` text;
+- `Context: up to 10 recent exchanges` indicator;
+- `Clear session`;
+- full in-memory transcript;
+- shared composer at the bottom/sticky edge as appropriate;
+- responsive phone behavior using the existing phone shell.
 
-- session header: `FRIDAY / SESSION`;
-- persistent safety text: `Advisory only · No actions executed`;
-- context indicator: `Context: up to 10 recent exchanges`;
-- `Clear session` control;
-- full current-session transcript;
-- sticky or bottom-positioned shared composer;
-- responsive behavior suitable for the existing phone shell.
+The full transcript is visual history. Only the bounded context window is sent to providers.
 
-The full session is visual history only; the provider request still receives only the bounded 10-exchange context window.
+The existing global `Automation` UI, if still visible outside this workspace, must not be interpreted or wired as permission for the assistant to execute actions. This milestone gives the assistant no action authority regardless of that presentation state.
 
-### 8.3 Message presentation
+### 8.3 Provenance and fallback disclosure
 
-User messages and Friday messages should be visually distinguishable without introducing a separate design language.
+Each completed assistant reply preserves its own provenance:
 
-Friday replies reuse and extend the existing assistant provenance treatment:
+- `FRIDAY CLOUD AI`;
+- `FRIDAY LOCAL AI`;
+- `LOCAL ANALYSIS · NO AI`;
+- final provider/model when available.
 
-- `FRIDAY CLOUD AI` for cloud providers;
-- `FRIDAY LOCAL AI` for Ollama;
-- `LOCAL ANALYSIS · NO AI` for deterministic analysis;
-- provider and model metadata when present.
+When `fallbackUsed !== true`, no fallback control appears.
 
-Each completed assistant response stores its own provenance so earlier messages do not change appearance when later provider fallback occurs.
-
-### 8.4 Fallback details
-
-When `fallbackUsed !== true`, no fallback label is shown.
-
-When `fallbackUsed === true`, the reply shows a compact `Fallback used` indicator plus an expandable `Details` control.
-
-The expanded details render the returned `attempts` in their original order, for example:
+When `fallbackUsed === true`, show `Fallback used` and an expandable `Details` button. Details render only the failed attempts actually returned by the server, in original order. Example:
 
 ```text
 Groq   — timeout
 Gemini — upstream
-Ollama — success
 ```
 
-The current server records failed attempts before the successful provider. The UI must not invent a successful attempt that is absent from the response. The final provider/model displayed in the normal provenance line remains the authoritative successful source.
+If Ollama then succeeds, its success is represented by the normal final provenance line (`FRIDAY LOCAL AI · ollama · qwen3:4b-instruct`), not by fabricating `Ollama — success` inside `attempts`.
 
-If deterministic local analysis is the final result, the failed AI attempts may be shown in the details followed by the normal deterministic provenance label; no fabricated `deterministic — success` attempt is required.
-
-### 8.5 Errors
-
-A failed request remains in the visual transcript as:
-
-- the submitted user message;
-- an assistant error message for that turn.
-
-The UI does not automatically retry or silently switch the user's prompt. The operator may edit or submit another request after the composer becomes available.
+If deterministic local analysis is the final result, failed AI attempts remain expandable and the deterministic provenance badge represents the final outcome.
 
 ## 9. API contract
 
-### 9.1 Request
-
-`POST /api/assistant`
+`POST /api/assistant` accepts optional history while preserving prompt-only backward compatibility:
 
 ```json
 {
@@ -302,39 +214,33 @@ The UI does not automatically retry or silently switch the user's prompt. The op
 }
 ```
 
-`history` is optional for backward compatibility. A request containing only `prompt` continues to behave as a one-shot request.
+No conversation/session ID is returned.
 
-### 9.2 Server-side validation rules
+### 9.1 Current prompt validation
 
-The server is the enforcement boundary even when the browser follows the same limits.
-
-#### Current prompt
-
-- Convert the incoming prompt to a trimmed string using the existing prompt handling rules.
+- Trim using existing prompt semantics.
 - Empty prompt: existing `400` / `invalid-prompt` behavior.
-- More than 4,000 characters after trimming: return `400` with `error: "invalid-prompt"` and a reason indicating the prompt is too long.
-- Do **not** silently truncate the current operator request because truncation could change its operational meaning.
+- More than 4,000 characters after trimming: `400` / `invalid-prompt` with a clear too-long reason.
+- Never silently truncate the current operator request because truncation could change operational meaning.
 
-#### History
+### 9.2 History normalization
 
-History is untrusted contextual input.
+History is untrusted contextual input. Server rules, in order:
 
-Normalization rules, in order:
-
-1. Non-array history becomes an empty history.
-2. Keep entries whose role is exactly `user` or `assistant` and whose content can be converted to a non-empty trimmed string.
+1. Non-array history becomes `[]`.
+2. Keep only entries with role exactly `user` or `assistant` and non-empty trimmed content.
 3. Truncate each historical content value to 2,000 characters.
-4. Retain the newest entries when the combined historical content exceeds 12,000 characters; remove oldest entries until the total is within the limit.
-5. Retain no more than the newest 20 valid messages.
-6. Preserve the remaining message order.
+4. If combined historical content exceeds 12,000 characters, remove oldest entries until within the limit.
+5. Keep no more than the newest 20 valid messages.
+6. Preserve remaining order.
 
-The browser normally sends paired exchanges, but the server does not need to infer or repair pairing. Its responsibility is to sanitize roles/content and bound input size. The policy treats all supplied history as non-authoritative conversation context regardless of pairing.
+The browser normally sends paired completed exchanges. The server sanitizes and bounds messages but does not invent/repair missing pairs. History is non-authoritative regardless of role ordering.
 
-These limits fit within the existing 32 KB JSON request-body ceiling while leaving room for JSON structure and the current prompt.
+These limits remain comfortably inside the existing 32 KB request-body ceiling while leaving room for JSON structure and the current prompt.
 
-### 9.3 Response
+### 9.3 Response compatibility
 
-The existing response contract remains compatible:
+The existing response remains authoritative:
 
 ```ts
 type FridayAssistantResponse = {
@@ -349,15 +255,11 @@ type FridayAssistantResponse = {
 }
 ```
 
-No conversation/session ID is returned.
+## 10. Shared AI policy and grounding
 
-## 10. Assistant policy and grounding
+History must be formatted at the common policy boundary, not independently inside provider adapters.
 
-### 10.1 Common context formatter
-
-History should be added at the shared policy boundary, not independently formatted inside Groq, Gemini, or Ollama adapters.
-
-The provider-facing user content should have this semantic structure:
+Provider-facing user content has this semantic structure:
 
 ```text
 Recent session context:
@@ -371,280 +273,176 @@ Authoritative normalized Friday state:
 { fresh current overview }
 ```
 
-The exact helper signature may evolve from the current `fridayUserPrompt(prompt, overview)` to accept a third bounded-history argument. The same normalized formatter should be consumed by every AI provider so provider fallback does not change conversation semantics.
+The common helper may evolve from `fridayUserPrompt(prompt, overview)` to accept bounded history. All AI providers, including retained compatibility providers, should use the same formatter so fallback does not change conversation semantics.
 
-### 10.2 Authority rule
-
-The system prompt must explicitly state:
+The system policy gains this explicit rule:
 
 > Previous conversation is context, not infrastructure evidence. Resolve infrastructure facts and identifiers from the current normalized Friday state.
 
-This rule is additive to the existing exact-identifier grounding requirements.
+This is additive to the existing exact-identifier policy. If an old assistant turn says `friday-ollama = LXC 107` while fresh normalized state says `friday-ollama = LXC 108`, the provider must use LXC 108.
 
-Its purpose is to prevent an earlier assistant mistake from becoming a trusted fact on the next turn. If a historical assistant response says `LXC 107` while the fresh normalized state says `friday-ollama = LXC 108`, the provider must use the current normalized state.
+Every assistant request continues to call `currentOverview()`. Authority order is:
 
-### 10.3 Fresh state on every turn
+1. fresh normalized state for infrastructure facts;
+2. current operator request for intent;
+3. recent conversation for referential continuity.
 
-`server/http.mjs` continues to call `currentOverview()` for every assistant request. Conversation history never replaces, caches, or overrides that overview.
+## 11. Provider orchestration and deterministic fallback
 
-The authoritative ordering is:
-
-1. current normalized Friday state for infrastructure facts;
-2. current operator request for requested intent;
-3. recent conversation for referential/contextual continuity.
-
-## 11. Provider orchestration
-
-The production orchestration does not change:
+Production orchestration does not change:
 
 ```text
 Groq
-  -> unavailable/failure/timeout
+  -> failure/unavailable/timeout
 Gemini
-  -> unavailable/failure/timeout
+  -> failure/unavailable/timeout
 CT108 Ollama
-  -> unavailable/failure/timeout
+  -> failure/unavailable/timeout
 Deterministic local analysis
 ```
 
-No parallel requests are introduced.
+No parallel fan-out is introduced. Timeout values, provider order/configuration, local context size, local output-token cap, and failure classification remain unchanged.
 
-`answerAssistant()` accepts the sanitized history and passes it to configured AI providers together with the current prompt, overview, shared system prompt, and existing timeout signal.
+`answerAssistant()` accepts sanitized history and passes it to AI providers with the current prompt, overview, shared system policy, and existing timeout signal.
 
-All supported AI provider adapters should consume the same shared Friday prompt formatter. This includes the preferred production providers and any retained explicit compatibility providers so behavior does not diverge when an alternate configured provider is used.
+Deterministic local analysis continues to evaluate the **current prompt only**. It does not resolve pronouns from history. If all AI providers fail and `check that one again` does not independently map to a deterministic command, Friday returns the existing unavailable result instead of guessing the referent.
 
-Timeout behavior, provider ordering, provider configuration, local context size, local output-token cap, and fallback attempt classification are outside this milestone and remain unchanged.
+## 12. Safety boundary
 
-## 12. Deterministic fallback behavior
+Conversation context may help Friday explain health, summarize alerts, compare systems, identify likely causes, and propose read-only diagnostics. It grants no execution permission.
 
-Deterministic local analysis continues to evaluate the **current prompt only**.
+The implementation must not add or enable Docker socket access, Proxmox writes, shell execution, network changes, deployment actions, restart/stop/start controls, remediation, approval execution, arbitrary write adapters, or hidden action endpoints.
 
-It does not resolve pronouns or ambiguous references from conversation history. This avoids silently teaching the deterministic command parser conversational semantics that it does not currently support.
+The existing policy prohibiting Friday from claiming it executed/restarted/changed/deployed/remediated anything remains active.
 
-Example:
+## 13. Component boundaries
 
-- Current prompt: `check service health` -> deterministic preview may answer if supported.
-- Current prompt: `check that one again` after all AI providers fail -> deterministic preview should not guess what `that one` means.
+The implementation plan should keep these responsibilities isolated:
 
-If no AI provider succeeds and the current prompt does not independently map to supported deterministic analysis, Friday returns the existing unavailable response rather than inferring from history.
+- **`useFridaySession`**: transcript state, context selection, request lifecycle, loading/error replacement, clearing.
+- **`src/lib/api.ts`**: typed `{ prompt, history }` request/response transport only.
+- **Conversation presentation**: compact/full rendering only; no network call.
+- **Composer**: input/submission presentation; receives callbacks/loading state.
+- **Assistant provenance**: evolve/compose existing `AssistantReply`; provenance belongs to each reply.
+- **Server history normalizer**: pure independently tested sanitizer/bounder; no persistence.
+- **Shared AI policy formatter**: serializes history, current prompt, and fresh normalized state consistently for every AI provider.
 
-## 13. Safety boundary
+Extract existing composer markup only where it eliminates duplication needed by this milestone. Unrelated dashboard refactors are out of scope.
 
-This milestone must preserve Friday's current read-only/advisory boundary.
+## 14. Error handling
 
-Conversation context may help Friday explain, compare, summarize, diagnose, and propose read-only next steps. It does not grant any execution permission.
+- Invalid/too-long current prompt: HTTP `400`, shown as an error turn when submitted from the UI.
+- Earlier provider fails and later provider succeeds: normal reply, `fallbackUsed: true`, failed-attempt details.
+- All AI providers fail but deterministic analysis succeeds: normal local-analysis reply plus failed-attempt provenance.
+- All AI providers fail and deterministic analysis cannot map the current prompt: existing `503` unavailable semantics and a visible transcript error.
+- Browser/network failure: visible error turn; no auto-retry.
+- While loading: composer and Clear Session are disabled.
 
-The implementation must not add or enable:
+## 15. TDD and verification
 
-- Docker socket access;
-- Proxmox writes;
-- shell command execution;
-- network configuration changes;
-- deployment actions;
-- restart/stop/start controls;
-- remediation execution;
-- approval execution;
-- arbitrary HTTP write adapters;
-- hidden action endpoints.
+Implementation uses TDD with red/green evidence for new behavior.
 
-The FRIDAY workspace must visibly state `Advisory only · No actions executed`.
+### 15.1 HTTP/contract tests
 
-The existing policy that Friday must not claim it executed/restarted/changed/deployed/remediated anything remains active.
+Verify:
 
-## 14. Component boundaries
-
-The implementation plan should prefer the following responsibility boundaries.
-
-### `useFridaySession`
-
-Owns transcript state, context selection, request lifecycle, loading/error turn replacement, and session clearing.
-
-Depends on the API client, not directly on `fetch`.
-
-### API client (`src/lib/api.ts`)
-
-Defines request/response types and sends `{ prompt, history }` to `/api/assistant`.
-
-It does not own transcript state.
-
-### Conversation presentation
-
-A focused conversation component renders a supplied message list in either compact or full mode. It does not call the assistant API.
-
-### Composer
-
-A focused shared composer owns only input presentation/submission wiring. It receives loading state and submit/change callbacks from the session owner.
-
-Existing composer markup may be extracted only where that reduces duplicate desktop/mobile behavior needed by this milestone. Unrelated dashboard refactoring is out of scope.
-
-### Assistant provenance/reply presentation
-
-The existing `AssistantReply` behavior should be evolved or composed into the new conversation rendering so its cloud/local/deterministic labels remain consistent. Fallback disclosure belongs with the individual assistant message.
-
-### Server history normalization
-
-A small pure helper should normalize/bound incoming history before `answerAssistant()` receives it. This helper should be independently unit-testable and must not persist the result.
-
-### Shared AI policy formatter
-
-Owns formatting of sanitized history, current request, and normalized state into provider-facing text. Provider adapters should not implement independent history serialization.
-
-## 15. Testing strategy
-
-Implementation uses TDD. Tests are added before behavior changes and must demonstrate red/green progression for the new requirements.
-
-### 15.1 Server HTTP/contract tests
-
-Cover:
-
-- request with prompt only remains compatible;
-- request with valid history forwards sanitized history to `answerAssistantImpl`;
+- prompt-only requests remain compatible;
+- valid history reaches `answerAssistantImpl` after sanitization;
 - empty prompt remains `400 invalid-prompt`;
-- prompt over 4,000 characters returns `400 invalid-prompt` rather than being silently truncated;
+- prompt over 4,000 characters is rejected, not truncated;
 - non-array history becomes empty;
-- invalid roles are discarded;
-- empty history messages are discarded;
-- historical messages are truncated to 2,000 characters;
-- history is reduced to newest messages when total content exceeds 12,000 characters;
-- history is capped at newest 20 valid messages;
-- fresh overview is still built for every assistant request;
-- no persistence API or write side effect is introduced.
+- invalid roles/empty messages are discarded;
+- historical messages truncate to 2,000 characters;
+- total history retains newest content under 12,000 characters;
+- history caps at newest 20 valid messages;
+- fresh overview is built every request;
+- no persistence/write side effect is introduced.
 
-### 15.2 Assistant orchestration/policy tests
+### 15.2 AI policy/orchestration/provider tests
 
-Cover:
+Verify:
 
-- sanitized history is passed to the successful AI provider;
-- the same history survives provider failover to the next provider;
-- deterministic fallback receives only the current prompt through `previewImpl`;
-- provider attempts/fallback metadata remain unchanged;
-- policy text declares prior conversation non-authoritative for infrastructure facts;
-- provider-facing prompt separates recent context, current request, and authoritative normalized state;
-- exact infrastructure-identifier grounding remains present;
-- a stale/wrong identifier in assistant history does not alter the current normalized state serialized to the provider prompt.
+- history reaches a successful provider;
+- identical sanitized history survives provider failover;
+- deterministic `previewImpl` receives only the current prompt;
+- attempts/fallback metadata remain unchanged;
+- policy marks conversation as non-authoritative;
+- provider prompt clearly separates history, current request, and authoritative state;
+- exact identifier grounding remains present;
+- stale/wrong identifiers in history cannot replace the fresh state serialized in the prompt;
+- Groq, Gemini, Ollama, and retained compatibility adapters use the common history formatter without transport regressions.
 
-### 15.3 Provider adapter tests
+### 15.3 Frontend tests
 
-For Groq, Gemini, Ollama, and retained compatibility adapters:
+Verify:
 
-- history reaches the shared formatter/provider request;
-- normalized state remains present;
-- provider-specific transport details remain otherwise unchanged.
-
-### 15.4 Frontend session tests
-
-Cover:
-
-- a submitted user turn appears immediately;
-- an analyzing assistant placeholder appears while the request is pending;
-- success replaces the placeholder with the completed response;
-- failure replaces the placeholder with an error and does not auto-retry;
-- Overview and FRIDAY share the same transcript;
-- navigation between Overview and FRIDAY does not clear the transcript;
-- remount starts with an empty transcript;
-- Overview renders at most the two newest completed exchanges;
-- FRIDAY renders the full current-session transcript;
-- only 10 newest completed exchanges are sent in history;
-- the current prompt is not duplicated inside history;
+- submitted user turn appears immediately;
+- analyzing placeholder appears while pending;
+- success/error replaces that placeholder;
+- failure does not auto-retry;
+- Overview and FRIDAY share one transcript across navigation;
+- remount starts empty;
+- Overview shows at most two latest exchange groups, including current loading/error state;
+- FRIDAY shows the full in-memory transcript;
+- only the 10 newest completed exchanges are sent as history;
+- current prompt is not duplicated in history;
 - failed/loading exchanges are excluded from later model history;
-- `Clear session` empties only session messages;
-- provider/mode/model are stored per assistant turn;
-- `Fallback used` appears only when true;
-- expandable details preserve returned provider-attempt order and outcomes;
-- the FRIDAY workspace displays the advisory/read-only statement.
+- Clear Session only clears assistant session data and is disabled while loading;
+- each reply retains mode/provider/model/fallback metadata;
+- fallback details show only returned failed attempts in original order;
+- FRIDAY displays `Advisory only · No actions executed`.
 
-### 15.5 Regression gates
+### 15.4 Existing CI gates
 
-The existing Friday CI suite must remain green, including:
+The exact feature head must also pass the existing Friday suite: application tests, production build, shell validation, observer/monitoring/diagnostics safety boundaries, controller Compose, local Docker override Compose, VM100 observer Compose, controller image build, and observer image build.
 
-- application tests;
-- production build;
-- shell validation;
-- observer security boundary tests;
-- monitoring safety boundary tests;
-- diagnostics safety boundary tests;
-- controller Compose validation;
-- local Docker override Compose validation;
-- VM100 observer Compose validation;
-- controller image build;
-- observer image build.
+## 16. Data lifecycle, accessibility, and responsive behavior
 
-## 16. Error handling details
+Conversation content exists only in React memory, the current `/api/assistant` request, and whichever configured provider is attempted by the existing failover sequence. Friday itself does not intentionally persist transcript contents in browser storage, `/data`, monitoring/incident history, or an audit database.
 
-- Invalid current prompt: HTTP `400`, displayed as an assistant error turn if reached from the UI.
-- AI provider failure with later provider success: normal assistant reply plus `fallbackUsed: true` and failed attempt details.
-- All AI providers fail but deterministic analysis succeeds: normal local-analysis reply plus fallback provenance.
-- All AI providers fail and deterministic analysis cannot map the current prompt: existing `503` assistant-unavailable semantics; visual error remains in transcript.
-- Network/API failure in the browser: visible error turn; no automatic retry.
-- Clearing while idle: immediate local reset.
-- The UI should disable Clear Session while a request is actively in flight, avoiding orphaning a pending response into a newly cleared transcript. No request-cancellation feature is required for this milestone.
+Transcript DOM order remains natural. Loading/error announcements should use focused live-region behavior rather than re-announcing the entire transcript. Fallback Details uses a real button with `aria-expanded`; Clear Session is a real accessible button; the composer stays keyboard-submittable; disabled controls expose normal disabled state. Mobile FRIDAY reuses the existing phone shell/navigation.
 
-## 17. Data privacy and lifecycle
+## 17. Rollout
 
-Conversation contents exist in:
-
-1. React memory while the page is mounted;
-2. the request body for the current `/api/assistant` call;
-3. provider requests according to the currently selected provider/fallback sequence.
-
-Friday itself does not intentionally write the transcript to disk, local storage, session storage, monitoring history, incident history, or an audit database in this milestone.
-
-Provider-side data handling is governed by the configured external/local provider and is not changed by this design.
-
-## 18. Accessibility and responsive behavior
-
-- Transcript messages remain keyboard-readable in natural DOM order.
-- Loading/error updates use appropriate live-region behavior without making the entire historical transcript repeatedly announce.
-- Expand/collapse fallback details uses a real button with `aria-expanded`.
-- Clear Session is a real button with an explicit accessible name.
-- The composer remains keyboard-submittable.
-- Disabled/loading controls expose standard disabled state.
-- Mobile FRIDAY uses the existing phone shell and bottom navigation; no separate mobile application architecture is introduced.
-
-## 19. Rollout and verification
-
-This change should be delivered as a focused feature PR from `main` after the written spec and implementation plan are approved.
+Deliver this as a focused feature PR from `main` after this written spec and the implementation plan are approved.
 
 Before merge:
 
-1. run the complete automated test suite;
-2. run the production build;
-3. run all existing safety/Compose/container CI gates;
-4. review the final diff for accidental persistence or mutation authority;
-5. validate desktop and phone conversation behavior at representative sizes;
-6. validate Groq primary success and provenance;
-7. validate a controlled provider fallback path without changing production provider order permanently;
-8. validate CT108 Ollama receives conversational context under the existing local timeout;
-9. regression-check exact infrastructure identifier grounding with conversation history present.
+1. run the complete automated suite and production build;
+2. pass all existing safety/Compose/container gates;
+3. review the final diff for accidental persistence or mutation authority;
+4. validate desktop and phone conversation behavior;
+5. validate Groq primary provenance;
+6. validate a controlled fallback route without permanently changing production provider order;
+7. validate CT108 Ollama receives bounded conversation context under the existing local timeout;
+8. regression-check exact infrastructure identifier grounding with history present.
 
-Production deployment remains a separate explicit step after merge. This design does not authorize deployment or infrastructure mutation by Friday itself.
+Production deployment remains a separate explicit step after merge. Nothing in this design authorizes Friday to deploy or mutate infrastructure.
 
-## 20. Acceptance criteria
+## 18. Acceptance criteria
 
-The milestone is complete only when all of the following are true:
+The milestone is complete only when:
 
-- Overview and FRIDAY share one in-memory transcript.
-- Refresh/remount clears the transcript.
-- No conversation persistence mechanism has been added.
-- Friday can use up to the previous 10 completed exchanges as context.
-- Server-side validation independently enforces context limits.
-- Fresh normalized infrastructure state is attached on every request and is explicitly more authoritative than conversation history.
-- Overview shows no more than the two latest completed exchanges.
-- FRIDAY shows the full current-session transcript.
-- Each completed assistant reply retains its own mode/provider/model provenance.
-- Fallback disclosure is compact and expandable.
-- Failed provider attempts are shown only from returned attempt data.
-- Deterministic fallback continues to evaluate the current prompt only.
-- No autonomous or infrastructure-write authority is added.
-- FRIDAY visibly states `Advisory only · No actions executed`.
-- All new tests and existing CI gates pass on the exact feature head before merge.
+- Overview and FRIDAY share one in-memory transcript;
+- refresh/remount clears it and no persistence mechanism exists;
+- Friday can use up to the previous 10 completed exchanges as context;
+- the server independently enforces prompt/history limits;
+- fresh normalized state is attached every turn and explicitly outranks history for infrastructure facts;
+- Overview shows no more than two latest exchange groups, including loading/error state;
+- FRIDAY shows the full current-session transcript;
+- each assistant reply retains its own provenance;
+- fallback disclosure is compact/expandable and does not invent successful attempts;
+- deterministic fallback uses only the current prompt;
+- the assistant receives no new mutation authority;
+- FRIDAY visibly states `Advisory only · No actions executed`;
+- all new tests and existing CI gates pass on the exact feature head before merge.
 
-## 21. Follow-on work
+## 19. Follow-on roadmap
 
-After this milestone, the roadmap remains:
+After this milestone:
 
-1. expand read-only visibility and adapters such as Omada, AdGuard, and explicitly approved HTTP endpoint checks;
+1. expand approved read-only visibility/adapters such as Omada, AdGuard, and HTTP endpoint checks;
 2. add authentication, identity/RBAC, durable action audit, approval semantics, and kill-switch controls;
 3. only then design separately approved, tightly allowlisted controlled actions.
 
-Durable assistant history may be reconsidered during the identity/RBAC stage, when conversation ownership and access controls can be specified safely.
+Durable assistant history can be reconsidered during identity/RBAC design, when conversation ownership and access controls can be specified safely.
