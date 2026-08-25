@@ -16,7 +16,7 @@ Provider credentials are server-only. Never put them in `VITE_*` variables.
 FRIDAY_AI_ENABLED=true
 FRIDAY_AI_PROVIDER_ORDER=groq,gemini,ollama
 FRIDAY_CLOUD_AI_TIMEOUT_MS=15000
-FRIDAY_LOCAL_AI_TIMEOUT_MS=30000
+FRIDAY_LOCAL_AI_TIMEOUT_MS=45000
 
 GROQ_API_KEY=
 GROQ_MODEL=
@@ -65,10 +65,10 @@ Proxmox host
 
 The CT108 firewall should allow TCP/11434 only from VM102 (`192.168.1.64`). The model is expected to report `100% GPU` in `ollama ps` during inference.
 
-Friday uses an 8192-token context by default and bounds local output with `FRIDAY_LOCAL_AI_MAX_TOKENS` (default `512`). The instruct variant is preferred for routine operational summaries because it avoids the long reasoning behavior observed with the base `qwen3:4b` model.
+Friday uses an 8192-token context by default and bounds local output with `FRIDAY_LOCAL_AI_MAX_TOKENS` (default `512`). The instruct variant is preferred for routine operational summaries because it avoids the long reasoning behavior observed with the base `qwen3:4b` model. The default local provider timeout is 45 seconds, leaving practical headroom for the measured CT108 Friday workload while cloud providers retain a 15-second default budget.
 
 The Compose `local-ai` Ollama service remains available as an optional private development/recovery path and publishes no host/LAN port. Production VM102 should point `FRIDAY_LOCAL_AI_URL` at CT108 when using the GPU service.
 
 ## Safety boundary
 
-AI remains advisory and read-only. All providers receive normalized Friday state only. This change does not add infrastructure execution tools, mutation routes, Docker socket access, Proxmox write access, remediation actions, or approval bypasses.
+AI remains advisory and read-only. All providers receive normalized Friday state only. The shared AI policy requires providers to preserve exact service IDs, VM/LXC numbers, host names, and service-name mappings from normalized state rather than infer, renumber, merge, or substitute identifiers. This change does not add infrastructure execution tools, mutation routes, Docker socket access, Proxmox write access, remediation actions, or approval bypasses.
