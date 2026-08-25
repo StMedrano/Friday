@@ -4,28 +4,37 @@ This is the source-of-truth handoff ledger for coding agents. Update it when a m
 
 ## Authoritative branch, host, and UI
 
-- `main` is the authoritative deployed FRIDAY build after reviewed feature work is merged.
+- `main` is the authoritative FRIDAY build after reviewed feature work is merged.
 - VM 102 (`friday-controller`, `192.168.1.64`) is the authoritative controller host.
 - VM 100 (`192.168.1.124`) is managed infrastructure and hosts the separate read-only Docker observer.
-- The approved deployed frontend is **FRIDAY UI v3** in React/TypeScript under `src/`.
-- PR #5 branch `feature/incident-diagnostics-mobile` contains the completed Incident Diagnostics + Mobile Dashboard candidate and is not deployed until merged and explicitly rolled out.
+- CT108 (`friday-ollama`, `192.168.1.70`) is the GPU-backed local Ollama fallback host.
+- The deployed frontend is **FRIDAY UI v3** in React/TypeScript under `src/`.
+- PR #5 is merged. Incident Diagnostics and the Mobile Dashboard are part of `main`; they are no longer candidates.
+- PR #11 is merged. Groq -> Gemini -> CT108 Ollama is the preferred sequential AI chain.
+- PR #12 is merged. The default local AI timeout is 45 seconds and the shared AI policy requires exact infrastructure identifier preservation.
 
-## Current deployed baseline
+## Current deployed controller baseline
 
-VM102 is healthy on port `3010` with:
+VM102 was updated from `main` through PR #12 merge commit `02e4ba326ead580e6432928b0d25f23088448ff2` and rebuilt successfully.
 
-- live read-only Proxmox integration to `192.168.1.211:8006`;
-- VM100 observer integration enabled;
-- `FRIDAY_DOCKER_ENABLED=false`;
-- durable monitoring enabled with a 30-second poll and 300-second service grace period;
-- one production `service-offline` incident for VM100 `nginx-proxy-manager`;
-- no infrastructure mutation authority.
+Fresh production validation confirmed:
 
-VM100's deployed observer is healthy at `192.168.1.124:3199` and returns authenticated sanitized Docker inventory. Production validation previously observed 16 containers. Nginx Proxy Manager remained `Exited (255)` after monitoring validation.
+- `friday` container healthy on port `3010`;
+- `/healthz` returns `{"status":"ok","service":"friday","mode":"live"}`;
+- `FRIDAY_AI_PROVIDER_ORDER=groq,gemini,ollama`;
+- `FRIDAY_CLOUD_AI_TIMEOUT_MS=15000`;
+- `FRIDAY_LOCAL_AI_TIMEOUT_MS=45000`;
+- `FRIDAY_LOCAL_AI_MODEL=qwen3:4b-instruct`;
+- Groq primary response succeeds without fallback;
+- Gemini was independently validated as the secondary cloud provider;
+- CT108 `qwen3:4b-instruct` was independently validated as the local GPU fallback;
+- a grounding regression check returned `friday-ollama – LXC 108`, matching normalized state;
+- local VM102 Docker observation remains disabled in normal production operation;
+- no infrastructure mutation authority exists.
 
 ## Monitoring & Incidents — merged and production validated
 
-Monitoring & Incidents shipped through PR #4 and is live on VM102.
+Monitoring & Incidents shipped through PR #4 and is part of `main`.
 
 Implemented behavior:
 
@@ -37,32 +46,31 @@ Implemented behavior:
 - cached monitoring-aware overview;
 - no restart/repair/execute endpoint.
 
-## Incident Diagnostics — PR #5 candidate implemented
+## Incident Diagnostics — merged in PR #5
 
-The diagnostics backend is implemented on `feature/incident-diagnostics-mobile` but is **not merged or deployed**.
+Incident Diagnostics is part of `main` and remains environment-gated with `FRIDAY_DIAGNOSTICS_ENABLED`.
 
-Candidate behavior:
+Implemented behavior:
 
-- `FRIDAY_DIAGNOSTICS_ENABLED=false` by default;
-- monitoring state schema v2 preserves a per-incident diagnostics map;
-- VM100 observer adds only fixed bearer-authenticated GET inspect/log routes;
+- monitoring state schema preserves a per-incident diagnostics map;
+- VM100 observer code includes only fixed bearer-authenticated GET inspect/log routes;
 - inspect output is allowlisted and omits environment variables, raw labels, bind paths, command arguments, and raw Docker JSON;
 - observer log output is bounded and sanitized;
-- supported VM100 `service-offline`, `service-degraded`, and `service-flapping` incidents receive one automatic metadata-only diagnostic report;
-- already-open supported incidents receive one startup backfill if no report exists;
+- supported VM100 `service-offline`, `service-degraded`, and `service-flapping` incidents can receive one automatic metadata-only diagnostic report;
+- already-open supported incidents can receive one startup backfill if no report exists;
 - deterministic analysis separates observed facts, findings, likely causes, and recommendations;
 - raw logs are never collected automatically and are never persisted;
 - explicit log inspection records metadata-only audit history;
 - diagnostic failures do not crash monitoring or change incident lifecycle state.
 
-Candidate controller routes:
+Controller routes:
 
 ```text
 GET /api/incidents/:incidentId/diagnostics
 GET /api/incidents/:incidentId/logs
 ```
 
-Candidate observer routes:
+Observer routes implemented in source:
 
 ```text
 GET /health
@@ -73,9 +81,13 @@ GET /api/v1/containers/:id/logs?tail=100
 
 There are no diagnostic POST/PUT/PATCH/DELETE routes and no arbitrary Docker proxy, SSH, shell, exec, or remediation path.
 
-## Mobile Dashboard — PR #5 candidate implemented
+### Remaining diagnostics rollout verification
 
-The mobile dashboard is implemented on the same PR #5 branch and remains **unmerged and undeployed**.
+The current controller has the merged PR #5 code because VM102 was updated from `main`. Before relying on VM100 diagnostics operationally, re-run the observer-side production checks: `/health`, authenticated inventory, fixed inspect, bounded logs, and confirmation that the target container state is unchanged. Do not infer observer rollout state from the controller deployment alone.
+
+## Mobile Dashboard — merged in PR #5
+
+The Mobile Dashboard is part of `main`.
 
 Phone layout boundary:
 
@@ -105,28 +117,35 @@ Implemented behavior:
 - `View Diagnosis` shares incident selection with the Incidents workspace;
 - diagnosis shows read-only facts, findings, likely causes, and recommendations;
 - `Inspect Logs · Read Only` is the only log-fetch control and logs are not requested before explicit activation;
-- mobile command bar has five primary destinations plus a More sheet;
-- safe-area-aware fixed bottom navigation and minimum 44px primary touch targets are styled;
+- safe-area-aware bottom navigation and minimum 44px primary touch targets are styled;
 - width containment, log-panel containment, and reduced-motion treatment are present;
 - frontend tests explicitly reject restart/repair/execute/stop/start-container diagnostic controls.
 
-Automated tests prove the 700px routing behavior and desktop component regression, but this connector session has no browser/device runner that can reach private VM102. True visual acceptance at 360px, 390px, 430px, and desktop 1440px remains required before merge or rollout; JSDOM is not being treated as proof of pixel-level overflow/clipping.
+Representative real-device phone and desktop screenshots were reviewed during PR #5. Exact 360px/390px/430px acceptance and a real incident-detail/log-panel pass remain production-polish checks and must not be represented as completed until performed.
 
-## Diagnostics rollout contract
+## Friday AI — merged, deployed, and provider-chain validated
 
-Do not enable controller diagnostics before the expanded observer is deployed and validated.
+Preferred sequence:
 
-1. Merge only after exact-head PR verification and explicit owner approval.
-2. Upgrade VM100 observer first.
-3. Obtain the NPM ID only from sanitized observer inventory.
-4. Validate fixed inspect/log GET routes.
-5. Re-check `docker ps -a` and require NPM to remain in the same pre-validation state.
-6. Upgrade VM102 with `FRIDAY_DIAGNOSTICS_ENABLED=false`.
-7. Confirm Proxmox, observer, monitoring, and the existing incident still work.
-8. Enable only `FRIDAY_DIAGNOSTICS_ENABLED=true`, recreate with base Compose, and validate the diagnostic/backfill APIs.
-9. Re-check VM100 NPM state again.
+```text
+Groq -> Gemini -> CT108 GPU Ollama -> deterministic local analysis
+```
 
-Rollback is controller-only: disable `FRIDAY_DIAGNOSTICS_ENABLED` and recreate FRIDAY. Monitoring history/state remains intact.
+Production defaults/overrides currently validated on VM102:
+
+```env
+FRIDAY_AI_ENABLED=true
+FRIDAY_AI_PROVIDER_ORDER=groq,gemini,ollama
+FRIDAY_CLOUD_AI_TIMEOUT_MS=15000
+FRIDAY_LOCAL_AI_TIMEOUT_MS=45000
+FRIDAY_LOCAL_AI_ENABLED=true
+FRIDAY_LOCAL_AI_URL=http://192.168.1.70:11434
+FRIDAY_LOCAL_AI_MODEL=qwen3:4b-instruct
+FRIDAY_LOCAL_AI_CONTEXT=8192
+FRIDAY_LOCAL_AI_MAX_TOKENS=512
+```
+
+The shared AI policy requires exact service IDs, VM/LXC numbers, host names, and service-name mappings from normalized state. AI receives normalized Friday state and no Docker, Proxmox, shell, network, deployment, or remediation tools.
 
 ## VM100 observer security boundary
 
@@ -141,44 +160,23 @@ The observer must never gain restart, stop, kill, exec, remove, image creation, 
 - Normal Proxmox + VM100 observer + monitoring + diagnostics uses base `compose.yaml` with `FRIDAY_DOCKER_ENABLED=false`.
 - `make live` is reserved for an explicit decision to mount VM102's Docker socket for local observation.
 
-## AI boundary
-
-- AI is disabled by default.
-- Provider credentials remain server-side only.
-- AI receives normalized state and no Docker, Proxmox, shell, or network mutation tools.
-
-## Verification status for PR #5
-
-Merge-gate verification is always tied to the **exact current PR head SHA**. Before any merge decision, the Friday CI run associated with that exact head must be successful; do not reuse an older green run after the head moves.
-
-The required Friday CI pipeline includes:
-
-- all Vitest frontend tests, including mobile CSS and no-remediation assertions;
-- all Node/server/observer/monitoring/diagnostics tests;
-- production TypeScript/Vite build;
-- shell validation;
-- observer security boundary;
-- monitoring safety boundary;
-- diagnostics safety boundary;
-- controller/local-Docker/VM100-observer Compose validation;
-- controller image build;
-- VM100 observer image build.
-
-In addition to automated CI, real-browser visual acceptance at 360px, 390px, 430px, and desktop 1440px remains a separate pre-merge/rollout requirement.
-
 ## Not implemented yet
 
-- Real-device/browser visual acceptance of PR #5 at 360/390/430px and desktop 1440px.
-- Omada authenticated read-only API adapter.
+- Full Friday assistant conversation/history UI connected to `/api/assistant`.
+- Omada authenticated read-only site/device/health adapter.
 - AdGuard authenticated read-only API/statistics adapter.
 - Uptime Kuma/Prometheus/Grafana native adapters.
+- Approved HTTP endpoint checks for both sites.
 - Application authentication and RBAC.
 - Durable action audit log/action request store.
-- Human approval queue.
+- Human approval queue and global automation kill switch.
 - Infrastructure mutation/execution endpoints.
 - Notification delivery.
-- Full Friday chat/history UI connected to `/api/assistant`.
 - Voice input pipeline.
+
+## Next product milestone
+
+After this source-of-truth cleanup, the next feature milestone is the **Friday Assistant experience**: connect the command composer to `/api/assistant`, preserve `/api/commands/preview` as the deterministic safety/no-AI path, expose provider/fallback provenance, and add read-only conversation/history UX without granting execution authority.
 
 ## Safety gate
 
