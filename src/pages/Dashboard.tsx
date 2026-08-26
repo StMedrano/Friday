@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Command, Cpu, Database, Gauge, HardDrive, Home, MemoryStick, Network, Search, Server, Settings, ShieldCheck, Sparkles, TerminalSquare } from 'lucide-react'
-import { askFridayAssistant, fetchMonitoringHistory, useFridayOverview, type FridayIncident, type MonitoringEvent } from '../lib/api'
+import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, Gauge, HardDrive, Home, MemoryStick, Network, Search, Server, Settings, ShieldCheck, Sparkles, TerminalSquare } from 'lucide-react'
+import { fetchMonitoringHistory, useFridayOverview, type FridayIncident, type MonitoringEvent } from '../lib/api'
+import { useFridaySession } from '../hooks/useFridaySession'
 import { usePhoneLayout } from '../hooks/usePhoneLayout'
 import ActiveIncidents from '../components/ActiveIncidents'
-import AssistantReply, { type AssistantReplyState } from '../components/AssistantReply'
+import FridayComposer from '../components/FridayComposer'
+import FridayConversation from '../components/FridayConversation'
+import FridayWorkspace from '../components/FridayWorkspace'
 import IncidentsWorkspace from '../components/IncidentsWorkspace'
 import MobileHome from '../components/MobileHome'
 import MobileNavigation from '../components/MobileNavigation'
@@ -19,15 +22,11 @@ const nav = [
 
 export default function Dashboard() {
   const { overview, connected } = useFridayOverview()
+  const friday = useFridaySession()
   const isPhone = usePhoneLayout()
   const [active, setActive] = useState('Overview')
   const [automation, setAutomation] = useState(true)
   const [query, setQuery] = useState('')
-  const [assistant, setAssistant] = useState<AssistantReplyState>({
-    text: 'Everything critical is operating normally. I am ready to inspect your infrastructure.',
-    loading: false,
-    error: null,
-  })
   const [history, setHistory] = useState<MonitoringEvent[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null)
@@ -53,30 +52,12 @@ export default function Dashboard() {
     return () => controller.abort()
   }, [active])
 
-  async function askFriday(e: React.FormEvent) {
-    e.preventDefault()
+  async function submitFriday(event: React.FormEvent) {
+    event.preventDefault()
     const text = query.trim()
-    if (!text || assistant.loading) return
-
-    setAssistant((current) => ({ ...current, loading: true, error: null }))
-    try {
-      const result = await askFridayAssistant(text)
-      setAssistant({
-        text: result.text || result.reason || 'Friday returned no response text.',
-        mode: result.mode,
-        provider: result.provider,
-        model: result.model,
-        loading: false,
-        error: null,
-      })
-      setQuery('')
-    } catch (error) {
-      setAssistant((current) => ({
-        ...current,
-        loading: false,
-        error: error instanceof Error ? error.message : 'Friday assistant unavailable',
-      }))
-    }
+    if (!text || friday.loading) return
+    setQuery('')
+    await friday.sendMessage(text)
   }
 
   function navigate(destination: string) {
@@ -101,11 +82,17 @@ export default function Dashboard() {
             overview={overview}
             connected={connected}
             query={query}
-            assistant={assistant}
+            messages={friday.messages}
+            loading={friday.loading}
             onQueryChange={setQuery}
-            onSubmit={askFriday}
+            onSubmit={submitFriday}
             onNavigate={navigate}
             onSelectIncident={viewDiagnosis}
+          /> : active === 'FRIDAY' ? <FridayWorkspace
+            session={friday}
+            query={query}
+            onQueryChange={setQuery}
+            onSubmit={submitFriday}
           /> : active === 'Incidents' ? <IncidentsWorkspace
             incidents={incidents}
             monitoring={overview.monitoring}
@@ -142,15 +129,22 @@ export default function Dashboard() {
             <label className="v3-automation"><span><b>Automation</b><small>{automation ? 'Enabled · policy gated' : 'Disabled · read only'}</small></span><input type="checkbox" checked={automation} onChange={e => setAutomation(e.target.checked)}/><em /></label>
           </section>
 
-          {active === 'Overview' || active === 'FRIDAY' ? <>
+          {active === 'Overview' ? <>
             <section className="v3-friday">
               <div className="v3-core-wrap"><div className="v3-ring r1"/><div className="v3-ring r2"/><div className="v3-core"><span/></div></div>
               <div className="v3-command">
                 <span className="v3-kicker">FRIDAY / ONLINE</span>
                 <h2>What would you like me to handle?</h2>
                 <p>Ask about servers, applications, incidents, deployments, networking, logs, or system health.</p>
-                <form onSubmit={askFriday}><Command size={18}/><input value={query} onChange={e => setQuery(e.target.value)} placeholder="Ask FRIDAY anything…" disabled={assistant.loading}/><button aria-label="Send command" disabled={assistant.loading}><ChevronRight size={18}/></button></form>
-                <AssistantReply state={assistant} />
+                <FridayConversation messages={friday.messages} compact/>
+                <FridayComposer
+                  value={query}
+                  loading={friday.loading}
+                  placeholder="Ask FRIDAY anything…"
+                  onChange={setQuery}
+                  onSubmit={submitFriday}
+                />
+                {friday.messages.length > 0 && <button type="button" className="v3-friday-continue" onClick={() => navigate('FRIDAY')}>Continue conversation <ChevronRight size={14}/></button>}
               </div>
               <div className="v3-health">
                 <span className="v3-kicker">SYSTEM HEALTH</span>
@@ -193,7 +187,12 @@ export default function Dashboard() {
               <div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><span>{online} online</span></div>
               <div className="v3-services">{overview.services.map(s => <button key={s.id} onClick={() => navigate('Applications')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span><em>{s.updated}</em></button>)}</div>
             </section>
-          </> : active === 'Incidents' ? <IncidentsWorkspace
+          </> : active === 'FRIDAY' ? <FridayWorkspace
+            session={friday}
+            query={query}
+            onQueryChange={setQuery}
+            onSubmit={submitFriday}
+          /> : active === 'Incidents' ? <IncidentsWorkspace
             incidents={incidents}
             monitoring={overview.monitoring}
             history={history}

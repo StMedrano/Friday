@@ -112,7 +112,7 @@ test('Groq adapter uses the OpenAI-compatible chat completions endpoint and shar
       assert.equal(body.max_completion_tokens, 1200)
       assert.match(body.messages[0].content, /read-only infrastructure copilot/i)
       assert.match(body.messages[1].content, /Check health/)
-      assert.match(body.messages[1].content, /Normalized Friday state/)
+      assert.match(body.messages[1].content, /Authoritative normalized Friday state/)
       return new Response(JSON.stringify({ choices: [{ message: { content: 'Groq answer' } }] }), { status: 200 })
     },
   })

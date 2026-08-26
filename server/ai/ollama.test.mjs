@@ -3,10 +3,15 @@ import assert from 'node:assert/strict'
 import { askOllama } from './ollama.mjs'
 import { ProviderUnavailableError } from './errors.mjs'
 
-test('Ollama uses private chat API with shared policy and configured context', async () => {
+test('Ollama uses private chat API with shared policy configured context and recent session history', async () => {
+  let providerText = ''
   const result = await askOllama({
     providerConfig: { enabled: true, baseUrl: 'http://ollama:11434', model: 'qwen3:4b', context: 8192 },
     prompt: 'Check health',
+    history: [
+      { role: 'user', content: 'Check friday-ollama' },
+      { role: 'assistant', content: 'friday-ollama is LXC 108' },
+    ],
     overview: { mode: 'live', services: [] },
     fetchImpl: async (url, options) => {
       assert.equal(url, 'http://ollama:11434/api/chat')
@@ -17,12 +22,15 @@ test('Ollama uses private chat API with shared policy and configured context', a
       assert.equal(body.stream, false)
       assert.equal(body.options.num_ctx, 8192)
       assert.match(body.messages[0].content, /read-only infrastructure copilot/i)
-      assert.match(body.messages[1].content, /Check health/)
-      assert.match(body.messages[1].content, /Normalized Friday state/)
+      providerText = body.messages[1].content
       return new Response(JSON.stringify({ message: { role: 'assistant', content: 'Local answer' }, done: true }), { status: 200 })
     },
   })
 
+  assert.match(providerText, /Recent session context:/)
+  assert.match(providerText, /Check friday-ollama/)
+  assert.match(providerText, /Current operator request:\nCheck health/)
+  assert.match(providerText, /Authoritative normalized Friday state:/)
   assert.deepEqual(result, { provider: 'ollama', model: 'qwen3:4b', text: 'Local answer' })
 })
 

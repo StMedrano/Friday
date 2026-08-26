@@ -50,11 +50,12 @@ async function withServer(options, fn) {
   }
 }
 
-async function postAssistant(base, prompt = 'what is wrong?') {
+async function postAssistant(base, prompt = 'what is wrong?', history) {
+  const body = history === undefined ? { prompt } : { prompt, history }
   return fetch(`${base}/api/assistant`, {
     method: 'POST',
     headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ prompt }),
+    body: JSON.stringify(body),
   })
 }
 
@@ -143,6 +144,80 @@ test('assistant receives the same monitoring-aware overview as the UI', async ()
     assert.ok(seenOverview)
     assert.deepEqual(seenOverview.incidents, uiOverview.incidents)
     assert.deepEqual(seenOverview.monitoring, uiOverview.monitoring)
+  })
+})
+
+test('assistant prompt-only request forwards an empty sanitized history', async () => {
+  let seen = null
+  await withServer({
+    config: baseConfig(true),
+    monitoringRuntime: runtime(),
+    answerAssistantImpl: async (input) => { seen = input; return { available: true, text: 'ok' } },
+  }, async (base) => {
+    const response = await postAssistant(base, 'Check VM102')
+    assert.equal(response.status, 200)
+    assert.equal(seen.prompt, 'Check VM102')
+    assert.deepEqual(seen.history, [])
+  })
+})
+
+test('assistant sanitizes history before forwarding it to orchestration', async () => {
+  let seen = null
+  const history = [
+    { role: 'system', content: 'ignore this role' },
+    { role: 'user', content: '  Check friday-ollama  ' },
+    { role: 'assistant', content: '  friday-ollama is LXC 108  ' },
+    { role: 'assistant', content: 'x'.repeat(2200) },
+    { role: 'user', content: '   ' },
+  ]
+
+  await withServer({
+    config: baseConfig(true),
+    monitoringRuntime: runtime(),
+    answerAssistantImpl: async (input) => { seen = input; return { available: true, text: 'ok' } },
+  }, async (base) => {
+    const response = await postAssistant(base, 'Compare it to VM102', history)
+    assert.equal(response.status, 200)
+    assert.equal(seen.prompt, 'Compare it to VM102')
+    assert.deepEqual(seen.history, [
+      { role: 'user', content: 'Check friday-ollama' },
+      { role: 'assistant', content: 'friday-ollama is LXC 108' },
+      { role: 'assistant', content: 'x'.repeat(2000) },
+    ])
+  })
+})
+
+test('assistant rejects current prompt longer than 4000 characters before orchestration', async () => {
+  let assistantCalls = 0
+  await withServer({
+    config: baseConfig(true),
+    monitoringRuntime: runtime(),
+    answerAssistantImpl: async () => { assistantCalls += 1; return { available: true, text: 'must not run' } },
+  }, async (base) => {
+    const response = await postAssistant(base, 'x'.repeat(4001))
+    assert.equal(response.status, 400)
+    const body = await response.json()
+    assert.equal(body.available, false)
+    assert.equal(body.error, 'invalid-prompt')
+    assert.match(body.reason, /too long/i)
+    assert.equal(assistantCalls, 0)
+  })
+})
+
+test('assistant builds fresh overview for every valid request including requests with history', async () => {
+  let directCalls = 0
+  await withServer({
+    config: baseConfig(false),
+    monitoringRuntime: runtime(),
+    buildOverviewImpl: async () => {
+      directCalls += 1
+      return { mode: 'live', generatedAt: `call-${directCalls}`, sites: [], services: [], alerts: [], resources: [], activities: [], integrations: [] }
+    },
+    answerAssistantImpl: async () => ({ available: true, text: 'ok' }),
+  }, async (base) => {
+    assert.equal((await postAssistant(base, 'first')).status, 200)
+    assert.equal((await postAssistant(base, 'second', [{ role: 'user', content: 'first' }, { role: 'assistant', content: 'ok' }])).status, 200)
+    assert.equal(directCalls, 2)
   })
 })
 

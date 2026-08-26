@@ -132,6 +132,31 @@ Response includes `accepted`, `mode:"preview"`, `command`, `destructive:false`, 
 
 Optional advisory AI analysis. Disabled unless `FRIDAY_AI_ENABLED=true`. The assistant receives normalized monitoring-aware state and no infrastructure execution tools.
 
+The request body accepts a required current `prompt` plus optional client-supplied conversational `history`:
+
+```json
+{
+  "prompt": "Compare it to VM102",
+  "history": [
+    {"role":"user","content":"Check friday-ollama"},
+    {"role":"assistant","content":"friday-ollama is LXC 108"}
+  ]
+}
+```
+
+`history` is optional, so the legacy `{ "prompt": "..." }` shape remains valid. The HTTP endpoint is stateless: there is no assistant session ID, server-side conversation store, database record, `/data` conversation persistence, or server clear/delete-session route. The browser owns the current in-memory session and sends bounded recent history with each request.
+
+Assistant input limits are enforced before provider invocation:
+
+- Current prompt is trimmed and must contain 1–4,000 characters. A 4,001-character prompt is rejected with HTTP 400 / `invalid-prompt`; it is not truncated.
+- History roles are exactly `user` or `assistant`. Malformed roles and empty entries are discarded.
+- Each historical message is trimmed and capped at 2,000 characters.
+- At most the newest 20 valid historical messages are retained.
+- Historical content is additionally capped at 12,000 total characters by dropping oldest retained messages first.
+- Non-array or omitted history normalizes to an empty history.
+
+Fresh normalized Friday state is rebuilt for every assistant request and is authoritative for infrastructure facts and identifiers. Previous conversation is contextual only, not infrastructure evidence. The deterministic local-analysis fallback receives only the current prompt and does not resolve ambiguous references from history.
+
 Preferred sequential provider order:
 
 ```text

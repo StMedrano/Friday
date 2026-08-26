@@ -27,6 +27,7 @@ function providerTimeoutMs(ai = {}, providerId) {
 export async function answerAssistant({
   config,
   prompt,
+  history = [],
   overview,
   providers = defaultProviders,
   previewImpl = previewCommand,
@@ -54,6 +55,7 @@ export async function answerAssistant({
         const result = await provider({
           providerConfig,
           prompt: text,
+          history,
           overview,
           systemPrompt,
           signal: signalFactory(providerTimeoutMs(ai, providerId)),

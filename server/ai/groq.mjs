@@ -18,6 +18,7 @@ function extractGroqText(payload = {}) {
 export async function askGroq({
   providerConfig = {},
   prompt,
+  history = [],
   overview,
   systemPrompt = fridaySystemPrompt(),
   fetchImpl = globalThis.fetch,
@@ -43,7 +44,7 @@ export async function askGroq({
         max_completion_tokens: 1200,
         messages: [
           { role: 'system', content: systemPrompt },
-          { role: 'user', content: fridayUserPrompt(prompt, overview) },
+          { role: 'user', content: fridayUserPrompt(prompt, overview, history) },
         ],
       }),
     })

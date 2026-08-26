@@ -5,6 +5,7 @@ import { fileURLToPath } from 'node:url'
 import { previewCommand } from './core.mjs'
 import { buildOverview, decorateOverviewWithMonitoring } from './overview.mjs'
 import { answerAssistant } from './assistant.mjs'
+import { normalizeAssistantHistory, validateAssistantPrompt } from './assistant-input.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -168,8 +169,17 @@ export function createFridayServer({
     if (request.method === 'POST' && url.pathname === '/api/assistant') {
       try {
         const body = await readBody(request)
+        const promptResult = validateAssistantPrompt(body.prompt)
+        if (!promptResult.ok) return json(response, 400, promptResult.result)
+
+        const history = normalizeAssistantHistory(body.history)
         const overview = await currentOverview({ config, monitoringRuntime, buildOverviewImpl })
-        const result = await answerAssistantImpl({ config, prompt: body.prompt, overview })
+        const result = await answerAssistantImpl({
+          config,
+          prompt: promptResult.prompt,
+          history,
+          overview,
+        })
         if (result.available) return json(response, 200, result)
         if (result.error === 'invalid-prompt') return json(response, 400, result)
         return json(response, 503, result)
