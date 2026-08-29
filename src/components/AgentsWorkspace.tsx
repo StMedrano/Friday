@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Bot, Cpu, ShieldCheck, Wrench } from 'lucide-react'
 import { fetchFridayAgents, type FridayAgentSummary } from '../lib/api'
+import '../agents.css'
 
 export default function AgentsWorkspace() {
   const [agents, setAgents] = useState<FridayAgentSummary[]>([])
