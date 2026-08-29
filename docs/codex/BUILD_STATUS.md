@@ -160,6 +160,45 @@ The observer must never gain restart, stop, kill, exec, remove, image creation, 
 - Normal Proxmox + VM100 observer + monitoring + diagnostics uses base `compose.yaml` with `FRIDAY_DOCKER_ENABLED=false`.
 - `make live` is reserved for an explicit decision to mount VM102's Docker socket for local observation.
 
+## Repository-Aware Agent Platform v1 — draft PR #18, CI verified, not merged/deployed
+
+PR #18 is a candidate milestone on `feature/repository-agent-platform-v1`. It is stacked on PR #17 (`feature/local-agent-core-no-supabase`), so neither this section nor the code it describes is authoritative production state until the stack is resolved, reviewed, merged, and separately deployed.
+
+Candidate behavior implemented in source:
+
+- local JSON-backed Agent Repository from PR #17; no Supabase dependency;
+- local Repository Registry for explicitly approved Git roots;
+- repository metadata includes ID, display name, optional remote, default branch, access mode, enabled state, and server-only local path/exclusion policy;
+- canonical path validation rejects `..` traversal, absolute paths, symlink escape, `.env`/nested `.env.*`, private-key patterns, `.git`, dependency directories, and build-output directories;
+- safe GET-only `/api/agents` and `/api/repositories` inventory endpoints omit model base URLs, internal instructions, and local filesystem paths;
+- Codebase Explorer uses only fixed read-only tools: `repo.status`, `repo.list`, `repo.read`, `repo.search`, `repo.history`, and `repo.manifest`;
+- file reads are bounded to 128 KiB of model-visible content without loading the full file into memory;
+- repository text search is bounded to 100 results and 1000 visited files per invocation;
+- Git metadata uses fixed `git status` and `git log` argument sets with a timeout/buffer cap; no arbitrary shell command is exposed;
+- deterministic Explorer orchestration validates the repository and agent before tool/model invocation and uses task states `QUEUED`, `ANALYZING`, `COMPLETED`, and `FAILED` in v1;
+- POST `/api/agents/explore` reuses Friday's 4000-character prompt limit and has no generic `/api/agents/action` equivalent;
+- Agents and Repositories UI workspaces consume sanitized API metadata; Repositories is added to desktop navigation and mobile More;
+- Overview Agent Mesh can hydrate from the actual agent registry while retaining the prior safe static fallback.
+
+Candidate safety limitations remain intentional:
+
+- no arbitrary filesystem browsing outside registered roots;
+- no arbitrary shell;
+- no write-capable Explorer tools;
+- no persistent task memory in this milestone;
+- no activated Developer write workflow;
+- no production deployment automation;
+- no merge or deployment has been performed for PR #18.
+
+Verification evidence for final candidate head `09a2d0380bf6800430038810e01c65e4158a02bd`:
+
+- GitHub Actions Friday CI run #334 completed successfully;
+- frontend and backend tests passed;
+- TypeScript/Vite production build passed;
+- observer, monitoring, and diagnostics safety-boundary checks passed;
+- controller, local-live, and VM100 observer Compose validation passed;
+- controller and VM100 observer container builds passed.
+
 ## Not implemented yet
 
 - Full Friday assistant conversation/history UI connected to `/api/assistant`.
