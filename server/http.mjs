@@ -6,6 +6,7 @@ import { previewCommand } from './core.mjs'
 import { buildOverview, decorateOverviewWithMonitoring } from './overview.mjs'
 import { answerAssistant } from './assistant.mjs'
 import { normalizeAssistantHistory, validateAssistantPrompt } from './assistant-input.mjs'
+import { toPublicRepository } from './repositories/repository.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -28,6 +29,21 @@ function json(response, statusCode, body) {
     'x-content-type-options': 'nosniff',
   })
   response.end(JSON.stringify(body))
+}
+
+function safeAgent(agent) {
+  return {
+    id: agent.id,
+    name: agent.name,
+    description: agent.description || '',
+    model: {
+      provider: agent.model?.provider || 'unknown',
+      model: agent.model?.model || null,
+    },
+    tools: Array.isArray(agent.tools) ? agent.tools : [],
+    permissions: agent.permissions && typeof agent.permissions === 'object' ? agent.permissions : {},
+    scope: agent.scope && typeof agent.scope === 'object' ? agent.scope : {},
+  }
 }
 
 function readBody(request) {
@@ -99,6 +115,9 @@ export function createFridayServer({
   monitoringRuntime = null,
   buildOverviewImpl = buildOverview,
   answerAssistantImpl = answerAssistant,
+  agentRepository = null,
+  repositoryRegistry = null,
+  agentOrchestrator = null,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
 
@@ -111,6 +130,24 @@ export function createFridayServer({
 
     if (request.method === 'GET' && url.pathname === '/api/health') {
       return json(response, 200, { status: 'ok', mode: config.mode, ai: config.ai.enabled, time: new Date().toISOString() })
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/agents') {
+      try {
+        const agents = agentRepository ? await agentRepository.list() : []
+        return json(response, 200, { agents: agents.map(safeAgent) })
+      } catch {
+        return json(response, 500, { error: 'agents-unavailable' })
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/repositories') {
+      try {
+        const repositories = repositoryRegistry ? await repositoryRegistry.list() : []
+        return json(response, 200, { repositories: repositories.map(toPublicRepository) })
+      } catch {
+        return json(response, 500, { error: 'repositories-unavailable' })
+      }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/overview') {
