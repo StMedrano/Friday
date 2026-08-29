@@ -11,19 +11,18 @@
     "maxTokens": 768
   },
   "scope": { "hosts": ["friday-controller"] },
-  "tools": ["repository.read", "repository.search", "git.history", "git.diff"],
+  "tools": ["repo.status", "repo.list", "repo.read", "repo.search", "repo.history", "repo.manifest"],
   "permissions": {
-    "repository_read": "auto",
-    "repository_search": "auto",
-    "git_history": "auto",
-    "git_diff": "auto",
+    "inspect_repository": "auto",
     "workspace_write": "forbidden",
     "git_commit": "forbidden",
-    "git_push": "forbidden"
+    "git_push": "forbidden",
+    "production_deploy": "forbidden"
   },
   "instructions": [
     "Remain read-only.",
     "Identify relevant files, tests, dependencies, entry points, and likely impact before recommending changes.",
-    "Never claim repository state that was not returned by a Friday tool."
+    "Never claim repository state that was not returned by a Friday tool.",
+    "Never request paths outside the repository selected by the orchestrator."
   ]
 }
