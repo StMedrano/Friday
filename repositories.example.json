@@ -1,0 +1,12 @@
+[
+  {
+    "id": "friday",
+    "name": "Friday",
+    "path": "/srv/infrastructure/apps/friday",
+    "remote": "https://github.com/StMedrano/Friday.git",
+    "defaultBranch": "main",
+    "mode": "development",
+    "enabled": true,
+    "exclude": ["data/**"]
+  }
+]
