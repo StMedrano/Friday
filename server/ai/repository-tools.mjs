@@ -1,5 +1,5 @@
-import { readdir, readFile, stat } from 'node:fs/promises'
-import { relative, basename } from 'node:path'
+import { open, readdir, stat } from 'node:fs/promises'
+import { relative, basename, join } from 'node:path'
 import { execFile as execFileCallback } from 'node:child_process'
 import { promisify } from 'node:util'
 
@@ -31,13 +31,26 @@ async function canonicalRoot(registry, repository) {
 async function readBoundedFile(path) {
   const info = await stat(path)
   if (!info.isFile()) throw new Error('Path is not a file')
-  const buffer = await readFile(path)
-  const sample = buffer.subarray(0, Math.min(buffer.length, MAX_FILE_BYTES))
+
+  const bytesToRead = Math.min(info.size, MAX_FILE_BYTES)
+  const buffer = Buffer.alloc(bytesToRead)
+  const handle = await open(path, 'r')
+  let bytesRead = 0
+  try {
+    if (bytesToRead > 0) {
+      const result = await handle.read(buffer, 0, bytesToRead, 0)
+      bytesRead = result.bytesRead
+    }
+  } finally {
+    await handle.close()
+  }
+
+  const sample = buffer.subarray(0, bytesRead)
   if (sample.includes(0)) throw new Error('Binary files are not readable')
   return {
     text: sample.toString('utf8'),
-    truncated: buffer.length > MAX_FILE_BYTES,
-    bytes: buffer.length,
+    truncated: info.size > MAX_FILE_BYTES,
+    bytes: info.size,
   }
 }
 
@@ -59,7 +72,7 @@ async function listEntries(registry, repository, relativePath = '.') {
   const entries = []
   for (const entry of await readdir(target, { withFileTypes: true })) {
     if (entries.length >= MAX_LIST_ENTRIES) break
-    const candidateRelative = safeRelative(root, `${target}/${entry.name}`)
+    const candidateRelative = safeRelative(root, join(target, entry.name))
     try {
       await registry.resolvePath(repository, candidateRelative)
     } catch {
@@ -81,7 +94,7 @@ async function searchRepository(registry, repository, query) {
     const dir = await registry.resolvePath(repository, relativeDir)
     for (const entry of await readdir(dir, { withFileTypes: true })) {
       if (results.length >= MAX_SEARCH_RESULTS) return
-      const relativePath = safeRelative(root, `${dir}/${entry.name}`)
+      const relativePath = safeRelative(root, join(dir, entry.name))
       let canonical
       try { canonical = await registry.resolvePath(repository, relativePath) } catch { continue }
       if (entry.isDirectory()) {
@@ -173,7 +186,7 @@ export function registerRepositoryTools({ registry, toolRegistry } = {}) {
           if (basename(path) === 'package.json') data = JSON.parse(text)
           manifests.push({ path, data, truncated })
         } catch {
-          // Missing or excluded manifests are simply not exposed.
+          // Missing, malformed, or excluded manifests are not exposed.
         }
       }
       return { manifests }
