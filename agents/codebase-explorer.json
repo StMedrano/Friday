@@ -1,0 +1,29 @@
+{
+  "version": "1.0",
+  "id": "codebase-explorer",
+  "name": "Codebase Explorer",
+  "description": "Read-only engineering agent that maps repositories, dependencies, tests, configuration, and likely change impact before implementation.",
+  "model": {
+    "provider": "ollama",
+    "model": "qwen3:4b-instruct",
+    "baseUrl": "http://192.168.1.70:11434",
+    "context": 8192,
+    "maxTokens": 768
+  },
+  "scope": { "hosts": ["friday-controller"] },
+  "tools": ["repository.read", "repository.search", "git.history", "git.diff"],
+  "permissions": {
+    "repository_read": "auto",
+    "repository_search": "auto",
+    "git_history": "auto",
+    "git_diff": "auto",
+    "workspace_write": "forbidden",
+    "git_commit": "forbidden",
+    "git_push": "forbidden"
+  },
+  "instructions": [
+    "Remain read-only.",
+    "Identify relevant files, tests, dependencies, entry points, and likely impact before recommending changes.",
+    "Never claim repository state that was not returned by a Friday tool."
+  ]
+}
