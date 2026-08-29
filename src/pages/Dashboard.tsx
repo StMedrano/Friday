@@ -1,22 +1,24 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, Gauge, HardDrive, Home, MemoryStick, Network, Search, Server, Settings, ShieldCheck, Sparkles, TerminalSquare } from 'lucide-react'
-import { fetchMonitoringHistory, useFridayOverview, type FridayIncident, type MonitoringEvent } from '../lib/api'
+import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, Gauge, GitBranch, HardDrive, Home, MemoryStick, Network, Search, Server, Settings, ShieldCheck, Sparkles, TerminalSquare } from 'lucide-react'
+import { fetchFridayAgents, fetchMonitoringHistory, useFridayOverview, type FridayAgentSummary, type FridayIncident, type MonitoringEvent } from '../lib/api'
 import { useFridaySession } from '../hooks/useFridaySession'
 import { usePhoneLayout } from '../hooks/usePhoneLayout'
 import ActiveIncidents from '../components/ActiveIncidents'
+import AgentsWorkspace from '../components/AgentsWorkspace'
 import FridayComposer from '../components/FridayComposer'
 import FridayConversation from '../components/FridayConversation'
 import FridayWorkspace from '../components/FridayWorkspace'
 import IncidentsWorkspace from '../components/IncidentsWorkspace'
 import MobileHome from '../components/MobileHome'
 import MobileNavigation from '../components/MobileNavigation'
+import RepositoriesWorkspace from '../components/RepositoriesWorkspace'
 import '../monitoring.css'
 import '../mobile.css'
 import '../assistant.css'
 
 const nav = [
   ['Overview', Home], ['FRIDAY', Sparkles], ['Infrastructure', Server], ['Applications', AppWindow],
-  ['Agents', Bot], ['Tasks', CheckCircle2], ['Approvals', ShieldCheck], ['Incidents', AlertTriangle],
+  ['Agents', Bot], ['Repositories', GitBranch], ['Tasks', CheckCircle2], ['Approvals', ShieldCheck], ['Incidents', AlertTriangle],
   ['Memory', Database], ['Audit', Activity], ['Settings', Settings],
 ] as const
 
@@ -30,12 +32,19 @@ export default function Dashboard() {
   const [history, setHistory] = useState<MonitoringEvent[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null)
+  const [agentMesh, setAgentMesh] = useState<FridayAgentSummary[] | null>(null)
   const online = overview.services.filter(s => s.status === 'online').length
   const health = Math.round((online / Math.max(overview.services.length, 1)) * 100)
   const incidents = overview.incidents ?? []
   const selectedIncident = incidents.find((incident) => incident.id === selectedIncidentId) ?? null
   const activeIncidents = overview.monitoring?.activeIncidents ?? incidents.filter((incident) => incident.status === 'open').length
   const metrics = useMemo(() => overview.resources.slice(0, 3), [overview.resources])
+
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchFridayAgents(controller.signal).then(setAgentMesh).catch(() => setAgentMesh(null))
+    return () => controller.abort()
+  }, [])
 
   useEffect(() => {
     if (active !== 'Incidents') return
@@ -70,6 +79,14 @@ export default function Dashboard() {
     setActive('Incidents')
   }
 
+  function activeWorkspace() {
+    if (active === 'FRIDAY') return <FridayWorkspace session={friday} query={query} onQueryChange={setQuery} onSubmit={submitFriday}/>
+    if (active === 'Incidents') return <IncidentsWorkspace incidents={incidents} monitoring={overview.monitoring} history={history} historyError={historyError} selectedIncident={selectedIncident} onSelectIncident={viewDiagnosis} onClearSelection={() => setSelectedIncidentId(null)}/>
+    if (active === 'Agents') return <AgentsWorkspace/>
+    if (active === 'Repositories') return <RepositoriesWorkspace/>
+    return <DetailView active={active} overview={overview}/>
+  }
+
   if (isPhone) {
     return <div className="v3-shell v3-phone-shell">
       <div className="v3-workspace">
@@ -88,20 +105,7 @@ export default function Dashboard() {
             onSubmit={submitFriday}
             onNavigate={navigate}
             onSelectIncident={viewDiagnosis}
-          /> : active === 'FRIDAY' ? <FridayWorkspace
-            session={friday}
-            query={query}
-            onQueryChange={setQuery}
-            onSubmit={submitFriday}
-          /> : active === 'Incidents' ? <IncidentsWorkspace
-            incidents={incidents}
-            monitoring={overview.monitoring}
-            history={history}
-            historyError={historyError}
-            selectedIncident={selectedIncident}
-            onSelectIncident={viewDiagnosis}
-            onClearSelection={() => setSelectedIncidentId(null)}
-          /> : <DetailView active={active} overview={overview}/>} 
+          /> : activeWorkspace()}
         </main>
       </div>
       <MobileNavigation active={active} activeIncidents={activeIncidents} onNavigate={navigate}/>
@@ -137,13 +141,7 @@ export default function Dashboard() {
                 <h2>What would you like me to handle?</h2>
                 <p>Ask about servers, applications, incidents, deployments, networking, logs, or system health.</p>
                 <FridayConversation messages={friday.messages} compact/>
-                <FridayComposer
-                  value={query}
-                  loading={friday.loading}
-                  placeholder="Ask FRIDAY anything…"
-                  onChange={setQuery}
-                  onSubmit={submitFriday}
-                />
+                <FridayComposer value={query} loading={friday.loading} placeholder="Ask FRIDAY anything…" onChange={setQuery} onSubmit={submitFriday}/>
                 {friday.messages.length > 0 && <button type="button" className="v3-friday-continue" onClick={() => navigate('FRIDAY')}>Continue conversation <ChevronRight size={14}/></button>}
               </div>
               <div className="v3-health">
@@ -176,9 +174,11 @@ export default function Dashboard() {
               <div className="v3-panel">
                 <div className="v3-section-head"><div><span className="v3-kicker">AGENT MESH</span><h2>Active agents</h2></div><Bot size={18}/></div>
                 <div className="v3-agents">
-                  <div><i className="on"/><span><b>Monitoring</b><small>Watching system health</small></span><em>ACTIVE</em></div>
-                  <div><i className="on"/><span><b>Infrastructure</b><small>Inventory synchronized</small></span><em>READY</em></div>
-                  <div><i/><span><b>Security</b><small>Policy engine ready</small></span><em>IDLE</em></div>
+                  {agentMesh?.length ? agentMesh.slice(0, 3).map((agent) => <div key={agent.id}><i className="on"/><span><b>{agent.name}</b><small>{agent.description || `${agent.tools.length} tools available`}</small></span><em>READY</em></div>) : <>
+                    <div><i className="on"/><span><b>Monitoring</b><small>Watching system health</small></span><em>ACTIVE</em></div>
+                    <div><i className="on"/><span><b>Infrastructure</b><small>Inventory synchronized</small></span><em>READY</em></div>
+                    <div><i/><span><b>Security</b><small>Policy engine ready</small></span><em>IDLE</em></div>
+                  </>}
                 </div>
               </div>
             </section>
@@ -187,20 +187,7 @@ export default function Dashboard() {
               <div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><span>{online} online</span></div>
               <div className="v3-services">{overview.services.map(s => <button key={s.id} onClick={() => navigate('Applications')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span><em>{s.updated}</em></button>)}</div>
             </section>
-          </> : active === 'FRIDAY' ? <FridayWorkspace
-            session={friday}
-            query={query}
-            onQueryChange={setQuery}
-            onSubmit={submitFriday}
-          /> : active === 'Incidents' ? <IncidentsWorkspace
-            incidents={incidents}
-            monitoring={overview.monitoring}
-            history={history}
-            historyError={historyError}
-            selectedIncident={selectedIncident}
-            onSelectIncident={viewDiagnosis}
-            onClearSelection={() => setSelectedIncidentId(null)}
-          /> : <DetailView active={active} overview={overview} />}
+          </> : activeWorkspace()}
         </main>
       </div>
     </div>
@@ -209,7 +196,7 @@ export default function Dashboard() {
 
 function DetailView({ active, overview }: { active: string, overview: ReturnType<typeof useFridayOverview>['overview'] }) {
   return <section className="v3-detail">
-    <div className="v3-detail-hero"><div className="v3-node-icon large">{active === 'Infrastructure' ? <Server/> : active === 'Applications' ? <AppWindow/> : active === 'Agents' ? <Bot/> : <TerminalSquare/>}</div><div><span className="v3-kicker">FRIDAY CONTROL PLANE</span><h2>{active}</h2><p>Operational view backed by the existing FRIDAY read-only API boundary.</p></div></div>
+    <div className="v3-detail-hero"><div className="v3-node-icon large">{active === 'Infrastructure' ? <Server/> : active === 'Applications' ? <AppWindow/> : <TerminalSquare/>}</div><div><span className="v3-kicker">FRIDAY CONTROL PLANE</span><h2>{active}</h2><p>Operational view backed by the existing FRIDAY read-only API boundary.</p></div></div>
     <div className="v3-detail-grid">
       <article><Gauge/><strong>{overview.services.length}</strong><span>Tracked services</span></article>
       <article><ShieldCheck/><strong>{overview.mode.toUpperCase()}</strong><span>Control mode</span></article>
