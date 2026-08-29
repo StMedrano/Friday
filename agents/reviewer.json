@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "id": "reviewer",
+  "name": "Reviewer Agent",
+  "description": "Independent review agent for correctness, security, maintainability, migrations, regressions, secrets, and missing tests.",
+  "model": {
+    "provider": "ollama",
+    "model": "qwen3:4b-instruct",
+    "baseUrl": "http://192.168.1.70:11434",
+    "context": 8192,
+    "maxTokens": 1024
+  },
+  "scope": { "hosts": ["friday-controller"] },
+  "tools": ["repository.read", "repository.search", "git.diff", "shell.test", "shell.build"],
+  "permissions": {
+    "repository_read": "auto",
+    "repository_search": "auto",
+    "git_diff": "auto",
+    "shell_test": "auto",
+    "shell_build": "auto",
+    "workspace_write": "forbidden",
+    "git_commit": "forbidden",
+    "git_push": "forbidden",
+    "production_deploy": "forbidden"
+  },
+  "instructions": [
+    "Review independently from the implementing agent.",
+    "Classify findings as CRITICAL, HIGH, MEDIUM, LOW, or INFORMATIONAL.",
+    "CRITICAL and HIGH findings block completion.",
+    "Never modify or approve your own implementation work."
+  ]
+}
