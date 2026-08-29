@@ -11,6 +11,7 @@ import { toPublicRepository } from './repositories/repository.mjs'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
 const SAFE_INCIDENT_ID = /^[A-Za-z0-9_.-]{1,256}$/
+const SAFE_REPOSITORY_ID = /^[A-Za-z0-9_.-]{1,128}$/
 
 const mime = {
   '.html': 'text/html; charset=utf-8',
@@ -36,10 +37,7 @@ function safeAgent(agent) {
     id: agent.id,
     name: agent.name,
     description: agent.description || '',
-    model: {
-      provider: agent.model?.provider || 'unknown',
-      model: agent.model?.model || null,
-    },
+    model: { provider: agent.model?.provider || 'unknown', model: agent.model?.model || null },
     tools: Array.isArray(agent.tools) ? agent.tools : [],
     permissions: agent.permissions && typeof agent.permissions === 'object' ? agent.permissions : {},
     scope: agent.scope && typeof agent.scope === 'object' ? agent.scope : {},
@@ -102,10 +100,7 @@ async function currentOverview({ config, monitoringRuntime, buildOverviewImpl })
   const cached = monitoringRuntime?.getOverview?.()
   if (config.monitoring?.enabled && cached) {
     const { incidents } = monitoringRuntime.getIncidents()
-    return decorateOverviewWithMonitoring(cached, {
-      incidents,
-      summary: monitoringRuntime.getSummary(),
-    })
+    return decorateOverviewWithMonitoring(cached, { incidents, summary: monitoringRuntime.getSummary() })
   }
   return buildOverviewImpl(config)
 }
@@ -127,11 +122,9 @@ export function createFridayServer({
     if (request.method === 'GET' && url.pathname === '/healthz') {
       return json(response, 200, { status: 'ok', service: 'friday', mode: config.mode })
     }
-
     if (request.method === 'GET' && url.pathname === '/api/health') {
       return json(response, 200, { status: 'ok', mode: config.mode, ai: config.ai.enabled, time: new Date().toISOString() })
     }
-
     if (request.method === 'GET' && url.pathname === '/api/agents') {
       try {
         const agents = agentRepository ? await agentRepository.list() : []
@@ -140,7 +133,6 @@ export function createFridayServer({
         return json(response, 500, { error: 'agents-unavailable' })
       }
     }
-
     if (request.method === 'GET' && url.pathname === '/api/repositories') {
       try {
         const repositories = repositoryRegistry ? await repositoryRegistry.list() : []
@@ -149,7 +141,6 @@ export function createFridayServer({
         return json(response, 500, { error: 'repositories-unavailable' })
       }
     }
-
     if (request.method === 'GET' && url.pathname === '/api/overview') {
       try {
         return json(response, 200, await currentOverview({ config, monitoringRuntime, buildOverviewImpl }))
@@ -157,11 +148,9 @@ export function createFridayServer({
         return json(response, 500, { error: 'overview-failed', detail: error.message })
       }
     }
-
     if (request.method === 'GET' && url.pathname === '/api/incidents') {
       return json(response, 200, monitoringRuntime?.getIncidents?.() || { summary: { active: 0, high: 0, warning: 0, resolved: 0 }, incidents: [] })
     }
-
     if (request.method === 'GET' && url.pathname === '/api/monitoring/history') {
       return json(response, 200, monitoringRuntime?.getHistory?.() || { events: [] })
     }
@@ -182,9 +171,7 @@ export function createFridayServer({
     const diagnosticRoute = parseIncidentDiagnosticRoute(url.pathname)
     if (request.method === 'GET' && diagnosticRoute) {
       if (diagnosticRoute.invalid) return json(response, 400, { error: 'invalid-incident-id' })
-      const handler = diagnosticRoute.kind === 'diagnostics'
-        ? monitoringRuntime?.getDiagnostic
-        : monitoringRuntime?.getIncidentLogs
+      const handler = diagnosticRoute.kind === 'diagnostics' ? monitoringRuntime?.getDiagnostic : monitoringRuntime?.getIncidentLogs
       if (typeof handler !== 'function') return json(response, 503, { error: 'diagnostics-unavailable' })
       try {
         const result = await handler.call(monitoringRuntime, diagnosticRoute.incidentId)
@@ -203,20 +190,31 @@ export function createFridayServer({
       }
     }
 
+    if (request.method === 'POST' && url.pathname === '/api/agents/explore') {
+      if (!agentOrchestrator) return json(response, 503, { error: 'agent-orchestrator-unavailable' })
+      try {
+        const body = await readBody(request)
+        const repositoryId = String(body.repositoryId || '').trim()
+        if (!SAFE_REPOSITORY_ID.test(repositoryId)) return json(response, 400, { error: 'invalid-repository-id' })
+        const promptResult = validateAssistantPrompt(body.prompt)
+        if (!promptResult.ok) return json(response, 400, { error: 'invalid-prompt', reason: promptResult.result.reason })
+        const result = await agentOrchestrator.analyzeRepository({ repositoryId, prompt: promptResult.prompt })
+        return json(response, result.status === 'COMPLETED' ? 200 : 502, result)
+      } catch (error) {
+        if (error?.code === 'FRIDAY_REPOSITORY_NOT_FOUND') return json(response, 404, { error: 'repository-not-found' })
+        if (error?.code === 'FRIDAY_AGENT_NOT_FOUND') return json(response, 503, { error: 'explorer-agent-unavailable' })
+        return json(response, 400, { error: 'explorer-request-failed' })
+      }
+    }
+
     if (request.method === 'POST' && url.pathname === '/api/assistant') {
       try {
         const body = await readBody(request)
         const promptResult = validateAssistantPrompt(body.prompt)
         if (!promptResult.ok) return json(response, 400, promptResult.result)
-
         const history = normalizeAssistantHistory(body.history)
         const overview = await currentOverview({ config, monitoringRuntime, buildOverviewImpl })
-        const result = await answerAssistantImpl({
-          config,
-          prompt: promptResult.prompt,
-          history,
-          overview,
-        })
+        const result = await answerAssistantImpl({ config, prompt: promptResult.prompt, history, overview })
         if (result.available) return json(response, 200, result)
         if (result.error === 'invalid-prompt') return json(response, 400, result)
         return json(response, 503, result)
@@ -228,7 +226,6 @@ export function createFridayServer({
     if (request.method === 'GET' || request.method === 'HEAD') {
       if (serveStatic(url.pathname, response)) return
     }
-
     json(response, 404, { error: 'not-found' })
   })
 }
