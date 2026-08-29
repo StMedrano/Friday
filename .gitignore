@@ -3,6 +3,7 @@ dist/
 .env
 .env.*
 !.env.example
+repositories.json
 *.log
 .DS_Store
 .vscode/
