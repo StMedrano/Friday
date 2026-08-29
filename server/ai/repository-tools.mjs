@@ -7,6 +7,7 @@ const execFile = promisify(execFileCallback)
 export const MAX_FILE_BYTES = 128 * 1024
 export const MAX_LIST_ENTRIES = 500
 export const MAX_SEARCH_RESULTS = 100
+export const MAX_SEARCH_FILES = 1000
 export const MAX_GIT_ENTRIES = 50
 const GIT_TIMEOUT_MS = 5000
 const GIT_MAX_BUFFER = 512 * 1024
@@ -88,12 +89,14 @@ async function searchRepository(registry, repository, query) {
   if (!needle) throw new Error('query is required')
   const root = await canonicalRoot(registry, repository)
   const results = []
+  let filesVisited = 0
+  let traversalLimitReached = false
 
   async function walk(relativeDir = '.') {
-    if (results.length >= MAX_SEARCH_RESULTS) return
+    if (results.length >= MAX_SEARCH_RESULTS || traversalLimitReached) return
     const dir = await registry.resolvePath(repository, relativeDir)
     for (const entry of await readdir(dir, { withFileTypes: true })) {
-      if (results.length >= MAX_SEARCH_RESULTS) return
+      if (results.length >= MAX_SEARCH_RESULTS || traversalLimitReached) return
       const relativePath = safeRelative(root, join(dir, entry.name))
       let canonical
       try { canonical = await registry.resolvePath(repository, relativePath) } catch { continue }
@@ -102,6 +105,11 @@ async function searchRepository(registry, repository, query) {
         continue
       }
       if (!entry.isFile()) continue
+      if (filesVisited >= MAX_SEARCH_FILES) {
+        traversalLimitReached = true
+        return
+      }
+      filesVisited += 1
       let contents
       try { contents = await readBoundedFile(canonical) } catch { continue }
       const lines = contents.text.split(/\r?\n/)
@@ -115,7 +123,12 @@ async function searchRepository(registry, repository, query) {
   }
 
   await walk('.')
-  return { query: needle, results, truncated: results.length >= MAX_SEARCH_RESULTS }
+  return {
+    query: needle,
+    results,
+    filesVisited,
+    truncated: traversalLimitReached || results.length >= MAX_SEARCH_RESULTS,
+  }
 }
 
 export function registerRepositoryTools({ registry, toolRegistry } = {}) {
