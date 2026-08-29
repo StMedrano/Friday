@@ -3,12 +3,7 @@ import type { ActivityItem, AlertItem, ResourceMetric, Service, Site } from './i
 import { activities, alerts, resources, services, sites } from '../data/mock'
 
 export type FridayAssistantMode = 'cloud-ai' | 'local-ai' | 'local-analysis'
-
-export type FridayAssistantAttempt = {
-  provider: string
-  outcome: string
-}
-
+export type FridayAssistantAttempt = { provider: string; outcome: string }
 export type FridayAssistantResponse = {
   available: boolean
   mode?: FridayAssistantMode
@@ -19,15 +14,26 @@ export type FridayAssistantResponse = {
   fallbackUsed?: boolean
   attempts?: FridayAssistantAttempt[]
 }
+export type FridayAssistantHistoryMessage = { role: 'user' | 'assistant'; content: string }
+export type FridayAssistantRequestOptions = { history?: FridayAssistantHistoryMessage[]; signal?: AbortSignal }
 
-export type FridayAssistantHistoryMessage = {
-  role: 'user' | 'assistant'
-  content: string
+export type FridayAgentSummary = {
+  id: string
+  name: string
+  description: string
+  model: { provider: string; model: string | null }
+  tools: string[]
+  permissions: Record<string, 'auto' | 'approval' | 'forbidden' | string>
+  scope: Record<string, unknown>
 }
 
-export type FridayAssistantRequestOptions = {
-  history?: FridayAssistantHistoryMessage[]
-  signal?: AbortSignal
+export type FridayRepositorySummary = {
+  id: string
+  name: string
+  remote?: string
+  defaultBranch: string
+  mode: 'read-only' | 'development' | 'pr-enabled'
+  enabled: boolean
 }
 
 export type FridayIncident = {
@@ -72,12 +78,7 @@ export type MonitoringEvent = {
   detail: string
 }
 
-export type DiagnosticFact = {
-  id: string
-  label: string
-  value: string
-}
-
+export type DiagnosticFact = { id: string; label: string; value: string }
 export type DiagnosticReport = {
   id?: string
   incidentId: string
@@ -97,7 +98,6 @@ export type DiagnosticReport = {
   error?: string | null
   reason?: string
 }
-
 export type DiagnosticLogsResponse = {
   incidentId: string
   serviceName?: string
@@ -122,20 +122,12 @@ export type FridayOverview = {
 }
 
 const fallback: FridayOverview = {
-  mode: 'mock',
-  sites,
-  services,
-  alerts,
-  resources,
-  activities,
-  incidents: [],
-  monitoring: null,
+  mode: 'mock', sites, services, alerts, resources, activities, incidents: [], monitoring: null,
 }
 
 export function useFridayOverview() {
   const [overview, setOverview] = useState<FridayOverview>(fallback)
   const [connected, setConnected] = useState(false)
-
   useEffect(() => {
     const controller = new AbortController()
     fetch('/api/overview', { signal: controller.signal })
@@ -143,26 +135,30 @@ export function useFridayOverview() {
         if (!response.ok) throw new Error(`Friday API ${response.status}`)
         return response.json()
       })
-      .then((data: FridayOverview) => {
-        setOverview(data)
-        setConnected(true)
-      })
+      .then((data: FridayOverview) => { setOverview(data); setConnected(true) })
       .catch(() => setConnected(false))
     return () => controller.abort()
   }, [])
-
   return { overview, connected }
 }
 
-export async function askFridayAssistant(
-  prompt: string,
-  { history = [], signal }: FridayAssistantRequestOptions = {},
-): Promise<FridayAssistantResponse> {
+export async function fetchFridayAgents(signal?: AbortSignal): Promise<FridayAgentSummary[]> {
+  const response = await fetch('/api/agents', { signal })
+  if (!response.ok) throw new Error(`Friday agents ${response.status}`)
+  const body = await response.json() as { agents?: FridayAgentSummary[] }
+  return Array.isArray(body.agents) ? body.agents : []
+}
+
+export async function fetchFridayRepositories(signal?: AbortSignal): Promise<FridayRepositorySummary[]> {
+  const response = await fetch('/api/repositories', { signal })
+  if (!response.ok) throw new Error(`Friday repositories ${response.status}`)
+  const body = await response.json() as { repositories?: FridayRepositorySummary[] }
+  return Array.isArray(body.repositories) ? body.repositories : []
+}
+
+export async function askFridayAssistant(prompt: string, { history = [], signal }: FridayAssistantRequestOptions = {}): Promise<FridayAssistantResponse> {
   const response = await fetch('/api/assistant', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ prompt, history }),
-    signal,
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, history }), signal,
   })
   const body = await response.json() as FridayAssistantResponse
   if (!response.ok) throw new Error(body.reason || 'Friday assistant unavailable')
@@ -183,35 +179,27 @@ function incidentPath(id: string, suffix: 'diagnostics' | 'logs') {
 export async function fetchIncidentDiagnostics(incidentId: string, signal?: AbortSignal) {
   const response = await fetch(incidentPath(incidentId, 'diagnostics'), { method: 'GET', signal })
   const body = await response.json() as DiagnosticReport | { error?: string }
-  if (!response.ok) {
-    throw new Error('error' in body && body.error ? body.error : `Friday diagnostics ${response.status}`)
-  }
+  if (!response.ok) throw new Error('error' in body && body.error ? body.error : `Friday diagnostics ${response.status}`)
   return body as DiagnosticReport
 }
 
 export async function rerunIncidentDiagnostics(incidentId: string, signal?: AbortSignal) {
   const response = await fetch(`${incidentPath(incidentId, 'diagnostics')}/rerun`, { method: 'POST', signal })
   const body = await response.json() as DiagnosticReport | { error?: string }
-  if (!response.ok) {
-    throw new Error('error' in body && body.error ? body.error : `Friday diagnostic rerun ${response.status}`)
-  }
+  if (!response.ok) throw new Error('error' in body && body.error ? body.error : `Friday diagnostic rerun ${response.status}`)
   return body as DiagnosticReport
 }
 
 export async function fetchIncidentLogs(incidentId: string, signal?: AbortSignal) {
   const response = await fetch(incidentPath(incidentId, 'logs'), { method: 'GET', signal })
   const body = await response.json() as DiagnosticLogsResponse | { error?: string }
-  if (!response.ok) {
-    throw new Error('error' in body && body.error ? body.error : `Friday diagnostic logs ${response.status}`)
-  }
+  if (!response.ok) throw new Error('error' in body && body.error ? body.error : `Friday diagnostic logs ${response.status}`)
   return body as DiagnosticLogsResponse
 }
 
 export async function previewFridayCommand(message: string) {
   const response = await fetch('/api/commands/preview', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ message }),
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ message }),
   })
   const body = await response.json()
   if (!response.ok) throw new Error(body.reason || 'Command preview failed')
