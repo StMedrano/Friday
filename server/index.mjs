@@ -5,6 +5,9 @@ import { createMonitoringRuntime } from './monitoring/runtime.mjs'
 import { createFileMonitoringStore } from './monitoring/store.mjs'
 import { LocalAgentRepository } from './agents/repository.mjs'
 import { LocalRepositoryRegistry } from './repositories/repository.mjs'
+import { ToolRegistry } from './ai/tool-registry.mjs'
+import { registerRepositoryTools } from './ai/repository-tools.mjs'
+import { createAgentOrchestrator } from './agents/orchestrator.mjs'
 
 const config = getConfig()
 const store = createFileMonitoringStore({ statePath: config.monitoring.statePath })
@@ -17,10 +20,19 @@ const agentRepository = new LocalAgentRepository({ directory: process.env.FRIDAY
 const repositoryRegistry = new LocalRepositoryRegistry({
   registryPath: process.env.FRIDAY_REPOSITORY_REGISTRY_PATH || './repositories.json',
 })
+const toolRegistry = new ToolRegistry()
+registerRepositoryTools({ registry: repositoryRegistry, toolRegistry })
+const agentOrchestrator = createAgentOrchestrator({ agentRepository, repositoryRegistry, toolRegistry })
 
 await monitoringRuntime.start()
 
-const server = createFridayServer({ config, monitoringRuntime, agentRepository, repositoryRegistry })
+const server = createFridayServer({
+  config,
+  monitoringRuntime,
+  agentRepository,
+  repositoryRegistry,
+  agentOrchestrator,
+})
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`Friday listening on 0.0.0.0:${config.port} (${config.mode} mode)`)
 })
