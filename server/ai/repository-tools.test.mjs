@@ -7,7 +7,7 @@ import { execFile as execFileCallback } from 'node:child_process'
 import { promisify } from 'node:util'
 import { LocalRepositoryRegistry } from '../repositories/repository.mjs'
 import { ToolRegistry, executeAgentTool } from './tool-registry.mjs'
-import { registerRepositoryTools } from './repository-tools.mjs'
+import { MAX_SEARCH_FILES, registerRepositoryTools } from './repository-tools.mjs'
 
 const execFile = promisify(execFileCallback)
 const agent = {
@@ -15,7 +15,7 @@ const agent = {
   permissions: { inspect_repository: 'auto' },
 }
 
-async function fixture() {
+async function fixture({ manyFiles = false } = {}) {
   const root = await mkdtemp(join(tmpdir(), 'friday-tools-'))
   const repo = join(root, 'repo')
   await mkdir(join(repo, 'src'), { recursive: true })
@@ -25,6 +25,11 @@ async function fixture() {
   await writeFile(join(repo, '.env'), 'TOKEN=secret')
   await writeFile(join(repo, 'config', '.env.local'), 'TOKEN=nested-secret')
   await writeFile(join(repo, 'big.txt'), 'x'.repeat(140 * 1024))
+  if (manyFiles) {
+    const directory = join(repo, 'many')
+    await mkdir(directory)
+    await Promise.all(Array.from({ length: MAX_SEARCH_FILES + 25 }, (_, index) => writeFile(join(directory, `file-${String(index).padStart(4, '0')}.txt`), 'no matching text\n')))
+  }
   await execFile('git', ['init'], { cwd: repo })
   await execFile('git', ['config', 'user.email', 'friday@example.invalid'], { cwd: repo })
   await execFile('git', ['config', 'user.name', 'Friday Test'], { cwd: repo })
@@ -72,4 +77,12 @@ test('Explorer tools block secrets and traversal and bound large reads', async (
   assert.equal(big.status, 'completed')
   assert.equal(big.output.truncated, true)
   assert.ok(big.output.text.length <= 128 * 1024)
+})
+
+test('repository search stops after its file traversal budget', async () => {
+  const { tools } = await fixture({ manyFiles: true })
+  const result = await execute(tools, 'repo.search', { query: 'definitely-not-present' })
+  assert.equal(result.status, 'completed')
+  assert.ok(result.output.filesVisited <= MAX_SEARCH_FILES)
+  assert.equal(result.output.truncated, true)
 })
