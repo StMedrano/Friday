@@ -2,8 +2,13 @@ import { readFile, realpath } from 'node:fs/promises'
 import { resolve, relative, sep } from 'node:path'
 
 export const DEFAULT_EXCLUDES = [
-  '.env', '.env.*', '.git/**', '**/*.pem', '**/*.key', '**/id_rsa', '**/id_ed25519',
-  'node_modules/**', 'dist/**', 'build/**', '.next/**',
+  '.env', '.env.*', '**/.env', '**/.env.*',
+  '.git', '.git/**', '**/.git', '**/.git/**',
+  '*.pem', '**/*.pem', '*.key', '**/*.key', 'id_rsa', '**/id_rsa', 'id_ed25519', '**/id_ed25519',
+  'node_modules', 'node_modules/**', '**/node_modules', '**/node_modules/**',
+  'dist', 'dist/**', '**/dist', '**/dist/**',
+  'build', 'build/**', '**/build', '**/build/**',
+  '.next', '.next/**', '**/.next', '**/.next/**',
 ]
 
 const MODES = new Set(['read-only', 'development', 'pr-enabled'])
@@ -91,9 +96,7 @@ export class LocalRepositoryRegistry {
     const root = await realpath(repository.path)
     const candidate = await realpath(resolve(root, requested))
     const rel = relative(root, candidate)
-    if (rel === '..' || rel.startsWith(`..${sep}`) || resolve(candidate) === resolve(root, '..')) {
-      throw new Error('Path is outside repository')
-    }
+    if (rel === '..' || rel.startsWith(`..${sep}`)) throw new Error('Path is outside repository')
     const canonicalRelative = normalizeRelative(relative(root, candidate) || '.')
     if (isExcluded(canonicalRelative, repository.exclude)) throw new Error('Path is excluded')
     return candidate
