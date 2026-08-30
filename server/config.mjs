@@ -24,6 +24,16 @@ function providerOrder(value) {
   return parsed.length ? parsed : [...DEFAULT_AI_PROVIDER_ORDER]
 }
 
+function localAgentProfile(env, prefix, fallbackModel = 'qwen3:4b-instruct') {
+  return {
+    provider: 'ollama',
+    baseUrl: env[`FRIDAY_AGENT_${prefix}_URL`] || 'http://192.168.1.70:11434',
+    model: env[`FRIDAY_AGENT_${prefix}_MODEL`] || fallbackModel,
+    context: positiveNumber(env[`FRIDAY_AGENT_${prefix}_CONTEXT`] ?? env.FRIDAY_AGENT_MODEL_CONTEXT, 8192),
+    maxTokens: positiveNumber(env[`FRIDAY_AGENT_${prefix}_MAX_TOKENS`] ?? env.FRIDAY_AGENT_MODEL_MAX_TOKENS, 768),
+  }
+}
+
 export function getConfig(env = process.env) {
   const legacyAiTimeoutProvided = String(env.FRIDAY_AI_REQUEST_TIMEOUT_MS ?? '').trim() !== ''
   const legacyAiTimeoutMs = positiveNumber(env.FRIDAY_AI_REQUEST_TIMEOUT_MS, 20000)
@@ -67,6 +77,14 @@ export function getConfig(env = process.env) {
     },
     diagnostics: {
       enabled: enabled(env.FRIDAY_DIAGNOSTICS_ENABLED),
+    },
+    agents: {
+      enabled: enabled(env.FRIDAY_AGENT_REGISTRY_ENABLED),
+      modelProfiles: {
+        'local-router': localAgentProfile(env, 'LOCAL_ROUTER'),
+        'local-general': localAgentProfile(env, 'LOCAL_GENERAL'),
+        'local-coder': localAgentProfile(env, 'LOCAL_CODER'),
+      },
     },
     ai: {
       enabled: enabled(env.FRIDAY_AI_ENABLED),
