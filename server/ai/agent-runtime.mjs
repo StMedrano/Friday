@@ -1,16 +1,25 @@
 import { askOllama } from './ollama.mjs'
 
 const VALID_PERMISSION_MODES = new Set(['auto', 'approval', 'forbidden'])
+const DEPLOYMENT_MODEL_FIELDS = ['provider', 'model', 'baseUrl', 'context', 'maxTokens']
 
 export function validateAgentSpec(agent = {}) {
   const errors = []
   if (!agent || typeof agent !== 'object') errors.push('agent must be an object')
+  if (String(agent?.version || '') !== '1.1') errors.push('version must be 1.1')
   if (!String(agent?.id || '').trim()) errors.push('id is required')
   if (!String(agent?.name || '').trim()) errors.push('name is required')
-  if (agent?.model?.provider !== 'ollama') errors.push('model.provider must be ollama for local-agent v1')
-  if (!String(agent?.model?.model || '').trim()) errors.push('model.model is required')
+  if (!String(agent?.model?.profile || '').trim()) errors.push('model.profile is required')
+  for (const field of DEPLOYMENT_MODEL_FIELDS) {
+    if (agent?.model && Object.prototype.hasOwnProperty.call(agent.model, field)) {
+      errors.push(`deployment-specific model.${field} is not allowed in v1.1`)
+    }
+  }
+  if (agent?.enabled != null && typeof agent.enabled !== 'boolean') errors.push('enabled must be a boolean')
   if (!Array.isArray(agent?.tools)) errors.push('tools must be an array')
-  if (!agent?.permissions || typeof agent.permissions !== 'object') errors.push('permissions must be an object')
+  if (!agent?.permissions || typeof agent.permissions !== 'object' || Array.isArray(agent.permissions)) {
+    errors.push('permissions must be an object')
+  }
 
   for (const [action, mode] of Object.entries(agent?.permissions || {})) {
     if (!VALID_PERMISSION_MODES.has(mode)) errors.push(`invalid permission mode for ${action}`)
@@ -47,6 +56,7 @@ export function buildAgentSystemPrompt(agent) {
 
 export async function runLocalAgent({
   agent,
+  modelProfile,
   prompt,
   overview = '',
   fetchImpl = globalThis.fetch,
@@ -59,12 +69,23 @@ export async function runLocalAgent({
     throw error
   }
 
+  if (
+    !modelProfile ||
+    modelProfile.provider !== 'ollama' ||
+    !String(modelProfile.baseUrl || '').trim() ||
+    !String(modelProfile.model || '').trim()
+  ) {
+    const error = new Error('Invalid local agent model profile')
+    error.code = 'FRIDAY_AGENT_MODEL_PROFILE_INVALID'
+    throw error
+  }
+
   const providerConfig = {
     enabled: true,
-    baseUrl: agent.model.baseUrl || 'http://127.0.0.1:11434',
-    model: agent.model.model,
-    context: agent.model.context || 8192,
-    maxTokens: agent.model.maxTokens || 768,
+    baseUrl: modelProfile.baseUrl,
+    model: modelProfile.model,
+    context: modelProfile.context || 8192,
+    maxTokens: modelProfile.maxTokens || 768,
   }
 
   return askOllama({

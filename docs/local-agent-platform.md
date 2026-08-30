@@ -2,223 +2,208 @@
 
 ## Goal
 
-Friday must be able to operate its core agent platform entirely inside the homelab without requiring OpenAI, Anthropic, Groq, Gemini, Azure AI, or another third-party AI service.
+Friday's core agent capability must work inside the homelab without requiring OpenAI, Anthropic, Groq, Gemini, Azure AI, or another third-party AI service. Phase 1 provides **local-only advisory agents** backed by CT108 Ollama while preserving Friday's existing multi-provider general assistant for requests that do not match a local agent.
 
-`local-first` means cloud-independent, not literally protocol-free. Friday may use private/local interfaces such as Ollama HTTP on the LAN/localhost, SSH, Docker, Proxmox CLI/API, PostgreSQL, systemd, and approved internal services.
+`local-first` means cloud-independent. It does not mean protocol-free: Friday may use private LAN interfaces to self-hosted services, but every integration must remain within the repository's safety policy.
 
-Cloud AI may remain an optional operator-enabled escalation path, but Friday's core operation must not depend on it.
-
-## Target architecture
+## Phase 1 implemented architecture
 
 ```text
 Operator
-  -> Friday UI
-  -> Friday Controller / Orchestrator
-  -> Agent Registry
-       -> Proxmox Agent
-       -> Infrastructure Agent
-       -> Network Agent
-       -> Identity Agent
-       -> Media Agent
-       -> Development Agent
-       -> Production Agent
-       -> Database Agent
-       -> Security Agent
-       -> Backup Agent
-  -> Local Ollama model provider
-  -> Policy + Approval Engine
-  -> Controlled Tool Executor
-  -> Homelab targets
-  -> Durable audit + local memory
+  -> Friday UI / shared Friday session
+      -> local agent route
+           -> explicit/manual override
+           -> deterministic registered-agent match
+           -> CT108 local-router when ambiguous
+      -> matched agent
+           -> Git-authoritative agent definition
+           -> Supabase runtime registry row
+           -> server-side Ollama model profile
+           -> fresh normalized Friday state
+           -> CT108 Ollama inference
+      -> no match
+           -> existing Friday assistant path
 ```
 
-Agents are not separate LLM instances. An agent is a portable definition containing instructions, scope, tools, permissions, memory scope, and workflows. Multiple agents may share one Ollama model.
+A matched local agent **never** falls back to Groq, Gemini, OpenAI, Anthropic, or the general assistant chain after local inference failure. No-match is different: no-match means no agent took ownership, so the normal Friday assistant path remains available.
 
-## Agent specification direction
+## Agent authority and registry
 
-A future Friday Agent Specification v1 should support definitions similar to:
+Git is authoritative for Phase 1 agent definitions:
 
-```yaml
-name: infrastructure-agent
-description: Operates approved infrastructure services
-model:
-  provider: ollama
-  profile: local-coder
-scope:
-  hosts:
-    - vm100
-tools:
-  - ssh.read
-  - docker.inspect
-  - docker.logs
-  - systemd.status
-  - journal.read
-permissions:
-  observe: automatic
-  safe_action: automatic_logged
-  configuration_change: approval_required
-  destructive: forbidden
-memory:
-  namespace: infrastructure
+```text
+agents/*.json
 ```
 
-Agent definitions must remain model-provider independent so a local Ollama model can be replaced without rewriting the agent.
+Definitions use Agent Spec v1.1 and contain portable behavior/scope/tool-policy metadata. They do not contain deployment URLs, credentials, or cloud-provider selection.
 
-## Local model layer
+Self-hosted Supabase/Postgres is the runtime registry/cache. Phase 1 permits exactly two registry tables:
 
-Ollama is the default model runtime for local agents. Its HTTP interface is considered an internal Friday dependency when restricted to the controller/LAN; it is not a cloud dependency.
+```text
+friday_agents
+friday_agent_registry_state
+```
 
-Friday should support model profiles rather than hard-coding a different model per agent, for example:
+No action, approval, task, memory, executor, credential, or tool-run table is part of Phase 1. Schema enforcement is automated by `scripts/validate-agent-registry-schema.mjs` and CI.
 
-- `local-router`: lightweight intent classification and agent routing.
-- `local-general`: routine reasoning, summaries, diagnostics, and planning.
-- `local-coder`: code/configuration analysis and implementation planning.
+Registry sync is explicit. Valid Git definitions can update runtime registry rows; invalid changed definitions fail closed and cannot overwrite the last known valid row. Missing Git definitions are not silently converted into runtime deletion during Phase 1.
 
-Do not require one Ollama process/model per agent.
+## Agent Specification v1.1
 
-## Controlled tool execution
-
-The LLM must never receive unrestricted root shell access. Models propose structured tool calls; Friday validates scope and policy before execution.
-
-Example request:
+Agent definitions separate portable policy from deployment model configuration. Typical shape:
 
 ```json
 {
-  "tool": "docker.restart",
-  "target": "nginx-proxy-manager",
-  "host": "vm100"
+  "version": "1.1",
+  "id": "proxmox-observer",
+  "name": "Proxmox Observer",
+  "model": { "profile": "local-general" },
+  "scope": { "platforms": ["proxmox"], "hosts": ["VM 100", "LXC 108"] },
+  "tools": ["proxmox_read", "inventory_read"],
+  "permissions": { "read": ["proxmox.inventory"], "write": [] }
 }
 ```
 
-The executor resolves that request to an allowlisted implementation. Raw shell execution, if ever introduced, must be separately permissioned, tightly constrained, audited, and disabled by default.
+See `docs/agent-spec-v1.md` for the authoritative contract.
 
-Preferred local integrations include:
+## Local model profiles
 
-- SSH with dedicated service identities and least privilege.
-- Docker CLI/approved observer or executor service.
-- Proxmox `qm`, `pct`, `pvesh`, and narrowly scoped Proxmox credentials.
-- `systemctl`, `journalctl`, `df`, `lsblk`, `ip`, and `ss` through allowlisted tools.
-- Git and Ansible for versioned, repeatable configuration changes.
-- PostgreSQL for durable state, inventory, audit, and memory metadata.
+VM102 resolves profile IDs server-side. Phase 1 profiles are Ollama-only:
 
-## Permission levels
+- `local-router` — bounded intent classification/agent selection;
+- `local-general` — routine diagnostics, inventory reasoning, and summaries;
+- `local-coder` — local code/configuration analysis for future development agents.
 
-Friday agents use four operational levels:
+The initial deployment uses CT108 at `http://192.168.1.70:11434` with `qwen3:4b-instruct`. Keep TCP/11434 restricted to VM102.
 
-| Level | Meaning | Default behavior |
-| --- | --- | --- |
-| 0 Observe | Inventory, health, logs, metrics, diagnostics | Automatic |
-| 1 Safe action | Low-risk reversible action such as an approved service restart | Automatic only when explicitly allowlisted; always logged |
-| 2 Configuration | Compose/configuration/resource/network changes | Operator approval required |
-| 3 Destructive | Delete VM/container/data, format storage, destructive database operations | Explicit approval plus required precondition/backup; may be forbidden by agent policy |
+Model profiles make agents portable: changing a local model or Ollama endpoint does not require rewriting each agent definition.
 
-The existing repository safety boundary remains authoritative while execution infrastructure is incomplete. Do not grant mutation tools merely because this document describes the target architecture.
+## Routing
 
-## Initial agent catalog
+Routing is bounded to enabled registered agents:
 
-1. **Friday Orchestrator** — classify intent, select agents, coordinate workflows, and enforce policy.
-2. **Proxmox Agent** — VM/LXC inventory, health, snapshots, resource diagnostics, and eventually approved lifecycle operations.
-3. **Infrastructure Agent** — VM100 services, Docker, reverse proxy, DNS, monitoring, and infrastructure diagnostics.
-4. **Network Agent** — Omada, VLAN/routing/DNS/DHCP visibility and eventually approved network changes.
-5. **Identity Agent** — Authentik and identity-service health/configuration workflows.
-6. **Media Agent** — media VM/Umbrel, Emby, SABnzbd, storage, and media-service health.
-7. **Development Agent** — development environments, builds, tests, and deployments.
-8. **Production Agent** — production health and controlled release workflows.
-9. **Database Agent** — PostgreSQL/Supabase-compatible workloads where appropriate, backup verification, and database health.
-10. **Security Agent** — security events, certificates, exposure checks, and recommendations.
-11. **Backup Agent** — snapshot/backup scheduling state, verification, restore readiness, and pre-change protection.
+1. An explicit agent ID wins only if that agent exists and is enabled.
+2. Strong registered platform/scope language can route deterministically.
+3. Ambiguous requests may use the `local-router` profile.
+4. Local-router output must be an exact enabled candidate ID or no-match.
+5. Router failure returns a safe unavailable/no-match result rather than inventing an agent.
 
-## Local memory and knowledge
+The shared Friday session calls this routing layer before the general assistant. Manual direct ask is also available from the Agents workspace.
 
-Friday should maintain local durable knowledge for:
-
-- hosts and exact infrastructure identifiers;
-- VMs/LXCs and service ownership;
-- IP addresses, VLANs, ports, and service mappings;
-- containers and dependencies;
-- runbooks and local skills;
-- incidents and diagnostic findings;
-- approved configuration history;
-- action/approval/audit records.
-
-PostgreSQL is the preferred durable store. Vector retrieval may be added locally (for example pgvector) when it provides measurable value. Redis is optional and must not become a durability dependency.
-
-The agent must preserve exact infrastructure IDs/names from authoritative Friday state rather than inventing or renumbering resources.
-
-## Local skills
-
-Agents should be strengthened with repository-controlled operational skills/runbooks rather than relying only on model knowledge.
-
-Example layout:
+## Phase 1 API
 
 ```text
-skills/
-  docker-troubleshooting/
-    SKILL.md
-    metadata.yaml
-    checks.sh
+GET  /api/agents
+GET  /api/agents/:agentId
+GET  /api/agents/registry/status
+POST /api/agents/route
+POST /api/agents/:agentId/ask
+POST /api/agents/registry/sync
 ```
 
-A troubleshooting skill should define ordered observations, allowed tools, stop conditions, remediation options, approval requirements, and verification steps.
+`registry/sync` accepts only an empty JSON object and updates Friday-owned registry state from Git. `route` and `ask` validate bounded prompts. Agent IDs are constrained machine IDs rather than arbitrary paths.
 
-## Offline requirement
+There is no create/edit/delete agent API and no execute/restart/shell/tool endpoint.
 
-The target end state is:
+## Shared session behavior
+
+The existing merged Friday Assistant session remains browser-memory-only. For each new user message:
+
+- a matched local agent can answer first;
+- local-agent provenance is stored on the same session message surface;
+- no-match continues to the existing assistant request;
+- fresh normalized Friday infrastructure state is authoritative;
+- session history remains context rather than infrastructure evidence.
+
+Local-agent replies expose `mode:"local-agent"`, `provider:"ollama"`, selected agent/profile/model, and `execution.performed=false`.
+
+## Agents workspace
+
+The responsive Agents workspace provides:
+
+- registry health/status;
+- Git source path/checksum/sync metadata;
+- enabled agent list/details;
+- scope, tools, and model profile visibility;
+- explicit registry sync;
+- manual agent selection and direct ask;
+- local Ollama model/provenance display;
+- clear advisory-only copy.
+
+It intentionally provides no Restart, Execute, Delete, Approve, Shell, Edit agent, or Create agent controls.
+
+## Phase 1 safety boundary
+
+Phase 1 has **no tool executor**. Declared agent tools and permissions are policy metadata only.
+
+Non-negotiable Phase 1 rules:
+
+- no unrestricted LLM-to-root-shell path;
+- no SSH/shell execution from `server/agents`;
+- no Docker/Proxmox/network mutation endpoint;
+- no browser-visible Supabase service credential;
+- no cloud fallback after a local agent has matched;
+- no durable agent memory/task/approval/action tables;
+- no successful action claim: agent responses remain `execution.performed=false`;
+- Git remains the authoring authority.
+
+CI enforces the registry schema and key source boundaries in addition to runtime tests.
+
+## Self-hosted Supabase deployment handoff
+
+Apply the checked-in migration to the intended local Supabase/Postgres database before enabling the registry:
 
 ```text
-Internet unavailable          -> Friday core works
-Cloud AI unavailable          -> Friday core works
-Ollama available locally      -> AI agents work
-Local infrastructure reachable -> tools/diagnostics work
-Cloud provider enabled        -> optional escalation only
+supabase/migrations/202608300001_friday_agent_registry.sql
 ```
 
-GitHub synchronization may be unavailable offline; Friday's runtime must not depend on GitHub availability. Local Git can remain the source-control mechanism on the controller.
+Use the local Supabase SQL editor or a trusted local `psql` connection. The migration must result in exactly the two Phase 1 registry tables listed above.
 
-## Implementation phases
+On VM102, preserve the existing production `.env` before editing it. Add only the server-side variables already documented in `.env.example`:
 
-### Phase 1 — Local-only advisory agents
+```env
+FRIDAY_AGENT_REGISTRY_ENABLED=true
+FRIDAY_SUPABASE_URL=
+FRIDAY_SUPABASE_SERVICE_KEY=
+FRIDAY_AGENT_LOCAL_ROUTER_URL=http://192.168.1.70:11434
+FRIDAY_AGENT_LOCAL_ROUTER_MODEL=qwen3:4b-instruct
+FRIDAY_AGENT_LOCAL_GENERAL_URL=http://192.168.1.70:11434
+FRIDAY_AGENT_LOCAL_GENERAL_MODEL=qwen3:4b-instruct
+FRIDAY_AGENT_LOCAL_CODER_URL=http://192.168.1.70:11434
+FRIDAY_AGENT_LOCAL_CODER_MODEL=qwen3:4b-instruct
+FRIDAY_AGENT_MODEL_CONTEXT=8192
+FRIDAY_AGENT_MODEL_MAX_TOKENS=768
+```
 
-- Make Ollama the default/required AI path for local mode.
-- Add agent registry and Agent Specification v1.
-- Implement orchestrator routing.
-- Keep all infrastructure tools read-only.
-- Add local agent memory/inventory interfaces.
-- Add tests proving operation with all cloud provider credentials absent.
+Do not place the Supabase service key or local infrastructure secrets in browser variables or Git.
 
-### Phase 2 — Controlled safe actions
+## Live acceptance checklist
 
-Only after authentication, role policy, durable audit, approval infrastructure, and a global automation kill switch are implemented and tested:
+After deployment, verify in this order:
 
-- Add structured tool registry/executor.
-- Add allowlisted Level 1 actions.
-- Require before/after verification.
-- Record every action and result.
+1. `GET /api/agents` returns the expected registered definition(s).
+2. `GET /api/agents/registry/status` reports a healthy local registry state.
+3. `POST /api/agents/registry/sync` with `{}` succeeds and does not mutate infrastructure.
+4. `POST /api/agents/route` with a Proxmox-specific prompt selects `proxmox-observer`.
+5. `POST /api/agents/proxmox-observer/ask` returns `provider:"ollama"`, `mode:"local-agent"`, expected local profile/model, and `execution.performed:false`.
+6. The normal Friday composer automatically routes a Proxmox prompt to the local agent and shows local provenance.
+7. Desktop and phone Agents workspace layouts remain usable and show no action controls.
+8. Existing `/healthz`, `/api/health`, `/api/overview`, monitoring, diagnostics, and assistant paths remain healthy.
 
-### Phase 3 — Approved configuration workflows
+## Future phases
 
-- Add Level 2 approval workflow.
-- Prefer Git/Ansible/versioned configuration over ad-hoc shell mutation.
-- Require diff/plan preview before configuration changes.
-- Add rollback metadata and verification.
+### Phase 2 — safety prerequisites and controlled-action design
 
-### Phase 4 — Restricted destructive workflows
+Before any action executor exists, implement authentication/RBAC, durable append-only action audit, explicit approval workflow, and a global automation kill switch. Only then design a typed allowlisted executor.
 
-- Add only explicitly justified Level 3 operations.
-- Require explicit approval and backup/snapshot preconditions.
-- Keep high-risk operations forbidden when safe automation cannot be proven.
+### Phase 3 — approved configuration workflows
 
-## Non-negotiable safety rules
+Prefer versioned Git/Ansible/config plans, explicit diff/plan preview, approval, rollback metadata, and verification.
 
-- No unrestricted LLM-to-root-shell path.
-- No secrets in prompts, browser variables, Git, or agent definitions.
-- No Docker TCP API exposure.
-- No destructive action without policy enforcement and explicit approval.
-- No silent network/firewall/DNS/DHCP/VLAN changes.
-- No AI provider may bypass Friday's tool executor or approval engine.
-- Every mutating action must be attributable, logged, and verifiable.
-- The global automation kill switch must override all autonomous actions.
+### Phase 4 — restricted destructive workflows
 
-## Definition of success
+Only explicitly justified operations with stronger approval and backup/snapshot preconditions may be considered. High-risk actions may remain forbidden permanently.
 
-Friday is local-first when an operator can disconnect cloud AI services and still use the Friday controller, local Ollama-backed agents, local memory, diagnostics, agent routing, approved local tools, and automation policies without loss of core functionality.
+## Definition of Phase 1 success
+
+Friday Phase 1 is successful when a registered agent can be synced from Git, routed automatically or selected manually, reason over fresh normalized homelab state using CT108 Ollama with cloud AI unavailable, return useful advisory output with local provenance, and remain incapable of executing infrastructure changes.

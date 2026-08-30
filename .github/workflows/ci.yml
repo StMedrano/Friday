@@ -104,6 +104,24 @@ jobs:
             exit 1
           fi
 
+      - name: Validate agent registry schema
+        run: npm run validate:agent-registry-schema
+
+      - name: Verify local agent safety boundary
+        run: |
+          if grep -RniE --exclude-dir=superpowers 'VITE_.*SUPA[B]ASE|VITE_.*SERVICE_[K]EY' .env.example compose.yaml src server docs; then
+            echo 'Browser-visible Supabase credential detected.' >&2
+            exit 1
+          fi
+          if grep -RniE --exclude='*.test.mjs' --exclude='*.test.ts' --exclude='*.test.tsx' 'api/agents.*(execute|restart|shell)' server src; then
+            echo 'Agent execution route detected.' >&2
+            exit 1
+          fi
+          if grep -RniE 'child_process|execFile\(|spawn\(|ssh ' server/agents; then
+            echo 'Agent shell or SSH execution path detected.' >&2
+            exit 1
+          fi
+
       - name: Validate controller Compose
         run: docker compose config >/dev/null
 
