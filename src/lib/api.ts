@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import type { ActivityItem, AlertItem, ResourceMetric, Service, Site } from './infrastructure'
 import { activities, alerts, resources, services, sites } from '../data/mock'
 
-export type FridayAssistantMode = 'cloud-ai' | 'local-ai' | 'local-analysis'
+export type FridayAssistantMode = 'cloud-ai' | 'local-ai' | 'local-analysis' | 'local-agent'
 
 export type FridayAssistantAttempt = {
   provider: string
@@ -28,6 +28,37 @@ export type FridayAssistantHistoryMessage = {
 export type FridayAssistantRequestOptions = {
   history?: FridayAssistantHistoryMessage[]
   signal?: AbortSignal
+}
+
+export type FridayAgentRouting = 'manual' | 'deterministic' | 'local-router' | 'none'
+
+export type FridayAgentRouteResponse = {
+  matched: boolean
+  agentId?: string
+  agentName?: string
+  routing: FridayAgentRouting
+  confidence: number
+  reason: string
+  error?: string
+}
+
+export type FridayAgentExecution = {
+  performed: false
+  reason: string
+}
+
+export type FridayAgentResponse = {
+  available: boolean
+  mode?: 'local-agent'
+  provider?: 'ollama'
+  agentId?: string
+  agentName?: string
+  modelProfile?: string
+  model?: string | null
+  text?: string
+  reason?: string
+  error?: string
+  execution: FridayAgentExecution
 }
 
 export type FridayIncident = {
@@ -166,6 +197,30 @@ export async function askFridayAssistant(
   })
   const body = await response.json() as FridayAssistantResponse
   if (!response.ok) throw new Error(body.reason || 'Friday assistant unavailable')
+  return body
+}
+
+export async function routeFridayAgent(prompt: string, signal?: AbortSignal): Promise<FridayAgentRouteResponse> {
+  const response = await fetch('/api/agents/route', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+    signal,
+  })
+  const body = await response.json() as FridayAgentRouteResponse
+  if (!response.ok) throw new Error(body.reason || body.error || 'Friday agent routing unavailable')
+  return body
+}
+
+export async function askFridayAgent(agentId: string, prompt: string, signal?: AbortSignal): Promise<FridayAgentResponse> {
+  const response = await fetch(`/api/agents/${encodeURIComponent(agentId)}/ask`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ prompt }),
+    signal,
+  })
+  const body = await response.json() as FridayAgentResponse
+  if (!response.ok) throw new Error(body.reason || body.error || 'Local agent inference unavailable')
   return body
 }
 
