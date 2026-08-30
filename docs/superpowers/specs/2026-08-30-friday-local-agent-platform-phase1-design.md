@@ -42,7 +42,7 @@ agents/*.json
      v
 Agent Registry Sync
 - load definitions
-- validate Agent Spec v1
+- validate Agent Spec v1.1
 - resolve model profile references
 - compute checksum
 - reject invalid definitions
@@ -96,6 +96,35 @@ Supabase is the controller's local runtime registry/cache for approved definitio
 
 A registry synchronization never grants an agent more permissions than declared in Git.
 
+## Agent Specification v1.1 migration
+
+The currently shipped Agent Specification v1 requires `model.provider` and `model.model`. Phase 1 intentionally evolves the same v1 contract family to **Agent Specification v1.1**, which replaces deployment-specific model fields with a required model profile reference.
+
+A Phase 1 definition uses:
+
+```json
+{
+  "version": "1.1",
+  "model": {
+    "profile": "local-general"
+  }
+}
+```
+
+Rules:
+
+- `model.profile` is required for v1.1.
+- `model.provider`, `model.model`, and `model.baseUrl` are not valid authoring fields in v1.1.
+- The existing `agents/proxmox-observer.json` v1.0 definition must be migrated to v1.1 during implementation.
+- Runtime support for legacy v1.0 definitions may exist only as an explicit compatibility parser during migration; synchronized active definitions must be normalized to the v1.1 profile contract.
+- Model deployment details remain server-side and cannot be overridden by Supabase or browser input.
+
+### Enabled state
+
+`enabled` is also Git-authoritative in Phase 1. Agent Spec v1.1 may include an optional top-level `enabled` boolean that defaults to `true` when omitted.
+
+The synchronized `friday_agents.enabled` field is derived only from the validated Git definition. The Phase 1 UI and API do not provide enable/disable mutation controls.
+
 ## Supabase schema
 
 Phase 1 uses only two agent-platform tables.
@@ -129,7 +158,7 @@ Required fields:
 - `id`
 - `last_sync_at`
 - `last_sync_status`
-- `source_commit`
+- `source_commit` — nullable when Git/build revision metadata is unavailable at runtime; deployment should populate it when possible.
 - `agents_seen`
 - `agents_synced`
 - `agents_rejected`
@@ -145,7 +174,7 @@ Synchronization must:
 
 1. enumerate approved agent definition files under `agents/`;
 2. parse each definition;
-3. validate Agent Spec v1 before any database write;
+3. validate Agent Spec v1.1 before any database write;
 4. resolve/validate the referenced model profile;
 5. compute a stable source checksum;
 6. upsert valid definitions into `friday_agents`;
@@ -161,19 +190,7 @@ Phase 1 does not automatically delete registry entries merely because a source f
 
 ## Model profiles
 
-Agent definitions must not hard-code CT108 deployment details.
-
-Agent Spec v1 is extended for Phase 1 to reference a profile, for example:
-
-```json
-{
-  "model": {
-    "profile": "local-general"
-  }
-}
-```
-
-The controller resolves the profile from server-side configuration.
+Agent definitions must not hard-code CT108 deployment details. The controller resolves model profiles from server-side configuration.
 
 Initial profiles:
 
@@ -181,7 +198,7 @@ Initial profiles:
 - `local-general` — routine homelab reasoning, diagnostics, and summaries.
 - `local-coder` — code/configuration analysis when a future development agent needs it.
 
-Production `local-general` should resolve to the deployed CT108 Ollama service and the currently approved local model, initially:
+Production `local-general` should resolve to the deployed CT108 Ollama service and currently approved local model, initially:
 
 ```text
 provider: ollama
@@ -202,6 +219,8 @@ Routing precedence:
 3. **Local-router classification.** If deterministic routing is ambiguous, the orchestrator may call the CT108 `local-router` profile. The router may return only a registered agent ID plus bounded routing metadata; it does not answer the operator's infrastructure question.
 4. **No safe match.** If no enabled agent safely owns the request, return `no-agent-match`. Phase 1 must not invent a destination.
 
+Only registered and enabled agents are eligible.
+
 Initial deterministic examples:
 
 - Proxmox, VM IDs, CT/LXC IDs -> Proxmox Observer.
@@ -209,13 +228,11 @@ Initial deterministic examples:
 - Authentik identity questions -> future Identity Agent when installed.
 - Emby/SABnzbd/media storage questions -> future Media Agent when installed.
 
-Only registered and enabled agents are eligible.
-
 ## Agent runtime
 
 The selected agent is loaded from the runtime registry and executed through the existing constrained local-agent runtime pattern.
 
-Every agent response must include provenance sufficient for the UI/operator to identify:
+Every agent response must identify:
 
 - agent ID/name;
 - model profile;
@@ -285,7 +302,7 @@ Representative response:
 }
 ```
 
-`POST /api/agents/registry/sync` may update only Friday-owned registry tables from the current Git-authoritative definitions. It cannot change infrastructure, execute tools, or edit Git.
+`POST /api/agents/registry/sync` may update only Friday-owned registry tables from current Git-authoritative definitions. It cannot change infrastructure, execute tools, edit Git, or accept replacement agent policy in the request body.
 
 All request bodies must have explicit bounds comparable to existing `/api/assistant` safeguards.
 
@@ -312,7 +329,7 @@ Phase 1 UI excludes:
 
 - create/edit/delete agent controls;
 - Supabase-authored agent policy changes;
-- enable/disable mutation controls unless separately designed;
+- enable/disable mutation controls;
 - run-tool buttons;
 - restart/start/stop/delete controls;
 - approval controls;
@@ -391,7 +408,7 @@ Non-negotiable requirements:
 - no SSH write execution;
 - no network/firewall/DNS/DHCP/VLAN changes;
 - no secrets in agent definitions, prompts, browser variables, or API responses;
-- no cloud fallback for Agent Spec v1 runtime;
+- no cloud fallback for Agent Spec v1.1 runtime;
 - no action may be represented as executed;
 - permission declarations remain policy metadata only until a separately designed executor enforces them;
 - destructive/undeclared actions remain forbidden by default.
@@ -404,8 +421,10 @@ Authentication/RBAC, durable action audit, approvals, global automation kill swi
 
 Prove:
 
-- required fields/profile references validate;
+- v1.1 required fields/profile references validate;
 - invalid profiles fail closed;
+- legacy v1.0 migration behavior is explicit and tested;
+- `enabled` defaults to true and remains Git-authoritative;
 - undeclared actions resolve to forbidden;
 - server-side profile resolution does not leak sensitive configuration;
 - existing prototype definitions are migrated to the profile-based contract.
@@ -441,6 +460,7 @@ Prove:
 - response provenance is preserved;
 - `execution.performed` is always false in Phase 1;
 - no agent endpoint exposes mutation operations;
+- registry sync cannot accept replacement policy from the browser;
 - failures are normalized and do not crash unrelated Friday APIs;
 - request bodies/history are bounded.
 
@@ -466,7 +486,7 @@ Prove:
 Phase 1 adds server-side configuration for:
 
 - self-hosted Supabase URL;
-- server-only Supabase credential appropriate to the limited Friday-owned registry schema;
+- server-only Supabase credential limited to the Friday-owned registry schema as narrowly as the deployed Supabase setup supports;
 - model profile definitions/resolution;
 - agent registry enablement/sync behavior.
 
@@ -502,7 +522,8 @@ Phase 1 does not include:
 - multi-agent execution workflows;
 - cloud fallback for agents;
 - agent creation/editing from the UI;
-- bidirectional Git/Supabase synchronization.
+- bidirectional Git/Supabase synchronization;
+- automatic deletion/retirement of registry entries when Git files disappear.
 
 These require later designs.
 
@@ -510,7 +531,7 @@ These require later designs.
 
 Phase 1 is complete when all of the following are true:
 
-1. Git remains authoritative for Agent Spec definitions.
+1. Git remains authoritative for Agent Spec v1.1 definitions and enabled state.
 2. Self-hosted Supabase contains a synchronized validated runtime registry and registry status.
 3. Invalid definitions fail closed and cannot overwrite valid runtime policy.
 4. Model profiles resolve agent inference to CT108 without deployment-specific model URLs in agent definitions.
