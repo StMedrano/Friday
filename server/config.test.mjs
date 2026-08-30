@@ -52,6 +52,26 @@ test('cloud providers require explicit models while OpenAI keeps its legacy defa
   assert.equal(config.ai.providers.ollama.maxTokens, 512)
 })
 
+test('agent model profiles stay local-only and server-side', () => {
+  const config = getConfig({
+    FRIDAY_AGENT_REGISTRY_ENABLED: 'true',
+    FRIDAY_AGENT_LOCAL_GENERAL_URL: 'http://192.168.1.70:11434',
+    FRIDAY_AGENT_LOCAL_GENERAL_MODEL: 'qwen3:4b-instruct',
+    FRIDAY_AGENT_LOCAL_GENERAL_CONTEXT: '8192',
+    FRIDAY_AGENT_LOCAL_GENERAL_MAX_TOKENS: '768',
+  })
+
+  assert.equal(config.agents.enabled, true)
+  assert.deepEqual(config.agents.modelProfiles['local-general'], {
+    provider: 'ollama',
+    baseUrl: 'http://192.168.1.70:11434',
+    model: 'qwen3:4b-instruct',
+    context: 8192,
+    maxTokens: 768,
+  })
+  assert.equal('apiKey' in config.agents.modelProfiles['local-general'], false)
+})
+
 test('VM100 observer config is disabled by default and stays server-side', () => {
   const defaults = getConfig({})
   assert.equal(defaults.vm100Observer.enabled, false)
