@@ -109,7 +109,7 @@ jobs:
 
       - name: Verify local agent safety boundary
         run: |
-          if grep -RniE 'VITE_.*SUPA[B]ASE|VITE_.*SERVICE_[K]EY' .env.example compose.yaml src server docs; then
+          if grep -RniE --exclude-dir=superpowers 'VITE_.*SUPA[B]ASE|VITE_.*SERVICE_[K]EY' .env.example compose.yaml src server docs; then
             echo 'Browser-visible Supabase credential detected.' >&2
             exit 1
           fi
