@@ -72,6 +72,26 @@ test('agent model profiles stay local-only and server-side', () => {
   assert.equal('apiKey' in config.agents.modelProfiles['local-general'], false)
 })
 
+test('agent registry Supabase config is disabled by default and server-only', () => {
+  const defaults = getConfig({})
+  assert.deepEqual(defaults.agents.registry, {
+    enabled: false,
+    supabaseUrl: '',
+    supabaseServiceKey: '',
+  })
+
+  const config = getConfig({
+    FRIDAY_AGENT_REGISTRY_ENABLED: 'true',
+    FRIDAY_SUPABASE_URL: 'http://192.168.1.80:8000',
+    FRIDAY_SUPABASE_SERVICE_KEY: 'registry-secret',
+  })
+  assert.deepEqual(config.agents.registry, {
+    enabled: true,
+    supabaseUrl: 'http://192.168.1.80:8000',
+    supabaseServiceKey: 'registry-secret',
+  })
+})
+
 test('VM100 observer config is disabled by default and stays server-side', () => {
   const defaults = getConfig({})
   assert.equal(defaults.vm100Observer.enabled, false)
