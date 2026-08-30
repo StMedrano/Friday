@@ -39,6 +39,7 @@ export function getConfig(env = process.env) {
   const legacyAiTimeoutMs = positiveNumber(env.FRIDAY_AI_REQUEST_TIMEOUT_MS, 20000)
   const cloudTimeoutFallback = legacyAiTimeoutProvided ? legacyAiTimeoutMs : 15000
   const localTimeoutFallback = legacyAiTimeoutProvided ? legacyAiTimeoutMs : 45000
+  const agentRegistryEnabled = enabled(env.FRIDAY_AGENT_REGISTRY_ENABLED)
 
   return {
     port: Number(env.FRIDAY_PORT || 3010),
@@ -79,7 +80,12 @@ export function getConfig(env = process.env) {
       enabled: enabled(env.FRIDAY_DIAGNOSTICS_ENABLED),
     },
     agents: {
-      enabled: enabled(env.FRIDAY_AGENT_REGISTRY_ENABLED),
+      enabled: agentRegistryEnabled,
+      registry: {
+        enabled: agentRegistryEnabled,
+        supabaseUrl: env.FRIDAY_SUPABASE_URL || '',
+        supabaseServiceKey: env.FRIDAY_SUPABASE_SERVICE_KEY || '',
+      },
       modelProfiles: {
         'local-router': localAgentProfile(env, 'LOCAL_ROUTER'),
         'local-general': localAgentProfile(env, 'LOCAL_GENERAL'),
