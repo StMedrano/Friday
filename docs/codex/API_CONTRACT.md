@@ -1,122 +1,40 @@
 # Friday API Contract
 
-Base URL is same-origin with the UI. Browser clients call relative `/api/...` paths. Provider credentials stay server-side.
+Base URL is same-origin with the UI. Browser clients call relative `/api/...` paths. Provider and registry credentials stay server-side.
 
-## `GET /healthz`
+## Core health/state
+
+### `GET /healthz`
 
 Container health probe.
 
-```json
-{"status":"ok","service":"friday","mode":"mock"}
-```
+### `GET /api/health`
 
-## `GET /api/health`
+Runtime health and feature flags.
 
-Runtime health and feature flags. Response includes `status`, `mode`, `ai`, and an ISO `time`.
+### `GET /api/overview`
 
-## `GET /api/overview`
+Returns normalized FRIDAY state. Fresh normalized state is the authoritative infrastructure boundary for assistant and local-agent reasoning.
 
-Returns normalized FRIDAY state. Primary fields include `mode`, `sites`, `services`, `resources`, `alerts`, `activities`, `integrations`, optional `incidents`, and optional `monitoring`.
+## Monitoring and diagnostics
 
-When monitoring is enabled and a poll has completed, the controller serves the cached normalized live overview decorated with current incidents and monitoring summary. Provider-specific payloads are normalized before this boundary.
+### `GET /api/incidents`
 
-## `GET /api/incidents`
+Returns FRIDAY-owned monitoring incidents. There is no incident mutation endpoint.
 
-Returns FRIDAY-owned monitoring incidents. Open incidents are returned before recently resolved incidents.
+### `GET /api/monitoring/history`
 
-```json
-{
-  "summary": {"active":1,"high":1,"warning":0,"resolved":0},
-  "incidents": [
-    {
-      "id":"...",
-      "type":"service-offline",
-      "severity":"high",
-      "status":"open",
-      "host":"VM 100",
-      "serviceName":"nginx-proxy-manager",
-      "recommendedAction":"...",
-      "evidence":["Exited (255)"]
-    }
-  ]
-}
-```
+Returns bounded recent FRIDAY-owned monitoring events newest-first. History must not contain provider credentials, authorization headers, or raw application logs.
 
-There is no POST/PUT/PATCH/DELETE incident mutation endpoint.
+### `GET /api/incidents/:incidentId/diagnostics`
 
-## `GET /api/monitoring/history`
+Returns the persisted safe diagnostic report for one existing incident when diagnostics are supported/enabled.
 
-Returns recent FRIDAY-owned monitoring events newest-first. Event types include service status changes, incident lifecycle events, integration degraded/recovered events, monitoring poll failures, and metadata-only diagnostic log-inspection events.
+### `GET /api/incidents/:incidentId/logs`
 
-The history is bounded by `FRIDAY_MONITORING_HISTORY_LIMIT` and must not contain provider credentials, authorization headers, or raw application logs.
+Performs explicit read-only bounded log inspection. Raw log text is response-only and is not persisted.
 
-## `GET /api/incidents/:incidentId/diagnostics`
-
-Returns the persisted safe diagnostic report for one existing incident. Diagnostics are environment-gated with:
-
-```env
-FRIDAY_DIAGNOSTICS_ENABLED=false
-```
-
-When disabled, a known incident returns a normalized `not-supported` response without contacting the observer. When enabled, supported VM100 container incidents can return:
-
-- `pending`
-- `available`
-- `degraded`
-- `unavailable`
-- `not-supported`
-
-Representative available response:
-
-```json
-{
-  "id":"diagnostic-INCIDENT_ID",
-  "incidentId":"INCIDENT_ID",
-  "source":"vm100-observer",
-  "host":"VM 100",
-  "serviceName":"nginx-proxy-manager",
-  "collectedAt":"2026-08-20T01:00:00.000Z",
-  "status":"available",
-  "metadata":{"state":"exited","exitCode":255,"oomKilled":false,"restartCount":0},
-  "facts":[{"id":"exit-code","label":"Exit code","value":"255"}],
-  "findings":["The container exited with an application/startup failure rather than an OOM termination."],
-  "likelyCauses":["Application or startup configuration failure is likely."],
-  "recommendations":["Inspect recent sanitized application logs and recent configuration/deployment changes."],
-  "logsAvailable":true,
-  "lastLogInspectionAt":null,
-  "error":null
-}
-```
-
-Facts are direct observations. Findings and likely causes are deterministic interpretations and must not be represented as observed evidence.
-
-Automatic collection occurs once when a supported incident opens. On diagnostics startup, existing open supported incidents without a report receive one safe backfill attempt. Normal monitoring polls do not repeatedly re-inspect an incident once its report exists.
-
-## `GET /api/incidents/:incidentId/logs`
-
-Performs the explicit read-only log inspection requested by the user. This endpoint is **not** called automatically when an incident opens.
-
-The controller requests a fixed 100-line tail from the VM100 observer. The observer caps requested tail at 200 and returns at most 64 KiB of sanitized log text, with `truncated:true` when clipping occurred.
-
-Representative response:
-
-```json
-{
-  "incidentId":"INCIDENT_ID",
-  "serviceName":"nginx-proxy-manager",
-  "host":"VM 100",
-  "tail":100,
-  "logs":"sanitized ephemeral text",
-  "truncated":false,
-  "observedAt":"2026-08-20T01:00:00.000Z"
-}
-```
-
-Raw log text is response-only. It is never written to `/data/monitoring-state.json`, monitoring history, or another FRIDAY durable store. FRIDAY may persist only metadata such as the incident, timestamp, tail count, success/failure, and truncation state.
-
-Unknown incidents return 404. Disabled/unsupported diagnostics return a non-success response without contacting the observer. Provider failure returns a sanitized diagnostic error and does not change incident status.
-
-No POST/PUT/PATCH/DELETE diagnostics or logs action route exists.
+There is no diagnostic remediation endpoint.
 
 ## `POST /api/commands/preview`
 
@@ -126,13 +44,11 @@ Deterministic safety classifier. It never executes infrastructure work.
 {"command":"check system health"}
 ```
 
-Response includes `accepted`, `mode:"preview"`, `command`, `destructive:false`, and a message or rejection reason.
+Response includes preview/rejection metadata and never represents infrastructure execution.
 
 ## `POST /api/assistant`
 
-Optional advisory AI analysis. Disabled unless `FRIDAY_AI_ENABLED=true`. The assistant receives normalized monitoring-aware state and no infrastructure execution tools.
-
-The request body accepts a required current `prompt` plus optional client-supplied conversational `history`:
+Optional general advisory AI analysis. The request accepts a required current `prompt` plus optional client-supplied conversational `history`.
 
 ```json
 {
@@ -144,62 +60,137 @@ The request body accepts a required current `prompt` plus optional client-suppli
 }
 ```
 
-`history` is optional, so the legacy `{ "prompt": "..." }` shape remains valid. The HTTP endpoint is stateless: there is no assistant session ID, server-side conversation store, database record, `/data` conversation persistence, or server clear/delete-session route. The browser owns the current in-memory session and sends bounded recent history with each request.
+The HTTP endpoint is stateless. The browser owns the current in-memory Friday session. Prompt/history inputs are bounded and sanitized before provider invocation. Fresh normalized Friday state is rebuilt for every request and remains authoritative over conversation context.
 
-Assistant input limits are enforced before provider invocation:
-
-- Current prompt is trimmed and must contain 1–4,000 characters. A 4,001-character prompt is rejected with HTTP 400 / `invalid-prompt`; it is not truncated.
-- History roles are exactly `user` or `assistant`. Malformed roles and empty entries are discarded.
-- Each historical message is trimmed and capped at 2,000 characters.
-- At most the newest 20 valid historical messages are retained.
-- Historical content is additionally capped at 12,000 total characters by dropping oldest retained messages first.
-- Non-array or omitted history normalizes to an empty history.
-
-Fresh normalized Friday state is rebuilt for every assistant request and is authoritative for infrastructure facts and identifiers. Previous conversation is contextual only, not infrastructure evidence. The deterministic local-analysis fallback receives only the current prompt and does not resolve ambiguous references from history.
-
-Preferred sequential provider order:
+Preferred general assistant sequence:
 
 ```text
 Groq -> Gemini -> CT108 Ollama -> deterministic local analysis
 ```
 
-Representative successful cloud response:
+The general assistant remains advisory and has no Docker, Proxmox, shell, network, deployment, or remediation tools.
+
+# Local Agent Platform Phase 1 API
+
+Phase 1 local agents are distinct from the general multi-provider assistant. Git is authoritative for definitions, self-hosted Supabase stores runtime registry state, and matched agents infer through CT108/Ollama only.
+
+All local-agent prompt inputs are trimmed, required to be non-empty, and capped at 4,000 characters. Agent IDs accept only bounded machine-readable IDs; path/query/control forms are rejected.
+
+## `GET /api/agents`
+
+Returns the sanitized enabled/runtime agent registry view for UI and routing.
+
+Representative item:
 
 ```json
 {
-  "available": true,
-  "mode": "cloud-ai",
-  "provider": "groq",
-  "model": "openai/gpt-oss-20b",
-  "text": "read-only advisory response",
-  "fallbackUsed": false,
-  "attempts": []
+  "version": "1.1",
+  "id": "proxmox-observer",
+  "name": "Proxmox Observer",
+  "description": "Read-only Proxmox inventory and diagnostics.",
+  "enabled": true,
+  "model": { "profile": "local-general" },
+  "scope": { "platforms": ["proxmox"] },
+  "tools": ["proxmox_read", "inventory_read"],
+  "source": {
+    "path": "agents/proxmox-observer.json",
+    "checksum": "...",
+    "syncedAt": "..."
+  }
 }
 ```
 
-Representative successful local response:
+If the registry is disabled/unavailable, the endpoint fails closed with a sanitized service error; it does not invent agents.
+
+## `GET /api/agents/:agentId`
+
+Returns one sanitized registered agent definition. Unknown agents return 404 / `agent-not-found`.
+
+## `GET /api/agents/registry/status`
+
+Returns the current Friday-owned registry sync state, including normalized status, last sync/source commit when available, counts of definitions seen/synced/rejected, and sanitized errors.
+
+## `POST /api/agents/registry/sync`
+
+Explicitly synchronizes valid Git-owned definitions into the runtime registry. The only accepted request body is an empty object:
+
+```json
+{}
+```
+
+This endpoint may update only the approved Friday registry tables. It does not edit Git definitions and does not execute infrastructure work. Extra request fields are rejected.
+
+## `POST /api/agents/route`
+
+Selects an enabled registered local agent for the supplied prompt.
+
+```json
+{"prompt":"Check Proxmox VM status"}
+```
+
+Routing precedence:
+
+1. valid explicit/manual agent override when supplied by the internal caller;
+2. deterministic routing for strong registered platform/scope language;
+3. CT108 `local-router` classification for ambiguity;
+4. safe no-match/unavailable result.
+
+The local router may return only an exact enabled registered candidate ID or no match. Unknown output and router failure do not invent a route.
+
+A route response identifies whether a match occurred, the selected `agentId` when matched, and routing provenance such as deterministic/manual/local-router.
+
+## `POST /api/agents/:agentId/ask`
+
+Runs one advisory request through the selected registered local agent using a fresh normalized Friday overview.
+
+```json
+{"prompt":"Check VM 100"}
+```
+
+Representative successful response:
 
 ```json
 {
   "available": true,
-  "mode": "local-ai",
+  "mode": "local-agent",
   "provider": "ollama",
+  "agentId": "proxmox-observer",
+  "agentName": "Proxmox Observer",
+  "modelProfile": "local-general",
   "model": "qwen3:4b-instruct",
   "text": "read-only advisory response",
-  "fallbackUsed": false,
-  "attempts": []
+  "execution": {
+    "performed": false,
+    "reason": "Phase 1 agents are advisory only."
+  }
 }
 ```
 
-When one or more configured providers fail before a later provider succeeds, `fallbackUsed` is true and `attempts` contains normalized provider/outcome entries. Provider errors are sanitized; raw upstream exceptions and credentials are not returned.
+A matched agent uses only its resolved local Ollama profile. It never falls back to Groq, Gemini, OpenAI, Anthropic, or the general assistant provider chain after a match. Local inference failure returns a sanitized local-agent unavailable result with `execution.performed=false`.
 
-If no configured AI provider can answer, Friday can return deterministic local analysis with `mode:"local-analysis"`, `provider:"deterministic"`, and no execution authority.
+## Shared Friday session routing
 
-The shared assistant policy requires exact service IDs, VM/LXC numbers, host names, and service-name mappings from normalized state. AI output is advisory only and cannot claim or authorize successful infrastructure execution.
+The browser's merged Friday session sends each new prompt through local-agent routing first. When a registered agent matches, the UI records the returned local-agent provenance on the same conversation surface. When no agent matches, the existing `/api/assistant` path remains the general advisory fallback.
+
+“No agent match” and “matched agent failed” are deliberately different:
+
+- **no match** -> normal Friday assistant may answer;
+- **matched agent local inference failure** -> return local-agent unavailable; do not cloud-fallback that matched request.
+
+## Phase 1 forbidden API surface
+
+The following capabilities do not exist in Phase 1:
+
+- agent create/edit/delete APIs;
+- restart/stop/start endpoints;
+- arbitrary agent tool execution;
+- shell/SSH execution;
+- approval/task/memory/action endpoints;
+- infrastructure mutation through an agent response.
+
+PUT/PATCH/DELETE agent mutation routes and POST execution/restart/tool routes must remain absent. Every successful local-agent result remains advisory with `execution.performed=false`.
 
 ## VM100 observer contract
-
-The controller's diagnostic APIs depend on the separately deployed observer at `192.168.1.124:3199`:
 
 ```text
 GET /health
@@ -208,8 +199,8 @@ GET /api/v1/containers/:id/inspect
 GET /api/v1/containers/:id/logs?tail=100
 ```
 
-The observer accepts only a known hexadecimal container ID obtained from its sanitized inventory. It is not a generic Docker API proxy.
+The observer is not a generic Docker API proxy.
 
 ## Future action APIs
 
-Do not add execution to the endpoints above. Action proposals, approvals, and execution must use separate policy-gated endpoints and durable action-audit IDs only after authentication/RBAC, approval workflow, and a global automation kill switch exist.
+Do not add execution to the endpoints above. Future actions require a separate, explicitly reviewed policy-gated design after authentication/RBAC, durable append-only action audit, explicit approval workflow, and a global automation kill switch exist and are tested.

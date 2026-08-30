@@ -14,11 +14,16 @@ Friday agents are local-first definitions that separate agent behavior from depl
 ## Optional fields
 
 - `description`: agent purpose.
-- `enabled`: Git-authoritative boolean; defaults to enabled when omitted by future loaders.
+- `enabled`: Git-authoritative boolean.
 - `scope.hosts`: host aliases the agent is allowed to target.
+- `scope.platforms`: platform families used for deterministic routing.
 - `instructions`: additional operational constraints.
 
 Agent Spec v1.1 must not include deployment-specific `model.provider`, `model.model`, `model.baseUrl`, `model.context`, or `model.maxTokens` fields. Those values belong to server-side model profiles so an agent definition remains portable between local Ollama deployments.
+
+## Source of truth
+
+Git under `agents/` is authoritative for definitions and enabled state. Self-hosted Supabase is a runtime registry/cache, not an authoring surface. The Phase 1 sync process validates Git definitions before updating registry rows; invalid changed definitions cannot replace the last known valid registry row, and a missing Git file does not silently delete a runtime row.
 
 ## Model profiles
 
@@ -28,30 +33,42 @@ The Friday controller resolves profile IDs such as:
 - `local-general` — routine homelab reasoning, diagnostics, and summaries.
 - `local-coder` — code/configuration analysis for future development agents.
 
-Profiles remain server-side and resolve to Ollama only in Phase 1. The production `local-general` profile initially targets CT108 at `http://192.168.1.70:11434` with `qwen3:4b-instruct`.
+Profiles resolve to **Ollama only** in Phase 1. The initial VM102 configuration points the local profiles to CT108 (`192.168.1.70:11434`) and `qwen3:4b-instruct`.
+
+## Routing
+
+Agent selection supports three paths:
+
+1. explicit/manual agent override;
+2. deterministic routing for strong registered scope/platform language;
+3. the bounded `local-router` Ollama profile for ambiguous requests.
+
+The router may select only an enabled registered agent ID or return no match. Unknown router output is rejected. A matched agent is then run only through its resolved local Ollama model profile; it does **not** fall back to Friday's cloud assistant providers.
 
 ## Permission modes
 
 Every declared action must use one of three modes:
 
-- `auto`: policy metadata for an action that may eventually be eligible for automatic execution after the required executor/audit safety architecture exists.
-- `approval`: policy metadata for an action that would require explicit operator approval in a future controlled-action phase.
+- `auto`: future policy metadata only;
+- `approval`: future policy metadata for an action that would require operator approval;
 - `forbidden`: Friday must not execute the action.
 
-Any action that is not declared defaults to `forbidden`.
+Any undeclared action defaults to `forbidden`.
 
-**Phase 1 does not implement a tool executor.** All permission values are descriptive policy metadata only and no agent action is executed.
+**Phase 1 does not implement a tool executor.** Permission values are descriptive policy metadata only.
 
 ## Safety model
 
-The model receives no unrestricted shell access and no infrastructure mutation tools. It can reason about declared tools and suggest actions, but it cannot invoke them in Phase 1. Friday must never claim an infrastructure action ran unless a future separately designed executor actually returns a verified result.
+The model receives no unrestricted shell access and no infrastructure mutation tools. It can reason about declared tools and suggest actions, but it cannot invoke them in Phase 1. Every successful local-agent response carries `execution.performed=false`; Friday must never claim an infrastructure action ran unless a future separately designed executor returns a verified result.
 
-The first shipped agent, `agents/proxmox-observer.json`, is intentionally diagnostic-first. Destructive operations such as VM deletion and disk formatting remain forbidden.
+The first shipped definition, `agents/proxmox-observer.json`, is intentionally diagnostic/read-only. Destructive operations remain forbidden.
 
 ## Runtime
 
-`server/ai/agent-runtime.mjs` validates the v1.1 definition, constructs a constrained system prompt, and delegates inference to Friday's existing Ollama provider using a separately resolved model profile. Agent JSON never selects a cloud provider and never embeds CT108 credentials or deployment-specific model endpoints.
+`server/ai/agent-runtime.mjs` validates the v1.1 definition, constructs a constrained system prompt, and delegates inference to Friday's existing Ollama transport using a resolved model profile. Agent JSON never selects a cloud provider and never embeds CT108 credentials or deployment-specific model endpoints.
 
-## Next implementation milestone
+Phase 1 registry, routing, API, shared-session auto-routing, manual override, and the read-only Agents workspace are implemented in PR #19. Live VM102/Supabase/UI acceptance remains a separate rollout gate before the PR is ready to merge.
 
-Phase 1 builds the registry, routing, API, and read-only Agents workspace around this contract. A typed tool registry/executor remains a later milestone and must not be introduced until authentication, RBAC, durable action audit, approval infrastructure, and the global automation kill switch are implemented and tested.
+## Future executor prerequisite
+
+A typed tool registry/executor remains a later milestone. Do not add it until authentication/RBAC, durable append-only action audit, explicit approval infrastructure, and a global automation kill switch are implemented and tested.
