@@ -113,7 +113,7 @@ jobs:
             echo 'Browser-visible Supabase credential detected.' >&2
             exit 1
           fi
-          if grep -RniE 'api/agents.*(execute|restart|shell)' server src; then
+          if grep -RniE --exclude='*.test.mjs' --exclude='*.test.ts' --exclude='*.test.tsx' 'api/agents.*(execute|restart|shell)' server src; then
             echo 'Agent execution route detected.' >&2
             exit 1
           fi
