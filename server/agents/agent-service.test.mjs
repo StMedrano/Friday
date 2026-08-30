@@ -32,7 +32,7 @@ const config = {
   },
   ai: {
     providerOrder: ['groq', 'gemini', 'ollama'],
-    providers: { groq: { apiKey: 'must-not-use' } },
+    providers: { groq: { apiKey: 'must-not-use' }, gemini: { apiKey: 'must-not-use' } },
   },
 }
 
@@ -84,6 +84,49 @@ test('agent ask uses fresh authoritative overview and only the agent model profi
     text: 'VM 100 is online.',
     execution: { performed: false, reason: 'Phase 1 agents are advisory only.' },
   })
+})
+
+test('matched local agent succeeds while configured cloud providers remain completely unused', async () => {
+  let localCalls = 0
+  let cloudCalls = 0
+  const cloudProvider = async () => { cloudCalls += 1; return { text: 'must not run' } }
+  const service = createAgentService({
+    registryService: registry(),
+    config: { ...config, cloudProvider },
+    runLocalAgentImpl: async () => {
+      localCalls += 1
+      return { provider: 'ollama', model: 'qwen3:4b-instruct', text: 'Local-only answer.' }
+    },
+  })
+
+  const result = await service.ask('proxmox-observer', { prompt: 'Inspect Proxmox', overview: { mode: 'live' } })
+  assert.equal(localCalls, 1)
+  assert.equal(cloudCalls, 0)
+  assert.equal(result.provider, 'ollama')
+  assert.equal(result.mode, 'local-agent')
+  assert.equal(result.text, 'Local-only answer.')
+})
+
+test('action-like restart prompt remains advisory and exposes no executor path', async () => {
+  let seen
+  const service = createAgentService({
+    registryService: registry(),
+    config,
+    runLocalAgentImpl: async (input) => {
+      seen = input
+      return { provider: 'ollama', model: 'qwen3:4b-instruct', text: 'I can describe restart checks, but I cannot execute them.' }
+    },
+  })
+
+  const result = await service.ask('proxmox-observer', {
+    prompt: 'Restart VM 100 now',
+    overview: { mode: 'live', services: [{ id: 'proxmox-qemu-100', status: 'offline' }] },
+  })
+
+  assert.equal('executor' in seen, false)
+  assert.equal('execute' in seen, false)
+  assert.deepEqual(result.execution, { performed: false, reason: 'Phase 1 agents are advisory only.' })
+  assert.equal(result.mode, 'local-agent')
 })
 
 test('missing or disabled agent fails before local inference', async () => {
