@@ -7,6 +7,7 @@ import { createFileMonitoringStore } from './monitoring/store.mjs'
 import { createSupabaseRegistryClient } from './agents/supabase-client.mjs'
 import { createAgentRegistryService } from './agents/registry-service.mjs'
 import { syncAgentRegistry } from './agents/registry-sync.mjs'
+import { createAgentService } from './agents/agent-service.mjs'
 
 const config = getConfig()
 const store = createFileMonitoringStore({ statePath: config.monitoring.statePath })
@@ -19,6 +20,7 @@ const monitoringRuntime = createMonitoringRuntime({
 await monitoringRuntime.start()
 
 let agentRegistryService = null
+let agentService = null
 if (config.agents.registry.enabled) {
   const registryClient = createSupabaseRegistryClient({
     baseUrl: config.agents.registry.supabaseUrl,
@@ -33,6 +35,10 @@ if (config.agents.registry.enabled) {
       modelProfiles: config.agents.modelProfiles,
     },
   })
+  agentService = createAgentService({
+    registryService: agentRegistryService,
+    config,
+  })
 
   try {
     await agentRegistryService.sync()
@@ -41,7 +47,7 @@ if (config.agents.registry.enabled) {
   }
 }
 
-const server = createFridayServer({ config, monitoringRuntime, agentRegistryService })
+const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService })
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`Friday listening on 0.0.0.0:${config.port} (${config.mode} mode)`)
 })
