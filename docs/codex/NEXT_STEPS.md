@@ -2,9 +2,10 @@
 
 Work from top to bottom. Do not skip safety prerequisites to reach action features sooner.
 
-## P0 — VM100 observer baseline — completed
+## P0 — VM100 observer baseline — completed; nic1 example migrated
 
-- VM100 is static at `192.168.1.124` and observer port `3199` is the read-only Docker boundary.
+- VM100's verified nic1 address is `10.1.10.10/24` on VLAN 10; observer port `3199` remains the read-only Docker boundary.
+- `192.168.1.124` is the legacy vmbr0 rollback address.
 - VM102 uses the observer with local controller Docker observation disabled in normal production operation.
 - Docker's native TCP API remains unexposed.
 
@@ -43,7 +44,7 @@ Completed behavior:
 
 The old “finish Friday Assistant experience” milestone is retired.
 
-## P5 — Local Agent Platform Phase 1 — implementation complete; live acceptance next
+## P5 — Local Agent Platform Phase 1 — implementation complete; network validation and live acceptance next
 
 Draft PR #19 implements the Phase 1 local advisory agent platform.
 
@@ -54,22 +55,23 @@ Implemented source behavior:
 3. Agent Spec v1.1 uses server-resolved local model profiles.
 4. Routing order is manual override -> deterministic match -> bounded CT108 local-router for ambiguity.
 5. A matched agent runs through CT108/local Ollama only; matched-agent failure never falls back to cloud AI.
-6. Shared Friday composer automatically routes matched requests; no-match preserves the existing assistant path.
+6. Server-side `POST /api/assistant` automatically routes matched requests using the same current overview; no-match or routing-service unavailability preserves the existing assistant path.
 7. The Agents workspace supports registry visibility, explicit sync, agent details, manual selection, and direct ask.
 8. Every Phase 1 response remains advisory with `execution.performed=false`.
 9. CI validates the exact two-table schema and rejects agent execution routes, shell/SSH paths, and browser-visible Supabase credentials.
 
 ### Required live acceptance before PR #19 merge readiness
 
-1. Apply `supabase/migrations/202608300001_friday_agent_registry.sql` to self-hosted Supabase/Postgres.
-2. Back up/preserve VM102 `.env`, then configure only the server-side Phase 1 variables from `.env.example`.
-3. Rebuild the Friday controller without changing unrelated infrastructure.
-4. Verify `GET /api/agents` and `GET /api/agents/registry/status`.
-5. Run `POST /api/agents/registry/sync` with `{}` and verify a healthy sync.
-6. Route a Proxmox prompt and verify `proxmox-observer` is selected.
-7. Directly ask `proxmox-observer` and require `provider:"ollama"`, `mode:"local-agent"`, expected model/profile, and `execution.performed:false`.
-8. Send a Proxmox request through the normal shared Friday composer and verify automatic local-agent routing/provenance.
-9. Complete desktop and phone Agents workspace acceptance and confirm no action controls appear.
+1. Verify CT108's configured `10.1.10.12/24` nic1 address from inside CT108 and verify TCP/11434, `/api/tags`, and `/api/chat` from authoritative VM102; do not migrate agent URLs before all checks pass.
+2. Apply `supabase/migrations/202608300001_friday_agent_registry.sql` to self-hosted Supabase/Postgres.
+3. Back up/preserve VM102 `.env`, then configure only the server-side Phase 1 variables from `.env.example`.
+4. Rebuild the Friday controller without changing unrelated infrastructure.
+5. Verify `GET /api/agents` and `GET /api/agents/registry/status`.
+6. Run `POST /api/agents/registry/sync` with `{}` and verify a healthy sync.
+7. Route a Proxmox prompt and verify `proxmox-observer` is selected.
+8. Directly ask `proxmox-observer` and require `provider:"ollama"`, `mode:"local-agent"`, expected model/profile, and `execution.performed:false`.
+9. Send a Proxmox request through the normal shared Friday composer and verify automatic local-agent routing/provenance.
+10. Complete desktop and phone Agents workspace acceptance and confirm no action controls appear.
 
 Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execution, restart endpoints, or cloud fallback for matched agents as part of this rollout.
 

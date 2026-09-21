@@ -1,12 +1,12 @@
 import { useRef, useState } from 'react'
 import {
-  askFridayAgent,
   askFridayAssistant,
-  routeFridayAgent,
-  type FridayAgentRouting,
+  type FridayAgentExecution,
+  type FridayAgentRoutingProvenance,
   type FridayAssistantAttempt,
   type FridayAssistantHistoryMessage,
   type FridayAssistantMode,
+  type FridayAssistantResponse,
 } from '../lib/api'
 
 export type FridaySessionMessage = {
@@ -20,7 +20,8 @@ export type FridaySessionMessage = {
   modelProfile?: string
   agentId?: string
   agentName?: string
-  routing?: FridayAgentRouting
+  routing?: FridayAgentRoutingProvenance
+  execution?: FridayAgentExecution
   fallbackUsed?: boolean
   attempts?: FridayAssistantAttempt[]
 }
@@ -49,6 +50,13 @@ function completedHistory(messages: FridaySessionMessage[]): FridayAssistantHist
     }
   }
   return pairs.slice(-10).flat()
+}
+
+function assistantFailureResponse(error: unknown): FridayAssistantResponse | undefined {
+  if (!error || typeof error !== 'object' || !('response' in error)) return undefined
+  const response = (error as { response?: unknown }).response
+  if (!response || typeof response !== 'object') return undefined
+  return response as FridayAssistantResponse
 }
 
 export function useFridaySession(): FridaySession {
@@ -99,42 +107,6 @@ export function useFridaySession(): FridaySession {
     replaceMessages([...messagesRef.current, userMessage, assistantMessage])
 
     try {
-      let route = null
-      try {
-        route = await routeFridayAgent(text)
-      } catch {
-        route = null
-      }
-
-      if (route?.matched === true && route.agentId) {
-        try {
-          const result = await askFridayAgent(route.agentId, text)
-          updateAssistant(assistantId, {
-            text: result.text || result.reason || 'Friday agent returned no response text.',
-            status: 'complete',
-            mode: 'local-agent',
-            provider: result.provider,
-            model: result.model,
-            modelProfile: result.modelProfile,
-            agentId: result.agentId || route.agentId,
-            agentName: result.agentName || route.agentName,
-            routing: route.routing,
-            fallbackUsed: false,
-            attempts: [],
-          })
-        } catch (error) {
-          updateAssistant(assistantId, {
-            text: error instanceof Error ? error.message : 'Local agent inference unavailable',
-            status: 'error',
-            mode: 'local-agent',
-            agentId: route.agentId,
-            agentName: route.agentName,
-            routing: route.routing,
-          })
-        }
-        return
-      }
-
       const result = await askFridayAssistant(text, { history })
       updateAssistant(assistantId, {
         text: result.text || result.reason || 'Friday returned no response text.',
@@ -142,13 +114,29 @@ export function useFridaySession(): FridaySession {
         mode: result.mode,
         provider: result.provider,
         model: result.model,
+        modelProfile: result.modelProfile,
+        agentId: result.agentId,
+        agentName: result.agentName,
+        routing: result.routing,
+        execution: result.execution,
         fallbackUsed: result.fallbackUsed,
         attempts: result.attempts,
       })
     } catch (error) {
+      const response = assistantFailureResponse(error)
       updateAssistant(assistantId, {
         text: error instanceof Error ? error.message : 'Friday assistant unavailable',
         status: 'error',
+        mode: response?.mode,
+        provider: response?.provider,
+        model: response?.model,
+        modelProfile: response?.modelProfile,
+        agentId: response?.agentId,
+        agentName: response?.agentName,
+        routing: response?.routing,
+        execution: response?.execution,
+        fallbackUsed: response?.fallbackUsed,
+        attempts: response?.attempts,
       })
     } finally {
       loadingRef.current = false

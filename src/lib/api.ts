@@ -8,9 +8,15 @@ export type FridayAssistantAttempt = { provider: string; outcome: string }
 
 export type FridayAssistantResponse = {
   available: boolean
+  error?: string
   mode?: FridayAssistantMode
   provider?: string
   model?: string | null
+  modelProfile?: string
+  agentId?: string
+  agentName?: string
+  routing?: FridayAgentRoutingProvenance
+  execution?: FridayAgentExecution
   text?: string
   reason?: string
   fallbackUsed?: boolean
@@ -20,6 +26,13 @@ export type FridayAssistantResponse = {
 export type FridayAssistantHistoryMessage = { role: 'user' | 'assistant'; content: string }
 export type FridayAssistantRequestOptions = { history?: FridayAssistantHistoryMessage[]; signal?: AbortSignal }
 export type FridayAgentRouting = 'manual' | 'deterministic' | 'local-router' | 'none'
+
+export type FridayAgentRoutingProvenance = {
+  matched: true
+  method: FridayAgentRouting
+  confidence: number
+  reason: string
+}
 
 export type FridayAgentRouteResponse = {
   matched: boolean
@@ -119,7 +132,9 @@ export function useFridayOverview() {
 export async function askFridayAssistant(prompt: string, { history = [], signal }: FridayAssistantRequestOptions = {}): Promise<FridayAssistantResponse> {
   const response = await fetch('/api/assistant', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt, history }), signal })
   const body = await response.json() as FridayAssistantResponse
-  if (!response.ok) throw new Error(body.reason || 'Friday assistant unavailable')
+  if (!response.ok) {
+    throw Object.assign(new Error(body.reason || 'Friday assistant unavailable'), { response: body })
+  }
   return body
 }
 

@@ -60,7 +60,34 @@ Optional general advisory AI analysis. The request accepts a required current `p
 }
 ```
 
-The HTTP endpoint is stateless. The browser owns the current in-memory Friday session. Prompt/history inputs are bounded and sanitized before provider invocation. Fresh normalized Friday state is rebuilt for every request and remains authoritative over conversation context.
+The HTTP endpoint is stateless. The browser owns the current in-memory Friday session. Prompt/history inputs are bounded and sanitized before provider invocation. Fresh normalized Friday state is rebuilt exactly once for every request and remains authoritative over conversation context.
+
+When the agent service is available, this endpoint routes first. A matched registered agent receives that same current overview and returns immediately through local Ollama. A successful match does not invoke the general provider chain. If routing returns no match, or the routing service itself is unavailable, the general assistant behavior below is preserved. If a matched agent's local inference fails, the endpoint returns `local-agent-unavailable` and never invokes a cloud/general provider.
+
+Representative auto-routed response:
+
+```json
+{
+  "available": true,
+  "mode": "local-agent",
+  "provider": "ollama",
+  "model": "qwen3:4b-instruct",
+  "modelProfile": "local-general",
+  "agentId": "proxmox-observer",
+  "agentName": "Proxmox Observer",
+  "routing": {
+    "matched": true,
+    "method": "deterministic",
+    "confidence": 0.98,
+    "reason": "Strong Proxmox scope match."
+  },
+  "text": "read-only grounded advisory response",
+  "execution": {
+    "performed": false,
+    "reason": "Phase 1 agents are advisory only."
+  }
+}
+```
 
 Preferred general assistant sequence:
 
@@ -170,7 +197,7 @@ A matched agent uses only its resolved local Ollama profile. It never falls back
 
 ## Shared Friday session routing
 
-The browser's merged Friday session sends each new prompt through local-agent routing first. When a registered agent matches, the UI records the returned local-agent provenance on the same conversation surface. When no agent matches, the existing `/api/assistant` path remains the general advisory fallback.
+The browser's merged Friday session sends each new prompt once to `/api/assistant`. The server performs local-agent routing before any general provider call. When a registered agent matches, the UI records the returned local-agent provenance on the same conversation surface. When no agent matches, `/api/assistant` continues through the general advisory path.
 
 “No agent match” and “matched agent failed” are deliberately different:
 

@@ -13,6 +13,29 @@ const publicDir = join(__dirname, '..', 'dist')
 const SAFE_INCIDENT_ID = /^[A-Za-z0-9_.-]{1,256}$/
 const NO_AGENT_EXECUTION = { performed: false, reason: 'Phase 1 agents are advisory only.' }
 
+function matchedRoutingProvenance(route = {}) {
+  return {
+    matched: true,
+    method: route.routing || 'none',
+    confidence: Number.isFinite(route.confidence) ? route.confidence : 0,
+    reason: route.reason || 'Registered agent matched.',
+  }
+}
+
+function localAgentUnavailable(route = {}) {
+  return {
+    available: false,
+    mode: 'local-agent',
+    provider: 'ollama',
+    error: 'local-agent-unavailable',
+    ...(route.agentId ? { agentId: route.agentId } : {}),
+    ...(route.agentName ? { agentName: route.agentName } : {}),
+    reason: 'Local agent inference unavailable.',
+    routing: matchedRoutingProvenance(route),
+    execution: { ...NO_AGENT_EXECUTION },
+  }
+}
+
 const mime = {
   '.html': 'text/html; charset=utf-8',
   '.js': 'text/javascript; charset=utf-8',
@@ -274,6 +297,39 @@ export function createFridayServer({
 
         const history = normalizeAssistantHistory(body.history)
         const overview = await currentOverview({ config, monitoringRuntime, buildOverviewImpl })
+
+        let route = null
+        if (agentService) {
+          try {
+            route = await agentService.route({ prompt: promptResult.prompt })
+          } catch {
+            route = null
+          }
+        }
+
+        if (route?.matched === true) {
+          if (!route.agentId) return json(response, 503, localAgentUnavailable(route))
+          try {
+            const agentResult = await agentService.ask(route.agentId, {
+              prompt: promptResult.prompt,
+              overview,
+            })
+            const routedResult = {
+              ...agentResult,
+              mode: 'local-agent',
+              provider: 'ollama',
+              ...(!agentResult.agentId ? { agentId: route.agentId } : {}),
+              ...(!agentResult.agentName && route.agentName ? { agentName: route.agentName } : {}),
+              ...(!agentResult.available ? { error: 'local-agent-unavailable' } : {}),
+              routing: matchedRoutingProvenance(route),
+              execution: { ...NO_AGENT_EXECUTION },
+            }
+            return json(response, routedResult.available ? 200 : 503, routedResult)
+          } catch {
+            return json(response, 503, localAgentUnavailable(route))
+          }
+        }
+
         const result = await answerAssistantImpl({
           config,
           prompt: promptResult.prompt,
@@ -286,6 +342,10 @@ export function createFridayServer({
       } catch {
         return json(response, 502, { available: false, error: 'assistant-failed' })
       }
+    }
+
+    if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname.startsWith('/api/')) {
+      return json(response, 404, { error: 'not-found' })
     }
 
     if (request.method === 'GET' || request.method === 'HEAD') {

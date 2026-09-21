@@ -11,7 +11,8 @@ Friday's core agent capability must work inside the homelab without requiring Op
 ```text
 Operator
   -> Friday UI / shared Friday session
-      -> local agent route
+      -> POST /api/assistant
+      -> server-side local agent route
            -> explicit/manual override
            -> deterministic registered-agent match
            -> CT108 local-router when ambiguous
@@ -74,7 +75,7 @@ VM102 resolves profile IDs server-side. Phase 1 profiles are Ollama-only:
 - `local-general` — routine diagnostics, inventory reasoning, and summaries;
 - `local-coder` — local code/configuration analysis for future development agents.
 
-The initial deployment uses CT108 at `http://192.168.1.70:11434` with `qwen3:4b-instruct`. Keep TCP/11434 restricted to VM102.
+Live Proxmox configuration discovery found CT108 nic1 at `10.1.10.12/24` on VLAN 10, but inside-CT verification and VM102 TCP/11434, `/api/tags`, and `/api/chat` checks are still pending. The checked-in agent defaults therefore intentionally remain on the labeled legacy vmbr0 rollback endpoint `http://192.168.1.70:11434`; do not substitute `10.1.10.12` until every required validation passes. Keep TCP/11434 restricted to VM102.
 
 Model profiles make agents portable: changing a local model or Ollama endpoint does not require rewriting each agent definition.
 
@@ -88,7 +89,7 @@ Routing is bounded to enabled registered agents:
 4. Local-router output must be an exact enabled candidate ID or no-match.
 5. Router failure returns a safe unavailable/no-match result rather than inventing an agent.
 
-The shared Friday session calls this routing layer before the general assistant. Manual direct ask is also available from the Agents workspace.
+The server-side `/api/assistant` endpoint calls this routing layer before the general assistant. Manual direct ask is also available from the Agents workspace.
 
 ## Phase 1 API
 
@@ -107,7 +108,7 @@ There is no create/edit/delete agent API and no execute/restart/shell/tool endpo
 
 ## Shared session behavior
 
-The existing merged Friday Assistant session remains browser-memory-only. For each new user message:
+The existing merged Friday Assistant session remains browser-memory-only. For each new user message, the browser makes one `/api/assistant` request and the server:
 
 - a matched local agent can answer first;
 - local-agent provenance is stored on the same session message surface;
@@ -174,6 +175,8 @@ FRIDAY_AGENT_LOCAL_CODER_MODEL=qwen3:4b-instruct
 FRIDAY_AGENT_MODEL_CONTEXT=8192
 FRIDAY_AGENT_MODEL_MAX_TOKENS=768
 ```
+
+These `192.168.1.70` URL values are intentionally documented legacy rollback defaults. They are not evidence that CT108 nic1 migration has passed acceptance.
 
 Do not place the Supabase service key or local infrastructure secrets in browser variables or Git.
 

@@ -9,7 +9,7 @@ Friday is an infrastructure control plane. Its default posture is visibility fir
 - Proxmox: accessed through a dedicated read-only API token.
 - VM100 Docker: observed through the separate token-authenticated read-only observer; Docker's native TCP API is never exposed.
 - AI providers: receive normalized Friday state and a shared advisory/read-only policy, never infrastructure mutation tools.
-- CT108 Ollama: GPU-backed local provider on `192.168.1.70:11434`; its firewall should permit access only from VM102.
+- CT108 Ollama: GPU-backed local provider. `192.168.1.70:11434` remains an explicitly labeled legacy vmbr0 rollback endpoint; nic1 is configured as `10.1.10.12`, pending required inside-CT and VM102 Ollama validation. Its firewall should permit access only from VM102.
 - Optional Compose Ollama: private development/recovery service with no host/LAN-published port.
 - Network devices: remain authoritative for routing, VPN, VLAN, DHCP, DNS, and firewall policy.
 

@@ -1,6 +1,6 @@
 # VM 100 Integration
 
-VM 100 (`192.168.1.124`) is managed infrastructure. FRIDAY itself runs on VM 102. VM 100 hosts only the standalone read-only Docker observer for FRIDAY.
+VM 100 nic1 (`10.1.10.10/24`, VLAN 10) is managed infrastructure. Its legacy vmbr0 rollback address is `192.168.1.124`. FRIDAY itself runs on VM 102. VM 100 hosts only the standalone read-only Docker observer for FRIDAY.
 
 ## Observer deployment location
 
@@ -11,7 +11,7 @@ VM 100 (`192.168.1.124`) is managed infrastructure. FRIDAY itself runs on VM 102
 ## Observer port
 
 ```text
-192.168.1.124:3199
+10.1.10.10:3199
 ```
 
 Before deployment:
@@ -30,7 +30,7 @@ Use the files under `observer/`. Copy `.env.example` to `.env`, set a strong `FR
 docker compose config >/dev/null
 docker compose up -d --build
 docker compose ps
-curl -fsS http://192.168.1.124:3199/health
+curl -fsS http://10.1.10.10:3199/health
 ```
 
 From VM 102, a request without a bearer token must return `401`; a request with the configured token may read sanitized container inventory from `/api/v1/containers`.

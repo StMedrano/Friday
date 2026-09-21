@@ -1,6 +1,6 @@
 # Friday
 
-Friday is a two-site homelab control plane hosted on **VM102 (`friday-controller`, `192.168.1.64`)**. The production architecture combines FRIDAY UI v3, server-side read-only infrastructure adapters, monitoring/incidents, incident diagnostics, a mobile operations shell, the shared advisory Friday Assistant, and a local-first advisory agent platform without exposing privileged credentials to the browser.
+Friday is a two-site homelab control plane hosted on **VM102 (`friday-controller`)**. Live discovery on 2026-09-21 found VM102 nic1 at `10.1.10.11/24` on VLAN 10, and the deployed service responds on `10.1.10.11:3010`; legacy vmbr0 `192.168.1.64:3010` remains reachable as a rollback path. The production architecture combines FRIDAY UI v3, server-side read-only infrastructure adapters, monitoring/incidents, incident diagnostics, a mobile operations shell, the shared advisory Friday Assistant, and a local-first advisory agent platform without exposing privileged credentials to the browser.
 
 ## Authoritative build
 
@@ -8,9 +8,9 @@ Friday is a two-site homelab control plane hosted on **VM102 (`friday-controller
 
 Host roles:
 
-- VM102 `192.168.1.64` — Friday controller.
-- VM100 `192.168.1.124` — managed infrastructure + separate read-only Docker observer on port `3199`.
-- CT108 `192.168.1.70` — local Ollama model host.
+- VM102 nic1 `10.1.10.11` (VLAN 10) — authoritative Friday controller; `192.168.1.64` is legacy vmbr0 rollback.
+- VM100 nic1 `10.1.10.10` (VLAN 10) — managed infrastructure + separate read-only Docker observer on port `3199`; `192.168.1.124` is legacy vmbr0 rollback.
+- CT108 nic1 is configured as `10.1.10.12` (VLAN 10), but inside-guest and VM102-to-Ollama validation is pending; do not migrate the agent URLs yet.
 
 ## Current main baseline
 
@@ -142,6 +142,8 @@ FRIDAY_AGENT_MODEL_CONTEXT=8192
 FRIDAY_AGENT_MODEL_MAX_TOKENS=768
 ```
 
+The three `192.168.1.70` values above are intentionally retained legacy vmbr0 rollback defaults. Do not replace them with the discovered CT108 nic1 address until that address is verified from inside CT108 and VM102 successfully reaches TCP/11434, `/api/tags`, and `/api/chat` over vmbr1.
+
 Never commit the production `.env` or expose the Supabase service key/provider credentials through browser configuration.
 
 After configuration, rebuild only Friday and verify normal health:
@@ -156,7 +158,7 @@ make health
 Set the deployed Friday base URL:
 
 ```bash
-BASE=http://192.168.1.64:3010
+BASE=http://10.1.10.11:3010
 ```
 
 ## 1. Registry list and status
@@ -228,7 +230,7 @@ Normal production keeps controller-local Docker observation disabled:
 FRIDAY_MODE=live
 FRIDAY_DOCKER_ENABLED=false
 FRIDAY_VM100_OBSERVER_ENABLED=true
-FRIDAY_VM100_OBSERVER_URL=http://192.168.1.124:3199
+FRIDAY_VM100_OBSERVER_URL=http://10.1.10.10:3199
 FRIDAY_VM100_OBSERVER_TOKEN=
 FRIDAY_VM100_OBSERVER_HOST_NAME=VM 100
 ```

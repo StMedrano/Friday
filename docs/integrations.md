@@ -7,7 +7,7 @@ Friday integrations are server-side and read-only unless a future action adapter
 - Inventory adapter: `server/adapters/vm100-observer.mjs`
 - Diagnostics adapter: `server/adapters/vm100-observer-diagnostics.mjs`
 - Observer service: `observer/`
-- Transport: bearer-authenticated HTTP from VM102 to VM100 on `192.168.1.124:3199`.
+- Transport: bearer-authenticated HTTP from VM102 to VM100 nic1 on `10.1.10.10:3199` (VLAN 10).
 - Observer Docker access: local Unix socket only.
 - Purpose: sanitized VM100 container inventory plus narrowly scoped read-only incident diagnostics.
 - Never expose Docker's native TCP API.
@@ -79,6 +79,8 @@ Registry sync is explicit and Git-owned. It is not an agent editor and cannot cr
 ### CT108 local Ollama agent inference
 
 Agent profiles are server-side and Ollama-only:
+
+The values below are intentionally retained **legacy vmbr0 rollback defaults**. CT108 nic1 is configured as `10.1.10.12/24` on VLAN 10, but do not change active profile URLs until the address is verified from inside CT108 and authoritative VM102 passes TCP/11434, `/api/tags`, and `/api/chat` checks.
 
 ```env
 FRIDAY_AGENT_LOCAL_ROUTER_URL=http://192.168.1.70:11434

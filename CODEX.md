@@ -24,7 +24,7 @@ Friday is a real single-container control-plane MVP on VM102 with separate read-
 - `/api/assistant` provides advisory analysis with sequential provider failover.
 - Preferred production provider order is `groq,gemini,ollama`.
 - OpenAI and Anthropic adapters remain available for explicit compatibility but are not in the default provider order.
-- CT108 (`192.168.1.70`) runs native Ollama with `qwen3:4b-instruct` on the Radeon 780M through RADV/Vulkan.
+- CT108 runs native Ollama with `qwen3:4b-instruct` on the Radeon 780M through RADV/Vulkan. Proxmox config places nic1 at `10.1.10.12/24` on VLAN 10, but migration is blocked until inside-CT and VM102 Ollama checks pass; `192.168.1.70` is a legacy vmbr0 rollback example.
 - Cloud timeout default is 15 seconds; local timeout default is 45 seconds.
 - Deterministic local analysis is the final non-AI fallback.
 - The AI policy requires exact preservation of service IDs, VM/LXC numbers, host names, and service-name mappings from normalized state.
@@ -32,16 +32,17 @@ Friday is a real single-container control-plane MVP on VM102 with separate read-
 - No infrastructure mutation endpoint exists.
 
 ## Homelab environment
-- Proxmox VE host: `192.168.1.211`.
-- VM 100 (`ubuntu-docker`, `192.168.1.124`) is managed infrastructure and hosts the read-only Docker observer on port `3199`.
-- VM 102 (`friday-controller`, `192.168.1.64`) is the authoritative Friday controller.
-- CT108 (`friday-ollama`, `192.168.1.70`) is the GPU local-AI host.
-- VM 110 (`192.168.1.72`) is Umbrel/media.
+- Proxmox `vmbr1` is a VLAN-aware bridge over `nic1` with VLANs 2, 10, 20, 30, 40, 50, 60, 70, and 99. It intentionally has no IP address or gateway. The verified management API remains the legacy vmbr0 path `192.168.1.211:8006`; proposed `10.1.2.211` is not live.
+- VM 100 (`ubuntu-docker`) nic1 is `10.1.10.10/24` on VLAN 10 and hosts the read-only Docker observer on port `3199`; legacy vmbr0 is `192.168.1.124`.
+- VM 102 (`friday-controller`) nic1 is `10.1.10.11/24` on VLAN 10 and is the authoritative Friday controller; legacy vmbr0 is `192.168.1.64`. VM131 is absent from live Proxmox inventory.
+- CT108 (`friday-ollama`) nic1 is configured as `10.1.10.12/24` on VLAN 10; do not migrate Ollama configuration until the mandatory live checks pass.
+- VM 110 is Umbrel/media on VLAN 50; its nic1 address is not yet verified.
+- VM 120 Identity is currently `10.1.60.10/24` on VLAN 60, not the proposed VLAN 70 mapping.
+- VM 132 Supabase is currently `10.1.20.10/24` on VLAN 20.
 - Omada is the preferred network control plane for two physical sites.
-- Target Site A hierarchy: `10.10.0.0/16`.
-- Target Site B hierarchy: `10.20.0.0/16`.
+- Current VLAN addressing follows `10.1.<VLAN>.0/24`.
 - Sites are intended to communicate through a routed site-to-site VPN.
-- Current Friday work must not migrate addressing or redesign the network as an incidental application change.
+- Current Friday work must not modify vmbr0, addressing, bridges, VLANs, default routes, Omada, or any network control plane as an incidental application change.
 
 ## Safety constraints
 - Never commit secrets or real tokens.
@@ -108,15 +109,7 @@ make update
 Preserve the local `.env`; never overwrite production secrets from `.env.example`.
 
 ## Finish order
-Follow `docs/codex/NEXT_STEPS.md` exactly. The current next product milestone is the **Friday Assistant experience**:
-
-1. Connect the primary FRIDAY command composer to `/api/assistant` when AI is enabled.
-2. Keep `/api/commands/preview` as deterministic safety/no-AI fallback.
-3. Add provider/model/fallback provenance and conversation/history UX.
-4. Keep all output advisory and read-only.
-5. Then complete read-only endpoint/network/service adapters.
-6. Then add authentication/RBAC, durable action audit, approval workflow, and a global kill switch.
-7. Only after those safety prerequisites are tested may tightly allowlisted actions be considered.
+Follow `docs/codex/NEXT_STEPS.md` exactly. The current next milestone is **Local Agent Platform Phase 1 network validation and live acceptance**. Keep all output advisory/read-only. Complete CT108 nic1 validation, registry migration/sync, shared-composer and Agents UI acceptance before merge readiness; then continue read-only adapters. Authentication/RBAC, durable action audit, approval workflow, and a global kill switch remain prerequisites for any future tightly allowlisted action work.
 
 ## Verification contract
 Before completing application changes:

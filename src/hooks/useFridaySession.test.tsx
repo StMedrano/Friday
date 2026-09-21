@@ -51,16 +51,8 @@ afterEach(() => {
 })
 
 describe('useFridaySession', () => {
-  it('routes a matched request to the local agent and records local provenance without general assistant fallback', async () => {
-    mockRouteFridayAgent.mockResolvedValueOnce({
-      matched: true,
-      agentId: 'proxmox-observer',
-      agentName: 'Proxmox Observer',
-      routing: 'deterministic',
-      confidence: 0.98,
-      reason: 'Strong Proxmox scope match.',
-    })
-    mockAskFridayAgent.mockResolvedValueOnce({
+  it('records server-routed local-agent provenance from the shared assistant endpoint', async () => {
+    mockAskFridayAssistant.mockResolvedValueOnce({
       available: true,
       mode: 'local-agent',
       provider: 'ollama',
@@ -69,6 +61,12 @@ describe('useFridaySession', () => {
       modelProfile: 'local-general',
       model: 'qwen3:4b-instruct',
       text: 'VM 100 is observed as online.',
+      routing: {
+        matched: true,
+        method: 'deterministic',
+        confidence: 0.98,
+        reason: 'Strong Proxmox scope match.',
+      },
       execution: { performed: false, reason: 'Phase 1 agents are advisory only.' },
     })
     render(<Harness />)
@@ -77,9 +75,9 @@ describe('useFridaySession', () => {
       await session().sendMessage('Check VM 100 on Proxmox')
     })
 
-    expect(mockRouteFridayAgent).toHaveBeenCalledWith('Check VM 100 on Proxmox')
-    expect(mockAskFridayAgent).toHaveBeenCalledWith('proxmox-observer', 'Check VM 100 on Proxmox')
-    expect(mockAskFridayAssistant).not.toHaveBeenCalled()
+    expect(mockRouteFridayAgent).not.toHaveBeenCalled()
+    expect(mockAskFridayAgent).not.toHaveBeenCalled()
+    expect(mockAskFridayAssistant).toHaveBeenCalledWith('Check VM 100 on Proxmox', { history: [] })
     expect(session().messages[1]).toMatchObject({
       role: 'assistant',
       status: 'complete',
@@ -89,12 +87,18 @@ describe('useFridaySession', () => {
       modelProfile: 'local-general',
       agentId: 'proxmox-observer',
       agentName: 'Proxmox Observer',
-      routing: 'deterministic',
+      routing: {
+        matched: true,
+        method: 'deterministic',
+        confidence: 0.98,
+        reason: 'Strong Proxmox scope match.',
+      },
+      execution: { performed: false, reason: 'Phase 1 agents are advisory only.' },
       text: 'VM 100 is observed as online.',
     })
   })
 
-  it('uses the existing general assistant unchanged after a safe agent no-match', async () => {
+  it('uses the shared assistant endpoint unchanged for a general response', async () => {
     mockAskFridayAssistant.mockResolvedValueOnce({
       available: true,
       mode: 'cloud-ai',
@@ -109,11 +113,11 @@ describe('useFridaySession', () => {
     })
 
     expect(mockAskFridayAgent).not.toHaveBeenCalled()
+    expect(mockRouteFridayAgent).not.toHaveBeenCalled()
     expect(mockAskFridayAssistant).toHaveBeenCalledWith('Explain this dashboard', { history: [] })
   })
 
-  it('keeps registry or routing failure non-fatal by continuing to the general assistant', async () => {
-    mockRouteFridayAgent.mockRejectedValueOnce(new Error('agent routing unavailable'))
+  it('accepts the server general fallback after routing is unavailable', async () => {
     mockAskFridayAssistant.mockResolvedValueOnce({
       available: true,
       mode: 'local-analysis',
@@ -128,33 +132,51 @@ describe('useFridaySession', () => {
     })
 
     expect(mockAskFridayAssistant).toHaveBeenCalledTimes(1)
+    expect(mockRouteFridayAgent).not.toHaveBeenCalled()
+    expect(mockAskFridayAgent).not.toHaveBeenCalled()
     expect(session().messages[1]).toMatchObject({ status: 'complete', text: 'General path still works' })
   })
 
-  it('does not cloud-fallback a matched request when local agent inference fails', async () => {
-    mockRouteFridayAgent.mockResolvedValueOnce({
-      matched: true,
+  it('surfaces matched local-agent failure without a second client-side request', async () => {
+    const failure = {
+      available: false as const,
+      mode: 'local-agent' as const,
+      provider: 'ollama',
+      error: 'local-agent-unavailable',
       agentId: 'proxmox-observer',
       agentName: 'Proxmox Observer',
-      routing: 'local-router',
-      confidence: 0.72,
-      reason: 'Local router selected registered agent.',
-    })
-    mockAskFridayAgent.mockRejectedValueOnce(new Error('Local agent inference unavailable'))
+      reason: 'Local agent inference unavailable.',
+      routing: {
+        matched: true as const,
+        method: 'deterministic' as const,
+        confidence: 0.98,
+        reason: 'Strong Proxmox scope match.',
+      },
+      execution: { performed: false as const, reason: 'Phase 1 agents are advisory only.' },
+    }
+    mockAskFridayAssistant.mockRejectedValueOnce(Object.assign(
+      new Error('Local agent inference unavailable.'),
+      { response: failure },
+    ))
     render(<Harness />)
 
     await act(async () => {
       await session().sendMessage('Inspect the Proxmox guest state')
     })
 
-    expect(mockAskFridayAssistant).not.toHaveBeenCalled()
+    expect(mockAskFridayAssistant).toHaveBeenCalledTimes(1)
+    expect(mockRouteFridayAgent).not.toHaveBeenCalled()
+    expect(mockAskFridayAgent).not.toHaveBeenCalled()
     expect(session().messages[1]).toMatchObject({
       role: 'assistant',
       status: 'error',
-      text: 'Local agent inference unavailable',
+      text: 'Local agent inference unavailable.',
+      mode: 'local-agent',
+      provider: 'ollama',
       agentId: 'proxmox-observer',
       agentName: 'Proxmox Observer',
-      routing: 'local-router',
+      routing: failure.routing,
+      execution: failure.execution,
     })
   })
 

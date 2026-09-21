@@ -33,7 +33,7 @@ The Friday controller resolves profile IDs such as:
 - `local-general` — routine homelab reasoning, diagnostics, and summaries.
 - `local-coder` — code/configuration analysis for future development agents.
 
-Profiles resolve to **Ollama only** in Phase 1. The initial VM102 configuration points the local profiles to CT108 (`192.168.1.70:11434`) and `qwen3:4b-instruct`.
+Profiles resolve to **Ollama only** in Phase 1. The checked-in VM102 examples still point to CT108's explicitly labeled legacy vmbr0 rollback endpoint (`192.168.1.70:11434`) and `qwen3:4b-instruct`. CT108 nic1 is configured as `10.1.10.12`, but the examples must not migrate until inside-CT and VM102 `/api/tags` + `/api/chat` validation passes.
 
 ## Routing
 
