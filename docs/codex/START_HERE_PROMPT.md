@@ -3,7 +3,7 @@
 Paste the block below into Codex after pulling Friday on VM102.
 
 ```text
-You are continuing the Friday control-plane project on authoritative VM102 (`friday-controller`; nic1 `10.1.10.11/24`, VLAN 10, service `:3010` verified; legacy vmbr0 `192.168.1.64`). VM131 is absent from live inventory. VM100 (nic1 `10.1.10.10/24`, VLAN 10; legacy vmbr0 `192.168.1.124`) is managed infrastructure and hosts only the separate read-only Docker observer. CT108 nic1 is configured as `10.1.10.12/24`, but do not migrate Ollama URLs until inside-CT and VM102 TCP/11434, `/api/tags`, and `/api/chat` checks pass.
+You are continuing the Friday control-plane project on authoritative VM102 (`friday-controller`; nic1 `10.1.10.11/24`, VLAN 10, service `:3010` verified; legacy vmbr0 `192.168.1.64`). VM131 is absent from live inventory. VM100 (nic1 `10.1.10.10/24`, VLAN 10; legacy vmbr0 `192.168.1.124`) is managed infrastructure and hosts only the separate read-only Docker observer. CT108 nic1 is verified as `10.1.10.12/24`; VM102 passes TCP/11434, `/api/tags`, and `/api/chat`, and active agent defaults use that nic1 endpoint.
 
 Before changing anything:
 1. Read AGENTS.md completely.

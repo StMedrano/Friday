@@ -27,7 +27,7 @@ FRIDAY UI/API — VM102 friday-controller
 Future identity / policy / approval / action-audit layer
 ```
 
-VM102 is the authoritative FRIDAY controller; live VM131 is absent. VM100 is managed infrastructure and hosts the standalone read-only Docker observer. CT108 is the GPU-backed local-AI fallback. CT108 nic1 is configured as `10.1.10.12/24` on VLAN 10, but inside-guest and VM102 Ollama validation is pending, so agent profile URLs have not migrated. VM110 remains the media/Umbrel workload on VLAN 50; its nic1 address has not been discovered.
+VM102 is the authoritative FRIDAY controller; live VM131 is absent. VM100 is managed infrastructure and hosts the standalone read-only Docker observer. CT108 is the GPU-backed local-AI fallback. CT108 nic1 is verified as `10.1.10.12/24` on VLAN 10, VM102 passed TCP/11434 plus `/api/tags` and `/api/chat`, and agent profile defaults use that nic1 endpoint. VM110 remains the media/Umbrel workload on VLAN 50; its nic1 address has not been discovered.
 
 ## Assistant provider orchestration
 
@@ -56,13 +56,13 @@ VM102 Friday (nic1 10.1.10.11; legacy vmbr0 192.168.1.64)
     |
     | TCP/11434
     v
-CT108 friday-ollama (nic1 configured 10.1.10.12; validation pending)
+CT108 friday-ollama (nic1 10.1.10.12; validated from VM102)
     |
     v
 qwen3:4b-instruct — Radeon 780M / RADV Vulkan
 ```
 
-CT108 should allow TCP/11434 only from VM102. Do not update the three agent profile URLs to `10.1.10.12` until CT108 confirms the address internally and VM102 passes TCP/11434, `/api/tags`, and `/api/chat` over vmbr1. The optional Compose `local-ai` service remains a private development/recovery path with no host/LAN-published port; it is not the preferred production local provider while CT108 is available.
+CT108 should allow TCP/11434 only from VM102. The three agent profile URLs use the verified `10.1.10.12` vmbr1 endpoint. The optional Compose `local-ai` service remains a private development/recovery path with no host/LAN-published port; it is not the preferred production local provider while CT108 is available.
 
 ## Monitoring and diagnostics
 

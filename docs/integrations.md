@@ -80,14 +80,14 @@ Registry sync is explicit and Git-owned. It is not an agent editor and cannot cr
 
 Agent profiles are server-side and Ollama-only:
 
-The values below are intentionally retained **legacy vmbr0 rollback defaults**. CT108 nic1 is configured as `10.1.10.12/24` on VLAN 10, but do not change active profile URLs until the address is verified from inside CT108 and authoritative VM102 passes TCP/11434, `/api/tags`, and `/api/chat` checks.
+The values below use CT108's verified nic1 endpoint on vmbr1/VLAN 10. The running-container interface reports `10.1.10.12/24`, and authoritative VM102 passes TCP/11434, `/api/tags`, and `/api/chat` over that path.
 
 ```env
-FRIDAY_AGENT_LOCAL_ROUTER_URL=http://192.168.1.70:11434
+FRIDAY_AGENT_LOCAL_ROUTER_URL=http://10.1.10.12:11434
 FRIDAY_AGENT_LOCAL_ROUTER_MODEL=qwen3:4b-instruct
-FRIDAY_AGENT_LOCAL_GENERAL_URL=http://192.168.1.70:11434
+FRIDAY_AGENT_LOCAL_GENERAL_URL=http://10.1.10.12:11434
 FRIDAY_AGENT_LOCAL_GENERAL_MODEL=qwen3:4b-instruct
-FRIDAY_AGENT_LOCAL_CODER_URL=http://192.168.1.70:11434
+FRIDAY_AGENT_LOCAL_CODER_URL=http://10.1.10.12:11434
 FRIDAY_AGENT_LOCAL_CODER_MODEL=qwen3:4b-instruct
 FRIDAY_AGENT_MODEL_CONTEXT=8192
 FRIDAY_AGENT_MODEL_MAX_TOKENS=768

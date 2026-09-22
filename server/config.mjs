@@ -27,9 +27,8 @@ function providerOrder(value) {
 function localAgentProfile(env, prefix, fallbackModel = 'qwen3:4b-instruct') {
   return {
     provider: 'ollama',
-    // Legacy vmbr0 rollback default. CT108 nic1 must pass the documented
-    // inside-guest and VM102 Ollama checks before this endpoint is migrated.
-    baseUrl: env[`FRIDAY_AGENT_${prefix}_URL`] || 'http://192.168.1.70:11434',
+    // Verified CT108 nic1 endpoint on vmbr1 / VLAN 10.
+    baseUrl: env[`FRIDAY_AGENT_${prefix}_URL`] || 'http://10.1.10.12:11434',
     model: env[`FRIDAY_AGENT_${prefix}_MODEL`] || fallbackModel,
     context: positiveNumber(env[`FRIDAY_AGENT_${prefix}_CONTEXT`] ?? env.FRIDAY_AGENT_MODEL_CONTEXT, 8192),
     maxTokens: positiveNumber(env[`FRIDAY_AGENT_${prefix}_MAX_TOKENS`] ?? env.FRIDAY_AGENT_MODEL_MAX_TOKENS, 768),

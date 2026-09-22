@@ -44,7 +44,7 @@ Completed behavior:
 
 The old “finish Friday Assistant experience” milestone is retired.
 
-## P5 — Local Agent Platform Phase 1 — implementation complete; network validation and live acceptance next
+## P5 — Local Agent Platform Phase 1 — implementation and network validation complete; live acceptance blocked
 
 Draft PR #19 implements the Phase 1 local advisory agent platform.
 
@@ -62,16 +62,18 @@ Implemented source behavior:
 
 ### Required live acceptance before PR #19 merge readiness
 
-1. Verify CT108's configured `10.1.10.12/24` nic1 address from inside CT108 and verify TCP/11434, `/api/tags`, and `/api/chat` from authoritative VM102; do not migrate agent URLs before all checks pass.
-2. Apply `supabase/migrations/202608300001_friday_agent_registry.sql` to self-hosted Supabase/Postgres.
-3. Back up/preserve VM102 `.env`, then configure only the server-side Phase 1 variables from `.env.example`.
-4. Rebuild the Friday controller without changing unrelated infrastructure.
-5. Verify `GET /api/agents` and `GET /api/agents/registry/status`.
-6. Run `POST /api/agents/registry/sync` with `{}` and verify a healthy sync.
-7. Route a Proxmox prompt and verify `proxmox-observer` is selected.
-8. Directly ask `proxmox-observer` and require `provider:"ollama"`, `mode:"local-agent"`, expected model/profile, and `execution.performed:false`.
-9. Send a Proxmox request through the normal shared Friday composer and verify automatic local-agent routing/provenance.
-10. Complete desktop and phone Agents workspace acceptance and confirm no action controls appear.
+1. CT108 nic1 validation is complete: its running-container interface reports `10.1.10.12/24`, and authoritative VM102 passes TCP/11434, `/api/tags`, and `/api/chat` over vmbr1.
+2. Agent defaults now use `http://10.1.10.12:11434`; post-migration `make verify` passed on 2026-09-22.
+3. Repair the separately owned VM132 Supabase database permission failure: PostgREST is unhealthy and service-role REST returns 503 because PostgreSQL cannot read `global/pg_filenode.map`. Do not repair it as part of Friday application deployment.
+4. After Supabase is healthy, apply `supabase/migrations/202608300001_friday_agent_registry.sql` to self-hosted Supabase/Postgres.
+5. Back up/preserve VM102 `.env`, then configure only the server-side Phase 1 variables from `.env.example`.
+6. Rebuild the Friday controller without changing unrelated infrastructure.
+7. Verify `GET /api/agents` and `GET /api/agents/registry/status`.
+8. Run `POST /api/agents/registry/sync` with `{}` and verify a healthy sync.
+9. Route a Proxmox prompt and verify `proxmox-observer` is selected.
+10. Directly ask `proxmox-observer` and require `provider:"ollama"`, `mode:"local-agent"`, expected model/profile, and `execution.performed:false`.
+11. Send a Proxmox request through the normal shared Friday composer and verify automatic local-agent routing/provenance.
+12. Complete desktop and phone Agents workspace acceptance and confirm no action controls appear.
 
 Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execution, restart endpoints, or cloud fallback for matched agents as part of this rollout.
 

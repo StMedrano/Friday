@@ -24,7 +24,7 @@ Friday is a real single-container control-plane MVP on VM102 with separate read-
 - `/api/assistant` provides advisory analysis with sequential provider failover.
 - Preferred production provider order is `groq,gemini,ollama`.
 - OpenAI and Anthropic adapters remain available for explicit compatibility but are not in the default provider order.
-- CT108 runs native Ollama with `qwen3:4b-instruct` on the Radeon 780M through RADV/Vulkan. Proxmox config places nic1 at `10.1.10.12/24` on VLAN 10, but migration is blocked until inside-CT and VM102 Ollama checks pass; `192.168.1.70` is a legacy vmbr0 rollback example.
+- CT108 runs native Ollama with `qwen3:4b-instruct` on the Radeon 780M through RADV/Vulkan. Its running-container interface and Proxmox config verify nic1 at `10.1.10.12/24` on VLAN 10, and VM102 passes TCP/11434, `/api/tags`, and `/api/chat` over vmbr1. `192.168.1.70` is a legacy vmbr0 rollback reference.
 - Cloud timeout default is 15 seconds; local timeout default is 45 seconds.
 - Deterministic local analysis is the final non-AI fallback.
 - The AI policy requires exact preservation of service IDs, VM/LXC numbers, host names, and service-name mappings from normalized state.
@@ -35,7 +35,7 @@ Friday is a real single-container control-plane MVP on VM102 with separate read-
 - Proxmox `vmbr1` is a VLAN-aware bridge over `nic1` with VLANs 2, 10, 20, 30, 40, 50, 60, 70, and 99. It intentionally has no IP address or gateway. The verified management API remains the legacy vmbr0 path `192.168.1.211:8006`; proposed `10.1.2.211` is not live.
 - VM 100 (`ubuntu-docker`) nic1 is `10.1.10.10/24` on VLAN 10 and hosts the read-only Docker observer on port `3199`; legacy vmbr0 is `192.168.1.124`.
 - VM 102 (`friday-controller`) nic1 is `10.1.10.11/24` on VLAN 10 and is the authoritative Friday controller; legacy vmbr0 is `192.168.1.64`. VM131 is absent from live Proxmox inventory.
-- CT108 (`friday-ollama`) nic1 is configured as `10.1.10.12/24` on VLAN 10; do not migrate Ollama configuration until the mandatory live checks pass.
+- CT108 (`friday-ollama`) nic1 is verified as `10.1.10.12/24` on VLAN 10; active agent defaults use `http://10.1.10.12:11434`.
 - VM 110 is Umbrel/media on VLAN 50; its nic1 address is not yet verified.
 - VM 120 Identity is currently `10.1.60.10/24` on VLAN 60, not the proposed VLAN 70 mapping.
 - VM 132 Supabase is currently `10.1.20.10/24` on VLAN 20.
@@ -109,7 +109,7 @@ make update
 Preserve the local `.env`; never overwrite production secrets from `.env.example`.
 
 ## Finish order
-Follow `docs/codex/NEXT_STEPS.md` exactly. The current next milestone is **Local Agent Platform Phase 1 network validation and live acceptance**. Keep all output advisory/read-only. Complete CT108 nic1 validation, registry migration/sync, shared-composer and Agents UI acceptance before merge readiness; then continue read-only adapters. Authentication/RBAC, durable action audit, approval workflow, and a global kill switch remain prerequisites for any future tightly allowlisted action work.
+Follow `docs/codex/NEXT_STEPS.md` exactly. The current next milestone is **Local Agent Platform Phase 1 live acceptance**. Keep all output advisory/read-only. CT108 nic1 validation is complete; finish registry migration/sync, shared-composer and Agents UI acceptance before merge readiness, then continue read-only adapters. Authentication/RBAC, durable action audit, approval workflow, and a global kill switch remain prerequisites for any future tightly allowlisted action work.
 
 ## Verification contract
 Before completing application changes:

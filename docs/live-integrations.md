@@ -148,7 +148,7 @@ Groq -> Gemini -> CT108 GPU Ollama -> deterministic local analysis
 
 Relevant server-side configuration:
 
-The URL below is a legacy vmbr0 rollback example. CT108 nic1 is configured as `10.1.10.12`, but it must not replace the example or deployed agent profile URLs until inside-CT and VM102 TCP/11434, `/api/tags`, and `/api/chat` validation succeeds.
+The URL below uses CT108's verified nic1 endpoint. VM102 reaches TCP/11434, `/api/tags`, and `/api/chat` over vmbr1 with source `10.1.10.11`.
 
 ```env
 FRIDAY_AI_ENABLED=true
@@ -156,7 +156,7 @@ FRIDAY_AI_PROVIDER_ORDER=groq,gemini,ollama
 FRIDAY_CLOUD_AI_TIMEOUT_MS=15000
 FRIDAY_LOCAL_AI_TIMEOUT_MS=45000
 FRIDAY_LOCAL_AI_ENABLED=true
-FRIDAY_LOCAL_AI_URL=http://192.168.1.70:11434
+FRIDAY_LOCAL_AI_URL=http://10.1.10.12:11434
 FRIDAY_LOCAL_AI_MODEL=qwen3:4b-instruct
 FRIDAY_LOCAL_AI_CONTEXT=8192
 FRIDAY_LOCAL_AI_MAX_TOKENS=512

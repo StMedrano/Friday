@@ -75,7 +75,7 @@ VM102 resolves profile IDs server-side. Phase 1 profiles are Ollama-only:
 - `local-general` — routine diagnostics, inventory reasoning, and summaries;
 - `local-coder` — local code/configuration analysis for future development agents.
 
-Live Proxmox configuration discovery found CT108 nic1 at `10.1.10.12/24` on VLAN 10, but inside-CT verification and VM102 TCP/11434, `/api/tags`, and `/api/chat` checks are still pending. The checked-in agent defaults therefore intentionally remain on the labeled legacy vmbr0 rollback endpoint `http://192.168.1.70:11434`; do not substitute `10.1.10.12` until every required validation passes. Keep TCP/11434 restricted to VM102.
+Live running-container and Proxmox discovery verify CT108 nic1 at `10.1.10.12/24` on VLAN 10. VM102 passes TCP/11434, `/api/tags`, and `/api/chat` over vmbr1, so checked-in agent defaults use `http://10.1.10.12:11434`. Keep TCP/11434 restricted to VM102.
 
 Model profiles make agents portable: changing a local model or Ollama endpoint does not require rewriting each agent definition.
 
@@ -166,17 +166,17 @@ On VM102, preserve the existing production `.env` before editing it. Add only th
 FRIDAY_AGENT_REGISTRY_ENABLED=true
 FRIDAY_SUPABASE_URL=
 FRIDAY_SUPABASE_SERVICE_KEY=
-FRIDAY_AGENT_LOCAL_ROUTER_URL=http://192.168.1.70:11434
+FRIDAY_AGENT_LOCAL_ROUTER_URL=http://10.1.10.12:11434
 FRIDAY_AGENT_LOCAL_ROUTER_MODEL=qwen3:4b-instruct
-FRIDAY_AGENT_LOCAL_GENERAL_URL=http://192.168.1.70:11434
+FRIDAY_AGENT_LOCAL_GENERAL_URL=http://10.1.10.12:11434
 FRIDAY_AGENT_LOCAL_GENERAL_MODEL=qwen3:4b-instruct
-FRIDAY_AGENT_LOCAL_CODER_URL=http://192.168.1.70:11434
+FRIDAY_AGENT_LOCAL_CODER_URL=http://10.1.10.12:11434
 FRIDAY_AGENT_LOCAL_CODER_MODEL=qwen3:4b-instruct
 FRIDAY_AGENT_MODEL_CONTEXT=8192
 FRIDAY_AGENT_MODEL_MAX_TOKENS=768
 ```
 
-These `192.168.1.70` URL values are intentionally documented legacy rollback defaults. They are not evidence that CT108 nic1 migration has passed acceptance.
+These URLs are the verified production nic1 path. `192.168.1.70` remains a legacy rollback reference only.
 
 Do not place the Supabase service key or local infrastructure secrets in browser variables or Git.
 

@@ -10,7 +10,7 @@ Host roles:
 
 - VM102 nic1 `10.1.10.11` (VLAN 10) — authoritative Friday controller; `192.168.1.64` is legacy vmbr0 rollback.
 - VM100 nic1 `10.1.10.10` (VLAN 10) — managed infrastructure + separate read-only Docker observer on port `3199`; `192.168.1.124` is legacy vmbr0 rollback.
-- CT108 nic1 is configured as `10.1.10.12` (VLAN 10), but inside-guest and VM102-to-Ollama validation is pending; do not migrate the agent URLs yet.
+- CT108 nic1 is verified as `10.1.10.12/24` on VLAN 10; VM102 reaches TCP/11434, `/api/tags`, and `/api/chat` over vmbr1.
 
 ## Current main baseline
 
@@ -132,17 +132,17 @@ Then add/update only the checked-in server-side Phase 1 variables:
 FRIDAY_AGENT_REGISTRY_ENABLED=true
 FRIDAY_SUPABASE_URL=
 FRIDAY_SUPABASE_SERVICE_KEY=
-FRIDAY_AGENT_LOCAL_ROUTER_URL=http://192.168.1.70:11434
+FRIDAY_AGENT_LOCAL_ROUTER_URL=http://10.1.10.12:11434
 FRIDAY_AGENT_LOCAL_ROUTER_MODEL=qwen3:4b-instruct
-FRIDAY_AGENT_LOCAL_GENERAL_URL=http://192.168.1.70:11434
+FRIDAY_AGENT_LOCAL_GENERAL_URL=http://10.1.10.12:11434
 FRIDAY_AGENT_LOCAL_GENERAL_MODEL=qwen3:4b-instruct
-FRIDAY_AGENT_LOCAL_CODER_URL=http://192.168.1.70:11434
+FRIDAY_AGENT_LOCAL_CODER_URL=http://10.1.10.12:11434
 FRIDAY_AGENT_LOCAL_CODER_MODEL=qwen3:4b-instruct
 FRIDAY_AGENT_MODEL_CONTEXT=8192
 FRIDAY_AGENT_MODEL_MAX_TOKENS=768
 ```
 
-The three `192.168.1.70` values above are intentionally retained legacy vmbr0 rollback defaults. Do not replace them with the discovered CT108 nic1 address until that address is verified from inside CT108 and VM102 successfully reaches TCP/11434, `/api/tags`, and `/api/chat` over vmbr1.
+The three agent profiles use CT108's verified nic1 endpoint. `192.168.1.70` is a historical/legacy rollback reference only and must not be restored to active configuration.
 
 Never commit the production `.env` or expose the Supabase service key/provider credentials through browser configuration.
 

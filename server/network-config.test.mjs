@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict'
 import { readFile } from 'node:fs/promises'
 import test from 'node:test'
+import { getConfig } from './config.mjs'
 
 const rootUrl = new URL('../', import.meta.url)
 
@@ -33,14 +34,27 @@ test('active configuration does not introduce VLAN 80', async () => {
   }
 })
 
-test('unverified CT108 nic1 address is not substituted into agent defaults', async () => {
-  const [rootEnv, compose, serverConfig] = await Promise.all([
+test('verified CT108 nic1 address is used by every agent default', async () => {
+  const [rootEnv, compose] = await Promise.all([
     read('.env.example'),
     read('compose.yaml'),
-    read('server/config.mjs'),
   ])
 
-  for (const content of [rootEnv, compose, serverConfig]) {
-    assert.doesNotMatch(content, /FRIDAY_AGENT_LOCAL_(?:ROUTER|GENERAL|CODER)_URL[^\n]*10\.1\.10\.12/)
+  for (const content of [rootEnv, compose]) {
+    for (const profile of ['ROUTER', 'GENERAL', 'CODER']) {
+      assert.match(
+        content,
+        new RegExp(`FRIDAY_AGENT_LOCAL_${profile}_URL[^\\n]*10\\.1\\.10\\.12:11434`),
+      )
+    }
+    assert.doesNotMatch(
+      content,
+      /FRIDAY_AGENT_LOCAL_(?:ROUTER|GENERAL|CODER)_URL[^\n]*192\.168\.1\./,
+    )
+  }
+
+  const profiles = getConfig({}).agents.modelProfiles
+  for (const profile of ['local-router', 'local-general', 'local-coder']) {
+    assert.equal(profiles[profile].baseUrl, 'http://10.1.10.12:11434')
   }
 })

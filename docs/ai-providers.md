@@ -25,7 +25,7 @@ GEMINI_API_KEY=
 GEMINI_MODEL=
 
 FRIDAY_LOCAL_AI_ENABLED=true
-FRIDAY_LOCAL_AI_URL=http://192.168.1.70:11434
+FRIDAY_LOCAL_AI_URL=http://10.1.10.12:11434
 FRIDAY_LOCAL_AI_MODEL=qwen3:4b-instruct
 FRIDAY_LOCAL_AI_CONTEXT=8192
 FRIDAY_LOCAL_AI_MAX_TOKENS=512
@@ -58,12 +58,12 @@ The current local fallback is the native Ollama service on CT108:
 ```text
 Proxmox host
   -> AMD Radeon 780M / RADV Vulkan
-  -> CT108 friday-ollama (192.168.1.70:11434)
+  -> CT108 friday-ollama (10.1.10.12:11434, nic1 / VLAN 10)
   -> qwen3:4b-instruct
-  -> VM102 Friday (192.168.1.64)
+  -> VM102 Friday (10.1.10.11, nic1 / VLAN 10)
 ```
 
-The URL shown above and the legacy topology references in this document are vmbr0 rollback examples. Live Proxmox configuration places VM102 nic1 at `10.1.10.11` and CT108 nic1 at `10.1.10.12` on VLAN 10, but the Ollama URL must not be migrated until CT108 confirms the address internally and VM102 passes TCP/11434, `/api/tags`, and `/api/chat`. The CT108 firewall should allow TCP/11434 only from VM102. The model is expected to report `100% GPU` in `ollama ps` during inference.
+The nic1 path above is verified live: CT108's running-container interface reports `10.1.10.12/24`, and VM102 reaches TCP/11434, `/api/tags`, and `/api/chat` from `10.1.10.11` over `eth1`. The CT108 firewall should allow TCP/11434 only from VM102. The model is expected to report `100% GPU` in `ollama ps` during inference. Legacy vmbr0 addresses remain rollback references only.
 
 Friday uses an 8192-token context by default and bounds local output with `FRIDAY_LOCAL_AI_MAX_TOKENS` (default `512`). The instruct variant is preferred for routine operational summaries because it avoids the long reasoning behavior observed with the base `qwen3:4b` model. The default local provider timeout is 45 seconds, leaving practical headroom for the measured CT108 Friday workload while cloud providers retain a 15-second default budget.
 
