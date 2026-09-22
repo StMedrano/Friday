@@ -45,7 +45,7 @@ The proposed values `10.1.2.211`, `10.1.10.100`, `10.1.20.131`, `10.1.20.132`, a
 
 The last explicitly recorded VM102 production baseline predates the local Agent Platform Phase 1 branch. Existing production validation established a healthy Friday container on port `3010`, read-only Proxmox/VM100 visibility, Groq -> Gemini -> CT108 Ollama assistant fallback, exact infrastructure grounding, and no infrastructure mutation authority.
 
-Do not infer that PR #19's local agent registry/routing/workspace has been deployed merely because its CI is green. The live controller responds over nic1 at `10.1.10.11:3010` (and the legacy rollback path), but its agent list and registry-status endpoints returned 503 during this discovery. VM102/Supabase/API/UI rollout acceptance is still required.
+Do not infer that PR #19's current head has been deployed merely because its CI is green. On 2026-09-22, VM102's clean checkout was at `a12b540` while GitHub and the local PR branch were at `a2ff409`. The running container started on 2026-09-12, uses legacy CT108 agent URLs `192.168.1.76:11434`, and predates shared-composer auto-routing. The live registry list/status/detail endpoints now return 200, but full rollout acceptance remains required.
 
 ## Monitoring, diagnostics, mobile, and assistant — merged
 
@@ -98,10 +98,11 @@ Shared-composer implementation tests cover deterministic Proxmox routing, same-o
 - Network configuration regression: **passed** — all three active agent defaults resolve to `10.1.10.12:11434`, no active default uses `192.168.1.70`, and VLAN 80 remains absent.
 - VM100 observer nic1 health: `http://10.1.10.10:3199/health` returned 200.
 - VM102 Friday nic1 health: `http://10.1.10.11:3010/healthz` returned 200 in live mode; `/api/overview` returned 200.
-- Agent list and registry status on the deployed controller: **503 `agent-registry-unavailable`**. Registry availability is not evidence of the deployed Git revision, which was not independently verified.
+- Agent list, registry status, and `proxmox-observer` detail on the deployed controller: **200** on the later 2026-09-22 inspection. The status reports one synced agent, no rejections, and `sourceCommit:null`; the agent checksum matches the checked-in definition.
 - VM102 `make preflight`: **passed** on 2026-09-22 with a process-local Git safe-directory override; the deployed checkout is clean on the PR branch at older commit `a12b540`.
 - `make update`: **not run** because the script intentionally switches to `main`, which would not deploy this unmerged PR. The repo-local deployment skill permits an explicitly reviewed `docker compose up -d --build friday` for a PR checkpoint.
-- `make health`: **not run after a deployment**, because no deployment was attempted while the Supabase registry dependency is unhealthy.
+- `make health`: **not run after a new deployment**, because the PR head has not been deployed.
+- Live old-build route/ask/composer comparison: `/api/agents/route` selected `proxmox-observer` with confidence `0.98`; direct `/api/agents/proxmox-observer/ask` returned `mode:local-agent`, `provider:ollama`, model `qwen3:4b-instruct`, and `execution.performed:false`. The shared `/api/assistant` returned Groq/cloud provenance and no agent ID, confirming the running build predates the PR head's agent-first composer change.
 
 ### Agents UI acceptance — 2026-09-21
 
@@ -121,21 +122,23 @@ Automated component and responsive CSS suites passed. Coverage confirms registry
 
 - VM132 `supabase-prod` is reachable from VM102 at verified nic1 `10.1.20.10`; the route uses VM102 `eth1` via `10.1.10.1`.
 - The Supabase gateway is listening on TCP/8000, PostgreSQL/Supavisor ports are listening, and the service-role credential is present without being printed.
-- `supabase-rest` reports Docker health `unhealthy`; an authenticated service-role request to `/rest/v1/` returns HTTP 503.
-- Direct authenticated PostgreSQL connection fails because the database server cannot read `global/pg_filenode.map` (`Permission denied`). The database container's health probe still reports healthy, so that probe is not sufficient evidence of query readiness.
+- Earlier on 2026-09-22, `supabase-rest` was unhealthy, authenticated service-role REST returned 503, and authenticated PostgreSQL queries failed because the server could not read `global/pg_filenode.map` (`Permission denied`). The database then restarted automatically once at 12:36:47 UTC.
+- Later checks returned `supabase-rest:healthy`, service-role REST 200, successful authenticated SQL queries, and no additional restart. The data directory owner was observed as UID/GID `1000:1000` before restart; after restart the top-level directory and `pg_filenode.map` were UID 100, matching the PostgreSQL process UID. The mechanism that changed ownership has not been established, so this recovery is not yet evidence of stability.
+- Both Friday registry tables exist in the `postgres` database with one agent row and one state row. Read-only inspection on 2026-09-22 confirmed exactly the two `friday_` tables, all expected columns/types/nullability/defaults, and each primary key against `supabase/migrations/202608300001_friday_agent_registry.sql`; no schema migration write is currently needed.
 - The existing Supabase deployment `.env` is mode `0664`; this pre-existing credential-file permission issue was observed but not changed because infrastructure permission repair is outside this Friday application task.
-- The Friday registry migration, VM102 `.env` changes, controller deployment, live endpoint checks, and visual UI acceptance were not performed. Repair and validate Supabase under a separately authorized infrastructure task, then resume this checklist.
+- No VM102 `.env` migration, PR-head controller deployment, shared-composer live acceptance, or visual UI acceptance was performed. Investigate the ownership incident and validate sustained Supabase query readiness before deploying.
 
 ### Remaining Phase 1 rollout acceptance
 
 Before PR #19 is ready to merge:
 
-1. apply `supabase/migrations/202608300001_friday_agent_registry.sql` to the intended self-hosted Supabase/Postgres instance;
-2. preserve the VM102 production `.env` and add the server-only registry/model-profile variables from `.env.example`, using `http://10.1.10.12:11434` for all three profiles;
-3. rebuild only the Friday controller and verify normal health/read-only integrations remain unchanged;
-4. sync the registry and verify `GET /api/agents` plus registry status;
-5. verify Proxmox routing, direct Proxmox agent ask, and shared-composer automatic routing all return local Ollama provenance and `execution.performed=false`;
-6. complete desktop and phone Agents workspace acceptance.
+1. establish sustained Supabase SQL/PostgREST readiness and investigate the UID/GID ownership incident; the existing two-table schema has been validated and needs no migration write;
+2. arrange VM102 access to the owner-only `.env` and clean checkout, preserve `.env`, then update the three agent URLs to `http://10.1.10.12:11434` without changing unrelated integration credentials;
+3. fast-forward VM102's PR branch to the reviewed GitHub head and rebuild only the Friday controller with base Compose; do not use `make update`, which switches to `main`;
+4. run `make health` and verify normal health/read-only integrations remain unchanged;
+5. sync the registry and verify list, detail, and status against the deployed definition checksum;
+6. verify Proxmox routing, direct Proxmox agent ask, and shared-composer automatic routing all return local Ollama provenance and `execution.performed=false`;
+7. complete desktop and phone Agents workspace acceptance, then obtain explicit approval before merging PR #19.
 
 Do not represent those live rollout checks as complete until they are actually performed.
 
