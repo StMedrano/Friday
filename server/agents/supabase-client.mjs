@@ -8,6 +8,7 @@ export function createSupabaseRegistryClient({
   baseUrl,
   serviceKey,
   fetchImpl = globalThis.fetch,
+  timeoutMs = 10000,
 } = {}) {
   const root = String(baseUrl || '').replace(/\/+$/, '')
   const key = String(serviceKey || '')
@@ -28,6 +29,7 @@ export function createSupabaseRegistryClient({
       response = await fetchImpl(`${root}${path}`, {
         method,
         headers,
+        signal: AbortSignal.timeout(timeoutMs),
         ...(body === undefined ? {} : { body: JSON.stringify(body) }),
       })
     } catch {

@@ -1,10 +1,20 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createSupabaseRegistryClient } from './supabase-client.mjs'
+import { delayedJsonFetch } from '../../tests/helpers/delayed-json-fetch.mjs'
 
 function response(body, { ok = true, status = 200 } = {}) {
   return { ok, status, async json() { return body } }
 }
+
+test('registry request deadline returns a sanitized availability error on a stalled dependency', async () => {
+  const client = createSupabaseRegistryClient({
+    baseUrl: 'http://supabase.local', serviceKey: 'private-key', timeoutMs: 10,
+    fetchImpl: delayedJsonFetch([{ id: 'late-agent' }]),
+  })
+  await assert.rejects(() => client.listAgents(), (error) =>
+    error.code === 'FRIDAY_AGENT_REGISTRY_UNAVAILABLE' && !error.message.includes('private-key'))
+})
 
 test('registry client sends server-only PostgREST auth headers and lists agents', async () => {
   let request

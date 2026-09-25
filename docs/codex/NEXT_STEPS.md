@@ -64,16 +64,17 @@ Implemented source behavior:
 
 1. CT108 nic1 validation is complete: its running-container interface reports `10.1.10.12/24`, and authoritative VM102 passes TCP/11434, `/api/tags`, and `/api/chat` over vmbr1.
 2. Agent defaults now use `http://10.1.10.12:11434`; post-migration `make verify` passed on 2026-09-22.
-3. VM132's PostgreSQL ownership failure caused one automatic database restart on 2026-09-22. Later authenticated SQL and service-role REST passed; investigate the ownership incident and require sustained readiness before deploying Friday. See the [PR #19 rollout plan](../superpowers/plans/2026-09-22-pr19-rollout-completion.md).
-4. The existing `friday_agents` and `friday_agent_registry_state` tables matched the checked-in migration on 2026-09-22. No schema write is currently needed.
-5. Back up/preserve VM102 `.env`, then configure the three agent URLs to `http://10.1.10.12:11434` through an owner-capable VM102 session.
-6. Fast-forward the clean VM102 PR branch to the reviewed head and rebuild only Friday with base Compose; `make update` is unsuitable because it switches to `main`.
-7. Run `make preflight` and `make health`; verify `GET /api/agents`, agent detail, and registry status.
-8. Run `POST /api/agents/registry/sync` with `{}` only if registry state is stale, then verify a healthy sync.
-9. Route a Proxmox prompt and verify `proxmox-observer` is selected.
-10. Directly ask `proxmox-observer` and require `provider:"ollama"`, `mode:"local-agent"`, expected model/profile, and `execution.performed:false`.
-11. Send a Proxmox request through the normal shared Friday composer and verify automatic local-agent routing/provenance; the older running VM102 build currently answers through Groq.
-12. Complete desktop and phone Agents workspace acceptance and confirm no action controls appear. Obtain explicit owner approval before merge.
+3. Working-tree timeout hardening bounds registry requests to 10 seconds, local routing to 15 seconds, and matched local inference to 90 seconds by default. TDD tests and full `make verify` passed on 2026-09-24; this patch is not yet in the GitHub head or deployed build.
+4. VM132's PostgreSQL ownership failure caused one automatic database restart on 2026-09-22. Later authenticated SQL and service-role REST passed; investigate the ownership incident and require sustained readiness before deploying Friday. See the [PR #19 rollout plan](../superpowers/plans/2026-09-22-pr19-rollout-completion.md).
+5. The existing `friday_agents` and `friday_agent_registry_state` tables matched the checked-in migration on 2026-09-22. No schema write is currently needed.
+6. Back up/preserve VM102 `.env`, then configure the three agent URLs to `http://10.1.10.12:11434` through an owner-capable VM102 session.
+7. Fast-forward the clean VM102 PR branch to the reviewed head and rebuild only Friday with base Compose; `make update` is unsuitable because it switches to `main`.
+8. Run `make preflight` and `make health`; verify `GET /api/agents`, agent detail, and registry status.
+9. Run `POST /api/agents/registry/sync` with `{}` only if registry state is stale, then verify a healthy sync.
+10. Route a Proxmox prompt and verify `proxmox-observer` is selected.
+11. Directly ask `proxmox-observer` and require `provider:"ollama"`, `mode:"local-agent"`, expected model/profile, and `execution.performed:false`.
+12. Send a Proxmox request through the normal shared Friday composer and verify automatic local-agent routing/provenance; the older running VM102 build currently answers through Groq.
+13. Complete desktop and phone Agents workspace acceptance and confirm no action controls appear. Obtain explicit owner approval before merge.
 
 Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execution, restart endpoints, or cloud fallback for matched agents as part of this rollout.
 

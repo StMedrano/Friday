@@ -12,5 +12,6 @@ export function resolveModelProfile(config, profileId) {
     model: profile.model,
     context: profile.context,
     maxTokens: profile.maxTokens,
+    timeoutMs: profile.timeoutMs ?? (id === 'local-router' ? 15000 : 90000),
   }
 }

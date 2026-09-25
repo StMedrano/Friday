@@ -32,6 +32,7 @@ function localAgentProfile(env, prefix, fallbackModel = 'qwen3:4b-instruct') {
     model: env[`FRIDAY_AGENT_${prefix}_MODEL`] || fallbackModel,
     context: positiveNumber(env[`FRIDAY_AGENT_${prefix}_CONTEXT`] ?? env.FRIDAY_AGENT_MODEL_CONTEXT, 8192),
     maxTokens: positiveNumber(env[`FRIDAY_AGENT_${prefix}_MAX_TOKENS`] ?? env.FRIDAY_AGENT_MODEL_MAX_TOKENS, 768),
+    timeoutMs: Math.ceil(positiveNumber(env[`FRIDAY_AGENT_${prefix}_TIMEOUT_MS`], prefix === 'LOCAL_ROUTER' ? 15000 : 90000)),
   }
 }
 

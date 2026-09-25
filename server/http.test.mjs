@@ -2,6 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import { createFridayServer } from './http.mjs'
+import { getConfig } from './config.mjs'
+import { createAgentService } from './agents/agent-service.mjs'
+import { delayedJsonFetch } from '../tests/helpers/delayed-json-fetch.mjs'
 
 function baseConfig(monitoringEnabled = true) {
   return {
@@ -315,6 +318,41 @@ test('matched local-agent failure returns local-agent-unavailable without invoki
     })
   })
 })
+
+for (const matched of [true, false]) {
+  test(`stalled local ${matched ? 'matched agent fails without cloud' : 'router permits general fallback'}`, async () => {
+    const config = getConfig({ FRIDAY_AGENT_LOCAL_GENERAL_TIMEOUT_MS: '10', FRIDAY_AGENT_LOCAL_ROUTER_TIMEOUT_MS: '10' })
+    const agent = {
+      version: '1.1', id: 'proxmox-observer', name: 'Proxmox Observer', enabled: true,
+      model: { profile: 'local-general' }, scope: { hosts: ['proxmox'] }, tools: [], permissions: {},
+    }
+    const agentService = createAgentService({
+      config,
+      registryService: { async list() { return [agent] }, async get() { return agent } },
+      fetchImpl: delayedJsonFetch({ message: { content: 'proxmox-observer' } }),
+    })
+    let generalCalls = 0
+    await withServer({
+      config: baseConfig(true), monitoringRuntime: runtime(), agentService,
+      answerAssistantImpl: async () => {
+        generalCalls += 1
+        return { available: true, mode: 'cloud-ai', provider: 'groq', text: 'General response' }
+      },
+    }, async (base) => {
+      const response = await postAssistant(base, matched ? 'Summarize Proxmox health.' : 'Explain this dashboard.')
+      const body = await response.json()
+      assert.equal(response.status, matched ? 503 : 200)
+      assert.equal(generalCalls, matched ? 0 : 1)
+      if (matched) {
+        assert.equal(body.error, 'local-agent-unavailable')
+        assert.equal(body.agentId, 'proxmox-observer')
+        assert.equal(body.execution.performed, false)
+      } else {
+        assert.equal(body.mode, 'cloud-ai')
+      }
+    })
+  })
+}
 
 test('assistant safe no-match falls through with the same overview and sanitized history', async () => {
   const freshOverview = { mode: 'live', generatedAt: 'same-overview', sites: [], services: [], alerts: [], resources: [], activities: [], integrations: [] }

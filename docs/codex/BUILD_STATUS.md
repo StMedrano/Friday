@@ -43,9 +43,11 @@ The proposed values `10.1.2.211`, `10.1.10.100`, `10.1.20.131`, `10.1.20.132`, a
 
 ## Current deployed controller baseline
 
-The last explicitly recorded VM102 production baseline predates the local Agent Platform Phase 1 branch. Existing production validation established a healthy Friday container on port `3010`, read-only Proxmox/VM100 visibility, Groq -> Gemini -> CT108 Ollama assistant fallback, exact infrastructure grounding, and no infrastructure mutation authority.
+On 2026-09-24, read-only SSH confirmed VM102 (`friday-controller`, `10.1.10.11`) has a clean checkout at `127af8a` on the PR branch. This is behind the GitHub PR head `1f7bc0a` and does not include the current uncommitted timeout patch. VM102 `make preflight` completed without blocking errors and `make health` reported the Friday container running with health/overview endpoints OK.
 
-Do not infer that PR #19's current head has been deployed merely because its CI is green. On 2026-09-22, VM102's clean checkout was at `a12b540` while GitHub and the local PR branch were at `a2ff409`. The running container started on 2026-09-12, uses legacy CT108 agent URLs `192.168.1.76:11434`, and predates shared-composer auto-routing. The live registry list/status/detail endpoints now return 200, but full rollout acceptance remains required.
+Live API checks from VM102 on 2026-09-24 returned one enabled `proxmox-observer` definition with the checked-in checksum, registry status `ok` with one synced and zero rejected agents, and deterministic `/api/agents/route` selection of `proxmox-observer` at confidence `0.98` for “Summarize the current Proxmox health.” Direct Ask returned local provenance (`ollama`, `qwen3:4b-instruct`) and `execution.performed:false`, but failed grounding: it invented Site A/B networks, gateways, device counts, resource metrics, and incident history absent from the normalized live overview. It also conflated legacy and current VM100 observer addresses. This is the production failure addressed by PR head `1f7bc0a`; it is not deployed yet. Shared-composer live acceptance remains pending on a grounded build.
+
+Do not infer that GitHub's green check on `1f7bc0a` validates either the uncommitted timeout changes or the currently deployed `127af8a` image. The production agent endpoint remains the verified CT108 nic1 address `10.1.10.12:11434`; the timeout patch has not been deployed.
 
 ## Monitoring, diagnostics, mobile, and assistant — merged
 
@@ -103,6 +105,15 @@ Shared-composer implementation tests cover deterministic Proxmox routing, same-o
 - `make update`: **not run** because the script intentionally switches to `main`, which would not deploy this unmerged PR. The repo-local deployment skill permits an explicitly reviewed `docker compose up -d --build friday` for a PR checkpoint.
 - `make health`: **not run after a new deployment**, because the PR head has not been deployed.
 - Live old-build route/ask/composer comparison: `/api/agents/route` selected `proxmox-observer` with confidence `0.98`; direct `/api/agents/proxmox-observer/ask` returned `mode:local-agent`, `provider:ollama`, model `qwen3:4b-instruct`, and `execution.performed:false`. The shared `/api/assistant` returned Groq/cloud provenance and no agent ID, confirming the running build predates the PR head's agent-first composer change.
+
+### Deadline hardening — 2026-09-24 working-tree verification
+
+- GitHub PR #19 remains open/draft at `1f7bc0a21e69a5387119ba14d9ddf9551d98320b`, merge state `CLEAN`; its `verify` check passed. The working-tree changes below are not included in that remote SHA or deployed controller yet.
+- Added a 10-second Supabase registry request deadline and configurable local-router inference (15 seconds by default) plus local general/coder agent inference (90 seconds by default). Only the model-profile deadlines are environment-overridable through their corresponding `FRIDAY_AGENT_LOCAL_*_TIMEOUT_MS` variables. Existing general Friday assistant provider timeouts are unchanged.
+- A stalled registry request maps to the existing sanitized registry-unavailable error. A stalled local router safely permits normal assistant fallback; stalled matched-agent inference returns `local-agent-unavailable` and never invokes cloud providers.
+- TDD regressions cover profile defaults/overrides, stalled registry requests, stalled matched inference with no cloud fallback, and stalled routing with safe general fallback. The legacy config assertion now includes the profile timeout.
+- `make verify`: **passed** from the current working tree in a temporary Node 22 Alpine tool container: 85/85 frontend tests, 232/232 server/observer/script tests, TypeScript/Vite production build, and all three Compose validations.
+- The deployed health and live assistant acceptance recorded above precede this timeout patch; they do not validate an unpushed or undeployed build.
 
 ### Agents UI acceptance — 2026-09-21
 

@@ -87,6 +87,7 @@ export async function runLocalAgent({
     context: modelProfile.context || 8192,
     maxTokens: modelProfile.maxTokens || 768,
   }
+  const deadline = AbortSignal.timeout(modelProfile.timeoutMs ?? 90000)
 
   return askOllama({
     providerConfig,
@@ -94,6 +95,6 @@ export async function runLocalAgent({
     overview,
     systemPrompt: buildAgentSystemPrompt(agent),
     fetchImpl,
-    signal,
+    signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
   })
 }

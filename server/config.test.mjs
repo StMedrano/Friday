@@ -68,6 +68,7 @@ test('agent model profiles stay local-only and server-side', () => {
     model: 'qwen3:4b-instruct',
     context: 8192,
     maxTokens: 768,
+    timeoutMs: 90000,
   })
   assert.equal('apiKey' in config.agents.modelProfiles['local-general'], false)
 })

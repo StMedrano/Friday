@@ -133,6 +133,7 @@ export function createLocalRouter({
       overview,
       systemPrompt,
       fetchImpl,
+      signal: AbortSignal.timeout(modelProfile.timeoutMs ?? 15000),
     })
 
     const text = String(result?.text || '').trim()
