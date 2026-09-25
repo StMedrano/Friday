@@ -64,7 +64,7 @@ Implemented source behavior:
 
 1. CT108 nic1 validation is complete: its running-container interface reports `10.1.10.12/24`, and authoritative VM102 passes TCP/11434, `/api/tags`, and `/api/chat` over vmbr1.
 2. Agent defaults now use `http://10.1.10.12:11434`; post-migration `make verify` passed on 2026-09-22.
-3. Working-tree timeout hardening bounds registry requests to 10 seconds, local routing to 15 seconds, and matched local inference to 90 seconds by default. TDD tests and full `make verify` passed on 2026-09-24; this patch is not yet in the GitHub head or deployed build.
+3. PR head `0e241b4` contains timeout hardening: registry requests are bounded to 10 seconds, local routing to 15 seconds, and matched local inference to 90 seconds by default. TDD tests, full `make verify`, and GitHub CI passed on 2026-09-24. The patch is not deployed to VM102 yet.
 4. VM132's PostgreSQL ownership failure caused one automatic database restart on 2026-09-22. Later authenticated SQL and service-role REST passed; investigate the ownership incident and require sustained readiness before deploying Friday. See the [PR #19 rollout plan](../superpowers/plans/2026-09-22-pr19-rollout-completion.md).
 5. The existing `friday_agents` and `friday_agent_registry_state` tables matched the checked-in migration on 2026-09-22. No schema write is currently needed.
 6. Back up/preserve VM102 `.env`, then configure the three agent URLs to `http://10.1.10.12:11434` through an owner-capable VM102 session.

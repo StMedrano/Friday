@@ -106,14 +106,14 @@ Shared-composer implementation tests cover deterministic Proxmox routing, same-o
 - `make health`: **not run after a new deployment**, because the PR head has not been deployed.
 - Live old-build route/ask/composer comparison: `/api/agents/route` selected `proxmox-observer` with confidence `0.98`; direct `/api/agents/proxmox-observer/ask` returned `mode:local-agent`, `provider:ollama`, model `qwen3:4b-instruct`, and `execution.performed:false`. The shared `/api/assistant` returned Groq/cloud provenance and no agent ID, confirming the running build predates the PR head's agent-first composer change.
 
-### Deadline hardening — 2026-09-24 working-tree verification
+### Deadline hardening — 2026-09-24 PR verification
 
-- GitHub PR #19 remains open/draft at `1f7bc0a21e69a5387119ba14d9ddf9551d98320b`, merge state `CLEAN`; its `verify` check passed. The working-tree changes below are not included in that remote SHA or deployed controller yet.
+- GitHub PR #19 remains open/draft at `0e241b4`, merge state `CLEAN`; its `verify` check passed. The timeout changes are published in the PR but not deployed to VM102 yet.
 - Added a 10-second Supabase registry request deadline and configurable local-router inference (15 seconds by default) plus local general/coder agent inference (90 seconds by default). Only the model-profile deadlines are environment-overridable through their corresponding `FRIDAY_AGENT_LOCAL_*_TIMEOUT_MS` variables. Existing general Friday assistant provider timeouts are unchanged.
 - A stalled registry request maps to the existing sanitized registry-unavailable error. A stalled local router safely permits normal assistant fallback; stalled matched-agent inference returns `local-agent-unavailable` and never invokes cloud providers.
 - TDD regressions cover profile defaults/overrides, stalled registry requests, stalled matched inference with no cloud fallback, and stalled routing with safe general fallback. The legacy config assertion now includes the profile timeout.
 - `make verify`: **passed** from the current working tree in a temporary Node 22 Alpine tool container: 85/85 frontend tests, 232/232 server/observer/script tests, TypeScript/Vite production build, and all three Compose validations.
-- The deployed health and live assistant acceptance recorded above precede this timeout patch; they do not validate an unpushed or undeployed build.
+- The deployed health and direct-Ask evidence above are from VM102 `127af8a`, before commit `0e241b4`; they do not validate the timeout patch or the grounded-overview correction at `1f7bc0a`.
 
 ### Agents UI acceptance — 2026-09-21
 
