@@ -2,6 +2,9 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
 import { createFridayServer } from './http.mjs'
+import { getConfig } from './config.mjs'
+import { createAgentService } from './agents/agent-service.mjs'
+import { delayedJsonFetch } from '../tests/helpers/delayed-json-fetch.mjs'
 
 function baseConfig(monitoringEnabled = true) {
   return {
@@ -144,6 +147,271 @@ test('assistant receives the same monitoring-aware overview as the UI', async ()
     assert.ok(seenOverview)
     assert.deepEqual(seenOverview.incidents, uiOverview.incidents)
     assert.deepEqual(seenOverview.monitoring, uiOverview.monitoring)
+  })
+})
+
+test('assistant routes a matched Proxmox prompt before the general provider chain', async () => {
+  const calls = []
+  const agentService = {
+    async route({ prompt }) {
+      calls.push(['route', prompt])
+      return {
+        matched: true,
+        agentId: 'proxmox-observer',
+        agentName: 'Proxmox Observer',
+        routing: 'deterministic',
+        confidence: 0.98,
+        reason: 'Strong Proxmox scope match.',
+      }
+    },
+    async ask(agentId, { prompt }) {
+      calls.push(['ask', agentId, prompt])
+      return {
+        available: true,
+        mode: 'local-agent',
+        provider: 'ollama',
+        modelProfile: 'local-general',
+        model: 'qwen3:4b-instruct',
+        agentId,
+        agentName: 'Proxmox Observer',
+        text: 'Proxmox is healthy.',
+        execution: { performed: false, reason: 'Phase 1 agents are advisory only.' },
+      }
+    },
+  }
+  let assistantCalls = 0
+
+  await withServer({
+    config: baseConfig(true),
+    monitoringRuntime: runtime(),
+    agentService,
+    answerAssistantImpl: async () => {
+      assistantCalls += 1
+      return { available: true, mode: 'cloud-ai', provider: 'groq', text: 'must not run' }
+    },
+  }, async (base) => {
+    const response = await postAssistant(base, 'Summarize the current Proxmox health.')
+    assert.equal(response.status, 200)
+    assert.deepEqual(calls, [
+      ['route', 'Summarize the current Proxmox health.'],
+      ['ask', 'proxmox-observer', 'Summarize the current Proxmox health.'],
+    ])
+    assert.equal(assistantCalls, 0)
+  })
+})
+
+test('matched assistant agent receives the current overview and returns routing provenance', async () => {
+  const freshOverview = {
+    mode: 'live',
+    generatedAt: 'current-friday-overview',
+    sites: [],
+    services: [{ id: 'proxmox-lxc-108', name: 'friday-ollama', status: 'online' }],
+    alerts: [],
+    resources: [],
+    activities: [],
+    integrations: [],
+  }
+  let seenOverview
+  const agentService = {
+    async route() {
+      return {
+        matched: true,
+        agentId: 'proxmox-observer',
+        agentName: 'Proxmox Observer',
+        routing: 'deterministic',
+        confidence: 0.98,
+        reason: 'Strong Proxmox scope match.',
+      }
+    },
+    async ask(agentId, { overview }) {
+      seenOverview = overview
+      const ollama = overview.services.find((service) => service.id === 'proxmox-lxc-108')
+      return {
+        available: true,
+        mode: 'local-agent',
+        provider: 'ollama',
+        modelProfile: 'local-general',
+        model: 'qwen3:4b-instruct',
+        agentId,
+        agentName: 'Proxmox Observer',
+        text: `${ollama.id} is ${ollama.status}.`,
+        execution: { performed: false, reason: 'Phase 1 agents are advisory only.' },
+      }
+    },
+  }
+
+  await withServer({
+    config: baseConfig(false),
+    agentService,
+    buildOverviewImpl: async () => freshOverview,
+    answerAssistantImpl: async () => { throw new Error('general assistant must not run') },
+  }, async (base) => {
+    const response = await postAssistant(base, 'Summarize the current Proxmox health.')
+    assert.equal(response.status, 200)
+    const body = await response.json()
+    assert.equal(seenOverview, freshOverview)
+    assert.deepEqual(body, {
+      available: true,
+      mode: 'local-agent',
+      provider: 'ollama',
+      modelProfile: 'local-general',
+      model: 'qwen3:4b-instruct',
+      agentId: 'proxmox-observer',
+      agentName: 'Proxmox Observer',
+      text: 'proxmox-lxc-108 is online.',
+      execution: { performed: false, reason: 'Phase 1 agents are advisory only.' },
+      routing: {
+        matched: true,
+        method: 'deterministic',
+        confidence: 0.98,
+        reason: 'Strong Proxmox scope match.',
+      },
+    })
+  })
+})
+
+test('matched local-agent failure returns local-agent-unavailable without invoking general providers', async () => {
+  let assistantCalls = 0
+  const agentService = {
+    async route() {
+      return {
+        matched: true,
+        agentId: 'proxmox-observer',
+        agentName: 'Proxmox Observer',
+        routing: 'deterministic',
+        confidence: 0.98,
+        reason: 'Strong Proxmox scope match.',
+      }
+    },
+    async ask() {
+      throw new Error('Ollama connection detail must stay private')
+    },
+  }
+
+  await withServer({
+    config: baseConfig(true),
+    monitoringRuntime: runtime(),
+    agentService,
+    answerAssistantImpl: async () => {
+      assistantCalls += 1
+      return { available: true, mode: 'cloud-ai', provider: 'groq', text: 'must not run' }
+    },
+  }, async (base) => {
+    const response = await postAssistant(base, 'Summarize the current Proxmox health.')
+    assert.equal(response.status, 503)
+    assert.equal(assistantCalls, 0)
+    assert.deepEqual(await response.json(), {
+      available: false,
+      mode: 'local-agent',
+      provider: 'ollama',
+      error: 'local-agent-unavailable',
+      agentId: 'proxmox-observer',
+      agentName: 'Proxmox Observer',
+      reason: 'Local agent inference unavailable.',
+      routing: {
+        matched: true,
+        method: 'deterministic',
+        confidence: 0.98,
+        reason: 'Strong Proxmox scope match.',
+      },
+      execution: { performed: false, reason: 'Phase 1 agents are advisory only.' },
+    })
+  })
+})
+
+for (const matched of [true, false]) {
+  test(`stalled local ${matched ? 'matched agent fails without cloud' : 'router permits general fallback'}`, async () => {
+    const config = getConfig({ FRIDAY_AGENT_LOCAL_GENERAL_TIMEOUT_MS: '10', FRIDAY_AGENT_LOCAL_ROUTER_TIMEOUT_MS: '10' })
+    const agent = {
+      version: '1.1', id: 'proxmox-observer', name: 'Proxmox Observer', enabled: true,
+      model: { profile: 'local-general' }, scope: { hosts: ['proxmox'] }, tools: [], permissions: {},
+    }
+    const agentService = createAgentService({
+      config,
+      registryService: { async list() { return [agent] }, async get() { return agent } },
+      fetchImpl: delayedJsonFetch({ message: { content: 'proxmox-observer' } }),
+    })
+    let generalCalls = 0
+    await withServer({
+      config: baseConfig(true), monitoringRuntime: runtime(), agentService,
+      answerAssistantImpl: async () => {
+        generalCalls += 1
+        return { available: true, mode: 'cloud-ai', provider: 'groq', text: 'General response' }
+      },
+    }, async (base) => {
+      const response = await postAssistant(base, matched ? 'Summarize Proxmox health.' : 'Explain this dashboard.')
+      const body = await response.json()
+      assert.equal(response.status, matched ? 503 : 200)
+      assert.equal(generalCalls, matched ? 0 : 1)
+      if (matched) {
+        assert.equal(body.error, 'local-agent-unavailable')
+        assert.equal(body.agentId, 'proxmox-observer')
+        assert.equal(body.execution.performed, false)
+      } else {
+        assert.equal(body.mode, 'cloud-ai')
+      }
+    })
+  })
+}
+
+test('assistant safe no-match falls through with the same overview and sanitized history', async () => {
+  const freshOverview = { mode: 'live', generatedAt: 'same-overview', sites: [], services: [], alerts: [], resources: [], activities: [], integrations: [] }
+  let seenAssistantInput
+  let routeCalls = 0
+  const agentService = {
+    async route() {
+      routeCalls += 1
+      return { matched: false, routing: 'none', confidence: 0, reason: 'No registered agent matched.' }
+    },
+  }
+
+  await withServer({
+    config: baseConfig(false),
+    agentService,
+    buildOverviewImpl: async () => freshOverview,
+    answerAssistantImpl: async (input) => {
+      seenAssistantInput = input
+      return { available: true, mode: 'cloud-ai', provider: 'groq', model: 'general', text: 'General answer.' }
+    },
+  }, async (base) => {
+    const response = await postAssistant(base, 'Explain this dashboard', [
+      { role: 'user', content: ' previous question ' },
+      { role: 'assistant', content: ' previous answer ' },
+    ])
+    assert.equal(response.status, 200)
+    assert.equal(routeCalls, 1)
+    assert.equal(seenAssistantInput.overview, freshOverview)
+    assert.deepEqual(seenAssistantInput.history, [
+      { role: 'user', content: 'previous question' },
+      { role: 'assistant', content: 'previous answer' },
+    ])
+  })
+})
+
+test('assistant routing failure remains non-fatal and falls through to the general assistant', async () => {
+  let assistantCalls = 0
+  let routeCalls = 0
+  const agentService = {
+    async route() {
+      routeCalls += 1
+      throw new Error('registry unavailable')
+    },
+  }
+
+  await withServer({
+    config: baseConfig(true),
+    monitoringRuntime: runtime(),
+    agentService,
+    answerAssistantImpl: async () => {
+      assistantCalls += 1
+      return { available: true, mode: 'local-analysis', provider: 'deterministic', model: null, text: 'General path works.' }
+    },
+  }, async (base) => {
+    const response = await postAssistant(base, 'Show overall service status')
+    assert.equal(response.status, 200)
+    assert.equal(routeCalls, 1)
+    assert.equal(assistantCalls, 1)
+    assert.equal((await response.json()).text, 'General path works.')
   })
 })
 

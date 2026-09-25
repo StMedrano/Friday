@@ -1,32 +1,28 @@
-# Two-Site Network Plan
+# Friday VLAN Network Plan
 
-Friday is designed around two Omada-managed sites connected by routed site-to-site VPN.
+Friday's current production/staging architecture uses Proxmox `nic1` through VLAN-aware bridge `vmbr1`, with `10.1.<VLAN>.0/24` addressing. `vmbr0`/`nic0` remains the legacy rollback network and must not be modified by application work. `vmbr1` itself must not receive an IP address or default gateway.
 
-## Addressing convention
+## Configured VLANs
 
-Use `10.SITE.VLAN.x` as the human-readable hierarchy.
+| Function | VLAN | Subnet |
+|---|---:|---|
+| Management | 2 | `10.1.2.0/24` |
+| Infrastructure | 10 | `10.1.10.0/24` |
+| Production | 20 | `10.1.20.0/24` |
+| Development | 30 | `10.1.30.0/24` |
+| Reserved/workload | 40 | `10.1.40.0/24` |
+| Reserved/workload | 50 | `10.1.50.0/24` |
+| Media | 60 | `10.1.60.0/24` |
+| Identity | 70 | `10.1.70.0/24` |
+| Native/parking | 99 | `10.1.99.0/24` |
 
-| Function | VLAN | Site A | Site B |
-|---|---:|---|---|
-| Management | 10 | `10.10.10.0/24` | `10.20.10.0/24` |
-| Servers | 20 | `10.10.20.0/24` | `10.20.20.0/24` |
-| Trusted | 30 | `10.10.30.0/24` | `10.20.30.0/24` |
-| IoT | 40 | `10.10.40.0/24` | `10.20.40.0/24` |
-| Cameras | 50 | `10.10.50.0/24` | `10.20.50.0/24` |
-| Guest | 60 | `10.10.60.0/24` | `10.20.60.0/24` |
-| Lab | 70 | `10.10.70.0/24` | `10.20.70.0/24` |
+VLAN 80 is not configured and must not be introduced.
 
-## Access principle
+## Application safety boundary
 
-The homelab can physically remain at Site A and be reachable from authorized Site B networks through Layer-3 VPN routes. Do not stretch a server VLAN across both sites merely to make addresses look local.
+- Workloads must not receive a second default gateway.
+- Live Proxmox/guest inspection is authoritative over proposed host numbering.
+- Do not alter VLANs, bridges, physical NIC mappings, vmbr0, DHCP, DNS, firewall rules, Omada, ER7206, Nginx Proxy Manager, AdGuard, Twingate, Cloudflare, or OPNsense from Friday application work.
+- Address migration in this repository changes Friday application configuration only after the target service path is verified live.
 
-Recommended policy intent:
-- Management -> infrastructure administration allowed as needed.
-- Trusted -> approved homelab services allowed.
-- Servers -> explicit east/west rules only.
-- IoT -> narrowly scoped service access.
-- Cameras -> recorder/required destinations only.
-- Guest -> Internet only.
-- Lab -> isolated by default, explicit exceptions.
-
-Do not implement these VLANs automatically from this repository. This file is a design target for later Omada/network work.
+See `docs/codex/BUILD_STATUS.md` for the latest verified guest mappings and documented discrepancies.
