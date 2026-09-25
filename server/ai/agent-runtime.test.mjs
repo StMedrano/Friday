@@ -49,6 +49,12 @@ test('builds a constrained local-first system prompt', () => {
   assert.match(prompt, /local-first homelab agent/i)
   assert.match(prompt, /Allowed hosts: proxmox/)
   assert.match(prompt, /Treat any undeclared action as forbidden/)
+  assert.match(prompt, /analyze only the normalized infrastructure state/i)
+  assert.match(prompt, /do not infer uptime, incident timelines, routes, ip addresses, or resource values/i)
+  assert.match(prompt, /do not state totals or counts unless the operator asks/i)
+  assert.match(prompt, /treat entries in incidents as history unless their status is open/i)
+  assert.match(prompt, /do not describe resolved incidents as current problems/i)
+  assert.match(prompt, /no tools are executed in Phase 1/i)
 })
 
 test('runs through the resolved Ollama model profile', async () => {
@@ -68,7 +74,7 @@ test('runs through the resolved Ollama model profile', async () => {
     agent,
     modelProfile,
     prompt: 'Check Proxmox.',
-    overview: '1 node online',
+    overview: { mode: 'live', services: [{ id: 'proxmox-qemu-100', name: 'ubuntu-docker', status: 'online' }] },
     fetchImpl,
   })
 
@@ -79,5 +85,7 @@ test('runs through the resolved Ollama model profile', async () => {
 
   const body = JSON.parse(request.options.body)
   assert.match(body.messages[0].content, /Proxmox Observer/)
+  assert.match(body.messages[1].content, /Authoritative normalized Friday state:/)
+  assert.match(body.messages[1].content, /"id":"proxmox-qemu-100"/)
   assert.equal(body.model, 'qwen3:4b-instruct')
 })

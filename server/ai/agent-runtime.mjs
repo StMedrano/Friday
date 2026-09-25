@@ -1,4 +1,5 @@
 import { askOllama } from './ollama.mjs'
+import { fridaySystemPrompt } from './policy.mjs'
 
 const VALID_PERMISSION_MODES = new Set(['auto', 'approval', 'forbidden'])
 const DEPLOYMENT_MODEL_FIELDS = ['provider', 'model', 'baseUrl', 'context', 'maxTokens']
@@ -41,9 +42,16 @@ export function buildAgentSystemPrompt(agent) {
   const tools = Array.isArray(agent.tools) ? agent.tools.join(', ') : ''
 
   return [
+    fridaySystemPrompt(),
     `You are Friday agent: ${agent.name}.`,
     agent.description ? `Purpose: ${agent.description}` : '',
     'You are a local-first homelab agent. Do not assume cloud services are available.',
+    'Use only facts present in the current authoritative normalized Friday state; do not fill gaps with training knowledge or previous conversation.',
+    'Do not state totals or counts unless the operator asks; if asked, count only the corresponding current-state collection and name what was counted.',
+    'Do not infer uptime, incident timelines, routes, IP addresses, or resource values. If a requested fact is absent, say it is not present in the current state.',
+    'Treat entries in incidents as history unless their status is open. Do not describe resolved incidents as current problems.',
+    'Only recommend current addresses or routes explicitly present in the current state; never use an address found only in historical evidence.',
+    'No tools are executed in Phase 1. Tool names are descriptive only; do not claim to call, inspect, or run a tool.',
     'You must never invent tool results or claim that an action ran unless Friday executed it.',
     'Prefer observation and diagnosis before proposing changes.',
     'Treat any undeclared action as forbidden.',
