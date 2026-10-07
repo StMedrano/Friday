@@ -137,11 +137,47 @@ It may not gain a Docker, Proxmox, network, shell, SSH, firewall, VLAN, storage,
 
 The existing prerequisite remains: authentication/RBAC, append-only action audit, explicit approval workflow, and global kill switch must exist and be tested before any future typed action executor.
 
+### 7. Agents are composed from shared resources
+
+A Friday agent is not only a prompt plus a model. Its effective runtime identity is composed from:
+
+```text
+identity
++ group membership
++ inherited group skills
++ agent-specific skills
++ allowed plugins/capabilities
++ scoped memory
++ explicit permissions
++ current task context
++ selected model
+```
+
+Group/skill/plugin policy is Git-authoritative. Runtime health, connection state, leases, task state, and retrieved memory remain Friday-owned runtime state.
+
+Inheritance may add context or capability only when the resulting effective policy remains within higher-level security and permission boundaries. A child agent cannot use inheritance or an override to grant itself a plugin, permission, paid model, or infrastructure capability that its governing policy forbids.
+
 ## Terminology
 
 ### Agent
 
-A durable Friday role and policy definition: scope, instructions, permissions, capabilities, and allowed tools.
+A durable Friday role and policy definition: scope, instructions, permissions, capabilities, group membership, allowed plugins/tools, memory scopes, and model-capability requirements.
+
+### Group
+
+A Git-authoritative reusable policy layer that can assign shared skills, plugin permissions, memory scopes, and defaults to multiple agents.
+
+### Skill
+
+A Git-authoritative instruction/SOP package that teaches an agent how to perform a class of work. Skills may be shared globally, assigned by group, or added directly to an agent.
+
+### Plugin
+
+A registered integration or tool surface exposed to Friday, such as GitHub, Supabase, Google Drive, web search, Luci, Figma, or a future MCP service. Plugins expose named capabilities and never become available to an agent merely because they are connected.
+
+### Memory
+
+Durable or working context owned by Friday and retrieved under explicit scope rules. Memory is advisory context unless the underlying record is also an authoritative structured Friday state object.
 
 ### Provider
 
@@ -334,6 +370,151 @@ A later separately reviewed Agent Spec revision may add provider-neutral capabil
 
 No Phase 1 agent may acquire broader execution authority during migration.
 
+## Group and shared skills
+
+Friday uses Git-authoritative skills and skill groups so multiple agents can share stable SOPs without duplicating instructions.
+
+Representative repository structure:
+
+```text
+skills/
+  shared/
+    git/
+    documentation/
+    research/
+  engineering/
+    tdd/
+    code-review/
+    debugging/
+  security/
+    threat-modeling/
+    dependency-audit/
+
+skill-groups/
+  engineering.json
+  research.json
+  security.json
+```
+
+A group policy may declare:
+
+```yaml
+id: engineering
+skills:
+  - superpowers
+  - tdd
+  - git-workflow
+  - code-review
+plugins:
+  allow:
+    - github.read
+    - github.branch-write
+    - documentation.read
+memoryScopes:
+  - organization
+  - project
+  - group
+```
+
+An agent inherits its group's skills and may add agent-specific skills. Agent-specific skill additions cannot weaken group/system requirements or replace mandatory safety/process skills.
+
+Skill resolution is deterministic:
+
+1. system-required skills/process rules;
+2. organization-required skills;
+3. group skills;
+4. agent-specific skills;
+5. task-requested skills that are already approved for that agent/group.
+
+Duplicate skills resolve to one canonical skill ID/version. Missing or conflicting required skills fail closed rather than silently choosing arbitrary instructions.
+
+Skills contain instructions/SOPs only. They do not contain provider credentials and they do not directly grant runtime permissions.
+
+## Plugin registry
+
+Friday maintains a first-class plugin registry separate from model providers.
+
+Each plugin manifest defines normalized metadata such as:
+
+```ts
+type PluginDescriptor = {
+  id: string
+  capabilities: string[]
+  risk: "low" | "medium" | "high"
+  connectionType: "internal" | "mcp" | "api"
+  enabled: boolean
+}
+```
+
+Examples of capabilities:
+
+```text
+github.repository.read
+github.branch.write
+github.pull_request.write
+supabase.query.read
+drive.document.read
+web.search
+memory.search
+```
+
+Plugin availability is **deny by default**.
+
+Effective permission is the intersection of:
+
+1. globally enabled plugin capabilities;
+2. organization policy;
+3. group allow/deny policy;
+4. agent allow/deny policy;
+5. task/workflow policy;
+6. authentication/RBAC and approval requirements.
+
+A connected plugin is not automatically usable by every agent.
+
+Group or agent policy may narrow permissions but cannot exceed the globally configured maximum. High-risk/write capabilities may additionally require explicit approval even when assigned.
+
+Plugin manifests/policy are Git-authoritative. Secrets, OAuth tokens, API keys, connection health, and user-specific authorization remain server-side runtime/configuration state and never enter Git, context packets, handoffs, or model-visible output.
+
+## Scoped memory architecture
+
+Friday memory is explicit, scoped, and provider-neutral.
+
+Supported conceptual scopes:
+
+```text
+global
+organization
+project
+group
+agent
+task
+working/session
+```
+
+Examples:
+
+- **global** — stable Friday-wide non-secret conventions;
+- **organization** — TechTactics-wide operating knowledge;
+- **project** — Harbor/Friday/TechTactics project decisions and context;
+- **group** — engineering or research team knowledge;
+- **agent** — role-specific learned context;
+- **task** — facts/decisions for one work item;
+- **working/session** — short-lived context for the current run.
+
+Memory retrieval follows least-context principles: only scopes allowed by the agent/task are searched, and only relevant bounded results are included.
+
+Precedence rules:
+
+1. system/security policy is never sourced from memory and cannot be overridden by memory;
+2. current authoritative Friday structured state outranks remembered summaries;
+3. current task and accepted decisions outrank older project/group/agent memory;
+4. narrower relevant memory may refine broader memory when they do not conflict with authoritative state;
+5. working/session memory expires or is discarded according to policy and cannot silently become durable memory.
+
+Memory writes are explicit and typed. Agents may propose durable memory updates, but Friday validates scope, size, provenance, and authorization before persistence.
+
+The memory implementation may use Postgres/pgvector, Luci, or future adapters behind a common interface. No agent definition depends on a specific memory backend.
+
 ## Shared work state
 
 Multi-AI continuity requires structured Friday-owned state.
@@ -447,30 +628,50 @@ It does not need the previous provider's full chat transcript.
 
 The Context Builder creates one bounded provider-neutral packet for any worker.
 
-Inputs may include:
+Effective context is composed in a deterministic order:
 
-- agent policy;
-- work item;
-- acceptance criteria;
+1. Friday system/security policy;
+2. agent identity and immutable role constraints;
+3. organization policy;
+4. group policy;
+5. resolved mandatory/group/agent skills;
+6. effective plugin capability allowlist;
+7. authoritative project/work-item state and acceptance criteria;
+8. latest accepted decisions and latest validated handoff;
+9. bounded relevant memory from allowed scopes;
+10. artifact and Git/repository references;
+11. normalized Friday infrastructure state only when the task requires it;
+12. current working/session context.
+
+The packet may therefore include:
+
+- agent and group policy;
+- resolved skill IDs/versions and required instructions;
+- allowed plugin capability names;
+- work item and acceptance criteria;
 - latest handoff;
 - relevant decisions;
-- relevant project memory;
+- relevant scoped memory;
 - artifact references;
 - Git/repository metadata;
-- normalized Friday infrastructure state when the task requires it;
-- allowed tool names;
+- normalized Friday infrastructure state when required;
 - safety/approval policy.
 
 The Context Builder must enforce:
 
 - token/character bounds;
 - secret exclusion;
-- project/work-item scoping;
-- latest-state precedence;
+- project/work-item/memory-scope boundaries;
+- latest-authoritative-state precedence;
+- deterministic skill/group inheritance;
+- deny-by-default plugin capability filtering;
 - deterministic ordering of authoritative material;
-- separation of facts from previous-model suggestions.
+- separation of facts from previous-model suggestions;
+- provenance metadata for retrieved memory and external artifacts where available.
 
 Conversation history is optional context, never authoritative state.
+
+A model cannot expand its own effective skills, plugins, memory scopes, or permissions by returning instructions that request broader access.
 
 ## Friday MCP bridge
 
@@ -740,7 +941,7 @@ Deliver:
 
 This is the **first implementation subproject** after the architecture is approved.
 
-### Phase 2B — Shared Work + Handoff State
+### Phase 2B — Shared Work + Scoped Memory
 
 Deliver:
 
@@ -751,9 +952,23 @@ Deliver:
 - decisions;
 - run history;
 - optimistic concurrency/versioning;
-- context builder.
+- global/organization/project/group/agent/task/session memory scopes;
+- provider-neutral memory adapter;
+- validated memory writes and bounded retrieval.
 
-### Phase 2C — Friday MCP Interoperability
+### Phase 2C — Group Skills + Plugin Registry + Context Builder
+
+Deliver:
+
+- Git-authoritative group definitions;
+- Git-authoritative shared/group/agent skill resolution;
+- plugin manifests and capability registry;
+- deny-by-default group/agent plugin assignments;
+- deterministic permission intersection;
+- Context Builder composition across policy, skills, plugins, memory, task state, handoff, and decisions;
+- provenance and secret-exclusion checks.
+
+### Phase 2D — Friday MCP Interoperability
 
 Deliver:
 
@@ -761,11 +976,12 @@ Deliver:
 - read operations;
 - authenticated write operations;
 - external client identity/audit;
-- ChatGPT/Claude/Kimi-compatible handoff workflow where their client products support the required MCP operations.
+- ChatGPT/Claude/Kimi-compatible handoff workflow where their client products support the required MCP operations;
+- MCP exposure of only the effective plugin/work/memory capabilities allowed to the authenticated Friday identity.
 
 No infrastructure tool execution.
 
-### Phase 2D — Sequential Multi-Agent Orchestrator
+### Phase 2E — Sequential Multi-Agent Orchestrator
 
 Deliver:
 
@@ -774,11 +990,12 @@ Deliver:
 - reviewer handoffs;
 - failure/retry policy;
 - pause/resume;
-- operator approval for workflow-level decisions where needed.
+- operator approval for workflow-level decisions where needed;
+- preservation of group/skill/plugin/memory boundaries across agent-to-agent handoffs.
 
 Parallel autonomous swarms remain out of scope.
 
-### Phase 2E — Homelab Portability + Local NIM
+### Phase 2F — Homelab Portability + Local NIM
 
 Deliver:
 
@@ -786,6 +1003,8 @@ Deliver:
 - backup/restore;
 - deployment health checks;
 - optional local NIM provider;
+- portable skill/group/plugin policy;
+- portable memory export/restore contracts;
 - hosted-to-local migration acceptance.
 
 Local NIM is optional; Friday remains functional with free hosted NVIDIA endpoints when local hardware cannot serve the selected model.
@@ -811,6 +1030,34 @@ The first subproject is complete only when:
 9. no provider credentials reach browser-visible state;
 10. no tool/infrastructure mutation path is introduced;
 11. existing tests/build/CI remain green.
+
+## Phase 2B acceptance boundary
+
+The shared-work and memory phase is complete only when:
+
+1. task ownership/lease/version rules reject conflicting or stale writes;
+2. checkpoints and handoffs preserve append-oriented history;
+3. all seven memory scopes can be represented and access-filtered;
+4. authoritative task/decision state outranks retrieved memory;
+5. unauthorized memory scopes cannot be queried or injected into context;
+6. working/session memory cannot silently become durable memory;
+7. memory backend selection is hidden behind a provider-neutral interface;
+8. secrets are excluded from memory persistence and retrieval paths.
+
+## Phase 2C acceptance boundary
+
+The skills/plugins/context phase is complete only when:
+
+1. group skill inheritance is deterministic and testable;
+2. mandatory higher-level skills cannot be removed by an agent override;
+3. plugin capability access is deny-by-default;
+4. effective plugin permission is the intersection of global, organization, group, agent, task, RBAC, and approval policy;
+5. a connected plugin does not automatically become agent-accessible;
+6. Context Builder emits only allowed skill, plugin, memory, task, and artifact context;
+7. model output cannot expand skills, plugins, memory scopes, or permissions;
+8. plugin credentials/tokens never enter Git, context packets, handoffs, or model-visible state;
+9. group/agent definitions remain portable across hosted and homelab deployments;
+10. existing advisory/read-only infrastructure boundaries remain unchanged.
 
 ## Testing strategy
 
@@ -848,7 +1095,12 @@ Each implementation phase follows TDD.
 - credentials never serialized to API response;
 - browser-visible config cannot contain provider keys;
 - model output cannot alter model policy;
-- invalid registry metadata fails closed.
+- invalid registry metadata fails closed;
+- agent override cannot remove a mandatory group/system skill;
+- plugin access remains denied unless explicitly allowed;
+- group/agent plugin permissions cannot exceed global/RBAC limits;
+- unauthorized memory scopes are excluded from retrieval;
+- model-authored text cannot expand memory/plugin/skill permissions.
 
 ## Explicit non-goals for this architecture stage
 
@@ -879,3 +1131,7 @@ Not included:
 9. **Handoffs are structured state, not full-chat replication.**
 10. **Deployment location is configuration, not architecture.**
 11. **No Agent Fabric feature weakens Friday's current read-only infrastructure boundary.**
+12. **Git owns agent, group, skill, and plugin policy; runtime secrets/connection state do not live in Git.**
+13. **Plugins are deny-by-default and capability-scoped.**
+14. **Memory is explicitly scoped; authoritative current state outranks remembered summaries.**
+15. **An effective agent is identity + group + skills + plugins + memory + permissions + task context + selected model.**
