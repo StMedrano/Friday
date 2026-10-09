@@ -1,6 +1,6 @@
 # FRIDAY VM100 Observer
 
-The VM100 observer is FRIDAY's deliberately read-only Docker visibility service for VM 100 (`192.168.1.124`). It never publishes Docker's native TCP API and never exposes start, stop, restart, exec, remove, image, volume, network, archive, or daemon mutation operations.
+The VM100 observer is FRIDAY's deliberately read-only Docker visibility service for VM 100 nic1 (`10.1.10.10`, VLAN 10). The legacy vmbr0 rollback address is `192.168.1.124`. It never publishes Docker's native TCP API and never exposes start, stop, restart, exec, remove, image, volume, network, archive, or daemon mutation operations.
 
 ## Exposed HTTP contract
 
@@ -57,7 +57,7 @@ grep -qE '^FRIDAY_OBSERVER_TOKEN=.{64}$' .env && echo 'Observer token configured
 Keep these deployment values unless the approved architecture changes:
 
 ```env
-FRIDAY_OBSERVER_BIND_ADDRESS=192.168.1.124
+FRIDAY_OBSERVER_BIND_ADDRESS=10.1.10.10
 FRIDAY_OBSERVER_PORT=3199
 FRIDAY_OBSERVER_HOST_NAME=VM 100
 ```
@@ -68,7 +68,7 @@ Validate and start:
 docker compose config >/dev/null
 docker compose up -d --build
 docker compose ps
-curl -fsS http://192.168.1.124:3199/health | jq
+curl -fsS http://10.1.10.10:3199/health | jq
 ```
 
 The `.env` file is ignored runtime configuration and must remain mode `600`.
@@ -81,14 +81,14 @@ Inventory remains the source of valid container IDs:
 
 ```bash
 curl -fsS -H "Authorization: Bearer $TOKEN" \
-  http://192.168.1.124:3199/api/v1/containers | jq
+  http://10.1.10.10:3199/api/v1/containers | jq
 ```
 
 For a known container such as Nginx Proxy Manager, obtain its sanitized ID from inventory:
 
 ```bash
 CONTAINER_ID=$(curl -fsS -H "Authorization: Bearer $TOKEN" \
-  http://192.168.1.124:3199/api/v1/containers \
+  http://10.1.10.10:3199/api/v1/containers \
   | jq -r '.containers[] | select(.name=="nginx-proxy-manager") | .id')
 ```
 
@@ -96,10 +96,10 @@ Then use only that returned ID:
 
 ```bash
 curl -fsS -H "Authorization: Bearer $TOKEN" \
-  "http://192.168.1.124:3199/api/v1/containers/$CONTAINER_ID/inspect" | jq
+  "http://10.1.10.10:3199/api/v1/containers/$CONTAINER_ID/inspect" | jq
 
 curl -fsS -H "Authorization: Bearer $TOKEN" \
-  "http://192.168.1.124:3199/api/v1/containers/$CONTAINER_ID/logs?tail=100" | jq
+  "http://10.1.10.10:3199/api/v1/containers/$CONTAINER_ID/logs?tail=100" | jq
 ```
 
 Do not replace `CONTAINER_ID` with a Docker API path, shell expression, container name, file path, or arbitrary query string.
@@ -117,7 +117,7 @@ cd observer
 docker compose config >/dev/null
 docker compose up -d --build --force-recreate
 docker compose ps
-curl -fsS http://192.168.1.124:3199/health | jq
+curl -fsS http://10.1.10.10:3199/health | jq
 ```
 
 Verify inventory, inspect, and logs using the commands above. Finally prove the validation target was not changed:

@@ -4,6 +4,7 @@ import { fetchMonitoringHistory, useFridayOverview, type FridayIncident, type Mo
 import { useFridaySession } from '../hooks/useFridaySession'
 import { usePhoneLayout } from '../hooks/usePhoneLayout'
 import ActiveIncidents from '../components/ActiveIncidents'
+import AgentsWorkspace from '../components/AgentsWorkspace'
 import FridayComposer from '../components/FridayComposer'
 import FridayConversation from '../components/FridayConversation'
 import FridayWorkspace from '../components/FridayWorkspace'
@@ -13,6 +14,7 @@ import MobileNavigation from '../components/MobileNavigation'
 import '../monitoring.css'
 import '../mobile.css'
 import '../assistant.css'
+import '../agents.css'
 
 const nav = [
   ['Overview', Home], ['FRIDAY', Sparkles], ['Infrastructure', Server], ['Applications', AppWindow],
@@ -93,7 +95,7 @@ export default function Dashboard() {
             query={query}
             onQueryChange={setQuery}
             onSubmit={submitFriday}
-          /> : active === 'Incidents' ? <IncidentsWorkspace
+          /> : active === 'Agents' ? <AgentsWorkspace/> : active === 'Incidents' ? <IncidentsWorkspace
             incidents={incidents}
             monitoring={overview.monitoring}
             history={history}
@@ -137,13 +139,7 @@ export default function Dashboard() {
                 <h2>What would you like me to handle?</h2>
                 <p>Ask about servers, applications, incidents, deployments, networking, logs, or system health.</p>
                 <FridayConversation messages={friday.messages} compact/>
-                <FridayComposer
-                  value={query}
-                  loading={friday.loading}
-                  placeholder="Ask FRIDAY anything…"
-                  onChange={setQuery}
-                  onSubmit={submitFriday}
-                />
+                <FridayComposer value={query} loading={friday.loading} placeholder="Ask FRIDAY anything…" onChange={setQuery} onSubmit={submitFriday}/>
                 {friday.messages.length > 0 && <button type="button" className="v3-friday-continue" onClick={() => navigate('FRIDAY')}>Continue conversation <ChevronRight size={14}/></button>}
               </div>
               <div className="v3-health">
@@ -159,48 +155,19 @@ export default function Dashboard() {
 
             <section className="v3-section">
               <div className="v3-section-head"><div><span className="v3-kicker">SYSTEM</span><h2>Infrastructure</h2></div><button onClick={() => navigate('Infrastructure')}>View topology <ChevronRight size={15}/></button></div>
-              <div className="v3-infra">
-                {overview.services.slice(0, 3).map((service, idx) => <article key={service.id}>
-                  <div className="v3-node-icon">{idx === 0 ? <Server/> : idx === 1 ? <Boxes/> : <Network/>}</div>
-                  <div><span>{service.category.toUpperCase()}</span><h3>{service.name}</h3><p>{service.host} · {service.detail}</p></div>
-                  <div className={`v3-status ${service.status}`}><i/>{service.status}</div>
-                </article>)}
-              </div>
+              <div className="v3-infra">{overview.services.slice(0, 3).map((service, idx) => <article key={service.id}><div className="v3-node-icon">{idx === 0 ? <Server/> : idx === 1 ? <Boxes/> : <Network/>}</div><div><span>{service.category.toUpperCase()}</span><h3>{service.name}</h3><p>{service.host} · {service.detail}</p></div><div className={`v3-status ${service.status}`}><i/>{service.status}</div></article>)}</div>
             </section>
 
             <section className="v3-grid">
-              <div className="v3-panel">
-                <div className="v3-section-head"><div><span className="v3-kicker">TELEMETRY</span><h2>VM 100 · Infrastructure</h2></div><span className="v3-live"><i/> LIVE</span></div>
-                <div className="v3-metrics">{metrics.map((m, i) => <div key={m.label}><span>{i === 0 ? <Cpu/> : i === 1 ? <MemoryStick/> : <HardDrive/>}{m.label}</span><strong>{m.value}%</strong><div><i style={{width:`${m.value}%`}}/></div><small>{m.helper}</small></div>)}</div>
-              </div>
-              <div className="v3-panel">
-                <div className="v3-section-head"><div><span className="v3-kicker">AGENT MESH</span><h2>Active agents</h2></div><Bot size={18}/></div>
-                <div className="v3-agents">
-                  <div><i className="on"/><span><b>Monitoring</b><small>Watching system health</small></span><em>ACTIVE</em></div>
-                  <div><i className="on"/><span><b>Infrastructure</b><small>Inventory synchronized</small></span><em>READY</em></div>
-                  <div><i/><span><b>Security</b><small>Policy engine ready</small></span><em>IDLE</em></div>
-                </div>
-              </div>
+              <div className="v3-panel"><div className="v3-section-head"><div><span className="v3-kicker">TELEMETRY</span><h2>VM 100 · Infrastructure</h2></div><span className="v3-live"><i/> LIVE</span></div><div className="v3-metrics">{metrics.map((m, i) => <div key={m.label}><span>{i === 0 ? <Cpu/> : i === 1 ? <MemoryStick/> : <HardDrive/>}{m.label}</span><strong>{m.value}%</strong><div><i style={{width:`${m.value}%`}}/></div><small>{m.helper}</small></div>)}</div></div>
+              <div className="v3-panel"><div className="v3-section-head"><div><span className="v3-kicker">AGENT MESH</span><h2>Active agents</h2></div><Bot size={18}/></div><div className="v3-agents"><div><i className="on"/><span><b>Monitoring</b><small>Watching system health</small></span><em>ACTIVE</em></div><div><i className="on"/><span><b>Infrastructure</b><small>Inventory synchronized</small></span><em>READY</em></div><div><i/><span><b>Security</b><small>Policy engine ready</small></span><em>IDLE</em></div></div></div>
             </section>
 
-            <section className="v3-section">
-              <div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><span>{online} online</span></div>
-              <div className="v3-services">{overview.services.map(s => <button key={s.id} onClick={() => navigate('Applications')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span><em>{s.updated}</em></button>)}</div>
-            </section>
-          </> : active === 'FRIDAY' ? <FridayWorkspace
-            session={friday}
-            query={query}
-            onQueryChange={setQuery}
-            onSubmit={submitFriday}
-          /> : active === 'Incidents' ? <IncidentsWorkspace
-            incidents={incidents}
-            monitoring={overview.monitoring}
-            history={history}
-            historyError={historyError}
-            selectedIncident={selectedIncident}
-            onSelectIncident={viewDiagnosis}
-            onClearSelection={() => setSelectedIncidentId(null)}
-          /> : <DetailView active={active} overview={overview} />}
+            <section className="v3-section"><div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><span>{online} online</span></div><div className="v3-services">{overview.services.map(s => <button key={s.id} onClick={() => navigate('Applications')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span><em>{s.updated}</em></button>)}</div></section>
+          </> : active === 'FRIDAY' ? <FridayWorkspace session={friday} query={query} onQueryChange={setQuery} onSubmit={submitFriday}/>
+            : active === 'Agents' ? <AgentsWorkspace/>
+            : active === 'Incidents' ? <IncidentsWorkspace incidents={incidents} monitoring={overview.monitoring} history={history} historyError={historyError} selectedIncident={selectedIncident} onSelectIncident={viewDiagnosis} onClearSelection={() => setSelectedIncidentId(null)}/>
+            : <DetailView active={active} overview={overview} />}
         </main>
       </div>
     </div>
@@ -210,13 +177,7 @@ export default function Dashboard() {
 function DetailView({ active, overview }: { active: string, overview: ReturnType<typeof useFridayOverview>['overview'] }) {
   return <section className="v3-detail">
     <div className="v3-detail-hero"><div className="v3-node-icon large">{active === 'Infrastructure' ? <Server/> : active === 'Applications' ? <AppWindow/> : active === 'Agents' ? <Bot/> : <TerminalSquare/>}</div><div><span className="v3-kicker">FRIDAY CONTROL PLANE</span><h2>{active}</h2><p>Operational view backed by the existing FRIDAY read-only API boundary.</p></div></div>
-    <div className="v3-detail-grid">
-      <article><Gauge/><strong>{overview.services.length}</strong><span>Tracked services</span></article>
-      <article><ShieldCheck/><strong>{overview.mode.toUpperCase()}</strong><span>Control mode</span></article>
-      <article><Activity/><strong>{overview.activities.length}</strong><span>Recent events</span></article>
-    </div>
-    <div className="v3-panel v3-list"><div className="v3-section-head"><div><span className="v3-kicker">CURRENT STATE</span><h2>Environment inventory</h2></div></div>
-      {overview.services.map(s => <div className="v3-list-row" key={s.id}><i className={s.status}/><span><b>{s.name}</b><small>{s.site} · {s.host}</small></span><p>{s.detail}</p><em>{s.status}</em></div>)}
-    </div>
+    <div className="v3-detail-grid"><article><Gauge/><strong>{overview.services.length}</strong><span>Tracked services</span></article><article><ShieldCheck/><strong>{overview.mode.toUpperCase()}</strong><span>Control mode</span></article><article><Activity/><strong>{overview.activities.length}</strong><span>Recent events</span></article></div>
+    <div className="v3-panel v3-list"><div className="v3-section-head"><div><span className="v3-kicker">CURRENT STATE</span><h2>Environment inventory</h2></div></div>{overview.services.map(s => <div className="v3-list-row" key={s.id}><i className={s.status}/><span><b>{s.name}</b><small>{s.site} · {s.host}</small></span><p>{s.detail}</p><em>{s.status}</em></div>)}</div>
   </section>
 }

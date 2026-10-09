@@ -47,4 +47,34 @@ describe('Friday assistant history request contract', () => {
       history: [],
     })
   })
+
+  it('preserves matched local-agent provenance on a 503 response', async () => {
+    const failure = {
+      available: false,
+      mode: 'local-agent',
+      provider: 'ollama',
+      error: 'local-agent-unavailable',
+      agentId: 'proxmox-observer',
+      agentName: 'Proxmox Observer',
+      reason: 'Local agent inference unavailable.',
+      routing: {
+        matched: true,
+        method: 'deterministic',
+        confidence: 0.98,
+        reason: 'Strong Proxmox scope match.',
+      },
+      execution: { performed: false, reason: 'Phase 1 agents are advisory only.' },
+    }
+    const fetchMock = vi.fn().mockResolvedValue(new Response(JSON.stringify(failure), {
+      status: 503,
+      headers: { 'content-type': 'application/json' },
+    }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await expect(askFridayAssistant('Inspect Proxmox')).rejects.toMatchObject({
+      message: 'Local agent inference unavailable.',
+      response: failure,
+    })
+    expect(fetchMock).toHaveBeenCalledTimes(1)
+  })
 })

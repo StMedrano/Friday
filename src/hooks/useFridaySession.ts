@@ -1,9 +1,12 @@
 import { useRef, useState } from 'react'
 import {
   askFridayAssistant,
+  type FridayAgentExecution,
+  type FridayAgentRoutingProvenance,
   type FridayAssistantAttempt,
   type FridayAssistantHistoryMessage,
   type FridayAssistantMode,
+  type FridayAssistantResponse,
 } from '../lib/api'
 
 export type FridaySessionMessage = {
@@ -14,6 +17,11 @@ export type FridaySessionMessage = {
   mode?: FridayAssistantMode
   provider?: string
   model?: string | null
+  modelProfile?: string
+  agentId?: string
+  agentName?: string
+  routing?: FridayAgentRoutingProvenance
+  execution?: FridayAgentExecution
   fallbackUsed?: boolean
   attempts?: FridayAssistantAttempt[]
 }
@@ -44,6 +52,13 @@ function completedHistory(messages: FridaySessionMessage[]): FridayAssistantHist
   return pairs.slice(-10).flat()
 }
 
+function assistantFailureResponse(error: unknown): FridayAssistantResponse | undefined {
+  if (!error || typeof error !== 'object' || !('response' in error)) return undefined
+  const response = (error as { response?: unknown }).response
+  if (!response || typeof response !== 'object') return undefined
+  return response as FridayAssistantResponse
+}
+
 export function useFridaySession(): FridaySession {
   const [messages, setMessages] = useState<FridaySessionMessage[]>([])
   const [loading, setLoading] = useState(false)
@@ -59,6 +74,13 @@ export function useFridaySession(): FridaySession {
   function replaceMessages(next: FridaySessionMessage[]) {
     messagesRef.current = next
     setMessages(next)
+  }
+
+  function updateAssistant(assistantId: string, update: Partial<FridaySessionMessage>) {
+    replaceMessages(messagesRef.current.map((message) => message.id === assistantId ? {
+      ...message,
+      ...update,
+    } : message))
   }
 
   async function sendMessage(prompt: string) {
@@ -86,22 +108,36 @@ export function useFridaySession(): FridaySession {
 
     try {
       const result = await askFridayAssistant(text, { history })
-      replaceMessages(messagesRef.current.map((message) => message.id === assistantId ? {
-        ...message,
+      updateAssistant(assistantId, {
         text: result.text || result.reason || 'Friday returned no response text.',
         status: 'complete',
         mode: result.mode,
         provider: result.provider,
         model: result.model,
+        modelProfile: result.modelProfile,
+        agentId: result.agentId,
+        agentName: result.agentName,
+        routing: result.routing,
+        execution: result.execution,
         fallbackUsed: result.fallbackUsed,
         attempts: result.attempts,
-      } : message))
+      })
     } catch (error) {
-      replaceMessages(messagesRef.current.map((message) => message.id === assistantId ? {
-        ...message,
+      const response = assistantFailureResponse(error)
+      updateAssistant(assistantId, {
         text: error instanceof Error ? error.message : 'Friday assistant unavailable',
         status: 'error',
-      } : message))
+        mode: response?.mode,
+        provider: response?.provider,
+        model: response?.model,
+        modelProfile: response?.modelProfile,
+        agentId: response?.agentId,
+        agentName: response?.agentName,
+        routing: response?.routing,
+        execution: response?.execution,
+        fallbackUsed: response?.fallbackUsed,
+        attempts: response?.attempts,
+      })
     } finally {
       loadingRef.current = false
       setLoading(false)

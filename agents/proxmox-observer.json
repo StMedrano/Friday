@@ -1,14 +1,11 @@
 {
-  "version": "1.0",
+  "version": "1.1",
   "id": "proxmox-observer",
   "name": "Proxmox Observer",
   "description": "Read-only local agent for Proxmox health checks, inventory, diagnostics, and repair recommendations.",
+  "enabled": true,
   "model": {
-    "provider": "ollama",
-    "model": "qwen3:8b",
-    "baseUrl": "http://127.0.0.1:11434",
-    "context": 8192,
-    "maxTokens": 768
+    "profile": "local-general"
   },
   "scope": {
     "hosts": ["proxmox"]
@@ -34,6 +31,6 @@
     "Prefer the lowest-risk diagnostic path.",
     "Never claim a command ran unless Friday's tool executor returns a result.",
     "Never bypass approval or forbidden permission modes.",
-    "Keep destructive actions forbidden in v1."
+    "Keep destructive actions forbidden in v1.1."
   ]
 }

@@ -4,10 +4,12 @@
 Browser
    |
    v
-FRIDAY UI/API — VM102 friday-controller (192.168.1.64:3010)
+FRIDAY UI/API — VM102 friday-controller
+   nic1: 10.1.10.11/24, VLAN 10, service port 3010 verified
+   legacy rollback path: 192.168.1.64:3010
    |
-   +--> Proxmox read-only API — 192.168.1.211:8006
-   +--> VM100 read-only observer — 192.168.1.124:3199
+   +--> Proxmox read-only API — legacy vmbr0 192.168.1.211:8006
+   +--> VM100 read-only observer — nic1 10.1.10.10:3199, VLAN 10
    +--> approved HTTP/read adapters
    +--> optional local VM102 Docker observation (disabled in normal production)
    |
@@ -16,21 +18,20 @@ FRIDAY UI/API — VM102 friday-controller (192.168.1.64:3010)
    +--> POST /api/assistant
           |
           +--> monitoring-aware normalized overview
-          +--> Groq
-          +--> Gemini
-          +--> CT108 native Ollama — 192.168.1.70:11434
-          |      +--> qwen3:4b-instruct on Radeon 780M / RADV Vulkan
-          +--> deterministic local-analysis fallback
+          +--> registered agent routing
+          |      +--> match: CT108 Ollama only; no cloud fallback
+          |      +--> no match/unavailable: general assistant chain
+          +--> Groq -> Gemini -> CT108 Ollama -> deterministic local analysis
    |
    v
 Future identity / policy / approval / action-audit layer
 ```
 
-VM102 is the authoritative FRIDAY controller. VM100 is managed infrastructure and hosts the standalone read-only Docker observer. CT108 is the GPU-backed local-AI fallback. VM110 remains the media/Umbrel workload.
+VM102 is the authoritative FRIDAY controller; live VM131 is absent. VM100 is managed infrastructure and hosts the standalone read-only Docker observer. CT108 is the GPU-backed local-AI fallback. CT108 nic1 is verified as `10.1.10.12/24` on VLAN 10, VM102 passed TCP/11434 plus `/api/tags` and `/api/chat`, and agent profile defaults use that nic1 endpoint. VM110 remains the media/Umbrel workload on VLAN 50; its nic1 address has not been discovered.
 
 ## Assistant provider orchestration
 
-`POST /api/assistant` receives the monitoring-aware normalized overview used by the UI. Friday evaluates configured AI providers sequentially in `FRIDAY_AI_PROVIDER_ORDER`.
+`POST /api/assistant` receives the monitoring-aware normalized overview used by the UI. It first attempts registered agent routing. A matched agent receives that same overview and runs only through its local Ollama profile; local inference failure returns `local-agent-unavailable` without invoking the general chain. No-match or routing-service unavailability continues to configured general AI providers sequentially in `FRIDAY_AI_PROVIDER_ORDER`.
 
 Preferred production order:
 
@@ -51,17 +52,17 @@ Provider calls remain sequential rather than parallel fanout. Responses include 
 Production local AI is external to the Friday controller container:
 
 ```text
-VM102 Friday (192.168.1.64)
+VM102 Friday (nic1 10.1.10.11; legacy vmbr0 192.168.1.64)
     |
     | TCP/11434
     v
-CT108 friday-ollama (192.168.1.70)
+CT108 friday-ollama (nic1 10.1.10.12; validated from VM102)
     |
     v
 qwen3:4b-instruct — Radeon 780M / RADV Vulkan
 ```
 
-CT108 should allow TCP/11434 only from VM102. The optional Compose `local-ai` service remains a private development/recovery path with no host/LAN-published port; it is not the preferred production local provider while CT108 is available.
+CT108 should allow TCP/11434 only from VM102. The three agent profile URLs use the verified `10.1.10.12` vmbr1 endpoint. The optional Compose `local-ai` service remains a private development/recovery path with no host/LAN-published port; it is not the preferred production local provider while CT108 is available.
 
 ## Monitoring and diagnostics
 

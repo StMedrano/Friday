@@ -9,9 +9,10 @@
     "build": "tsc -b && vite build",
     "start": "node server/index.mjs",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "vitest run && node --test server/*.test.mjs server/ai/*.test.mjs server/adapters/*.test.mjs server/diagnostics/*.test.mjs server/monitoring/*.test.mjs observer/*.test.mjs scripts/*.test.mjs",
-    "test:server": "node --test server/*.test.mjs server/ai/*.test.mjs server/adapters/*.test.mjs server/diagnostics/*.test.mjs server/monitoring/*.test.mjs observer/*.test.mjs scripts/*.test.mjs",
-    "test:watch": "vitest"
+    "test": "vitest run && node --test server/*.test.mjs server/ai/*.test.mjs server/agents/*.test.mjs server/adapters/*.test.mjs server/diagnostics/*.test.mjs server/monitoring/*.test.mjs observer/*.test.mjs scripts/*.test.mjs",
+    "test:server": "node --test server/*.test.mjs server/ai/*.test.mjs server/agents/*.test.mjs server/adapters/*.test.mjs server/diagnostics/*.test.mjs server/monitoring/*.test.mjs observer/*.test.mjs scripts/*.test.mjs",
+    "test:watch": "vitest",
+    "validate:agent-registry-schema": "node scripts/validate-agent-registry-schema.mjs supabase/migrations/202608300001_friday_agent_registry.sql"
   },
   "dependencies": {
     "@vitejs/plugin-react": "5.0.2",
