@@ -24,6 +24,15 @@ function providerOrder(value) {
   return parsed.length ? parsed : [...DEFAULT_AI_PROVIDER_ORDER]
 }
 
+function configuredModels(raw) {
+  try {
+    const parsed = JSON.parse(String(raw ?? '[]'))
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 function localAgentProfile(env, prefix, fallbackModel = 'qwen3:4b-instruct') {
   return {
     provider: 'ollama',
@@ -92,6 +101,25 @@ export function getConfig(env = process.env) {
         'local-router': localAgentProfile(env, 'LOCAL_ROUTER'),
         'local-general': localAgentProfile(env, 'LOCAL_GENERAL'),
         'local-coder': localAgentProfile(env, 'LOCAL_CODER'),
+      },
+    },
+    modelFabric: {
+      enabled: enabled(env.FRIDAY_MODEL_FABRIC_ENABLED),
+      policy: Object.freeze({
+        freeOnly: true,
+        allowPaidFallback: false,
+        maxPaidSpendPerDay: 0,
+        preferLocal: true,
+        preferNvidiaFree: true,
+      }),
+      nvidia: {
+        enabled: enabled(env.FRIDAY_NVIDIA_ENABLED),
+        baseUrl: env.FRIDAY_NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1',
+        apiKey: env.NVIDIA_API_KEY || '',
+        models: configuredModels(env.FRIDAY_NVIDIA_MODELS_JSON),
+        localEnabled: enabled(env.FRIDAY_NVIDIA_LOCAL_ENABLED),
+        localBaseUrl: env.FRIDAY_NVIDIA_LOCAL_BASE_URL || 'http://nvidia-nim:8000/v1',
+        localModels: configuredModels(env.FRIDAY_NVIDIA_LOCAL_MODELS_JSON),
       },
     },
     ai: {

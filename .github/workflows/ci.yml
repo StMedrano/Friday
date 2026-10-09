@@ -104,6 +104,25 @@ jobs:
             exit 1
           fi
 
+      - name: Verify model-fabric read-only and credential boundary
+        run: |
+          if grep -RniE 'NVIDIA_API_KEY|VITE_.*NVIDIA|VITE_.*(API_KEY|TOKEN|SECRET|SERVICE_KEY)' src; then
+            echo 'Model credential or frontend secret detected.' >&2
+            exit 1
+          fi
+          if grep -RniE 'VITE_.*(NVIDIA|API_KEY|TOKEN|SECRET|SERVICE_KEY)' .env.example compose.yaml server/ai server/config.mjs; then
+            echo 'Browser-visible model secret detected.' >&2
+            exit 1
+          fi
+          if grep -niE 'child_process|execFile\(|spawn\(|ssh ' server/ai/model-*.mjs server/ai/nvidia.mjs; then
+            echo 'Model-fabric infrastructure execution path detected.' >&2
+            exit 1
+          fi
+          if grep -niE "request\.method === '(POST|PUT|PATCH|DELETE)'.*(model-fabric|infrastructure)" server/http.mjs; then
+            echo 'Model fabric or infrastructure mutation route detected.' >&2
+            exit 1
+          fi
+
       - name: Validate agent registry schema
         run: npm run validate:agent-registry-schema
 
