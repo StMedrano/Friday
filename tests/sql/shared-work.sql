@@ -38,3 +38,22 @@ begin
   raise exception 'service role cannot call private helper';
  end if;
 end $$;
+
+-- Immutable accepted history: service role may append but never rewrite or erase it.
+do $$
+declare t text;
+begin
+ foreach t in array array['friday_checkpoints','friday_handoffs','friday_memories','friday_artifacts'] loop
+  if has_table_privilege('service_role','public.'||t,'UPDATE')
+     or has_table_privilege('service_role','public.'||t,'DELETE') then
+    raise exception 'service role unexpectedly can rewrite or delete %',t;
+  end if;
+  if not has_table_privilege('service_role','public.'||t,'INSERT')
+    or not has_table_privilege('service_role','public.'||t,'SELECT') then
+    raise exception 'service role missing append/read on %',t;
+  end if;
+ end loop;
+ if has_table_privilege('service_role','public.friday_decisions','DELETE') then
+    raise exception 'review history deletable by service role';
+ end if;
+end $$;

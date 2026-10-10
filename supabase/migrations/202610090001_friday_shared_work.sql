@@ -139,7 +139,8 @@ revoke all on public.friday_handoffs from public, anon, authenticated;
 revoke all on public.friday_decisions from public, anon, authenticated;
 revoke all on public.friday_artifacts from public, anon, authenticated;
 revoke all on public.friday_memories from public, anon, authenticated;
-grant select, insert, update, delete on public.friday_projects, public.friday_work_items, public.friday_work_claims, public.friday_agent_runs, public.friday_checkpoints, public.friday_handoffs, public.friday_decisions, public.friday_artifacts, public.friday_memories to service_role;
+grant select, insert, update on public.friday_projects, public.friday_work_items, public.friday_work_claims, public.friday_agent_runs, public.friday_decisions to service_role;
+grant select, insert on public.friday_checkpoints, public.friday_handoffs, public.friday_artifacts, public.friday_memories to service_role;
 
 -- The transaction functions run with caller privileges and are callable only
 -- by the trusted server role. Caller-to-agent authorization happens in Friday.
