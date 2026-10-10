@@ -20,6 +20,7 @@ docker exec "$container" psql -U postgres -v ON_ERROR_STOP=1 -c 'create role ano
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < supabase/migrations/202610090001_friday_shared_work.sql >/dev/null
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work.sql >/dev/null
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work-claims.sql >/dev/null
+docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work-service-role.sql >/dev/null
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work-handoffs.sql >/dev/null
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work-decisions.sql >/dev/null
 FRIDAY_TEST_PG_CONTAINER="$container" sh tests/sql/shared-work-concurrency.sh
