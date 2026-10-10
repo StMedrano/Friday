@@ -9,10 +9,12 @@
     "build": "tsc -b && vite build",
     "start": "node server/index.mjs",
     "preview": "vite preview --host 0.0.0.0",
-    "test": "vitest run && node --test server/*.test.mjs server/ai/*.test.mjs server/agents/*.test.mjs server/adapters/*.test.mjs server/diagnostics/*.test.mjs server/monitoring/*.test.mjs observer/*.test.mjs scripts/*.test.mjs",
-    "test:server": "node --test server/*.test.mjs server/ai/*.test.mjs server/agents/*.test.mjs server/adapters/*.test.mjs server/diagnostics/*.test.mjs server/monitoring/*.test.mjs observer/*.test.mjs scripts/*.test.mjs",
+    "test": "vitest run && node --test server/*.test.mjs server/ai/*.test.mjs server/agents/*.test.mjs server/adapters/*.test.mjs server/diagnostics/*.test.mjs server/monitoring/*.test.mjs server/work/*.test.mjs observer/*.test.mjs scripts/*.test.mjs",
+    "test:server": "node --test server/*.test.mjs server/ai/*.test.mjs server/agents/*.test.mjs server/adapters/*.test.mjs server/diagnostics/*.test.mjs server/monitoring/*.test.mjs server/work/*.test.mjs observer/*.test.mjs scripts/*.test.mjs",
     "test:watch": "vitest",
-    "validate:agent-registry-schema": "node scripts/validate-agent-registry-schema.mjs supabase/migrations/202608300001_friday_agent_registry.sql"
+    "validate:agent-registry-schema": "node scripts/validate-agent-registry-schema.mjs supabase/migrations/202608300001_friday_agent_registry.sql",
+    "validate:shared-work-schema": "node scripts/validate-shared-work-schema.mjs supabase/migrations/202610090001_friday_shared_work.sql",
+    "test:shared-work-db": "sh scripts/test-shared-work-postgres.sh"
   },
   "dependencies": {
     "@vitejs/plugin-react": "5.0.2",

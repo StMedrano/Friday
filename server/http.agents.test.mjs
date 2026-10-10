@@ -153,3 +153,22 @@ test('agent HTTP surface exposes no mutation or execution routes', async () => {
     }
   })
 })
+
+test('Phase 2B does not expose public task, memory, handoff or decision operations',async()=>{
+ await withServer({
+  config:config(),
+  agentRegistryService:registry(),
+  buildOverviewImpl:async()=>overview()
+ },async(base)=>{
+  for(const route of ['/api/work','/api/work/claims','/api/memory','/api/handoffs','/api/decisions']){
+   for(const method of ['GET','POST','PATCH','DELETE']){
+    const response=await fetch(base+route,{
+     method,headers:{'content-type':'application/json'},
+     ...(method==='GET'?{}:{body:JSON.stringify({actor:{principalId:'admin'},operation:'execute'})})
+    })
+    assert.equal(response.status,404,method+' '+route+' unexpectedly exposed')
+    assert.deepEqual(await response.json(),{error:'not-found'})
+   }
+  }
+ })
+})

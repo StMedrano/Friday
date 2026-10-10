@@ -104,6 +104,27 @@ jobs:
             exit 1
           fi
 
+      - name: Verify shared-work security boundary
+        run: |
+          if grep -RniE 'child_process|execFile\(|spawn\(|ssh ' server/work --exclude='*.test.mjs'; then
+            echo 'Shared-work execution interface detected' >&2
+            exit 1
+          fi
+          if grep -niE "url\.pathname.*(/api/(work|memory|decisions|handoffs))" server/http.mjs; then
+            echo 'Unreviewed shared-work public endpoint detected' >&2
+            exit 1
+          fi
+          if grep -RniE 'VITE_.*(SUPABASE|SERVICE_KEY|SECRET|MEMORY_TOKEN)' src .env.example compose.yaml; then
+            echo 'Browser-exposed work credential detected' >&2
+            exit 1
+          fi
+
+      - name: Validate shared-work schema
+        run: npm run validate:shared-work-schema
+
+      - name: Test shared-work Postgres transactions
+        run: npm run test:shared-work-db
+
       - name: Validate agent registry schema
         run: npm run validate:agent-registry-schema
 
