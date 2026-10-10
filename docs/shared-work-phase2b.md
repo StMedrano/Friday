@@ -9,6 +9,10 @@
 - Tests: `npm test`, `npm run validate:shared-work-schema`, and `npm run test:shared-work-db`. The DB runner starts **its own ephemeral PostgreSQL 16 container** without volumes, host ports or an external network; it checks no configured DB URL is present and destroys only its own container.
 - Existing Phase 1 registry migration is unchanged. No task/memory HTTP APIs, MCP writes or infrastructure executors exist in 2B. New modules are **not wired into the public running Friday controller**.
 
+## Read-only homelab gateway preflight
+
+Run `node scripts/preflight-shared-work-target.mjs http://10.1.20.10:8000` from VM102 to check that the intended VM132 gateway responds. Only an unauthenticated GET on `/rest/v1/` is made. HTTP **401 is an expected reachable/gated response** and **does not prove authenticated PostgREST access, successful backup/restore, SQL privileges, schema compatibility, or migration readiness**. The structured report intentionally always returns `authenticated:false` and `migrationReady:false`; only a separately approved privileged read-only audit and staged migration can close those gates. No service keys or secrets are accepted as inputs. The script is covered by three tests in GitHub CI.
+
 ## Staging acceptance checklist
 
 1. Review the migration diff against all existing homelab schemas; verify an isolated backup and a tested restore path before any change to the actual shared server.

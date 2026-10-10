@@ -119,6 +119,9 @@ jobs:
             exit 1
           fi
 
+      - name: Verify read-only Supabase gateway preflight contract
+        run: node --test scripts/preflight-shared-work-target.test.mjs
+
       - name: Validate shared-work schema
         run: npm run validate:shared-work-schema
 
