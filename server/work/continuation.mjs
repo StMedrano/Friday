@@ -3,6 +3,7 @@ const forbidden=/(authorization\s*[:=]|bearer\s+[\w.-]{6,}|-----BEGIN|(?:api_key
 function sanitizeWork(work){
  if(!work||typeof work.id!=='string'||typeof work.projectId!=='string'||typeof work.objective!=='string'||
   !Array.isArray(work.acceptanceCriteria)||!Number.isSafeInteger(work.version))throw safeWorkError('storage-unavailable')
+ if(forbidden.test(JSON.stringify(work)))throw safeWorkError('storage-unavailable')
  return {id:work.id,projectId:work.projectId,objective:work.objective,
   acceptanceCriteria:work.acceptanceCriteria,status:work.status,version:work.version}
 }

@@ -28,3 +28,11 @@ test('stored credential-like handoff and accepted-decision strings are not emitt
  assert.equal(JSON.stringify(packet).includes('token-placeholder'),false)
  assert.equal(JSON.stringify(packet).includes('secret-test'),false)
 })
+
+test('continuation refuses to serialize credential-looking authoritative state',async()=>{
+ const poisonedWork={...workService,get:async()=>({...workItem,objective:'Authorization: Bearer leaked-sensitive'})}
+ await assert.rejects(
+  buildWorkContinuation({actor,workService:poisonedWork,decisionService,memoryService,workItemId:'w',scopes:[]}),
+  e=>e.kind==='storage-unavailable'
+ )
+})

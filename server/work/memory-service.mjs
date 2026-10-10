@@ -8,6 +8,7 @@ function permitted(actor,scope,ownerId){
   (scope!=='project'||actor.allowedProjectIds.includes(ownerId))
 }
 function sanitizeResult(row){
+ if(row&&/(authorization\s*[:=]|bearer\s+[\w.-]{6,}|-----BEGIN|(?:api_key|secret|password|token)\s*=)/i.test(JSON.stringify(row)))return null
  if(!row||typeof row!=='object'||typeof row.content!=='string'||row.content.length>4000 ||
   /(authorization\s*[:=]|bearer\s+[\w.-]{6,}|-----BEGIN|(?:api_key|secret|password|token)\s*=)/i.test(row.content))return null
  return {id:row.id,scope:row.scope,ownerId:row.ownerId,content:row.content,provenance:row.provenance,projectId:row.projectId}

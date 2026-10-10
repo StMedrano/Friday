@@ -10,7 +10,8 @@ const actor={principalId:'alice',allowedProjectIds:['project-1'],allowedMemorySc
 const durable=[
  {id:'m1',scope:'project',ownerId:'project-1',projectId:'project-1',content:'architecture readme',provenance:'operator'},
  {id:'m2',scope:'project',ownerId:'project-2',projectId:'project-2',content:'secret other project',provenance:'operator'},
- {id:'m3',scope:'group',ownerId:'engineers',content:'coding standards',provenance:'operator'}
+ {id:'m3',scope:'group',ownerId:'engineers',content:'coding standards',provenance:'operator'},
+ {id:'m4',scope:'group',ownerId:'engineers',content:'public fact',provenance:'Authorization: Bearer leaked-test-token'}
 ]
 const calls={put:[],search:[],get:[]}
 const repository={
