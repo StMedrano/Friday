@@ -1,7 +1,7 @@
 # Friday Agent Fabric — Phase 2B Shared Work and Scoped Memory Design
 
 Date: 2026-10-09  
-Status: **Proposed — requires written-spec approval before implementation planning**  
+Status: **Approved design (2026-10-09); implementation plan awaiting separate review/approval**  
 Repository: `StMedrano/Friday`  
 Branch: `design/friday-phase2b-shared-work-memory-20261009`  
 Parent architecture: `docs/superpowers/specs/2026-10-07-friday-agent-fabric-free-first-architecture-design.md` (PR #22)  
