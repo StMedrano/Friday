@@ -231,3 +231,24 @@ The observer is not a generic Docker API proxy.
 ## Future action APIs
 
 Do not add execution to the endpoints above. Future actions require a separate, explicitly reviewed policy-gated design after authentication/RBAC, durable append-only action audit, explicit approval workflow, and a global automation kill switch exist and are tested.
+
+
+## Internal Phase 2B Shared Work + Scoped Memory
+
+The Phase 2B modules under `server/work/` expose **internal JavaScript service methods only**.
+They do not add HTTP routes or an MCP bridge. Trusted Friday server code
+must supply a separately verified ActorContext; an agent cannot choose
+its own identity or gain capability grants through model output.
+
+- Work: `createWorkService({repository,agentAuthorizer})`
+- Database adapter: `createSupabaseWorkRepository({baseUrl,serviceKey})`
+- Memory: `createMemoryService({repository,sessionStore})`
+- Decisions and artifact metadata: `createDecisionService({repository,reviewAuthorizer})`
+- Continuation: `buildWorkContinuation({actor,workService,decisionService,memoryService,workItemId,scopes})`
+
+All shared work tables are private, protected by RLS and explicitly restricted
+to the trusted `service_role`. The database migration must be reviewed
+separately before application to homelab production. This does not change
+the local-Ollama-only matched-agent contract or introduce an executor.
+
+See `docs/shared-work-phase2b.md`.
