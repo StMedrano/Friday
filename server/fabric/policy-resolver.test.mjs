@@ -78,3 +78,12 @@ test('read-only classification rejects operation verbs despite a low plugin risk
   assert.equal(result.capabilityTrace.find(x=>x.capability===capability)?.decision,'approval-required',capability)
  }
 })
+
+test('direct resolver rejects conflicting plugin capability descriptors without trusting loader prevalidation',()=>{
+ const plugins={
+  legacy:{id:'legacy',enabled:false,risk:'high',capabilities:[cap]},
+  alias:{id:'alias',enabled:true,risk:'low',capabilities:[cap]}
+ }
+ const tampered={...catalog,plugins}
+ assert.throws(()=>resolveEffectivePolicy({...input,catalog:tampered}),e=>e.kind==='catalog-invalid')
+})
