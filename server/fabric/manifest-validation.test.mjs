@@ -34,3 +34,7 @@ test('scope owner fields must be exact and assignments cannot invent permission'
  for(const p of [{scope:'project',ownerId:'*'},{scope:'project',ownerId:'../etc'},{scope:'invented',ownerId:'a'}])assert.throws(()=>validateFabricManifest('assignment',{...assignment,allowedMemoryScopes:[p]}),e=>e.kind==='catalog-invalid')
  assert.throws(()=>validateFabricManifest('agent',{...assignment}),e=>e.kind==='catalog-invalid')
 })
+test('normalizes declared skill dependency objects to exact version-pinned IDs',()=>{
+ const normalized=validateFabricManifest('skill',{...skill,dependencies:[{id:'basic-review',version:'1.0.0'}]})
+ assert.deepEqual(normalized.dependencies,['basic-review@1.0.0'])
+})

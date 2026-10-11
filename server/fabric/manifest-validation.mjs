@@ -91,7 +91,7 @@ export function validateFabricManifest(kind,input) {
    if(typeof x.version!=='string'||!/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/.test(x.version))fail()
    if(x.instructionFile!=='SKILL.md')fail()
    isText(x.description,200);bool(x.required)
-   list(x.dependencies,dep=>{fields(dep,['id','version']);validId(dep.id);if(!/^\d+\.\d+\.\d+$/.test(dep.version))fail();return dep.id+'@'+dep.version})
+   x.dependencies=list(x.dependencies,dep=>{fields(dep,['id','version']);validId(dep.id);if(!/^\d+\.\d+\.\d+$/.test(dep.version))fail();return dep.id+'@'+dep.version})
   }else if(kind==='plugin'){
    fields(x,['schemaVersion','id','capabilities','risk','connectionType','enabled','description'])
    exactVersion(x.schemaVersion);validId(x.id);list(x.capabilities,validCap)

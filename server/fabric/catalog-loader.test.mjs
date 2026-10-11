@@ -55,3 +55,11 @@ test('ignores existing legacy project skills outside reviewed Phase 2C skill cat
  const loaded=await loadFabricCatalog({rootDir:root});
  assert.deepEqual(Object.keys(loaded.catalog.skills),['safe-code-review'])
 }))
+test('accepts version-pinned dependencies between validated Git skill manifests',()=>check(async root=>{
+ await mkdir(join(root,'skills/engineering/basic-review'))
+ await writeFile(join(root,'skills/engineering/basic-review/manifest.json'),JSON.stringify({...skill,id:'basic-review'}))
+ await writeFile(join(root,'skills/engineering/basic-review/SKILL.md'),'Verify sources.')
+ await writeFile(join(root,'skills/engineering/safe-code-review/manifest.json'),JSON.stringify({...skill,dependencies:[{id:'basic-review',version:'1.0.0'}]}))
+ const result=await loadFabricCatalog({rootDir:root})
+ assert.deepEqual(result.catalog.skills['safe-code-review'].dependencies,['basic-review@1.0.0'])
+}))
