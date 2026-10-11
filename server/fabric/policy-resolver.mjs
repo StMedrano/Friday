@@ -42,8 +42,10 @@ export function resolveEffectivePolicy({catalog,agent,actor,projectId,workItem,t
  for(const p of Object.values(catalog.plugins)){
   for(const c of arr(p.capabilities)){
    if(!isCap(c))continue
-   if(!pluginByCap.has(c))pluginByCap.set(c,[])
-   pluginByCap.get(c).push(p)
+   // Defend the resolver as well as the catalog loader against capability
+   // shadowing, including disabled high-risk versus enabled low-risk aliases.
+   if(pluginByCap.has(c))deny('catalog-invalid')
+   pluginByCap.set(c,[p])
   }
  }
  const allCaps=uniqueSorted([...pluginByCap.keys(),...arr(group.allowedPluginCapabilities),...arr(assignment.allowedPluginCapabilities)])
