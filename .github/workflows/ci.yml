@@ -139,6 +139,9 @@ jobs:
             exit 1
           fi
 
+      - name: Verify dormant Phase 2C release boundary
+        run: npm run verify:fabric-dormant
+
       - name: Validate shared-work schema
         run: npm run validate:shared-work-schema
 
