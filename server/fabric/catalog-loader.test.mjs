@@ -63,3 +63,8 @@ test('accepts version-pinned dependencies between validated Git skill manifests'
  const result=await loadFabricCatalog({rootDir:root})
  assert.deepEqual(result.catalog.skills['safe-code-review'].dependencies,['basic-review@1.0.0'])
 }))
+
+test('rejects ambiguous capabilities declared by two plugin descriptors',()=>check(async root=>{
+ await writeFile(join(root,'plugin-catalog/github-alt.json'),JSON.stringify({...plugin,id:'github-alt',risk:'high',enabled:true}))
+ await assert.rejects(loadFabricCatalog({rootDir:root}),e=>e.kind==='catalog-invalid')
+}))

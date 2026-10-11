@@ -80,3 +80,12 @@ test('context builder respects maxChars and refuses to leak secret-bearing advis
  assert.ok(!JSON.stringify(packet).includes('sample-token-value'))
  await assert.rejects(build(f,{maxChars:256}),e=>e.kind==='context-too-large')
 })
+
+test('current project context excludes memory rows assigned to another project even if actor has both grants',async()=>{
+ const f=fixture({memories:[
+  {id:'other',scope:'project',ownerId:'project-a',projectId:'project-b',content:'Cross-project confidential note',provenance:'fixture'},
+  {id:'current',scope:'project',ownerId:'project-a',projectId:'project-a',content:'Authorized local note',provenance:'fixture'}
+ ]})
+ const packet=await build(f,{actor:{...actor,allowedProjectIds:['project-a','project-b']}})
+ assert.deepEqual(packet.memory.map(m=>m.id),['current'])
+})

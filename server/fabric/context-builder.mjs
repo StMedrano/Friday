@@ -30,12 +30,13 @@ function advisoryHandoff(row,workItemId){
  if(!value||typeof value.summary!=='string')fail('storage-unavailable')
  return {summary:value.summary,recommendedNextCapability:typeof value.recommendedNextCapability==='string'?value.recommendedNextCapability:null,trust:'advisory'}
 }
-function advisoryMemories(rows,scopes){
+function advisoryMemories(rows,scopes,projectId){
  if(!Array.isArray(rows))fail('storage-unavailable')
  const allowed=new Set(scopes.map(s=>JSON.stringify([s.scope,s.ownerId])))
  const out=[]
  for(const row of rows){
-  if(!row||!allowed.has(JSON.stringify([row.scope,row.ownerId])))continue
+  if(!row||!allowed.has(JSON.stringify([row.scope,row.ownerId]))||
+     (row.projectId!==null&&row.projectId!==undefined&&row.projectId!==projectId))continue
   if(typeof row.content!=='string'||typeof row.id!=='string')continue
   out.push({id:row.id,scope:row.scope,ownerId:row.ownerId,excerpt:row.content,provenance:typeof row.provenance==='string'?row.provenance:'',trust:'advisory'})
  }
@@ -55,7 +56,7 @@ export async function buildAgentContext({actor,agentId,workItemId,taskPolicy,cat
  const accepted=acceptedDecisions(decisionRows,workItemId)
  const handoff=advisoryHandoff(await workService.getLatestHandoff({actor:a,workItemId}),workItemId)
  const rows=await memoryService.search({actor:a,scopes:policy.memoryScopeRequests,query:'',limit:20})
- const memory=advisoryMemories(rows,policy.memoryScopeRequests)
+ const memory=advisoryMemories(rows,policy.memoryScopeRequests,work.projectId)
  const mandatory={
   schemaVersion:'1',source:{gitCommit:catalog.sourceCommit||'',policyHash:catalog.policyHash||'',agentChecksum:agent.source?.checksum||''},
   agent:{id:agent.id,name:agent.name||'',modelProfile:agent.model?.profile||null,groupId:policy.groupId},

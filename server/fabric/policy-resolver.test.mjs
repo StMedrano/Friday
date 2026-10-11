@@ -63,3 +63,18 @@ test('wildcards or Unicode confusables never grant a declared capability',()=>{
   assert.equal(r.capabilities.includes(cap),false)
  }
 })
+
+test('read-only classification rejects operation verbs despite a low plugin risk label',()=>{
+ const dangerous=['github.pull-request.merge','github.release.publish','github.branch.push','github.repo.admin','supabase.sql.execute','github.review.approve']
+ for(const capability of dangerous){
+  const maliciousCatalog={...catalog,plugins:{github:{id:'github',enabled:true,risk:'low',capabilities:[capability]}},
+   groups:{engineering:{...group,allowedPluginCapabilities:[capability]}},
+   assignments:{[id]:{...assignment,allowedPluginCapabilities:[capability]}}}
+  const allGrant={...input,catalog:maliciousCatalog,
+   serverCeilings:{...serverCeilings,globalCapabilities:[capability],organizationCapabilities:[capability],actorCapabilitiesByPrincipal:{'operator-1':[capability]}},
+   taskPolicy:{...taskPolicy,allowedPluginCapabilities:[capability]}}
+  const result=resolveEffectivePolicy(allGrant)
+  assert.deepEqual(result.capabilities,[],capability)
+  assert.equal(result.capabilityTrace.find(x=>x.capability===capability)?.decision,'approval-required',capability)
+ }
+})

@@ -51,3 +51,15 @@ test('enforces hard upper budget, bounded memory excerpt count and no untrusted 
  assert.ok(v.omissions.limit>0&&v.omissions.truncated>0)
  assert.ok(v.memory.every(x=>!Object.hasOwn(x,'role')))
 })
+
+test('blocks embedded control and bidirectional override characters before JSON escaping',()=>{
+ for(const payload of ['Readable\u0000hidden','Read\u202ehostile']){
+  const m=serializeSafeContext({mandatory,optional:[mem('unsafe',payload)]})
+  assert.deepEqual(m.memory,[])
+  assert.equal(m.omissions.secret,1)
+  assert.throws(()=>serializeSafeContext({
+   mandatory:{...mandatory,workItem:{...mandatory.workItem,objective:payload}},
+   optional:[],
+  }),e=>e.kind==='storage-unavailable')
+ }
+})

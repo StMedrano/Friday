@@ -85,6 +85,16 @@ export async function loadFabricCatalog({rootDir,sourceCommit='',limits={}}={}){
    skills[key]={...skill,body,checksum:digest(skill.checksum+':'+digest(body))}
    for(const dep of skill.dependencies)if(!skills[dep.split('@')[0]]||skills[dep.split('@')[0]].version!==dep.split('@')[1])failure()
   }
+  // A capability must have one authoritative plugin/risk descriptor.
+  // Duplicate declarations can otherwise launder an enabled low-risk alias
+  // for a disabled or high-risk plugin.
+  const catalogCapabilities=new Set()
+  for(const plugin of Object.values(plugins)){
+   for(const capability of plugin.capabilities){
+    if(catalogCapabilities.has(capability))failure()
+    catalogCapabilities.add(capability)
+   }
+  }
   for(const g of Object.values(groups)){
    for(const id of [...g.requiredSkills,...g.optionalSkills])if(!skills[id])failure()
    for(const c of g.allowedPluginCapabilities){

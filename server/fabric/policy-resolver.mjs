@@ -5,6 +5,13 @@ import {resolveMemoryScopes} from './memory-grants.mjs'
 const deny=(kind='not-authorized')=>{throw new FabricPolicyError(kind)}
 const canonical=/^[a-z][a-z0-9-]*(?:\.[a-z][a-z0-9-]*)+$/
 const isCap=x=>typeof x==='string'&&canonical.test(x)
+// Phase 2C is advisory and only classifies explicitly read-only operations.
+// Unknown verbs are approval-required even if a descriptor claims 'low' risk.
+const readOnlyActions=new Set(['read','get','list','search','view','status','inspect','describe','query'])
+function isReadOnlyCapability(capability){
+ return readOnlyActions.has(capability.split('.').at(-1))
+}
+
 const arr=x=>Array.isArray(x)?x:[]
 const uniqueSorted=xs=>[...new Set(xs)].sort()
 function has(xs,value){return arr(xs).includes(value)}
@@ -59,7 +66,7 @@ export function resolveEffectivePolicy({catalog,agent,actor,projectId,workItem,t
   if(isDenied)reason='explicit-deny'
   else if(!allowed)reason='missing-allow'
   else if(!plugins.some(p=>p.enabled===true))reason='plugin-disabled'
-  else if(plugins.some(p=>p.enabled===true&&p.risk==='high')||/(?:^|\.)(?:write|delete|create|update|mutate|execute)$/.test(capability)){
+  else if(plugins.some(p=>p.enabled===true&&p.risk==='high')||!isReadOnlyCapability(capability)){
    reason='review-required';decision='approval-required'
   }else if(plugins.some(p=>p.enabled===true)){
    decision='allowed';reason='all-scopes-allowed';caps.push(capability)

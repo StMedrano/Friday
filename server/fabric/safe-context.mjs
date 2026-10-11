@@ -1,7 +1,24 @@
 import {FabricPolicyError} from './manifest-validation.mjs'
 const fail=kind=>{throw new FabricPolicyError(kind)}
 const secret=/(?:-----BEGIN [\w ]*PRIVATE KEY-----|authorization\s*[:=]|bearer\s+[a-zA-Z0-9._-]{6,}|(?:api[_-]?key|secret|password|token)\s*[:=]|sk-[\w-]{8,})/i
-const unsafe=x=>secret.test(JSON.stringify(x))||/[\u0000-\u0008\u000e-\u001f\u007f]/.test(JSON.stringify(x))
+const dangerousControls=/[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/
+function unsafe(value){
+ // Inspect raw strings before JSON.stringify escapes invisible characters.
+ const stack=[value],seen=new Set()
+ let inspected=0
+ while(stack.length){
+  if(++inspected>2000)return true
+  const item=stack.pop()
+  if(typeof item==='string'){
+   if(secret.test(item)||dangerousControls.test(item))return true
+  }else if(item&&typeof item==='object'){
+   if(seen.has(item))return true
+   seen.add(item)
+   for(const [key,entry] of Object.entries(item)){stack.push(key,entry)}
+  }
+ }
+ return false
+}
 const str=x=>typeof x==='string'?x:''
 const omissions=()=>({budget:0,secret:0,limit:0,truncated:0})
 function normalizeOptional(item){
