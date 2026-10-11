@@ -1,0 +1,5 @@
+{
+ "schemaVersion":"1","id":"supabase","capabilities":["supabase.query.read"],
+ "risk":"low","connectionType":"api","enabled":false,
+ "description":"Descriptive read-only database capability; not connected or executable"
+}

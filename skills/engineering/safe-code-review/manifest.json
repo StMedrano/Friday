@@ -1,0 +1,5 @@
+{
+ "schemaVersion":"1","id":"safe-code-review","version":"1.0.0",
+ "instructionFile":"SKILL.md","description":"Read-only evidence-based code review",
+ "required":true,"dependencies":[]
+}

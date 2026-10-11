@@ -172,3 +172,13 @@ test('Phase 2B does not expose public task, memory, handoff or decision operatio
   }
  })
 })
+test('Phase 2C adds no public policy, plugin, context or MCP write endpoints',async()=>{
+ await withServer({config:config(),agentRegistryService:registry(),buildOverviewImpl:async()=>overview()},async(base)=>{
+  for(const route of ['/api/policy','/api/plugins','/api/context','/api/fabric','/api/work','/api/memory','/mcp']){
+   for(const method of ['POST','PUT','PATCH','DELETE']){
+    const response=await fetch(base+route,{method,headers:{'content-type':'application/json'},body:'{}'})
+    assert.equal(response.status,404,method+' '+route)
+   }
+  }
+ })
+})
