@@ -1,7 +1,7 @@
 # Friday Agent Fabric — Phase 2C Group Skills, Plugin Policy, and Context Builder Design
 
 Date: 2026-10-11
-Status: **Approved direction; written design awaiting operator review**
+Status: **Written design approved by operator on 2026-10-11; implementation plan awaiting separate review**
 Repository: **StMedrano/Friday**
 Design branch: **design/friday-phase2c-policy-context-20261011**
 Approved foundation: Phase 1 agent registry and advisory local Ollama runtime; Phase 2B shared-work, scoped memory, decisions, checkpoints, and handoffs (merged PR #25, commit 0fba466e7e142105b3048af0c38d3fb3960ebd07).
