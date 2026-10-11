@@ -66,7 +66,7 @@ export async function loadFabricCatalog({rootDir,sourceCommit='',limits={}}={}){
    if(entry.type==='placeholder')continue
    const text=decoder.decode(entry.bytes)
    if(entry.type==='sop'){
-    if(text.length>limit.maxSopBytes||/[\u0000-\u0008\u000e-\u001f\u007f]/.test(text)||
+    if(text.length>limit.maxSopBytes||/[\u0000-\u0008\u000e-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/.test(text)||
        /(?:-----BEGIN|bearer\s+[\w.-]{6,}|(?:password|api_key|secret|token)\s*[:=])/i.test(text))failure()
     bodies.set(entry.name,text);continue
    }
