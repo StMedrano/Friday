@@ -4,20 +4,25 @@ const validId=x=>typeof x==='string'&&/^[a-z0-9][a-z0-9-]{1,62}[a-z0-9]$/.test(x
 export function resolveSkillInstructions({catalog,requiredSkillIds=[],optionalSkillIds=[],taskRequestedSkillIds=[],approvedSkillIds=[],maxChars=12000}={}){
  if(!catalog?.skills||typeof catalog.skills!=='object'||!Number.isSafeInteger(maxChars)||maxChars<1||maxChars>32000)denied('catalog-invalid')
  for(const xs of [requiredSkillIds,optionalSkillIds,taskRequestedSkillIds,approvedSkillIds])if(!Array.isArray(xs)||xs.length>32||xs.some(x=>!validId(x)))denied('catalog-invalid')
- const selected=[],omissions=[],seen=new Set()
+ const selected=[],omissions=[],seen=new Set(),resolvedClosures=new Map()
  let chars=0
  function gather(id,path=new Set()){
   if(path.has(id))denied('catalog-invalid')
+  if(resolvedClosures.has(id))return resolvedClosures.get(id)
   const skill=catalog.skills[id]
   if(!skill||typeof skill.body!=='string'||!validId(skill.id)||!/^\d+\.\d+\.\d+$/.test(skill.version)||skill.body.length>2000||!Array.isArray(skill.dependencies))denied('catalog-invalid')
   const next=new Set(path);next.add(id)
-  const items=[]
+  const items=[],visited=new Set()
   for(const dependency of skill.dependencies){
    const [depId,depVersion]=dependency.split('@')
    if(!validId(depId)||!/^\d+\.\d+\.\d+$/.test(depVersion)||catalog.skills[depId]?.version!==depVersion)denied('catalog-invalid')
-   items.push(...gather(depId,next))
+   for(const dependent of gather(depId,next)){
+    if(!visited.has(dependent.id)){visited.add(dependent.id);items.push(dependent)}
+   }
   }
-  return [...items,skill]
+  if(!visited.has(skill.id))items.push(skill)
+  resolvedClosures.set(id,items)
+  return items
  }
  function include(id,required,source){
   let closure
