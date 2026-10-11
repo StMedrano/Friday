@@ -35,3 +35,18 @@ The first command reports only a catalog digest and metadata counts. No private 
 ## Operational gates and rollback
 
 Development is in an isolated feature worktree. Implementer reviews are **not** independent; an external reviewer and verified exact-head CI are required before merge. The Phase 2C runtime is not imported into live Friday HTTP startup and remains disabled by default. Do not change VM102, database tables/grants or existing Docker tags until separately authorized. For a future approved rollout, disable the optional Phase 2C composition or revert its app image; do not drop Phase 2B historical records.
+
+## Post-merge dormant release preflight (read-only)
+
+Run `npm run verify:fabric-dormant` on the exact candidate Git tree, in addition to the normal tests and CI. The command validates catalog manifests and checks that every plugin descriptor is disabled, there are zero agent assignments, the normal controller entrypoints do not directly wire the Phase 2C runtime, the checked-in Compose/environment templates contain **no reference** to the Phase 2C activation flag (including false, truthy aliases and variable expansions), and the Dockerfile has real `COPY` instructions for all four catalog directories rather than commented placeholders. CI repeats this check.
+
+The preflight reports `status=dormant-verified` and `activationApproved=false` if the *repository-level* dormant checks pass. This is **not** evidence that the running container matches the candidate, and it is **not** an independent security review, complete data-flow audit, rollout authorization, or proof that no indirect integration or secrets exist. It intentionally fails when a future feature PR adds enabled plugins, assignments or runtime wiring; that future rollout requires a separately approved plan and its own revised policy.
+
+**Before any future production image update:**
+1. Review the exact head SHA, passing CI, image digest and any generated artifacts; obtain an independent security/code review (the Phase 2C implementation was merged without this review).
+2. Verify the current controller health and immutable image/tag rollback target; confirm existing Phase 1/2B state is backed up and unchanged.
+3. Require explicit operator approval for the specific candidate deployment and, separately, for any `FRIDAY_FABRIC_ENABLED=true` activation or plugin/agent grant. Never treat a merged PR as permission to enable new capabilities.
+4. Re-check no unreviewed HTTP/MCP routes, actor boundary, memory scope leakage, action execution, runtime secrets or migration/grant changes. The dormant preflight is one narrow automated guard, not a substitute for these checks.
+5. After an independently authorized rollout, compare observed health and version with the baseline. If the candidate fails, roll back to the *previous approved immutable image digest* and leave the fabric flag disabled; do not delete Phase 2B memory/decisions.
+
+**Current state:** dormant merge complete, production image unchanged; deployment and activation remain pending separate approvals.
