@@ -38,7 +38,7 @@ Development is in an isolated feature worktree. Implementer reviews are **not** 
 
 ## Post-merge dormant release preflight (read-only)
 
-Run `npm run verify:fabric-dormant` on the exact candidate Git tree, in addition to the normal tests and CI. The command validates catalog manifests and checks that every plugin descriptor is disabled, there are zero agent assignments, the normal controller entrypoints do not directly wire the Phase 2C runtime, the checked-in Compose/environment templates do not enable `FRIDAY_FABRIC_ENABLED`, and the Dockerfile includes all four catalog directories. CI repeats this check.
+Run `npm run verify:fabric-dormant` on the exact candidate Git tree, in addition to the normal tests and CI. The command validates catalog manifests and checks that every plugin descriptor is disabled, there are zero agent assignments, the normal controller entrypoints do not directly wire the Phase 2C runtime, the checked-in Compose/environment templates contain **no reference** to the Phase 2C activation flag (including false, truthy aliases and variable expansions), and the Dockerfile has real `COPY` instructions for all four catalog directories rather than commented placeholders. CI repeats this check.
 
 The preflight reports `status=dormant-verified` and `activationApproved=false` if the *repository-level* dormant checks pass. This is **not** evidence that the running container matches the candidate, and it is **not** an independent security review, complete data-flow audit, rollout authorization, or proof that no indirect integration or secrets exist. It intentionally fails when a future feature PR adds enabled plugins, assignments or runtime wiring; that future rollout requires a separately approved plan and its own revised policy.
 

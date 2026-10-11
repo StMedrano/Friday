@@ -8,7 +8,9 @@ const runtimePaths=['server/index.mjs','server/http.mjs','server/config.mjs']
 const deploymentPaths=['compose.yaml','compose.live.yaml','.env.example']
 const copied=['groups','skills','plugin-catalog','agent-assignments']
 const unsafeFabricWiring=/(?:\bcreateFabricRuntime\b|\bbuildAgentContext\b|\bloadFabricCatalog\b|(?:from\s*|import\s*\(\s*|require\s*\(\s*)['"][^'"]*\/fabric\/)/m
-const enabledEnv=/\bFRIDAY_FABRIC_ENABLED\s*[:=]\s*(?:['"]?true(?:['"]|\s|$)|['"]?\$\{FRIDAY_FABRIC_ENABLED:-true\})/im
+// Conservative dormant gate: *any* checked-in deployment flag reference
+// requires a future reviewed rollout gate, regardless of truthy spelling or expansion.
+const fabricFlagReference=/\bFRIDAY_FABRIC_ENABLED\b/
 const fail=()=>{throw new Error('dormant-safety-check-failed')}
 const loadText=(base,path)=>readFile(resolve(base,path),'utf8')
 
@@ -28,11 +30,12 @@ export async function verifyFabricDormant({rootDir=root}={}){
   if(unsafeFabricWiring.test(await loadText(base,file)))fail()
  }
  for(const file of deploymentPaths){
-  if(enabledEnv.test(await loadText(base,file)))fail()
+  if(fabricFlagReference.test(await loadText(base,file)))fail()
  }
  const dockerfile=await loadText(base,'Dockerfile')
  for(const folder of copied){
-  if(!dockerfile.includes('COPY --from=build /app/'+folder+' ./'+folder))fail()
+  const expression=new RegExp('^\\s*COPY\\s+--from=build\\s+/app/'+folder+'\\s+\\./'+folder+'\\s*$','m')
+  if(!expression.test(dockerfile))fail()
  }
  return Object.freeze({
   status:'dormant-verified',

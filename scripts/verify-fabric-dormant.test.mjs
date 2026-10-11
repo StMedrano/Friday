@@ -72,3 +72,26 @@ test('preflight rejects compose activation through a default-true variable expan
  await edit(root,file,(await readFile(join(root,file),'utf8'))+'\n      FRIDAY_FABRIC_ENABLED: ${FRIDAY_FABRIC_ENABLED:-true}\n')
  await assert.rejects(verifyFabricDormant({rootDir:root}),/dormant-safety-check-failed/)
 })
+
+test('dormant gate rejects alternate activation values and compose variable operators',async t=>{
+ for(const [i,value] of [
+  'FRIDAY_FABRIC_ENABLED: 1',
+  'FRIDAY_FABRIC_ENABLED: yes',
+  'FRIDAY_FABRIC_ENABLED: ${FRIDAY_FABRIC_ENABLED-true}',
+  'FRIDAY_FABRIC_ENABLED: ${FRIDAY_FABRIC_ENABLED:?must-enable}',
+  'FRIDAY_FABRIC_ENABLED: false',
+ ].entries()){
+  const root=await fixture(t)
+  const file='compose.live.yaml'
+  await edit(root,file,(await readFile(join(root,file),'utf8'))+'\n      '+value+'\n')
+  await assert.rejects(verifyFabricDormant({rootDir:root}),/dormant-safety-check-failed/,'case '+i)
+ }
+})
+test('Dockerfile packaging requires a real COPY instruction not a comment',async t=>{
+ const root=await fixture(t),file='Dockerfile'
+ const original=await readFile(join(root,file),'utf8')
+ const line='COPY --from=build /app/agent-assignments ./agent-assignments'
+ assert.ok(original.includes(line))
+ await edit(root,file,original.replace(line,'# '+line))
+ await assert.rejects(verifyFabricDormant({rootDir:root}),/dormant-safety-check-failed/)
+})
