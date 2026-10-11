@@ -38,3 +38,11 @@ test('normalizes declared skill dependency objects to exact version-pinned IDs',
  const normalized=validateFabricManifest('skill',{...skill,dependencies:[{id:'basic-review',version:'1.0.0'}]})
  assert.deepEqual(normalized.dependencies,['basic-review@1.0.0'])
 })
+
+test('rejects bidi and invisible C1 controls in human-readable manifest descriptions',()=>{
+ for(const unsafe of ['\u202e','\u2067','\u0085']){
+  for(const [kind,row] of [['skill',skill],['plugin',plugin]]){
+   assert.throws(()=>validateFabricManifest(kind,{...row,description:'Reviewed '+unsafe+'unsafe'}),e=>e.kind==='catalog-invalid')
+  }
+ }
+})
