@@ -42,3 +42,23 @@ test('same inputs produce deterministic skill results and reject more than sixte
  assert.deepEqual(resolveSkillInstructions(args),resolveSkillInstructions(args))
  assert.throws(()=>resolveSkillInstructions({catalog:c,requiredSkillIds:Object.keys(c.skills),maxChars:12000}),e=>e.kind==='catalog-invalid')
 })
+
+test('shared dependency fan-in is bounded before the sixteen-skill limit',()=>{
+ const rows=[make('tier-00-a'),make('tier-00-b')]
+ for(let n=1;n<=12;n++){
+  const prev=String(n-1).padStart(2,'0'),current=String(n).padStart(2,'0')
+  for(const side of ['a','b'])
+   rows.push(make('tier-'+current+'-'+side,['tier-'+prev+'-a@1.0.0','tier-'+prev+'-b@1.0.0']))
+ }
+ rows.push(make('root-skill',['tier-12-a@1.0.0','tier-12-b@1.0.0']))
+ const catalog=catalogue(rows)
+ let lookups=0
+ catalog.skills=new Proxy(catalog.skills,{
+  get(target,key,receiver){
+   if(typeof key==='string'&&Object.hasOwn(target,key))lookups++
+   return Reflect.get(target,key,receiver)
+  }
+ })
+ assert.throws(()=>resolveSkillInstructions({catalog,requiredSkillIds:['root-skill']}),e=>e.kind==='catalog-invalid')
+ assert.ok(lookups<=200,'reconvergent dependency traversal repeated '+lookups+' catalog lookups')
+})
