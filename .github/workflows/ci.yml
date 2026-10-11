@@ -122,6 +122,23 @@ jobs:
       - name: Verify read-only Supabase gateway preflight contract
         run: node --test scripts/preflight-shared-work-target.test.mjs
 
+      - name: Validate Git fabric catalog and internal-only Phase 2C security
+        run: |
+          npm run validate:fabric-catalog
+          node --test server/fabric/*.test.mjs scripts/validate-fabric-catalog.test.mjs
+          if grep -RniE 'child_process|execFile\(|spawn\(|/containers/.*/(start|stop|restart|kill|exec)' server/fabric --exclude='*.test.mjs'; then
+            echo 'Phase 2C fabric added forbidden execution capability' >&2
+            exit 1
+          fi
+          if grep -niE "url\.pathname.*(/api/(policy|plugins|context|fabric|work|memory)|/mcp)" server/http.mjs; then
+            echo 'Unreviewed fabric public endpoint exposed' >&2
+            exit 1
+          fi
+          if grep -RniE 'VITE_.*(SUPABASE|SERVICE_KEY|SECRET|TOKEN)' src .env.example compose.yaml; then
+            echo 'Browser-exposed credential variable detected' >&2
+            exit 1
+          fi
+
       - name: Validate shared-work schema
         run: npm run validate:shared-work-schema
 
