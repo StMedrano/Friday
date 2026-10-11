@@ -1,6 +1,6 @@
 # Friday Phase 2B shared work — operator and staging guide
 
-**Status:** Code implementation on an isolated development branch. Live rollout is a separate approval gate. The intended eventual shared-work PostgreSQL backend is the existing **homelab Supabase**; no production schema changes are made by these scripts or CI.
+**Status:** The authorized homelab Supabase schema migration was applied on 2026-10-11 after a restricted PostgreSQL 17.6 backup and isolated restore rehearsal. Its permissions were verified in production. Application deployment remains a separate step.
 
 ## Components
 
@@ -35,3 +35,14 @@ Safe code rollback: leave Phase 2B service entrypoints disabled and redeploy the
 ## Operational limitations before acceptance
 
 This is not an autonomous multi-AI workflow: no authentication-bound external MCP clients, background scheduler, public work-management interface or automatic inference chain. Task continuation is a reusable **internal API**; integration with providers, group skills, plugins and external clients belongs to subsequent approved phases.
+
+## Mandatory migration follow-up — Supabase default privileges
+
+Supabase can default to **all table privileges for service_role** via owner-specific default ACLs. A narrower GRANT statement alone does not revoke that broad access. Always apply both migrations transactionally in order:
+
+1. `supabase/migrations/202610090001_friday_shared_work.sql`
+2. `supabase/migrations/202610110001_friday_shared_work_grants.sql`
+
+Immediately verify the effective role grants with `tests/sql/shared-work.sql`. It must report no UPDATE or DELETE privilege for service_role on the append-only checkpoint, handoff, artifact, and memory tables. CI emulates broad Supabase default privileges before applying the two migrations.
+
+For the authorized 2026-10-11 VM132 rollout, a backup and globals dump were saved in a private server-side directory; the backup was successfully restored to an isolated matching PostgreSQL 17.6 instance with the production shared-preload extensions. The schema and follow-up grants passed tests on that restored instance and on the production database. This does not approve public APIs, external task execution, or automatic model handoffs.

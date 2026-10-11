@@ -17,7 +17,11 @@ until docker exec "$container" pg_isready -U postgres >/dev/null 2>&1; do
  sleep 1
 done
 docker exec "$container" psql -U postgres -v ON_ERROR_STOP=1 -c 'create role anon; create role authenticated; create role service_role bypassrls;' >/dev/null
+# Emulate Supabase's broader default grants so the follow-up migration
+# must revoke them explicitly before the SQL privilege audit runs.
+docker exec "$container" psql -U postgres -v ON_ERROR_STOP=1 -c "alter default privileges for role postgres in schema public grant all on tables to service_role;" >/dev/null
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < supabase/migrations/202610090001_friday_shared_work.sql >/dev/null
+docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < supabase/migrations/202610110001_friday_shared_work_grants.sql >/dev/null
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work.sql >/dev/null
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work-claims.sql >/dev/null
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work-service-role.sql >/dev/null
