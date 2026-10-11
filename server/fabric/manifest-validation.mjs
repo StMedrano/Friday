@@ -12,7 +12,7 @@ const secret=/(authorization\s*[:=]|bearer\s+[\w.-]{6,}|-----BEGIN|(?:api[_-]?ke
 const decoder=new TextDecoder('utf-8',{fatal:true})
 const plain=x=>x&&typeof x==='object'&&!Array.isArray(x)&&[null,Object.prototype].includes(Object.getPrototypeOf(x))
 function fields(v,names){if(!plain(v)||Object.keys(v).some(x=>!names.includes(x)))fail()}
-function isText(x,max=500){if(typeof x!=='string'||!x.trim()||x.length>max||/[\u0000-\u001f\u007f]/.test(x)||secret.test(x))fail();return x}
+function isText(x,max=500){if(typeof x!=='string'||!x.trim()||x.length>max||/[\u0000-\u001f\u007f-\u009f\u202a-\u202e\u2066-\u2069]/.test(x)||secret.test(x))fail();return x}
 function validId(x){if(typeof x!=='string'||!id.test(x))fail();return x}
 function validCap(x){if(typeof x!=='string'||!cap.test(x))fail();return x}
 function list(v,check,max=32){if(!Array.isArray(v)||v.length>max)fail();const seen=new Set();return v.map(x=>{const y=check(x);if(seen.has(y))fail();seen.add(y);return y})}
