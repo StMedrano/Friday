@@ -68,3 +68,10 @@ test('rejects ambiguous capabilities declared by two plugin descriptors',()=>che
  await writeFile(join(root,'plugin-catalog/github-alt.json'),JSON.stringify({...plugin,id:'github-alt',risk:'high',enabled:true}))
  await assert.rejects(loadFabricCatalog({rootDir:root}),e=>e.kind==='catalog-invalid')
 }))
+
+test('rejects bidirectional override and C1 controls in skill SOPs at catalog load',()=>check(async root=>{
+ for(const unsafe of ['\u202e','\u2066','\u0085']){
+  await writeFile(join(root,'skills/engineering/safe-code-review/SKILL.md'),'Review\n'+unsafe+'hidden change')
+  await assert.rejects(loadFabricCatalog({rootDir:root}),e=>e.kind==='catalog-invalid')
+ }
+}))
