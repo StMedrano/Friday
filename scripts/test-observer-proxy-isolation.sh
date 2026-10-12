@@ -70,4 +70,32 @@ docker exec "$observer" node -e '
   console.log("Authenticated observer inventory: HTTP",response.status);
  }).catch(()=>{process.exitCode=1})
 '
-echo 'PASS: observer rootless, no raw Docker socket, proxy forwards only whitelisted GET and denies writes'
+# Even a compromised observer cannot fetch raw inspect environment,
+# host bind mounts, untrusted labels, or arbitrary unstructured log output.
+self_id="$(docker inspect "$observer" --format '{{.Id}}')"
+docker exec -e TEST_CONTAINER_ID="$self_id" "$observer" node -e '
+ const http=require("http")
+ const id=process.env.TEST_CONTAINER_ID
+ async function query(path){
+  return await new Promise((resolve,reject)=>{
+   const req=http.request({socketPath:"/proxy/docker.sock",path,method:"GET"},res=>{
+    const chunks=[]
+    res.on("data",x=>chunks.push(x))
+    res.on("end",()=>resolve({status:res.statusCode,body:Buffer.concat(chunks).toString("utf8")}))
+   })
+   req.on("error",reject)
+   req.end()
+  })
+ }
+ (async()=>{
+  const inspect=await query("/containers/"+id+"/json")
+  if(inspect.status!==200)throw Error("inspection request failed")
+  const data=JSON.parse(inspect.body)
+  if(data.Config.Env!==undefined||data.Config.Cmd!==undefined||data.Mounts!==undefined||
+    data.HostConfig.Binds!==undefined)throw Error("unredacted Docker metadata escaped broker")
+  const logs=await query("/containers/"+id+"/logs?stdout=1&stderr=1&timestamps=1&tail=100")
+  if(logs.status!==403)throw Error("raw Docker logs were not blocked")
+  console.log("Sanitized inspect HTTP 200; raw log request HTTP 403")
+ })().catch(e=>{console.error(e.message);process.exitCode=1})
+'
+echo 'PASS: isolated observer can read projected Docker inventory/inspection only, never Docker writes, raw metadata or logs'
