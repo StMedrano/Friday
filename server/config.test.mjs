@@ -117,3 +117,12 @@ test('diagnostics are disabled by default and require explicit opt-in', () => {
   assert.deepEqual(getConfig({ FRIDAY_DIAGNOSTICS_ENABLED: 'true' }).diagnostics, { enabled: true })
   assert.deepEqual(getConfig({ FRIDAY_DIAGNOSTICS_ENABLED: 'false' }).diagnostics, { enabled: false })
 })
+test('operator registry sync token is absent by default and never appears in browser-facing config', () => {
+  const empty = getConfig({})
+  assert.equal(empty.operator.registrySyncToken, '')
+  const secret = 'a'.repeat(64)
+  const configured = getConfig({ FRIDAY_REGISTRY_SYNC_OPERATOR_TOKEN: secret })
+  assert.equal(configured.operator.registrySyncToken, secret)
+  assert.equal(JSON.stringify(configured.ai).includes(secret), false)
+  assert.equal(JSON.stringify(configured.agents).includes(secret), false)
+})

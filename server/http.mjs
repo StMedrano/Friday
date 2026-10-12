@@ -1,4 +1,5 @@
 import { createServer } from 'node:http'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -44,6 +45,20 @@ const mime = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
+}
+
+// Operator-only mutation boundary. A 32-byte random token, encoded as 64 hex
+// characters, must be supplied by a trusted server-side environment variable.
+// A browser-facing token or user-supplied identity header is never trusted.
+function authorizedOperator(request, token) {
+  if (typeof token !== 'string' || !/^[a-fA-F0-9]{64}$/.test(token)) return { status: 503, error: 'operator-auth-unconfigured' }
+  const auth = request.headers.authorization
+  const bearer = typeof auth === 'string' ? /^Bearer ([a-fA-F0-9]{64})$/.exec(auth) : null
+  if (!bearer) return { status: 401, error: 'operator-auth-required' }
+  const expected = createHash('sha256').update(token, 'utf8').digest()
+  const provided = createHash('sha256').update(bearer[1], 'utf8').digest()
+  if (!timingSafeEqual(expected, provided)) return { status: 401, error: 'operator-auth-required' }
+  return null
 }
 
 function json(response, statusCode, body) {
@@ -193,6 +208,8 @@ export function createFridayServer({
     }
 
     if (request.method === 'POST' && url.pathname === '/api/agents/registry/sync') {
+      const denial = authorizedOperator(request, config.operator?.registrySyncToken)
+      if (denial) return json(response, denial.status, { error: denial.error })
       if (!agentRegistryService) return json(response, 503, { error: 'agent-registry-unavailable' })
       try {
         const body = await readBody(request)

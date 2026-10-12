@@ -45,6 +45,7 @@ export function getConfig(env = process.env) {
 
   return {
     port: Number(env.FRIDAY_PORT || 3010),
+    operator: { registrySyncToken: env.FRIDAY_REGISTRY_SYNC_OPERATOR_TOKEN || '' },
     mode: env.FRIDAY_MODE === 'live' ? 'live' : 'mock',
     docker: {
       enabled: enabled(env.FRIDAY_DOCKER_ENABLED),

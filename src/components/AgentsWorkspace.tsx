@@ -3,7 +3,6 @@ import {
   askFridayAgent,
   fetchFridayAgentRegistryStatus,
   fetchFridayAgents,
-  syncFridayAgentRegistry,
   type FridayAgent,
   type FridayAgentRegistryStatus,
   type FridayAgentResponse,
@@ -28,7 +27,6 @@ export default function AgentsWorkspace() {
   const [selectedId, setSelectedId] = useState<string>('')
   const [loading, setLoading] = useState(true)
   const [unavailable, setUnavailable] = useState(false)
-  const [syncing, setSyncing] = useState(false)
   const [prompt, setPrompt] = useState('')
   const [asking, setAsking] = useState(false)
   const [answer, setAnswer] = useState<FridayAgentResponse | null>(null)
@@ -57,19 +55,6 @@ export default function AgentsWorkspace() {
 
   const selected = useMemo(() => agents.find((agent) => agent.id === selectedId) || null, [agents, selectedId])
 
-  async function syncRegistry() {
-    if (syncing) return
-    setSyncing(true)
-    try {
-      await syncFridayAgentRegistry()
-      await load()
-    } catch {
-      setUnavailable(true)
-    } finally {
-      setSyncing(false)
-    }
-  }
-
   async function askSelected(event: React.FormEvent) {
     event.preventDefault()
     const text = prompt.trim()
@@ -97,14 +82,11 @@ export default function AgentsWorkspace() {
         <span className={`v3-agent-registry-state ${status?.status === 'ok' ? 'online' : ''}`}>
           {unavailable ? 'Unavailable' : loading ? 'Loading' : status?.status || 'Unknown'}
         </span>
-        <button type="button" className="v3-agent-primary" onClick={syncRegistry} disabled={syncing || loading}>
-          {syncing ? 'Syncing…' : 'Sync registry'}
-        </button>
       </div>
     </header>
 
     <div className="v3-agent-authority">
-      <strong>Git is authoritative.</strong> Sync copies validated definitions into Friday-owned registry state only; it cannot edit policy or managed infrastructure.
+      <strong>Git is authoritative.</strong> Registry refresh runs during the trusted server startup or through an authenticated operator-only API. The browser cannot initiate a sync.
     </div>
 
     {unavailable && !agents.length ? <div className="v3-agent-empty" role="status">
@@ -114,7 +96,7 @@ export default function AgentsWorkspace() {
 
     {!unavailable && !loading && agents.length === 0 ? <div className="v3-agent-empty" role="status">
       <h3>No registered agents</h3>
-      <p>Synchronize approved Git definitions after the local registry is configured.</p>
+      <p>Approved Git definitions synchronize from the server; contact an operator if registry setup is pending.</p>
     </div> : null}
 
     {agents.length > 0 ? <div className="v3-agent-layout">
