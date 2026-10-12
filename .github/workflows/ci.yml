@@ -22,7 +22,10 @@ jobs:
           node-version: 22
 
       - name: Install dependencies
-        run: npm install --no-audit --no-fund
+        run: npm ci --no-audit --no-fund
+
+      - name: Audit locked dependencies
+        run: npm audit --audit-level=moderate
 
       - name: Test
         run: npm test
@@ -141,6 +144,9 @@ jobs:
 
       - name: Verify dormant Phase 2C release boundary
         run: npm run verify:fabric-dormant
+
+      - name: Verify controller Access JWT and Docker socket boundary
+        run: node --test server/security/*.test.mjs server/http.security.test.mjs scripts/verify-controller-security.test.mjs
 
       - name: Validate shared-work schema
         run: npm run validate:shared-work-schema

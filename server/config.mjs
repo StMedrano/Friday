@@ -44,6 +44,13 @@ export function getConfig(env = process.env) {
   const agentRegistryEnabled = enabled(env.FRIDAY_AGENT_REGISTRY_ENABLED)
 
   return {
+    access: {
+      // Live deployments MUST validate an Access JWT at the origin.
+      enabled: env.FRIDAY_MODE === 'live',
+      teamDomain: env.FRIDAY_ACCESS_TEAM_DOMAIN || '',
+      audience: env.FRIDAY_ACCESS_AUD || '',
+      operatorEmails: String(env.FRIDAY_ACCESS_OPERATOR_EMAILS || '').split(',').map(x=>x.trim()).filter(Boolean),
+    },
     port: Number(env.FRIDAY_PORT || 3010),
     mode: env.FRIDAY_MODE === 'live' ? 'live' : 'mock',
     docker: {

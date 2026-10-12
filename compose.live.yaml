@@ -2,7 +2,11 @@ services:
   friday:
     environment:
       FRIDAY_MODE: live
-      FRIDAY_DOCKER_ENABLED: ${FRIDAY_DOCKER_ENABLED:-true}
+      # No raw Docker daemon socket in the web application container.
+      FRIDAY_DOCKER_ENABLED: false
+      # Required for live API access: origin verifies signed Cloudflare Access JWTs.
+      FRIDAY_ACCESS_TEAM_DOMAIN: ${FRIDAY_ACCESS_TEAM_DOMAIN:-}
+      FRIDAY_ACCESS_AUD: ${FRIDAY_ACCESS_AUD:-}
+      FRIDAY_ACCESS_OPERATOR_EMAILS: ${FRIDAY_ACCESS_OPERATOR_EMAILS:-}
     volumes:
       - friday_data:/data
-      - /var/run/docker.sock:/var/run/docker.sock:ro

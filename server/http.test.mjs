@@ -9,6 +9,7 @@ import { delayedJsonFetch } from '../tests/helpers/delayed-json-fetch.mjs'
 function baseConfig(monitoringEnabled = true) {
   return {
     mode: 'live',
+    access: {enabled:false}, // in-process historical route fixtures
     port: 3010,
     monitoring: { enabled: monitoringEnabled, statePath: '/tmp/unused.json' },
     ai: { enabled: false, apiKey: '', model: 'test-model' },
