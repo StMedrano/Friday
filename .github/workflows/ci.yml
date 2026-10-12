@@ -181,6 +181,9 @@ jobs:
       - name: Build controller container
         run: docker build -t friday-ci .
 
+      - name: Scan controller image for OS and Node vulnerabilities
+        run: sh scripts/scan-controller-image.sh friday-ci
+
       - name: Smoke test isolated non-root controller
         run: sh scripts/test-controller-container-hardening.sh friday-ci
 

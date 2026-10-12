@@ -39,3 +39,15 @@ A staging/test copy may be exercised first using **disposable** data. The pre-ex
 - The controller may still receive a public connection if an ingress or firewall policy is wrong; verify the VM100-only backend allowlist and add ingress-level shared quotas.
 - An npm dependency audit is not an OS/image vulnerability scan. Add a base-image SBOM/CVE scan to the release process and document image digest pinning/renewals.
 - Independent security review of authentication and the new non-root deployment process is required. No automatic merge, production deployment, or Phase 2C activation is authorized.
+
+## Image vulnerability scan (October 12, 2026)
+
+A second scanner is now part of the exact-image GitHub CI gate, independent of npm audit:
+
+- A baseline **Trivy v0.75.0** scan of the candidate `node:22.23.2-alpine3.23` runtime found **1 CRITICAL + 13 HIGH** findings in npm's global CLI packages (`/usr/local/lib/node_modules/npm`) and **1 MEDIUM** Alpine zlib advisory. These were not present in Friday's project-level npm dependency tree.
+- Friday serves requests through `node server/index.mjs`; neither npm, npx, corepack nor Yarn is needed in the **runtime**. The revised runtime Docker stage runs `apk upgrade --no-cache` to use available Alpine fixes, then removes the global npm, npx, corepack and Yarn tools. The separate build stage retains npm for `npm ci`.
+- A rebuilt image scan with a fresh Trivy vulnerability database reported **zero OS and Node.js package vulnerabilities** in its JSON result. A further scan of the final runtime, without Yarn, reported **zero HIGH or CRITICAL findings**. Results apply to this candidate image and the scanner DB at scan time; later advisories may change the result.
+- CI now saves the freshly built image to a temporary tar archive and runs a **digest-pinned** Trivy scanner against that archive. The scanner never gets the Docker socket, production environment, or container network; it uses a separate writable cache, has a read-only root filesystem and drops privileges. A failed scan or any HIGH/CRITICAL advisory stops CI (`--exit-code 1`). Both the scan and existing npm-audit checks fail closed.
+- Disposable smoke testing also verifies that the final runtime lacks the global npm/Yarn binaries while remaining healthy, unprivileged, and able to write monitoring state under UID 10001.
+
+**Scope limitation:** Container scanners are advisory snapshots, not complete vulnerability guarantees or an independent penetration test. Even with this image scan passing, do not deploy without approved Cloudflare Access identity policy, non-destructive migration of root-owned monitoring data to a separate volume, an independently reviewed release, and explicit production approval. The scanner gate applies to the **Friday controller image only**; the VM100 observer and optional Ollama images require separate evaluation.

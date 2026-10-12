@@ -25,6 +25,8 @@ until docker exec "$container" wget -qO- http://127.0.0.1:3010/healthz >/dev/nul
   sleep 1
 done
 [ "$(docker exec "$container" id -u)" = 10001 ]
+# Global npm/yarn CLIs are only needed while building, never at runtime.
+docker exec "$container" sh -c 'test ! -d /usr/local/lib/node_modules && test ! -d /opt/yarn-v1.22.22 && ! command -v npm >/dev/null 2>&1 && ! command -v yarn >/dev/null 2>&1'
 [ "$(docker inspect "$container" --format '{{.HostConfig.ReadonlyRootfs}}')" = true ]
 [ "$(docker inspect "$container" --format '{{.HostConfig.CapDrop}}')" = '[ALL]' ]
 docker exec "$container" sh -c 'touch /data/hardening-check && rm /data/hardening-check && touch /tmp/hardening-check && rm /tmp/hardening-check'
