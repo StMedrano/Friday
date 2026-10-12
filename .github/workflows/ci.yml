@@ -43,6 +43,9 @@ jobs:
             sh -n "$file"
           done
 
+      - name: Verify isolated Friday staging Compose without starting services
+        run: sh scripts/verify-friday-staging.sh
+
       - name: Verify observer security boundary
         run: |
           grep -qx '.env' observer/.dockerignore
@@ -183,6 +186,9 @@ jobs:
 
       - name: Build controller container
         run: docker build -t friday-ci .
+
+      - name: Smoke test private Friday staging image without tunnel or host ports
+        run: sh scripts/test-friday-staging-isolation.sh
 
       - name: Scan controller image for OS and Node vulnerabilities
         run: sh scripts/scan-controller-image.sh friday-ci
