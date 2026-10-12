@@ -5,6 +5,14 @@ services:
       dockerfile: Dockerfile
     container_name: friday
     restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    # Only /data is persistent; root filesystem and build tree are immutable.
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,size=16m
     ports:
       - "${FRIDAY_UI_PORT:-3010}:3010"
     environment:
@@ -102,6 +110,8 @@ networks:
 
 volumes:
   friday_data:
-    name: friday_data
+    # For a separately approved, non-destructive data migration, select a
+    # newly prepared UID 10001-owned volume without modifying the old volume.
+    name: ${FRIDAY_DATA_VOLUME:-friday_data}
   friday_ollama:
     name: friday_ollama

@@ -21,8 +21,11 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Install dependencies from lockfile
+        run: npm ci --no-audit --no-fund
+
+      - name: Audit pinned dependencies
+        run: npm audit --audit-level=moderate
 
       - name: Test
         run: npm test
@@ -177,6 +180,9 @@ jobs:
 
       - name: Build controller container
         run: docker build -t friday-ci .
+
+      - name: Smoke test isolated non-root controller
+        run: sh scripts/test-controller-container-hardening.sh friday-ci
 
       - name: Build VM100 observer container
         run: docker build -t friday-observer-ci observer
