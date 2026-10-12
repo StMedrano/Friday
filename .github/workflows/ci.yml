@@ -176,7 +176,7 @@ jobs:
         run: docker compose -f compose.yaml -f compose.live.yaml config >/dev/null
 
       - name: Validate VM100 observer Compose
-        run: FRIDAY_OBSERVER_TOKEN=ci-test FRIDAY_OBSERVER_BIND_ADDRESS=127.0.0.1 docker compose -f observer/compose.yaml config >/dev/null
+        run: FRIDAY_OBSERVER_TOKEN=ci-test FRIDAY_OBSERVER_BIND_ADDRESS=127.0.0.1 FRIDAY_DOCKER_SOCKET_GID="$(stat -c %g /var/run/docker.sock)" docker compose -f observer/compose.yaml config >/dev/null
 
       - name: Build controller container
         run: docker build -t friday-ci .
@@ -192,3 +192,14 @@ jobs:
 
       - name: Build VM100 observer container
         run: docker build -t friday-observer-ci observer
+
+      - name: Build restricted Docker socket proxy
+        run: docker build -f observer/Dockerfile.proxy -t friday-observer-proxy-ci observer
+
+      - name: Scan observer and proxy runtime images
+        run: |
+          sh scripts/scan-controller-image.sh friday-observer-ci
+          sh scripts/scan-controller-image.sh friday-observer-proxy-ci
+
+      - name: Verify isolated Docker API read-only boundary
+        run: sh scripts/test-observer-proxy-isolation.sh friday-observer-proxy-ci friday-observer-ci
