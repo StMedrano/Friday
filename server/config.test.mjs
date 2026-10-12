@@ -142,3 +142,14 @@ test('Access identity verifier is default-off in dev and accepts only server-own
  assert.deepEqual(live.access.operatorEmails,['operator@example.test','backup@example.test'])
  assert.equal(live.access.issuer,'https://team.cloudflareaccess.com')
 })
+
+test('live configuration always enables identity enforcement, even if the Access flag is omitted or false', () => {
+  for (const value of [undefined, 'false', 'TRUE', '']) {
+    const env = { FRIDAY_MODE: 'live' }
+    if (value !== undefined) env.FRIDAY_CF_ACCESS_ENABLED = value
+    const config = getConfig(env)
+    assert.equal(config.mode, 'live')
+    assert.equal(config.access.enabled, true, String(value))
+  }
+  assert.equal(getConfig({ FRIDAY_MODE: 'mock', FRIDAY_CF_ACCESS_ENABLED: 'false' }).access.enabled, false)
+})

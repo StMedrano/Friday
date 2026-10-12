@@ -39,3 +39,14 @@ Only /healthz and /api/health remain unprotected by this middleware for health m
 **Release gates:** obtain team domain and AUD tag from the Cloudflare dashboard, confirm the chosen identities have appropriate Zero Trust Access policies, verify Nginx Proxy Manager forwards the JWT header unchanged, verify Cloudflare Access enforces UI access, and test anonymous/authorized/operator/expired-token paths on a disposable staging deployment. Ensure direct backend TCP/3010 stays restricted to the approved VM100 reverse proxy. Without the Cloudflare team config, the candidate's API fails closed with HTTP 503. This is intentional; do NOT deploy before stage testing and explicit approval.
 
 Reference: https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/authorization-cookie/validating-json/
+
+
+## Additional fail-closed staging contract (October 12, 2026)
+
+Release code now derives Access enforcement from **FRIDAY_MODE=live** regardless of the optional `FRIDAY_CF_ACCESS_ENABLED` flag. Even if an operator runs the base Compose or sets that flag to `false`, a live-mode instance without an issuer, audience and public origin responds **503** for the UI and all protected APIs. If the identity configuration is valid but a request has no or invalid signed JWT, it responds **401**. This avoids accidentally opening live APIs by omitting the live Compose override.
+
+The origin authorization boundary now also verifies Cloudflare's signed JWT before serving `/`, `/index.html` and static assets, not just API routes. `GET /healthz` and `GET /api/health` remain available for limited health monitoring. If Nginx Proxy Manager or Cloudflare Access fails to forward the JWT assertion for document/assets, the UI will fail closed; administrators **must verify header forwarding on a disposable staging deployment** before production.
+
+Automated security acceptance includes synthetic RSA-signed JWTs and locally mocked JWKS in `server/security/access-staging.test.mjs`; no real Cloudflare credentials, identities, egress, or live user data are required. Cases cover missing and spoofed headers, expired or wrong-audience tokens, valid signed viewer access to read/assistant endpoints, operator-only rerun and registry sync with a second server-side secret, cross-origin write denial, and correct loading of compiled UI for a signed identity. CI repeats these tests after building the UI, and a separate isolated container check runs the **actual production entrypoint in live mode without configuration** to confirm an unconfigured release denies UI/data/model requests while remaining healthy.
+
+These deterministic tests prove application-side behavior, **not** real Cloudflare Access policy configuration, user login, Nginx header passthrough, session expiry, IP firewall policy, or safe rollout. All such external acceptance and independent review gates remain open.

@@ -181,7 +181,10 @@ export function createFridayServer({
     // monitored inventory, agent service or external model can be reached.
     // Status endpoints remain limited, public health probes.
     let authenticatedIdentity=null
-    if (config.access?.enabled === true && url.pathname.startsWith('/api/')) {
+    // Protect the static UI and assets as well as all API routes at origin.
+    // Without a signed Access token, a direct backend connection cannot read
+    // inventory or fetch the UI even if the edge policy is misconfigured.
+    if (config.access?.enabled === true) {
       let verified
       try { verified=await verifyAccessImpl(request,config.access) }
       catch { verified={ok:false,status:503,error:'access-verification-unavailable'} }

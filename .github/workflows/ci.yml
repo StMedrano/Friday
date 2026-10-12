@@ -33,6 +33,9 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify signed Access identity can load built UI
+        run: node --test server/security/access-staging.test.mjs
+
       - name: Validate shell scripts
         run: |
           for file in scripts/*.sh; do
@@ -186,6 +189,9 @@ jobs:
 
       - name: Smoke test isolated non-root controller
         run: sh scripts/test-controller-container-hardening.sh friday-ci
+
+      - name: Verify real live-mode image fails closed without Access configuration
+        run: sh scripts/test-access-live-failclosed.sh friday-ci
 
       - name: Rehearse read-only root-to-nonroot data volume migration
         run: sh scripts/test-friday-volume-migration.sh friday-ci
