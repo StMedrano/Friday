@@ -126,3 +126,19 @@ test('operator registry sync token is absent by default and never appears in bro
   assert.equal(JSON.stringify(configured.ai).includes(secret), false)
   assert.equal(JSON.stringify(configured.agents).includes(secret), false)
 })
+
+test('Access identity verifier is default-off in dev and accepts only server-owned config', () => {
+ const absent=getConfig({})
+ assert.equal(absent.access.enabled,false)
+ assert.equal(absent.access.issuer,'')
+ const live=getConfig({
+  FRIDAY_CF_ACCESS_ENABLED:'true',
+  FRIDAY_CF_ACCESS_TEAM_DOMAIN:'https://team.cloudflareaccess.com',
+  FRIDAY_CF_ACCESS_AUD:'app-audience-code',
+  FRIDAY_CF_ACCESS_OPERATOR_EMAILS:'Operator@Example.Test, backup@example.test',
+  FRIDAY_PUBLIC_ORIGIN:'https://friday.mytechtactics.com',
+ })
+ assert.equal(live.access.enabled,true)
+ assert.deepEqual(live.access.operatorEmails,['operator@example.test','backup@example.test'])
+ assert.equal(live.access.issuer,'https://team.cloudflareaccess.com')
+})
