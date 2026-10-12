@@ -117,3 +117,10 @@ test('diagnostics are disabled by default and require explicit opt-in', () => {
   assert.deepEqual(getConfig({ FRIDAY_DIAGNOSTICS_ENABLED: 'true' }).diagnostics, { enabled: true })
   assert.deepEqual(getConfig({ FRIDAY_DIAGNOSTICS_ENABLED: 'false' }).diagnostics, { enabled: false })
 })
+
+test('live Friday always requires Access JWT verification with server-only settings',()=>{
+ const live=getConfig({FRIDAY_MODE:'live',FRIDAY_ACCESS_TEAM_DOMAIN:'https://team.cloudflareaccess.com',FRIDAY_ACCESS_AUD:'aud-123',FRIDAY_ACCESS_OPERATOR_EMAILS:'operator@example.test'})
+ assert.deepEqual(live.access,{enabled:true,teamDomain:'https://team.cloudflareaccess.com',audience:'aud-123',operatorEmails:['operator@example.test']})
+ assert.equal(getConfig({FRIDAY_MODE:'live',FRIDAY_ACCESS_REQUIRED:'false'}).access.enabled,true)
+ assert.equal(getConfig({FRIDAY_MODE:'mock'}).access.enabled,false)
+})
