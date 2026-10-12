@@ -187,5 +187,8 @@ jobs:
       - name: Smoke test isolated non-root controller
         run: sh scripts/test-controller-container-hardening.sh friday-ci
 
+      - name: Rehearse read-only root-to-nonroot data volume migration
+        run: sh scripts/test-friday-volume-migration.sh friday-ci
+
       - name: Build VM100 observer container
         run: docker build -t friday-observer-ci observer

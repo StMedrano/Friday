@@ -51,3 +51,15 @@ A second scanner is now part of the exact-image GitHub CI gate, independent of n
 - Disposable smoke testing also verifies that the final runtime lacks the global npm/Yarn binaries while remaining healthy, unprivileged, and able to write monitoring state under UID 10001.
 
 **Scope limitation:** Container scanners are advisory snapshots, not complete vulnerability guarantees or an independent penetration test. Even with this image scan passing, do not deploy without approved Cloudflare Access identity policy, non-destructive migration of root-owned monitoring data to a separate volume, an independently reviewed release, and explicit production approval. The scanner gate applies to the **Friday controller image only**; the VM100 observer and optional Ollama images require separate evaluation.
+
+## Automated isolated data-volume migration rehearsal
+
+GitHub CI now runs `sh scripts/test-friday-volume-migration.sh friday-ci` against the exact candidate image after its rootless runtime smoke test. This is **only a disposable test**, not a tool for migrating production data:
+
+- The rehearsal creates unique Docker volumes with the fixed prefixes `friday-migration-fixture-source-` and `friday-migration-fixture-target-`; it refuses an existing-name collision and cleans up the volumes on exit.
+- It seeds only **synthetic** monitoring JSON and an extra nested sentinel file, owned by root and protected with mode 0600. No real production files are read or copied.
+- The copy helper runs without networking or writable rootfs. Its **source** is a read-only volume mount. Limited `CHOWN`, `FOWNER` and `DAC_OVERRIDE` capabilities are used solely inside that disposable helper to copy and chown the **target** to UID:GID 10001; the running Friday process retains no capabilities.
+- The candidate non-root image reads the copied state, writes a temporary sentinel to its copied data directory, launches successfully with monitoring disabled to avoid rewriting the test fixture, and responds to its local health endpoint. Byte-for-byte comparisons verify that the source and copied state match and that the original retains its root ownership and mode 0600.
+- After the rehearsal, no fixture volumes or containers remain. The separately held production `friday_data` is **not mounted, modified or copied** by the rehearsal.
+
+This closes the **testability** of the root-owned to non-root copy procedure, but does NOT authorize a live migration or prove that every existing production file will be compatible. A maintenance window, verified backup, actual-volume inventory, copy checksums, Cloudflare Access sign-in verification, rollback procedure and independent review are still required before a real cutover.
