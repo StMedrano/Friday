@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, build/friday-core-mvp]
   pull_request:
-    branches: [main]
+    branches: [main, feat/friday-operator-auth-20261011]
 
 permissions:
   contents: read
