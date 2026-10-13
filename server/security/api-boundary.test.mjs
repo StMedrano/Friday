@@ -67,3 +67,31 @@ test('authenticated AI requests are bounded per identity without invoking furthe
   assert.equal(count(),40,'twenty allowed requests each called overview and assistant; denied request called neither')
  })
 })
+
+test('malformed request URLs return 400 without terminating the server before authentication',async()=>{
+ const {spawnSync}=await import('node:child_process')
+ const serverModule=new URL('../http.mjs',import.meta.url).href
+ const script=`
+  import {createConnection} from 'node:net'
+  import {createFridayServer} from ${JSON.stringify(serverModule)}
+  const server=createFridayServer({config:{mode:'live',ai:{enabled:false},access:{enabled:true}}})
+  await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
+  const port=server.address().port
+  try {
+   for(const raw of ['GET /api/overview HTTP/1.1\\r\\nHost: [\\r\\nConnection: close\\r\\n\\r\\n',
+     'GET http://[ HTTP/1.1\\r\\nHost: localhost\\r\\nConnection: close\\r\\n\\r\\n']){
+    const reply=await new Promise((resolve,reject)=>{
+     const socket=createConnection({host:'127.0.0.1',port},()=>socket.write(raw))
+     let response=''
+     socket.on('data',chunk=>response+=chunk)
+     socket.on('end',()=>resolve(response))
+     socket.on('error',reject)
+    })
+    if(!reply.startsWith('HTTP/1.1 400 '))throw Error('malformed request was not rejected')
+   }
+   if((await fetch('http://127.0.0.1:'+port+'/healthz')).status!==200)throw Error('server did not survive')
+  } finally {await new Promise(resolve=>server.close(resolve))}
+ `
+ const result=spawnSync(process.execPath,['--input-type=module','-e',script],{encoding:'utf8',timeout:10_000})
+ assert.equal(result.status,0,result.stderr||String(result.error))
+})

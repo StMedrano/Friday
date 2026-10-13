@@ -167,7 +167,12 @@ export function createFridayServer({
   const MAX_ACCESS_OPERATIONS_PER_MINUTE=20
 
   return createServer(async (request, response) => {
-    const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
+    let url
+    try {
+      url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
+    } catch {
+      return json(response, 400, { error: 'invalid-request-url' })
+    }
 
     if (request.method === 'GET' && url.pathname === '/healthz') {
       return json(response, 200, { status: 'ok', service: 'friday', mode: config.mode })

@@ -28,6 +28,14 @@ A synthetic delayed-key regression reproduced authorization of an identity that 
 
 Full `FRIDAY_DOCKER_SOCKET_GID=999 make verify` passed (388 Node passes, one expected pre-build compiled-UI skip), followed by all six post-build signed Access integration tests. The fixture group value only validates Compose. No production/staging deployment, session logout, credential rotation or Access policy change occurred. Live identity/session acceptance and the external security release gate remain open.
 
+## Separate automated review and malformed-request recovery — 2026-10-13
+
+A separate reviewer examined the authentication source (`server/security/cloudflare-access.mjs`, `server/http.mjs`, and `server/config.mjs`) at `82c7746` and assessed the expiry fix at `f98bb4c`. The reviewer found an uncaught URL parse failure before authentication: a malformed HTTP Host or absolute request target could reject the asynchronous request callback and terminate Node. An isolated child-process test using the actual Friday server and raw TCP requests reproduced `ERR_INVALID_URL` and process exit before the patch.
+
+The handler now catches URL parse failures and returns a sanitized HTTP 400. The regression checks both malformed inputs and a subsequent health 200, proving the server survives. All six API-boundary tests, full verification (390 Node passes), frontend build, Compose validation, and post-build Access 6/6 passed. The reviewer confirmed the catch addresses the reproduced crash. CI #441 passed on the preceding expiry-fix commit.
+
+The source review found no additional confirmed authentication bypass in its limited scope. It noted repeated JWKS retrieval during concurrency/outages without establishing deployment-level exploitability. This review is automated, not external human approval, and does not cover the whole PR, live Cloudflare configuration, or authenticated deployment acceptance. Release holds remain unchanged. No live deployment or session/policy change occurred.
+
 ## Outstanding manual/access-policy acceptance
 
 - **Unlisted identity:** In InPrivate, sign in with a separate email address **not on Friday Staging's Allow policy**. Confirm Cloudflare denies access. Do not broaden Include (OR), use Everyone/Bypass, or add the unauthorized test email to the policy. Capture status and time only; never capture login tokens.
