@@ -71,6 +71,8 @@ export function createCloudflareAccessVerifier({fetchImpl=fetch,now=()=>Date.now
    if(signature.toString('base64url')!==parts[2])return INVALID
    const valid=verifySignature('RSA-SHA256',Buffer.from(parts[0]+'.'+parts[1]),createPublicKey({key:match,format:'jwk'}),signature)
    if(!valid)return INVALID
+   // Key retrieval may outlast the identity; check expiry at authorization time.
+   if(payload.exp<=Math.floor(now()/1000))return INVALID
    const email=payload.email.toLowerCase()
    return {ok:true,email,operator:configuration.operatorEmails.includes(email)}
   }catch{return SERVICE_UNAVAILABLE}

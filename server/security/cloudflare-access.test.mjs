@@ -113,3 +113,15 @@ test('expired JWKS cache fails closed during outage and recovers without trustin
  assert.equal((await v(request,config)).ok,true)
  assert.equal(calls,3)
 })
+
+test('identity expiring during signing-key retrieval is rejected before authorization',async()=>{
+ let time=now*1000
+ const shortLived=token({...claims,exp:now+1})
+ const v=createCloudflareAccessVerifier({now:()=>time,fetchImpl:async(...args)=>{
+  const response=await fetcher(...args)
+  time=(now+1)*1000
+  return response
+ }})
+ assert.deepEqual(await v({headers:{'cf-access-jwt-assertion':shortLived}},config),
+  {ok:false,status:401,error:'access-identity-required'})
+})

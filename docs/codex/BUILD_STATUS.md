@@ -13,6 +13,8 @@ This checkpoint takes precedence over the older rollout entries below. Those dat
 - VM102 production container was rechecked read-only: `friday-release:0fba466`, running and healthy. No production checkout, state volume, integration or network change was made.
 - PR #29 remains draft/unmerged with zero submitted independent reviews. Remaining release gates: independent review, Access policy/negative-identity/session evidence, production Cloudflare/NPM acceptance, verified offline backup and separately approved copy-only UID10001 migration/cutover. Phase 2C remains disabled.
 
+- Continuation on 2026-10-13: CI #440 passed all 37 steps on `82c7746`. A subsequent test-first fix closes identity expiry during asynchronous signing-key retrieval; the final authorization decision now rechecks expiry. Full local verification and post-build Access 6/6 passed. This is candidate source work only; live Access/session and independent release review gates remain open.
+
 See [current finish queue](NEXT_STEPS.md#current-pr-29-release-queue-2026-10-13), [Access acceptance](../friday-cloudflare-acceptance-gates.md), and [VM100 staging runbook](../cloudflare-friday-staging-vm100.md).
 
 ## Historical capability and rollout ledger

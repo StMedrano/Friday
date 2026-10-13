@@ -22,6 +22,12 @@ Added three synthetic origin-verifier checks on PR #29: cached keys do not exten
 
 `FRIDAY_DOCKER_SOCKET_GID=999 make verify` passed (the group value is a Compose-validation fixture, not a live socket configuration). Post-build signed Access integration checks passed 6/6. These synthetic tests do not establish live Cloudflare logout, revocation, Allow policy, or unlisted-identity behavior. Browser inspection remains blocked by the Windows runtime initialization error `HRESULT 0x80070003`. No session was logged out, no policy changed, and no production or staging deployment occurred.
 
+## Expiry during signing-key retrieval — regression fixed 2026-10-13
+
+A synthetic delayed-key regression reproduced authorization of an identity that expired while JWKS retrieval was in progress: expiry was checked before the asynchronous fetch but not at the final authorization decision. The verifier now rechecks expiry after signature verification, immediately before returning the identity and operator role. The regression failed on the previous candidate and passes with the two-line fix; all nine verifier tests pass.
+
+Full `FRIDAY_DOCKER_SOCKET_GID=999 make verify` passed (388 Node passes, one expected pre-build compiled-UI skip), followed by all six post-build signed Access integration tests. The fixture group value only validates Compose. No production/staging deployment, session logout, credential rotation or Access policy change occurred. Live identity/session acceptance and the external security release gate remain open.
+
 ## Outstanding manual/access-policy acceptance
 
 - **Unlisted identity:** In InPrivate, sign in with a separate email address **not on Friday Staging's Allow policy**. Confirm Cloudflare denies access. Do not broaden Include (OR), use Everyone/Bypass, or add the unauthorized test email to the policy. Capture status and time only; never capture login tokens.
