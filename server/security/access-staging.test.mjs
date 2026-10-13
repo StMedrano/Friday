@@ -20,6 +20,15 @@ function jwt(claims=baseClaims,header={alg:'RS256',kid:'staging-rsa-key',typ:'JW
  const content=encode(header)+'.'+encode(claims)
  return content+'.'+sign('RSA-SHA256',Buffer.from(content),privateKey).toString('base64url')
 }
+function forgeSignature(identity){
+ const parts=identity.split('.')
+ const original=Buffer.from(parts[2],'base64url')
+ const forged=Buffer.from(original)
+ forged[0]^=1
+ parts[2]=forged.toString('base64url')
+ assert.notDeepEqual(Buffer.from(parts[2],'base64url'),original,'forged fixture must alter signature bytes')
+ return parts.join('.')
+}
 const token=jwt()
 const viewerToken=jwt({...baseClaims,email:'viewer@staging.test'})
 const headers=(identity,extra={})=>({
@@ -134,7 +143,7 @@ test('staging: wrong issuer, audience, signature and expired JWT fail closed',as
    jwt({...baseClaims,exp:fixedTime-1}),
    jwt({...baseClaims,email:'service@staging.test',service_token_id:'service-identity'}),
    jwt({...baseClaims}, {alg:'none',kid:'staging-rsa-key'}),
-   token.slice(0,-2)+'AA',
+   forgeSignature(token),
   ]
   for(const forged of candidates){
    const res=await fetch(base+'/api/overview',{headers:headers(forged)})
