@@ -58,3 +58,58 @@ test('signed identity without operator email cannot perform privileged operation
  const x=await v({headers:{'cf-access-jwt-assertion':token({...claims,email:'viewer@example.test'})}},config)
  assert.deepEqual(x,{ok:true,email:'viewer@example.test',operator:false})
 })
+
+test('cached signing keys never extend an identity past its exact expiry',async()=>{
+ let time=now*1000,calls=0
+ const v=createCloudflareAccessVerifier({now:()=>time,fetchImpl:async(...args)=>{calls++;return fetcher(...args)}})
+ const request={headers:{'cf-access-jwt-assertion':token()}}
+ assert.equal((await v(request,config)).ok,true)
+ time=(claims.exp-1)*1000
+ assert.equal((await v(request,config)).ok,true)
+ const beforeExpiry=calls
+ time=claims.exp*1000
+ assert.deepEqual(await v(request,config),{ok:false,status:401,error:'access-identity-required'})
+ assert.equal(calls,beforeExpiry,'expired identities must not trigger key retrieval')
+})
+
+test('unknown signing key refreshes only after cooldown and accepts a correctly signed rotated key',async()=>{
+ const rotated=generateKeyPairSync('rsa',{modulusLength:2048})
+ const next={...rotated.publicKey.export({format:'jwk'}),kid:'rotated-key',use:'sig',alg:'RS256'}
+ const raw=b64({alg:'RS256',kid:next.kid})+'.'+b64(claims)
+ const rotatedToken=raw+'.'+sign('RSA-SHA256',Buffer.from(raw),rotated.privateKey).toString('base64url')
+ let time=now*1000,calls=0
+ const v=createCloudflareAccessVerifier({now:()=>time,fetchImpl:async()=>{
+  calls++
+  return new Response(JSON.stringify({keys:calls===1?[jwk]:[next]}),{status:200})
+ }})
+ const original={headers:{'cf-access-jwt-assertion':token()}}
+ const replacement={headers:{'cf-access-jwt-assertion':rotatedToken}}
+ assert.equal((await v(original,config)).ok,true)
+ assert.equal((await v(replacement,config)).status,401)
+ assert.equal(calls,1)
+ time+=29_999
+ assert.equal((await v(replacement,config)).status,401)
+ assert.equal(calls,1)
+ time++
+ assert.equal((await v(replacement,config)).ok,true)
+ assert.equal(calls,2)
+ assert.equal((await v(original,config)).status,401,'removed key must not remain trusted')
+ assert.equal(calls,2)
+})
+
+test('expired JWKS cache fails closed during outage and recovers without trusting stale keys',async()=>{
+ let time=now*1000,unavailable=false,calls=0
+ const v=createCloudflareAccessVerifier({now:()=>time,fetchImpl:async(...args)=>{
+  calls++
+  if(unavailable)throw Error('synthetic JWKS outage')
+  return fetcher(...args)
+ }})
+ const request={headers:{'cf-access-jwt-assertion':token()}}
+ assert.equal((await v(request,config)).ok,true)
+ time+=300_001
+ unavailable=true
+ assert.deepEqual(await v(request,config),{ok:false,status:503,error:'access-verification-unavailable'})
+ unavailable=false
+ assert.equal((await v(request,config)).ok,true)
+ assert.equal(calls,3)
+})

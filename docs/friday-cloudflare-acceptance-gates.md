@@ -16,6 +16,12 @@ This performs anonymous **GET-only** tests on `/`, `/index.html`, `/api/overview
 
 VM100 inspected 2026-10-12: staging healthy, rootless UID 10001, read-only rootfs, zero host port bindings and zero mounted production volumes; staging tunnel running without restarts; external anonymous requests returned 302 and direct staging origin calls returned 401 (local health 200). The candidate branch is draft; production Friday and VM100 NPM/observer remain untouched.
 
+## Isolated session and signing-key acceptance — 2026-10-13
+
+Added three synthetic origin-verifier checks on PR #29: cached keys do not extend identity validity past the exact JWT expiry; an unknown signing key refreshes only after the 30-second cooldown and a removed key is rejected after rotation; an expired JWKS cache fails closed during an outage and recovers after key retrieval resumes. All eight verifier tests pass. Temporary mutations of each relevant guard were rejected by the corresponding new tests; the candidate implementation was unchanged.
+
+`FRIDAY_DOCKER_SOCKET_GID=999 make verify` passed (the group value is a Compose-validation fixture, not a live socket configuration). Post-build signed Access integration checks passed 6/6. These synthetic tests do not establish live Cloudflare logout, revocation, Allow policy, or unlisted-identity behavior. Browser inspection remains blocked by the Windows runtime initialization error `HRESULT 0x80070003`. No session was logged out, no policy changed, and no production or staging deployment occurred.
+
 ## Outstanding manual/access-policy acceptance
 
 - **Unlisted identity:** In InPrivate, sign in with a separate email address **not on Friday Staging's Allow policy**. Confirm Cloudflare denies access. Do not broaden Include (OR), use Everyone/Bypass, or add the unauthorized test email to the policy. Capture status and time only; never capture login tokens.
