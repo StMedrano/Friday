@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, Gauge, HardDrive, Home, MemoryStick, Network, Search, Server, Settings, ShieldCheck, Sparkles, TerminalSquare } from 'lucide-react'
-import { fetchMonitoringHistory, useFridayOverview, type FridayIncident, type MonitoringEvent } from '../lib/api'
+import { fetchFridayAgentGroups, fetchMonitoringHistory, useFridayOverview, type GroupWorkspace, type FridayIncident, type MonitoringEvent } from '../lib/api'
 import { useFridaySession } from '../hooks/useFridaySession'
 import { usePhoneLayout } from '../hooks/usePhoneLayout'
 import ActiveIncidents from '../components/ActiveIncidents'
@@ -27,7 +27,8 @@ export default function Dashboard() {
   const friday = useFridaySession()
   const isPhone = usePhoneLayout()
   const [active, setActive] = useState('Overview')
-  const [automation, setAutomation] = useState(true)
+  const [groups, setGroups] = useState<GroupWorkspace | null>(null)
+  const [groupsUnavailable, setGroupsUnavailable] = useState(false)
   const [query, setQuery] = useState('')
   const [history, setHistory] = useState<MonitoringEvent[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
@@ -51,6 +52,17 @@ export default function Dashboard() {
           setHistoryError('History unavailable')
         }
       })
+    return () => controller.abort()
+  }, [active])
+
+  useEffect(() => {
+    if (active !== 'Overview') return
+    const controller = new AbortController()
+    setGroups(null)
+    setGroupsUnavailable(false)
+    fetchFridayAgentGroups(controller.signal)
+      .then(data => { if (!controller.signal.aborted) setGroups(data) })
+      .catch(() => { if (!controller.signal.aborted) setGroupsUnavailable(true) })
     return () => controller.abort()
   }, [active])
 
@@ -80,6 +92,7 @@ export default function Dashboard() {
           <div className={`v3-mobile-status ${connected ? 'online' : 'warning'}`}><i/>{connected ? 'LIVE' : 'SAFE'}</div>
         </header>
         <main className="v3-main">
+          <div role="status">Actions not enabled</div>
           {active === 'Overview' ? <MobileHome
             overview={overview}
             connected={connected}
@@ -104,6 +117,7 @@ export default function Dashboard() {
             onSelectIncident={viewDiagnosis}
             onClearSelection={() => setSelectedIncidentId(null)}
           /> : <DetailView active={active} overview={overview}/>} 
+          {active === 'Overview' && <AgentConfiguration groups={groups} unavailable={groupsUnavailable} onNavigate={() => navigate('Agents')}/> }
         </main>
       </div>
       <MobileNavigation active={active} activeIncidents={activeIncidents} onNavigate={navigate}/>
@@ -128,7 +142,7 @@ export default function Dashboard() {
         <main className="v3-main">
           <section className="v3-intro">
             <div><span className="v3-kicker">COMMAND CENTER / {active.toUpperCase()}</span><h1>{active === 'Overview' ? 'Good afternoon.' : active}</h1><p>{connected ? `API connected · ${overview.mode} mode` : 'Local preview data · safe read-only interface'}</p></div>
-            <label className="v3-automation"><span><b>Automation</b><small>{automation ? 'Enabled · policy gated' : 'Disabled · read only'}</small></span><input type="checkbox" checked={automation} onChange={e => setAutomation(e.target.checked)}/><em /></label>
+            <div className="v3-automation" role="status">Actions not enabled</div>
           </section>
 
           {active === 'Overview' ? <>
@@ -160,7 +174,7 @@ export default function Dashboard() {
 
             <section className="v3-grid">
               <div className="v3-panel"><div className="v3-section-head"><div><span className="v3-kicker">TELEMETRY</span><h2>VM 100 · Infrastructure</h2></div><span className="v3-live"><i/> LIVE</span></div><div className="v3-metrics">{metrics.map((m, i) => <div key={m.label}><span>{i === 0 ? <Cpu/> : i === 1 ? <MemoryStick/> : <HardDrive/>}{m.label}</span><strong>{m.value}%</strong><div><i style={{width:`${m.value}%`}}/></div><small>{m.helper}</small></div>)}</div></div>
-              <div className="v3-panel"><div className="v3-section-head"><div><span className="v3-kicker">AGENT MESH</span><h2>Active agents</h2></div><Bot size={18}/></div><div className="v3-agents"><div><i className="on"/><span><b>Monitoring</b><small>Watching system health</small></span><em>ACTIVE</em></div><div><i className="on"/><span><b>Infrastructure</b><small>Inventory synchronized</small></span><em>READY</em></div><div><i/><span><b>Security</b><small>Policy engine ready</small></span><em>IDLE</em></div></div></div>
+              <AgentConfiguration groups={groups} unavailable={groupsUnavailable} onNavigate={() => navigate('Agents')}/>
             </section>
 
             <section className="v3-section"><div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><span>{online} online</span></div><div className="v3-services">{overview.services.map(s => <button key={s.id} onClick={() => navigate('Applications')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span><em>{s.updated}</em></button>)}</div></section>
@@ -179,5 +193,24 @@ function DetailView({ active, overview }: { active: string, overview: ReturnType
     <div className="v3-detail-hero"><div className="v3-node-icon large">{active === 'Infrastructure' ? <Server/> : active === 'Applications' ? <AppWindow/> : active === 'Agents' ? <Bot/> : <TerminalSquare/>}</div><div><span className="v3-kicker">FRIDAY CONTROL PLANE</span><h2>{active}</h2><p>Operational view backed by the existing FRIDAY read-only API boundary.</p></div></div>
     <div className="v3-detail-grid"><article><Gauge/><strong>{overview.services.length}</strong><span>Tracked services</span></article><article><ShieldCheck/><strong>{overview.mode.toUpperCase()}</strong><span>Control mode</span></article><article><Activity/><strong>{overview.activities.length}</strong><span>Recent events</span></article></div>
     <div className="v3-panel v3-list"><div className="v3-section-head"><div><span className="v3-kicker">CURRENT STATE</span><h2>Environment inventory</h2></div></div>{overview.services.map(s => <div className="v3-list-row" key={s.id}><i className={s.status}/><span><b>{s.name}</b><small>{s.site} · {s.host}</small></span><p>{s.detail}</p><em>{s.status}</em></div>)}</div>
+  </section>
+}
+
+function AgentConfiguration({ groups, unavailable, onNavigate }: {
+  groups: GroupWorkspace | null; unavailable: boolean; onNavigate: () => void
+}) {
+  const configured = new Set(groups?.groups.flatMap(group => group.members
+    .filter(member => member.state === 'configured' && member.agentId !== null)
+    .map(member => member.agentId))).size
+  return <section className="v3-panel" aria-label="Agent configuration">
+    <div className="v3-section-head"><div><span className="v3-kicker">GROUP WORKSPACE</span><h2>Agent configuration</h2></div><Bot size={18}/></div>
+    <div className="v3-agents">
+      <div><span><b>{unavailable || groups?.registryStatus === 'unavailable'
+        ? 'Agent configuration unavailable' : groups
+          ? `${configured} configured member${configured === 1 ? '' : 's'}`
+          : 'Loading agent configuration…'}</b><small>Configured does not mean running.</small></span></div>
+      <div><span><b>Work integration not connected.</b></span></div>
+    </div>
+    <div className="v3-section-head"><button type="button" onClick={onNavigate}>View Agents configuration <ChevronRight size={15}/></button></div>
   </section>
 }

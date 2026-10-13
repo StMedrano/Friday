@@ -18,6 +18,7 @@ vi.mock('../lib/api', () => ({
       monitoring: null,
     },
   }),
+  fetchFridayAgentGroups: vi.fn(() => new Promise(() => {})),
   fetchMonitoringHistory: vi.fn(async () => []),
   askFridayAssistant: (...args: unknown[]) => askFridayAssistant(...args),
 }))

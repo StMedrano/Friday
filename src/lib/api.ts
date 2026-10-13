@@ -202,3 +202,74 @@ export async function previewFridayCommand(message: string) {
   if (!response.ok) throw new Error(body.reason || 'Command preview failed')
   return body as { accepted: boolean; command: string; message: string; mode: 'preview' }
 }
+
+export type GroupMember = {
+  id: string; name: string; agentId: string | null
+  implementation: 'existing' | 'planned'
+  state: 'catalogued' | 'configured' | 'disabled' | 'unavailable'
+  reason: string
+}
+export type GroupWorkspace = {
+  schemaVersion: '1'; registryStatus: 'ok' | 'unavailable'
+  executionEnabled: false; workStatus: 'not-connected'
+  groups: Array<{ id: string; name: string; members: GroupMember[] }>
+}
+
+const groupUnavailable = () => new Error('Group workspace unavailable.')
+function groupObject(value: unknown, keys: string[]): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value) ||
+      Object.keys(value).length !== keys.length || keys.some(key => !Object.hasOwn(value, key))) throw groupUnavailable()
+  return value as Record<string, unknown>
+}
+function groupText(value: unknown, max: number): string {
+  if (typeof value !== 'string' || !value.trim() || value.length > max) throw groupUnavailable()
+  return value
+}
+function groupId(value: unknown): string {
+  const text = groupText(value, 64)
+  if (text.length < 3 || !/^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$/.test(text)) throw groupUnavailable()
+  return text
+}
+function parseGroupWorkspace(value: unknown): GroupWorkspace {
+  const body = groupObject(value, ['schemaVersion', 'registryStatus', 'executionEnabled', 'workStatus', 'groups'])
+  if (body.schemaVersion !== '1' || (body.registryStatus !== 'ok' && body.registryStatus !== 'unavailable') ||
+      body.executionEnabled !== false || body.workStatus !== 'not-connected' ||
+      !Array.isArray(body.groups) || body.groups.length !== 3) throw groupUnavailable()
+  const remaining = new Set(['techtactics', 'app-builder', 'homelab'])
+  const memberIds = new Set<string>()
+  const groups = body.groups.map(value => {
+    const group = groupObject(value, ['id', 'name', 'members'])
+    const id = groupId(group.id)
+    if (!remaining.delete(id) || !Array.isArray(group.members)) throw groupUnavailable()
+    const members = group.members.map(value => {
+      const member = groupObject(value, ['id', 'name', 'agentId', 'implementation', 'state', 'reason'])
+      const id = groupId(member.id)
+      if (memberIds.has(id) || memberIds.size >= 40) throw groupUnavailable()
+      memberIds.add(id)
+      const agentId = member.agentId === null ? null : groupId(member.agentId)
+      const implementation = member.implementation
+      const state = member.state
+      if (agentId === null) {
+        if (implementation !== 'planned' || state !== 'catalogued') throw groupUnavailable()
+      } else if (implementation !== 'existing' ||
+          (state !== 'configured' && state !== 'disabled' && state !== 'unavailable') ||
+          (body.registryStatus === 'unavailable' && state !== 'unavailable')) throw groupUnavailable()
+      return { id, name: groupText(member.name, 80), agentId, implementation, state,
+        reason: groupText(member.reason, 256) } as GroupMember
+    })
+    return { id, name: groupText(group.name, 80), members }
+  })
+  return { schemaVersion: '1', registryStatus: body.registryStatus as 'ok' | 'unavailable',
+    executionEnabled: false, workStatus: 'not-connected', groups }
+}
+
+export async function fetchFridayAgentGroups(signal?: AbortSignal): Promise<GroupWorkspace> {
+  try {
+    const response = await fetch('/api/agent-groups', { method: 'GET', signal })
+    if (!response.ok) throw groupUnavailable()
+    return parseGroupWorkspace(await response.json())
+  } catch (error) {
+    if (error && typeof error === 'object' && 'name' in error && error.name === 'AbortError') throw error
+    throw groupUnavailable()
+  }
+}

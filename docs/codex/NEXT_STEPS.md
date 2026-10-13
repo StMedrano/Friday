@@ -1,5 +1,15 @@
 # Friday — Ordered Finish Queue
 
+## Group workspace release queue — 2026-10-13
+
+1. Obtain independent Task 4 and whole-branch reviews, then publish the separate feature PR stacked on the verified PR #29 candidate. Require passing CI for its exact final head; local checks do not replace CI.
+2. Finish and release PR #29's security boundary independently before deploying this group slice. Its Access negative-identity/session, production origin-isolation, offline backup and copy-only non-root migration gates remain authoritative.
+3. Preview the built mock UI on desktop and phone when browser access is available. Verify unavailable state, keyboard group selection, navigation, advisory assistant preservation and cancellation. Browser visual acceptance was not performed in development.
+4. After separate access authorization, perform authenticated live read-only group/registry acceptance. Display configured definitions as configured, never as running workers; verify registry outage does not erase declared groups.
+5. Obtain separate merge/deployment decisions with an immutable reviewed candidate, verified offline backup and rollback target `0fba466e7e142105b3048af0c38d3fb3960ebd07` (recorded production image `friday-release:0fba466`). Do not infer production state from local test evidence.
+
+This slice has no automation policy control. Actions remain not enabled. Role implementation/registry registration, HomeLab telemetry activation, Web Growth integration, trusted actor bindings for work/customer/memory and controlled actions each require their own approved plan. Preserve local-only advisory Phase 1 and dormant Phase 2C.
+
 Use the current PR #29 queue first. Older P0–P10 entries below are historical product planning and must not trigger a repeat of completed rollout work. Do not skip safety prerequisites to reach action features sooner.
 
 ## Current PR #29 release queue — 2026-10-13

@@ -1,5 +1,20 @@
 # Friday Build Status
 
+## Group workspace candidate — 2026-10-13
+
+Feature branch `feat/friday-group-workspace-20261013` is stacked on PR #29 candidate `138e42f`. This is source implementation evidence, not live deployment or activation. The reviewed Task 3 baseline was `91df14cc6bc125ed55dfb5d55d2670b0d68f2e53`.
+
+- Display-only TechTactics (7), App Builder (5), HomeLab (7) catalog; only Proxmox Observer binds the existing registry. Planned roles stay catalogued even if a similarly named registry definition exists.
+- Authenticated GET-only `/api/agent-groups` returns validated display metadata and unavailable linked members during a registry outage. No task/customer/memory data, instruction bodies, credentials, policy grants or new running workers.
+- Agents preserves existing advisory registry browsing and adds keyboard-accessible groups/member states, request cancellation and stale-reply isolation.
+- Overview replaces hardcoded active/ready worker rows with deduplicated configured bound-member counts and an Agents navigation control. Configured does not mean running; registry/API failure displays unavailable. Desktop and phone show “Actions not enabled” without a simulated automation checkbox. Phone incident/assistant ordering is retained.
+- Task 4 TDD: five new tests failed before implementation; five passed afterward; two existing assistant regressions also passed after adding the new client mock.
+- Full `FRIDAY_DOCKER_SOCKET_GID=999 make verify`: 21 frontend files / 114 tests, 403 server/observer/script tests, production TypeScript/Vite build and base/live/observer Compose validation passed with synthetic fixture values.
+- Fabric catalog and dormant checks, both schema validators, disposable PostgreSQL migration/grant/lease/handoff/decision checks and five concurrent dual-claim trials passed. `npm audit`: zero vulnerabilities. Post-build Access staging suite: 6/6 passed, using synthetic signed identities and built assets; this does not establish live Access acceptance.
+- Built-browser visual QA was unavailable; no screenshot or authenticated live UI acceptance is claimed. Independent task/whole-branch review and exact-head CI remain release gates.
+
+No registry writes, provider calls, infrastructure activation or deployment occurred. Phase 2C stays dormant; HomeLab telemetry activation, Web Growth integration, trusted work/customer/memory bindings and controlled actions require separate plans. Verified production rollback reference remains `friday-release:0fba466`; immutable recorded source/archive target is `0fba466e7e142105b3048af0c38d3fb3960ebd07`. Revalidate that target and the offline backup at an authorized future cutover; this development task did not inspect runtime state.
+
 This is the source-of-truth handoff ledger for coding agents. Update it when a major capability changes.
 
 ## Current security release checkpoint — 2026-10-13

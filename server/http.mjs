@@ -9,6 +9,7 @@ import { answerAssistant } from './assistant.mjs'
 import { normalizeAssistantHistory, validateAssistantPrompt } from './assistant-input.mjs'
 import { validateAgentId, validateAgentPrompt, validateRegistrySyncBody } from './agents/input.mjs'
 import {createCloudflareAccessVerifier} from './security/cloudflare-access.mjs'
+import { getGroupWorkspace } from './agents/group-workspace.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -223,6 +224,17 @@ export function createFridayServer({
           if(accessUsage.size>=2000)accessUsage.clear()
         }
         accessUsage.set(key,state)
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/agent-groups') {
+      if (config.mode !== 'mock' && !authenticatedIdentity) {
+        return json(response, 503, { error: 'access-unconfigured' })
+      }
+      try {
+        return json(response, 200, await getGroupWorkspace({ registryService: agentRegistryService }))
+      } catch {
+        return json(response, 503, { error: 'group-workspace-unavailable' })
       }
     }
 
