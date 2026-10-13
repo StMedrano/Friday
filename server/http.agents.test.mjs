@@ -99,20 +99,41 @@ test('route and ask POST endpoints validate inputs and pass fresh overview to lo
   })
 })
 
-test('registry sync endpoint accepts only empty object and touches registry service only', async () => {
+test('registry synchronization is operator-token protected and fails closed before side effects', async () => {
+  const validToken = 'a'.repeat(64)
   let syncCalls = 0
   const registryService = registry()
-  registryService.sync = async () => { syncCalls += 1; return { status: 'ok', agentsSeen: 1, agentsSynced: 1, agentsRejected: 0, errors: [] } }
-
-  await withServer({ config: config(), agentRegistryService: registryService, buildOverviewImpl: async () => overview() }, async (base) => {
-    const ok = await post(base, '/api/agents/registry/sync', {})
-    assert.equal(ok.status, 200)
-    assert.equal(syncCalls, 1)
-
-    const rejected = await post(base, '/api/agents/registry/sync', { force: true })
-    assert.equal(rejected.status, 400)
-    assert.equal(syncCalls, 1)
-  })
+  registryService.sync = async () => { syncCalls += 1; return { status: 'ok', agentsSynced: 1 } }
+  for (const [configuredToken, authHeader, expected] of [
+    [undefined, undefined, 503],
+    [validToken, undefined, 401],
+    [validToken, 'Bearer ' + 'b'.repeat(64), 401],
+    [validToken, 'Basic ' + validToken, 401],
+    [validToken, 'Bearer ' + validToken, 200],
+  ]) {
+    await withServer({
+      config: { ...config(), operator: { registrySyncToken: configuredToken } },
+      agentRegistryService: registryService,
+      buildOverviewImpl: async () => overview(),
+    }, async (base) => {
+      const res = await fetch(base + '/api/agents/registry/sync', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(authHeader ? { authorization: authHeader } : {}) },
+        body: '{}',
+      })
+      assert.equal(res.status, expected, 'expected status ' + expected)
+      assert.equal(syncCalls, expected === 200 ? 1 : 0, 'only authenticated sync executes')
+      if (expected === 200) {
+        const invalid = await fetch(base + '/api/agents/registry/sync', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: authHeader },
+          body: '{"force":true}',
+        })
+        assert.equal(invalid.status, 400)
+        assert.equal(syncCalls, 1)
+      }
+    })
+  }
 })
 
 test('agent endpoints fail closed when registry/service is unavailable and sanitize faults', async () => {
@@ -152,4 +173,33 @@ test('agent HTTP surface exposes no mutation or execution routes', async () => {
       assert.deepEqual(await response.json(), { error: 'not-found' })
     }
   })
+})
+
+test('Phase 2B does not expose public task, memory, handoff or decision operations',async()=>{
+ await withServer({
+  config:config(),
+  agentRegistryService:registry(),
+  buildOverviewImpl:async()=>overview()
+ },async(base)=>{
+  for(const route of ['/api/work','/api/work/claims','/api/memory','/api/handoffs','/api/decisions']){
+   for(const method of ['GET','POST','PATCH','DELETE']){
+    const response=await fetch(base+route,{
+     method,headers:{'content-type':'application/json'},
+     ...(method==='GET'?{}:{body:JSON.stringify({actor:{principalId:'admin'},operation:'execute'})})
+    })
+    assert.equal(response.status,404,method+' '+route+' unexpectedly exposed')
+    assert.deepEqual(await response.json(),{error:'not-found'})
+   }
+  }
+ })
+})
+test('Phase 2C adds no public policy, plugin, context or MCP write endpoints',async()=>{
+ await withServer({config:config(),agentRegistryService:registry(),buildOverviewImpl:async()=>overview()},async(base)=>{
+  for(const route of ['/api/policy','/api/plugins','/api/context','/api/fabric','/api/work','/api/memory','/mcp']){
+   for(const method of ['POST','PUT','PATCH','DELETE']){
+    const response=await fetch(base+route,{method,headers:{'content-type':'application/json'},body:'{}'})
+    assert.equal(response.status,404,method+' '+route)
+   }
+  }
+ })
 })

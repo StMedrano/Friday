@@ -21,8 +21,11 @@ jobs:
         with:
           node-version: 22
 
-      - name: Install dependencies
-        run: npm install --no-audit --no-fund
+      - name: Install dependencies from lockfile
+        run: npm ci --no-audit --no-fund
+
+      - name: Audit pinned dependencies
+        run: npm audit --audit-level=moderate
 
       - name: Test
         run: npm test
@@ -30,12 +33,18 @@ jobs:
       - name: Build
         run: npm run build
 
+      - name: Verify signed Access identity can load built UI
+        run: node --test server/security/access-staging.test.mjs
+
       - name: Validate shell scripts
         run: |
           for file in scripts/*.sh; do
             echo "checking $file"
             sh -n "$file"
           done
+
+      - name: Verify isolated Friday staging Compose without starting services
+        run: sh scripts/verify-friday-staging.sh
 
       - name: Verify observer security boundary
         run: |
@@ -104,6 +113,50 @@ jobs:
             exit 1
           fi
 
+      - name: Verify shared-work security boundary
+        run: |
+          if grep -RniE 'child_process|execFile\(|spawn\(|ssh ' server/work --exclude='*.test.mjs'; then
+            echo 'Shared-work execution interface detected' >&2
+            exit 1
+          fi
+          if grep -niE "url\.pathname.*(/api/(work|memory|decisions|handoffs))" server/http.mjs; then
+            echo 'Unreviewed shared-work public endpoint detected' >&2
+            exit 1
+          fi
+          if grep -RniE 'VITE_.*(SUPABASE|SERVICE_KEY|SECRET|MEMORY_TOKEN)' src .env.example compose.yaml; then
+            echo 'Browser-exposed work credential detected' >&2
+            exit 1
+          fi
+
+      - name: Verify read-only Supabase gateway preflight contract
+        run: node --test scripts/preflight-shared-work-target.test.mjs
+
+      - name: Validate Git fabric catalog and internal-only Phase 2C security
+        run: |
+          npm run validate:fabric-catalog
+          node --test server/fabric/*.test.mjs scripts/validate-fabric-catalog.test.mjs
+          if grep -RniE 'child_process|execFile\(|spawn\(|/containers/.*/(start|stop|restart|kill|exec)' server/fabric --exclude='*.test.mjs'; then
+            echo 'Phase 2C fabric added forbidden execution capability' >&2
+            exit 1
+          fi
+          if grep -niE "url\.pathname.*(/api/(policy|plugins|context|fabric|work|memory)|/mcp)" server/http.mjs; then
+            echo 'Unreviewed fabric public endpoint exposed' >&2
+            exit 1
+          fi
+          if grep -RniE 'VITE_.*(SUPABASE|SERVICE_KEY|SECRET|TOKEN)' src .env.example compose.yaml; then
+            echo 'Browser-exposed credential variable detected' >&2
+            exit 1
+          fi
+
+      - name: Verify dormant Phase 2C release boundary
+        run: npm run verify:fabric-dormant
+
+      - name: Validate shared-work schema
+        run: npm run validate:shared-work-schema
+
+      - name: Test shared-work Postgres transactions
+        run: npm run test:shared-work-db
+
       - name: Verify model-fabric read-only and credential boundary
         run: |
           if grep -RniE 'NVIDIA_API_KEY|VITE_.*NVIDIA|VITE_.*(API_KEY|TOKEN|SECRET|SERVICE_KEY)' src; then
@@ -148,10 +201,36 @@ jobs:
         run: docker compose -f compose.yaml -f compose.live.yaml config >/dev/null
 
       - name: Validate VM100 observer Compose
-        run: FRIDAY_OBSERVER_TOKEN=ci-test FRIDAY_OBSERVER_BIND_ADDRESS=127.0.0.1 docker compose -f observer/compose.yaml config >/dev/null
+        run: FRIDAY_OBSERVER_TOKEN=ci-test FRIDAY_OBSERVER_BIND_ADDRESS=127.0.0.1 FRIDAY_DOCKER_SOCKET_GID="$(stat -c %g /var/run/docker.sock)" docker compose -f observer/compose.yaml config >/dev/null
 
       - name: Build controller container
         run: docker build -t friday-ci .
 
+      - name: Smoke test private Friday staging image without tunnel or host ports
+        run: sh scripts/test-friday-staging-isolation.sh
+
+      - name: Scan controller image for OS and Node vulnerabilities
+        run: sh scripts/scan-controller-image.sh friday-ci
+
+      - name: Smoke test isolated non-root controller
+        run: sh scripts/test-controller-container-hardening.sh friday-ci
+
+      - name: Verify real live-mode image fails closed without Access configuration
+        run: sh scripts/test-access-live-failclosed.sh friday-ci
+
+      - name: Rehearse read-only root-to-nonroot data volume migration
+        run: sh scripts/test-friday-volume-migration.sh friday-ci
+
       - name: Build VM100 observer container
         run: docker build -t friday-observer-ci observer
+
+      - name: Build restricted Docker socket proxy
+        run: docker build -f observer/Dockerfile.proxy -t friday-observer-proxy-ci observer
+
+      - name: Scan observer and proxy runtime images
+        run: |
+          sh scripts/scan-controller-image.sh friday-observer-ci
+          sh scripts/scan-controller-image.sh friday-observer-proxy-ci
+
+      - name: Verify isolated Docker API read-only boundary
+        run: sh scripts/test-observer-proxy-isolation.sh friday-observer-proxy-ci friday-observer-ci

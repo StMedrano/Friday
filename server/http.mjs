@@ -1,4 +1,5 @@
 import { createServer } from 'node:http'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -7,6 +8,7 @@ import { buildOverview, decorateOverviewWithMonitoring } from './overview.mjs'
 import { answerAssistant } from './assistant.mjs'
 import { normalizeAssistantHistory, validateAssistantPrompt } from './assistant-input.mjs'
 import { validateAgentId, validateAgentPrompt, validateRegistrySyncBody } from './agents/input.mjs'
+import {createCloudflareAccessVerifier} from './security/cloudflare-access.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -44,6 +46,20 @@ const mime = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
+}
+
+// Operator-only mutation boundary. A 32-byte random token, encoded as 64 hex
+// characters, must be supplied by a trusted server-side environment variable.
+// A browser-facing token or user-supplied identity header is never trusted.
+function authorizedOperator(request, token) {
+  if (typeof token !== 'string' || !/^[a-fA-F0-9]{64}$/.test(token)) return { status: 503, error: 'operator-auth-unconfigured' }
+  const auth = request.headers.authorization
+  const bearer = typeof auth === 'string' ? /^Bearer ([a-fA-F0-9]{64})$/.exec(auth) : null
+  if (!bearer) return { status: 401, error: 'operator-auth-required' }
+  const expected = createHash('sha256').update(token, 'utf8').digest()
+  const provided = createHash('sha256').update(bearer[1], 'utf8').digest()
+  if (!timingSafeEqual(expected, provided)) return { status: 401, error: 'operator-auth-required' }
+  return null
 }
 
 function json(response, statusCode, body) {
@@ -144,11 +160,19 @@ export function createFridayServer({
   agentService = null,
   buildOverviewImpl = buildOverview,
   answerAssistantImpl = answerAssistant,
+  verifyAccessImpl = createCloudflareAccessVerifier(),
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
+  const accessUsage=new Map()
+  const MAX_ACCESS_OPERATIONS_PER_MINUTE=20
 
   return createServer(async (request, response) => {
-    const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
+    let url
+    try {
+      url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
+    } catch {
+      return json(response, 400, { error: 'invalid-request-url' })
+    }
 
     if (request.method === 'GET' && url.pathname === '/healthz') {
       return json(response, 200, { status: 'ok', service: 'friday', mode: config.mode })
@@ -156,6 +180,50 @@ export function createFridayServer({
 
     if (request.method === 'GET' && url.pathname === '/api/health') {
       return json(response, 200, { status: 'ok', mode: config.mode, ai: config.ai.enabled, time: new Date().toISOString() })
+    }
+
+    // Verify Cloudflare's SIGNED application JWT at the origin, before any
+    // monitored inventory, agent service or external model can be reached.
+    // Status endpoints remain limited, public health probes.
+    let authenticatedIdentity=null
+    // Protect the static UI and assets as well as all API routes at origin.
+    // Without a signed Access token, a direct backend connection cannot read
+    // inventory or fetch the UI even if the edge policy is misconfigured.
+    if (config.access?.enabled === true) {
+      let verified
+      try { verified=await verifyAccessImpl(request,config.access) }
+      catch { verified={ok:false,status:503,error:'access-verification-unavailable'} }
+      if (!verified?.ok) return json(response, verified?.status===503?503:401,{error:verified?.error||'access-identity-required'})
+      authenticatedIdentity=verified
+      // Prevent credentialed cross-site POSTs from abusing Access browser
+      // cookies. Non-browser operator clients have no Origin header.
+      if (request.method !== 'GET' && request.method !== 'HEAD' &&
+          (!config.access.publicOrigin || (request.headers.origin&&request.headers.origin!==config.access.publicOrigin))) {
+        return json(response,403,{error:'origin-denied'})
+      }
+      const isOperatorMutation=request.method==='POST'&&(
+        url.pathname==='/api/agents/registry/sync' ||
+        /^\/api\/incidents\/[^/]+\/diagnostics\/rerun$/.test(url.pathname))
+      if (isOperatorMutation&&!authenticatedIdentity.operator) return json(response,403,{error:'operator-required'})
+
+      // Small process-local resource guard; deployed ingress must also apply
+      // distributed request quotas and abusive-client controls.
+      const isExpensive=request.method==='POST'&&(
+        url.pathname==='/api/assistant'||url.pathname==='/api/agents/route'||
+        /^\/api\/agents\/[^/]+\/ask$/.test(url.pathname)||isOperatorMutation)
+      if (isExpensive) {
+        const time=Date.now()
+        const key=authenticatedIdentity.email
+        const prior=accessUsage.get(key)
+        const state=!prior||prior.until<=time?{count:0,until:time+60000}:prior
+        if(state.count>=MAX_ACCESS_OPERATIONS_PER_MINUTE) return json(response,429,{error:'rate-limit-exceeded'})
+        state.count+=1
+        if(accessUsage.size>=2000&&!accessUsage.has(key)){
+          for(const [id,entry] of accessUsage)if(entry.until<=time)accessUsage.delete(id)
+          if(accessUsage.size>=2000)accessUsage.clear()
+        }
+        accessUsage.set(key,state)
+      }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/overview') {
@@ -193,6 +261,8 @@ export function createFridayServer({
     }
 
     if (request.method === 'POST' && url.pathname === '/api/agents/registry/sync') {
+      const denial = authorizedOperator(request, config.operator?.registrySyncToken)
+      if (denial) return json(response, denial.status, { error: denial.error })
       if (!agentRegistryService) return json(response, 503, { error: 'agent-registry-unavailable' })
       try {
         const body = await readBody(request)

@@ -54,6 +54,17 @@ export function getConfig(env = process.env) {
 
   return {
     port: Number(env.FRIDAY_PORT || 3010),
+    operator: { registrySyncToken: env.FRIDAY_REGISTRY_SYNC_OPERATOR_TOKEN || '' },
+    access: {
+      // Production API identity must never depend on an optional Compose override.
+      // An unconfigured live Access policy fails closed with HTTP 503.
+      enabled: env.FRIDAY_MODE === 'live' || enabled(env.FRIDAY_CF_ACCESS_ENABLED),
+      issuer: env.FRIDAY_CF_ACCESS_TEAM_DOMAIN || '',
+      audience: env.FRIDAY_CF_ACCESS_AUD || '',
+      publicOrigin: env.FRIDAY_PUBLIC_ORIGIN || '',
+      operatorEmails: String(env.FRIDAY_CF_ACCESS_OPERATOR_EMAILS || '').split(',')
+        .map(x=>x.trim().toLowerCase()).filter(Boolean),
+    },
     mode: env.FRIDAY_MODE === 'live' ? 'live' : 'mock',
     docker: {
       enabled: enabled(env.FRIDAY_DOCKER_ENABLED),

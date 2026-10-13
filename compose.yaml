@@ -5,6 +5,14 @@ services:
       dockerfile: Dockerfile
     container_name: friday
     restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    # Only /data is persistent; root filesystem and build tree are immutable.
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,size=16m
     ports:
       - "${FRIDAY_UI_PORT:-3010}:3010"
     environment:
@@ -32,6 +40,13 @@ services:
       FRIDAY_ENDPOINTS_ENABLED: ${FRIDAY_ENDPOINTS_ENABLED:-false}
       FRIDAY_ENDPOINT_URLS: ${FRIDAY_ENDPOINT_URLS:-}
       FRIDAY_AGENT_REGISTRY_ENABLED: ${FRIDAY_AGENT_REGISTRY_ENABLED:-false}
+      # Server-only operator mutation token; never expose to browser code.
+      FRIDAY_REGISTRY_SYNC_OPERATOR_TOKEN: ${FRIDAY_REGISTRY_SYNC_OPERATOR_TOKEN:-}
+      FRIDAY_CF_ACCESS_ENABLED: ${FRIDAY_CF_ACCESS_ENABLED:-false}
+      FRIDAY_CF_ACCESS_TEAM_DOMAIN: ${FRIDAY_CF_ACCESS_TEAM_DOMAIN:-}
+      FRIDAY_CF_ACCESS_AUD: ${FRIDAY_CF_ACCESS_AUD:-}
+      FRIDAY_CF_ACCESS_OPERATOR_EMAILS: ${FRIDAY_CF_ACCESS_OPERATOR_EMAILS:-}
+      FRIDAY_PUBLIC_ORIGIN: ${FRIDAY_PUBLIC_ORIGIN:-https://friday.mytechtactics.com}
       FRIDAY_SUPABASE_URL: ${FRIDAY_SUPABASE_URL:-}
       FRIDAY_SUPABASE_SERVICE_KEY: ${FRIDAY_SUPABASE_SERVICE_KEY:-}
       # Verified CT108 nic1 endpoint on vmbr1 / VLAN 10.
@@ -103,6 +118,8 @@ networks:
 
 volumes:
   friday_data:
-    name: friday_data
+    # For a separately approved, non-destructive data migration, select a
+    # newly prepared UID 10001-owned volume without modifying the old volume.
+    name: ${FRIDAY_DATA_VOLUME:-friday_data}
   friday_ollama:
     name: friday_ollama

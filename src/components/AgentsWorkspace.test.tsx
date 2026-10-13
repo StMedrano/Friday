@@ -29,7 +29,6 @@ function installFetch() {
     const url = String(input)
     if (url === '/api/agents' && (!init?.method || init.method === 'GET')) return jsonResponse([agent])
     if (url === '/api/agents/registry/status') return jsonResponse(status)
-    if (url === '/api/agents/registry/sync') return jsonResponse({ ...status, agentsSynced: 1 })
     if (url === '/api/agents/proxmox-observer/ask') return jsonResponse({
       available: true, mode: 'local-agent', provider: 'ollama', agentId: 'proxmox-observer', agentName: 'Proxmox Observer',
       modelProfile: 'local-general', model: 'qwen3:4b-instruct', text: 'VM 100 is observed as online.',
@@ -58,20 +57,20 @@ describe('AgentsWorkspace', () => {
     expect(screen.getByText(/abc123checksum/)).toBeInTheDocument()
     expect(screen.getByText(/Aug 30, 2026|2026-08-30/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Ask this agent' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Sync registry' })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Sync registry' })).not.toBeInTheDocument()
 
     for (const forbidden of ['Restart', 'Execute', 'Delete', 'Approve', 'Shell', 'Edit agent', 'Create agent']) {
       expect(screen.queryByRole('button', { name: new RegExp(forbidden, 'i') })).not.toBeInTheDocument()
     }
   })
 
-  it('syncs only Friday-owned registry state from Git and refreshes status', async () => {
+  it('does not expose an unauthenticated registry write action', async () => {
     const fetchMock = installFetch()
     render(<AgentsWorkspace />)
     await screen.findByText('Proxmox Observer')
-    fireEvent.click(screen.getByRole('button', { name: 'Sync registry' }))
-    await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/agents/registry/sync', expect.objectContaining({ method: 'POST', body: JSON.stringify({}) })))
+    expect(screen.queryByRole('button', { name: 'Sync registry' })).not.toBeInTheDocument()
     expect(screen.getByText(/Git is authoritative/i)).toBeInTheDocument()
+    expect(fetchMock).not.toHaveBeenCalledWith('/api/agents/registry/sync', expect.anything())
   })
 
   it('manually asks the selected agent and renders local-only provenance and execution=false', async () => {

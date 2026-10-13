@@ -2,7 +2,8 @@ services:
   friday:
     environment:
       FRIDAY_MODE: live
-      FRIDAY_DOCKER_ENABLED: ${FRIDAY_DOCKER_ENABLED:-true}
-    volumes:
-      - friday_data:/data
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Fail closed until the reviewed Cloudflare Access application is set up.
+      FRIDAY_CF_ACCESS_ENABLED: 'true'
+      # Do not expose the host Docker daemon to the browser-facing controller.
+      # Use the separate least-privilege observer interface for inventory.
+      FRIDAY_DOCKER_ENABLED: false

@@ -7,7 +7,6 @@ import {
   fetchIncidentDiagnostics,
   fetchIncidentLogs,
   routeFridayAgent,
-  syncFridayAgentRegistry,
 } from './api'
 
 afterEach(() => vi.unstubAllGlobals())
@@ -92,21 +91,6 @@ describe('Friday local agent API', () => {
     expect((await fetchFridayAgentRegistryStatus()).status).toBe('ok')
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/agents', expect.objectContaining({ method: 'GET' }))
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/agents/registry/status', expect.objectContaining({ method: 'GET' }))
-  })
-
-  it('syncs only from Git with an empty POST body object', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ status: 'ok', agentsSynced: 1 }), {
-      status: 200,
-      headers: { 'content-type': 'application/json' },
-    }))
-    vi.stubGlobal('fetch', fetchMock)
-
-    await syncFridayAgentRegistry()
-
-    expect(fetchMock).toHaveBeenCalledWith('/api/agents/registry/sync', expect.objectContaining({
-      method: 'POST',
-      body: JSON.stringify({}),
-    }))
   })
 
   it('routes automatically and manually asks an encoded selected agent', async () => {

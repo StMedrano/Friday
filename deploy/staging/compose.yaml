@@ -1,0 +1,83 @@
+# Private Friday Staging stack; deployment remains operator-approved, not production.
+# Services survive VM100 reboots unless intentionally stopped; no host ports.
+name: friday-access-stage
+services:
+  friday-staging:
+    build:
+      context: ../..
+      dockerfile: Dockerfile
+    image: friday-staging-candidate:security
+    # Restart automatically after VM100 reboot; an intentional docker stop remains stopped.
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /data:rw,noexec,nosuid,nodev,uid=10001,gid=10001,size=16m
+      - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,size=16m
+    # Stage has no access to VM100 Docker, VM102, Supabase, Ollama, or live data.
+    environment:
+      NODE_ENV: production
+      FRIDAY_MODE: live
+      FRIDAY_PORT: "3010"
+      FRIDAY_CF_ACCESS_ENABLED: "true"
+      FRIDAY_CF_ACCESS_TEAM_DOMAIN: https://mytechtactics.cloudflareaccess.com
+      # Must be the STAGING Access application's AUD, never the production AUD.
+      FRIDAY_CF_ACCESS_AUD: ${FRIDAY_STAGE_CF_ACCESS_AUD:?The separate staging Cloudflare Access AUD is required}
+      FRIDAY_PUBLIC_ORIGIN: https://friday-staging.mytechtactics.com
+      FRIDAY_CF_ACCESS_OPERATOR_EMAILS: ""
+      FRIDAY_MONITORING_ENABLED: "false"
+      FRIDAY_DIAGNOSTICS_ENABLED: "false"
+      FRIDAY_AI_ENABLED: "false"
+      FRIDAY_AGENT_REGISTRY_ENABLED: "false"
+      FRIDAY_DOCKER_ENABLED: "false"
+      FRIDAY_PROXMOX_ENABLED: "false"
+      FRIDAY_VM100_OBSERVER_ENABLED: "false"
+      FRIDAY_LOCAL_AI_ENABLED: "false"
+      FRIDAY_ENDPOINTS_ENABLED: "false"
+    networks:
+      - friday_staging
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3010/healthz"]
+      interval: 30s
+      timeout: 4s
+      start_period: 10s
+      retries: 3
+
+  cloudflared-staging:
+    # Only start with --profile tunnel AFTER Cloudflare staging Access is active.
+    # Digest verified read-only on VM100 on 2026-10-12; review/pin anew later.
+    image: cloudflare/cloudflared@sha256:9b49eed8f62806d5d45ddf59ecefb5710429598ea6d3fcccd2af938f621b2b07
+    profiles: [tunnel]
+    restart: unless-stopped
+    user: "65532:65532"
+    read_only: true
+    cap_drop:
+      - ALL
+    pids_limit: 64
+    security_opt:
+      - no-new-privileges:true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,uid=65532,gid=65532,size=16m
+    # Secure remotely-managed tunnel token read from a host-only file secret.
+    # Never place token in Compose, Git, command line, or regular environment.
+    command: ["tunnel", "run", "--token-file", "/run/secrets/staging_tunnel_token"]
+    secrets:
+      - staging_tunnel_token
+    depends_on:
+      friday-staging:
+        condition: service_healthy
+    networks:
+      - friday_staging
+
+networks:
+  friday_staging:
+    driver: bridge
+
+secrets:
+  staging_tunnel_token:
+    file: ${FRIDAY_STAGE_TUNNEL_TOKEN_FILE:?Absolute VM100 path to private tunnel token file is required}

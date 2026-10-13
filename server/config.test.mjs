@@ -117,6 +117,42 @@ test('diagnostics are disabled by default and require explicit opt-in', () => {
   assert.deepEqual(getConfig({ FRIDAY_DIAGNOSTICS_ENABLED: 'true' }).diagnostics, { enabled: true })
   assert.deepEqual(getConfig({ FRIDAY_DIAGNOSTICS_ENABLED: 'false' }).diagnostics, { enabled: false })
 })
+test('operator registry sync token is absent by default and never appears in browser-facing config', () => {
+  const empty = getConfig({})
+  assert.equal(empty.operator.registrySyncToken, '')
+  const secret = 'a'.repeat(64)
+  const configured = getConfig({ FRIDAY_REGISTRY_SYNC_OPERATOR_TOKEN: secret })
+  assert.equal(configured.operator.registrySyncToken, secret)
+  assert.equal(JSON.stringify(configured.ai).includes(secret), false)
+  assert.equal(JSON.stringify(configured.agents).includes(secret), false)
+})
+
+test('Access identity verifier is default-off in dev and accepts only server-owned config', () => {
+ const absent=getConfig({})
+ assert.equal(absent.access.enabled,false)
+ assert.equal(absent.access.issuer,'')
+ const live=getConfig({
+  FRIDAY_CF_ACCESS_ENABLED:'true',
+  FRIDAY_CF_ACCESS_TEAM_DOMAIN:'https://team.cloudflareaccess.com',
+  FRIDAY_CF_ACCESS_AUD:'app-audience-code',
+  FRIDAY_CF_ACCESS_OPERATOR_EMAILS:'Operator@Example.Test, backup@example.test',
+  FRIDAY_PUBLIC_ORIGIN:'https://friday.mytechtactics.com',
+ })
+ assert.equal(live.access.enabled,true)
+ assert.deepEqual(live.access.operatorEmails,['operator@example.test','backup@example.test'])
+ assert.equal(live.access.issuer,'https://team.cloudflareaccess.com')
+})
+
+test('live configuration always enables identity enforcement, even if the Access flag is omitted or false', () => {
+  for (const value of [undefined, 'false', 'TRUE', '']) {
+    const env = { FRIDAY_MODE: 'live' }
+    if (value !== undefined) env.FRIDAY_CF_ACCESS_ENABLED = value
+    const config = getConfig(env)
+    assert.equal(config.mode, 'live')
+    assert.equal(config.access.enabled, true, String(value))
+  }
+  assert.equal(getConfig({ FRIDAY_MODE: 'mock', FRIDAY_CF_ACCESS_ENABLED: 'false' }).access.enabled, false)
+})
 
 test('model fabric is opt-in, permanently free-only, and server-side', () => {
   const defaults = getConfig({}).modelFabric
