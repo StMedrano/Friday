@@ -153,3 +153,27 @@ test('live configuration always enables identity enforcement, even if the Access
   }
   assert.equal(getConfig({ FRIDAY_MODE: 'mock', FRIDAY_CF_ACCESS_ENABLED: 'false' }).access.enabled, false)
 })
+
+test('model fabric is opt-in, permanently free-only, and server-side', () => {
+  const defaults = getConfig({}).modelFabric
+  assert.equal(defaults.enabled, false)
+  assert.equal(defaults.nvidia.enabled, false)
+  assert.equal(defaults.nvidia.localEnabled, false)
+  assert.equal(defaults.nvidia.baseUrl, 'https://integrate.api.nvidia.com/v1')
+  assert.equal(defaults.nvidia.localBaseUrl, 'http://nvidia-nim:8000/v1')
+  const model = { id:'free', model:'vendor/model', billingClass:'free', capabilities:['general'],
+    supportsTools:false, supportsVision:false }
+  const config = getConfig({
+    FRIDAY_MODEL_FABRIC_ENABLED: 'true', FRIDAY_NVIDIA_ENABLED:'true',
+    NVIDIA_API_KEY:'server-secret', FRIDAY_NVIDIA_MODELS_JSON: JSON.stringify([model]),
+    FRIDAY_NVIDIA_LOCAL_MODELS_JSON: 'oops',
+    FRIDAY_ALLOW_PAID_FALLBACK: 'true',
+  }).modelFabric
+  assert.equal(config.enabled, true)
+  assert.deepEqual(config.policy, { freeOnly:true, allowPaidFallback:false, maxPaidSpendPerDay:0,
+    preferLocal:true, preferNvidiaFree:true })
+  assert.equal(config.nvidia.apiKey, 'server-secret')
+  assert.deepEqual(config.nvidia.models, [model])
+  assert.deepEqual(config.nvidia.localModels, [])
+  assert.deepEqual(getConfig({ FRIDAY_NVIDIA_MODELS_JSON:'{}' }).modelFabric.nvidia.models, [])
+})
