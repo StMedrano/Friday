@@ -30,9 +30,9 @@ On 2026-10-12, the two obsolete stopped token-bearing connectors were guardedly 
 
 These steps are complete; **do not rotate again or recreate the connector merely to repeat this handoff**. This does not establish that all historical external token copies were erased. Production, NPM, Access policy and Phase 2C were unchanged.
 
-## Staging restart fix — verified in code, live application pending
+## Staging restart fix — applied and verified on VM100
 
-Commit `511b9f70e237900fce24cbd0f0099c42c7bb3c97` makes both staging services use `restart: unless-stopped`. CI #437 passed. The existing live staging app still needs its policy checked and, if unchanged, updated without recreation after VM100 reconnects. VM100 Desktop Commander was offline during the continuation check; no live policy change is claimed. Do not reboot VM100 or Docker for testing. See [staging reboot recovery](cloudflare-friday-staging-vm100.md#staging-reboot-recovery-2026-10-13).
+Commit `511b9f70e237900fce24cbd0f0099c42c7bb3c97` makes both staging services use `restart: unless-stopped`. CI #437 passed. After VM100 reconnected on 2026-10-13, the existing staging app was inspected: healthy, UID10001, read-only root, no host ports or volumes, but still `restart: no`. Applied only the reviewed one-line staging Compose policy and `docker update --restart unless-stopped` to that existing app. Both staging services now report `unless-stopped`; IDs and start times are unchanged, so neither service was restarted or recreated. Internal health returned 200, protected origin routes returned 401, and all six public anonymous checks returned trusted-team 302. The connector has four registered connections, zero restarts and zero error lines. NPM is running, observer healthy, and VM102 production remains healthy/unchanged. Do not reboot VM100 or Docker for testing. See [staging reboot recovery](cloudflare-friday-staging-vm100.md#staging-reboot-recovery-2026-10-13).
 
 ## Historical rotation procedure — for a separately authorized future rotation
 
