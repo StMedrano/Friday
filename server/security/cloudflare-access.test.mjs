@@ -14,6 +14,15 @@ function token(payload=claims,header={alg:'RS256',kid:jwk.kid,typ:'JWT'}){
  const raw=b64(header)+'.'+b64(payload)
  return raw+'.'+sign('RSA-SHA256',Buffer.from(raw),privateKey).toString('base64url')
 }
+function forgeSignature(identity){
+ const parts=identity.split('.')
+ const original=Buffer.from(parts[2],'base64url')
+ const forged=Buffer.from(original)
+ forged[0]^=1
+ parts[2]=forged.toString('base64url')
+ assert.notDeepEqual(Buffer.from(parts[2],'base64url'),original,'forged fixture must alter signature bytes')
+ return parts.join('.')
+}
 const fetcher=async(url,opts)=>{
  assert.equal(url,issuer+'/cdn-cgi/access/certs')
  assert.equal(opts.redirect,'error')
@@ -28,7 +37,7 @@ test('signed Access application JWT authorizes an identified user with correctly
 test('anonymous, forged, wrong issuer, wrong aud, expired, future nbf, service token and alg none fail closed',async()=>{
  const v=createCloudflareAccessVerifier({fetchImpl:fetcher,now:()=>now*1000})
  for(const [name,t] of [
-  ['missing',undefined],['forged',token().slice(0,-2)+'AA'],['issuer',token({...claims,iss:'https://evil.example'})],
+  ['missing',undefined],['forged',forgeSignature(token())],['issuer',token({...claims,iss:'https://evil.example'})],
   ['audience',token({...claims,aud:['wrong']})],['expired',token({...claims,exp:now-1})],
   ['future',token({...claims,nbf:now+100})],['service',token({...claims,email:undefined})],
   ['none',token(claims,{alg:'none',kid:jwk.kid})],['missing-sub',token({...claims,sub:''})],
