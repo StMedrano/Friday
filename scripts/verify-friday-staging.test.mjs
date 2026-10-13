@@ -8,8 +8,10 @@ const compose=()=>readFile(new URL('compose.yaml',root),'utf8')
 
 test('staging is a standalone private Docker network with no published ports, production volumes or socket',async()=>{
  const source=await compose()
- assert.match(source,/friday-staging:/)
- assert.match(source,/cloudflared-staging:/)
+ const [stageSource,tunnelSource]=source.split(/^  cloudflared-staging:$/m)
+ assert.ok(stageSource&&tunnelSource,'both staging and tunnel blocks must exist')
+ assert.match(stageSource,/^    restart: unless-stopped$/m)
+ assert.match(tunnelSource,/^    restart: unless-stopped$/m)
  assert.match(source,/FRIDAY_MODE:\s*live/)
  assert.match(source,/FRIDAY_CF_ACCESS_ENABLED:\s*['"]?true['"]?/)
  assert.match(source,/FRIDAY_CF_ACCESS_AUD:.*FRIDAY_STAGE_CF_ACCESS_AUD/)
@@ -36,10 +38,12 @@ test('staging compose validator rejects host-published ports, prod data, wrong a
     FRIDAY_PUBLIC_ORIGIN:'https://friday-staging.mytechtactics.com',
     FRIDAY_MONITORING_ENABLED:'false',FRIDAY_AI_ENABLED:'false',FRIDAY_DOCKER_ENABLED:'false',
     FRIDAY_PROXMOX_ENABLED:'false',FRIDAY_VM100_OBSERVER_ENABLED:'false',FRIDAY_AGENT_REGISTRY_ENABLED:'false'},
+   restart:'unless-stopped',
    networks:{friday_staging:{}},tmpfs:['/data:rw,nosuid,nodev,uid=10001,gid=10001,size=16m'],ports:[],read_only:true,cap_drop:['ALL'],
   },
   'cloudflared-staging':{
    image:'cloudflare/cloudflared@sha256:'+'a'.repeat(64),
+   restart:'unless-stopped',
    profiles:['tunnel'],networks:{friday_staging:{}},ports:[],read_only:true,cap_drop:['ALL'],
    command:['tunnel','run','--token-file','/run/secrets/staging_tunnel_token'],
    secrets:[{source:'staging_tunnel_token',target:'/run/secrets/staging_tunnel_token'}],
@@ -47,6 +51,9 @@ test('staging compose validator rejects host-published ports, prod data, wrong a
  },volumes:{},networks:{friday_staging:{driver:'bridge'}},secrets:{staging_tunnel_token:{file:'/tmp/fixture-token'}}}
  assert.deepEqual(validateStagingCompose(good),[])
  for(const [path,alter] of [
+  ['staging does not auto-recover',j=>{j.services['friday-staging'].restart='no'}],
+  ['staging restart always ignores intentional stops',j=>{j.services['friday-staging'].restart='always'}],
+  ['tunnel does not auto-recover',j=>{j.services['cloudflared-staging'].restart='no'}],
   ['host port',j=>{j.services['friday-staging'].ports=[{published:'13101',target:3010}]}],
   ['prod volume',j=>{j.services['friday-staging'].volumes=[{source:'friday_data',target:'/data'}]}],
   ['auth disabled',j=>{j.services['friday-staging'].environment.FRIDAY_CF_ACCESS_ENABLED='false'}],

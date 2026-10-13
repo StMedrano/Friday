@@ -1,16 +1,16 @@
 # Friday Cloudflare Tunnel + Access staging on VM100
 
-**Status: prepared but NOT deployed (2026-10-12).** This document plans a separate staging deployment; it is not a production cutover authorization. Source of truth is the existing Friday security draft PR #29 at its exact reviewed SHA.
+**Status (2026-10-13): staging deployed on VM100, Cloudflare Tunnel token rotated, browser login accepted.** Production Friday remains unchanged; staging deployment does not authorize production cutover or PR merge. Earlier setup instructions below document how the approved deployment was established, not work that still needs to be performed. The live staging installation is `/home/stalin/staging/friday`, with Compose in `deploy/staging/compose.yaml`. PR #29 remains draft until independent review and separate release approval.
 
 ## Observed, read-only VM100 baseline
 
 - VM100 `infrastructure`: 192.168.1.124 (legacy) and 10.1.10.10 (VLAN 10). Docker Engine 29.6.1 / Compose v5.3.1.
 - Existing live `nginx-proxy-manager` listens on 80/443; live `friday-observer` listens on 3199. Do **not** change either.
-- An existing, unverified `cloudflare/cloudflared:latest` container named `clever_nobel` was observed on default bridge with no published ports; its purpose, origin route and credentials have not been validated. **Do not reuse, edit, stop, remove, or obtain its token** for staging. A distinct named staging tunnel and token are required.
+- Historical baseline: an unmanaged `cloudflare/cloudflared:latest` container named `clever_nobel` existed before staging. Both obsolete, stopped token-bearing Docker containers were verified and removed on 2026-10-12 with approval. The active staging connector is the separate `friday-access-stage-cloudflared-staging-1` service; do not repurpose production/other tunnels.
 - Cloudflare public DNS queries returned NXDOMAIN for `friday-staging.mytechtactics.com` and `friday.mytechtactics.com` at the time of inspection. Internal Friday DNS resolves privately and is not an Access verification.
 - VM102 production Friday runs a different, healthy image with root-owned `friday_data`, unchanged. Stage must never mount production state or use VM102 runtime secrets.
 
-## Proposed staging route (deliberately bypass Nginx Proxy Manager)
+## Deployed staging route (deliberately bypasses Nginx Proxy Manager)
 
 ```text
 Remote browser
@@ -25,7 +25,7 @@ Remote browser
 
 No local reverse-proxy modification is needed for this first staging test. **This staging setup does not verify Nginx Proxy Manager's JWT forwarding; that remains a separate production acceptance gate.** Cloudflare Tunnel makes outbound connections; the router needs no inbound forwarding. Neither staging container publishes any host TCP port. The only shared resource is a dedicated, privately scoped Docker bridge, not the Docker socket, VM100 observer network, production Friday volume, or existing tunnels.
 
-### Cloudflare administrator setup FIRST — do not publish tunnel route yet
+### Historical Cloudflare administrator setup (completed for staging)
 
 1. At [Cloudflare Zero Trust](https://one.dash.cloudflare.com/) → **Access controls → Applications**, create a **new self-hosted public application** named `Friday Staging` for exactly `friday-staging.mytechtactics.com`, blank path (protect *all* paths, including assets, APIs, and health). Do **not** use a wildcard or change the existing production Friday app.
 2. Attach an **Allow** policy with **Include → Emails** for the intended explicit staging testers; ensure the Include section has no `Authentication Method → PWD`, Everyone, or Bypass rule that could widen access (multiple Include rules are OR). Set chosen identity provider and MFA/security requirements as supported. Validate saved policy is attached to **Friday Staging**.
@@ -80,3 +80,23 @@ Do **not** execute these steps now. Once the reviewer and staging Access adminis
 The above is a **preparation plan only**. A live staging activation can only occur after the user explicitly approves deploying *this* isolated staging stack and provides the staging application's AUD and permission to install/use a separate tunnel token **on VM100 only**. The production Friday release still requires separate Cloudflare/NPM acceptance, independent security review, a verified root-owned volume backup and copy-only migration, and separate cutover approval. Phase 2C remains disabled.
 
 Official Cloudflare docs: [Self-hosted public application](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/), [tunnel published application route](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/), [run token-file](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/run-parameters/).
+
+## Staging reboot recovery (2026-10-13)
+
+The first approved VM100 staging deployment used `restart: "no"` for `friday-staging`. Following a VM100 host reboot on 2026-10-13, Docker restarted the `cloudflared-staging` connector (which already used `unless-stopped`), but left `friday-staging` exited. The controller had to be started manually. Both services now declare `restart: unless-stopped`, so they are eligible to restart when the Docker daemon starts after a host reboot, **unless an operator intentionally stopped them**. This is not a substitute for VM100 host uptime, Docker daemon availability, an independent watchdog, or recovery from a merely unhealthy-but-running process.
+
+**Production and Cloudflare caveats:** Do not restart the Docker daemon or reboot VM100 just to test this in production. Use the isolated CI container to confirm its actual Docker restart policy. The currently approved staged instance lives under `/home/stalin/staging/friday`; never apply this Compose file to VM102 or change NPM, the observer, or the Cloudflare Access application.
+
+Safe read-only verification on VM100:
+
+```sh
+docker inspect friday-access-stage-friday-staging-1 \
+  --format 'app={{.State.Health.Status}} restart={{.HostConfig.RestartPolicy.Name}} published_ports={{len .HostConfig.PortBindings}} mounts={{len .Mounts}}'
+docker inspect friday-access-stage-cloudflared-staging-1 \
+  --format 'connector={{.State.Status}} restart={{.HostConfig.RestartPolicy.Name}}'
+curl --silent --show-error --max-redirs 0 --output /dev/null \
+  --write-out 'anonymous_http=%{http_code}\n' \
+  https://friday-staging.mytechtactics.com/
+```
+
+Expected values: healthy app, `unless-stopped` on both services, zero host port bindings/mounts, running connector, and HTTPS 302 to the exact Cloudflare Access team login for an anonymous request. A successful *authenticated* sign-in must still be tested by a user; do not collect their JWT or cookie. Record failures in PR #29. Staging restart-policy changes do not confer production release authorization.

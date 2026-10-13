@@ -26,6 +26,7 @@ export function validateStagingCompose(c){
  const aud=service.environment?.FRIDAY_CF_ACCESS_AUD
  if(typeof aud!=='string'||!/^[A-Za-z0-9_-]{12,128}$/.test(aud)||aud===productionAud)errors.push('staging AUD missing or equals production')
  if(service.ports?.length||tunnel.ports?.length)errors.push('host ports must not be published')
+ if(service.restart!=='unless-stopped'||tunnel.restart!=='unless-stopped')errors.push('staging controller and connector must survive reboots unless intentionally stopped')
  for(const [name,s] of Object.entries(c.services)){
   if(s.network_mode==='host'||s.privileged===true||s.read_only!==true||!s.cap_drop?.includes('ALL'))errors.push(name+' privileges too broad')
   if(s.volumes?.length)errors.push(name+' must have no production mounts/volumes')

@@ -1,5 +1,5 @@
-# Preparation only. Never deploy this stack without separate staging approval.
-# All services join an isolated project network; NO published host ports.
+# Private Friday Staging stack; deployment remains operator-approved, not production.
+# Services survive VM100 reboots unless intentionally stopped; no host ports.
 name: friday-access-stage
 services:
   friday-staging:
@@ -7,7 +7,8 @@ services:
       context: ../..
       dockerfile: Dockerfile
     image: friday-staging-candidate:security
-    restart: "no"
+    # Restart automatically after VM100 reboot; an intentional docker stop remains stopped.
+    restart: unless-stopped
     user: "10001:10001"
     read_only: true
     cap_drop:

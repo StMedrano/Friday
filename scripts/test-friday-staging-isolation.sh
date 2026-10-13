@@ -21,6 +21,7 @@ id="$(compose ps -q friday-staging)"
 [ -n "$id" ]
 [ "$(docker inspect "$id" --format '{{.Config.User}}')" = '10001:10001' ]
 [ "$(docker inspect "$id" --format '{{.HostConfig.ReadonlyRootfs}}')" = true ]
+[ "$(docker inspect "$id" --format '{{.HostConfig.RestartPolicy.Name}}')" = unless-stopped ]
 [ "$(docker inspect "$id" --format '{{len .HostConfig.PortBindings}}')" = 0 ]
 [ "$(docker inspect "$id" --format '{{len .Mounts}}')" = 0 ]
 [ -z "$(compose ps -q cloudflared-staging)" ]
