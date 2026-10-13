@@ -5,7 +5,7 @@ Repository: StMedrano/Friday
 Prerequisite: security PR #29 release acceptance.
 
 ## User outcome
-Friday is the operator's single workspace for all agent teams. TechTactics Web Growth agents and App Builder agents appear in Friday, with their work, handoffs, context and artifacts. Existing business records and approval history survive integration. A group name is an organizational boundary, not permission to execute tools.
+Friday is the operator's single workspace for all agent teams. TechTactics Web Growth, App Builder and HomeLab agents appear in Friday, with their work, handoffs, context and artifacts. Existing business records and approval history survive integration. A group name is an organizational boundary, not permission to execute tools.
 
 ## Verified starting point
 Friday's Phase 1 registry supports advisory agents. Phase 2B provides work, decisions, handoffs and scoped memory. Phase 2C provides Git-authoritative group policy, skills and capability descriptions, but remains dormant and does not include a group UI, executor or background scheduler. Each agent has one primary policy group.
@@ -28,9 +28,9 @@ Source discovery is not proof that any role has a running autonomous worker.
 | --- | --- | --- |
 | TechTactics | Manager, Scout, Auditor, Designer, Sales, Accounting/Tax, Legal | Existing role sources to integrate |
 | App Builder | Coordinator, Planner, Developer, Reviewer, QA | Proposed initial roles, not existing workers |
-| Infrastructure | Existing Proxmox Observer | Preserve current advisory behavior |
+| HomeLab | Coordinator, Proxmox Observer, Container Operations, Network Observer, Backup/Storage, Security, Service Health | Proxmox Observer exists; other roles are proposed |
 
-TechTactics's Web Growth department is a display/work category inside the TechTactics group. Do not introduce nested policy inheritance or multiple primary groups. Keep the existing engineering example intact. Stable policy IDs are techtactics, app-builder and infrastructure; migration of the existing Proxmox agent assignment is separately reviewed, not automatic.
+TechTactics's Web Growth department is a display/work category inside the TechTactics group. Do not introduce nested policy inheritance or multiple primary groups. Keep the existing engineering example intact. Stable policy IDs are techtactics, app-builder and homelab; migration of the existing Proxmox agent assignment is separately reviewed, not automatic.
 
 Each agent has its own stable ID, primary group, role/source revision and runtime state. States distinguish catalogued, configured, ready, busy, blocked and unavailable. Do not infer a running worker from a role Markdown file.
 
@@ -55,6 +55,24 @@ Initial App Builder roles support planning, code review, implementation proposal
 
 Retain free-first model intent. Preserve current Phase 1 local-only behavior. Web Growth currently uses Gemini; do not silently switch providers, promise free capacity or change billing while integrating the workspace. Provider/model selection and unavailable/quota state remain explicit server-side settings.
 
+## Fourth slice: HomeLab activation and controlled operations
+HomeLab is a first-class Friday group. Its proposed members have explicit lanes:
+- Coordinator: prioritize incidents, assign work and report blockers.
+- Proxmox Observer: preserve the existing read-only host/VM inventory and advisory analysis.
+- Container Operations: read inventory/health through the restricted observer; later use separately approved typed actions.
+- Network Observer: inspect authorized Omada, DNS and connectivity evidence without changing network configuration.
+- Backup/Storage: report backup age, verification/restore-test evidence, capacity and recovery readiness.
+- Security: report exposed services, authorized scan findings and remediation proposals.
+- Service Health: correlate availability checks and monitoring incidents.
+
+Activation has two distinct milestones. First, deploy the reviewed secured Friday candidate and connect verified read-only adapters; verify that current live state, incidents and local-agent advice are real. Second, implement a controlled action service so approved HomeLab tasks can perform bounded work. The first milestone does not imply the second already exists.
+
+Before the first action, implement trusted roles, an append-only action audit, typed tool registry, durable request/approval lifecycle, an execution worker with narrow credentials, concurrency/idempotency controls, cancellation/kill switch and before/after verification. Every action binds an exact host, service/resource ID, operation, approved parameters, actor and expiry; revalidate policy immediately before execution. Model output cannot supply arbitrary shell, an arbitrary destination or a new grant.
+
+Proposed first executable action: restart one explicitly allowlisted disposable staging service, only after owner approval for that exact target. Test denied identity, altered target, duplicate execution, expired/revoked approval, kill switch, failure/timeout and post-action health. Expansion to production services requires a separately reviewed target allowlist and rollout. Host reboot, network/VLAN/firewall changes, volume deletion, database migrations and arbitrary SSH remain outside this initial action slice.
+
+Action workers may run near managed infrastructure while Friday remains their central identity/task/approval workspace; this is still one Friday platform. Do not grant an unrestricted Docker socket, root shell or Proxmox administration token to an AI model. Preserve observer GET-only behavior; a future write adapter has a separate credential and service boundary.
+
 ## Authorization and compatibility
 - Viewer reads only authorized group/project records.
 - Operator/admin changes require explicitly designed routes, trusted identity, role checks and durable audit; read slices add none.
@@ -70,11 +88,12 @@ Retain free-first model intent. Preserve current Phase 1 local-only behavior. We
 3. A crafted assignment, group ID, role instruction or handoff cannot grant tools or additional scopes.
 4. Mock mode is clearly labelled and uses only synthetic fixtures.
 5. Private Web Growth reads preserve source IDs, stages, approval/send states and artifact provenance; timeout/schema/auth errors are visible.
-6. Integration makes no lead-store writes, sends no email and invokes no financial/legal or infrastructure mutation.
+6. Group/read-adapter slices make no lead-store writes, send no email and invoke no financial/legal or infrastructure mutation. The later HomeLab action slice follows its separate approval/execution contract.
 7. Existing Phase 1, Phase 2B and dormant Phase 2C invariants remain green until separately approved activation.
 8. Test-first regressions, production frontend build, CI and separate code review cover each slice.
+9. HomeLab read-only activation reports verified real telemetry and unavailable dependencies honestly; controlled actions remain disabled until their own acceptance tests and approved rollout pass.
 
 ## Release order
-Complete PR #29's security acceptance first. Review this written design, then write/review the first slice implementation plan. Build the group workspace on a separate feature PR, followed by the private Web Growth adapter and authorized task integration. Roll out each verified slice independently with rollback; do not merge group changes into the security PR to bypass its holds.
+Complete PR #29's security acceptance first. Review this written design, then write/review the first slice implementation plan. Build the group workspace on a separate feature PR, followed by HomeLab read-only activation, the private Web Growth adapter and authorized task integration. Develop controlled HomeLab actions as a separate subsystem and release after the prerequisites above. Roll out each verified slice independently with rollback; do not merge group changes into the security PR to bypass its holds.
 
 Production PR #29 still needs live unlisted-identity and allowed-viewer/operator-denial evidence, policy/log and logout/session acceptance, external security review, production identity-forwarding/origin/ingress checks and verified backup/copy-only migration/cutover authorization. Passing CI does not establish these facts.
