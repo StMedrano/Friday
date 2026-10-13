@@ -87,7 +87,12 @@ function redactDockerResult(path,bytes){
 
 export function createDockerReadOnlyProxyServer({
  dockerRequestOptions=()=>({socketPath:'/var/run/docker.sock'}),
+ maxUpstreamDurationMs=5000,
 }={}) {
+ // Socket inactivity timeouts can be evaded by trickling data forever.
+ // Impose a wall-clock deadline independently of bytes received.
+ const deadlineMs=Number.isSafeInteger(maxUpstreamDurationMs)&&
+   maxUpstreamDurationMs>=100&&maxUpstreamDurationMs<=30000?maxUpstreamDurationMs:5000
  return http.createServer((req,res)=>{
   const path=req.url||''
   if(!allowedDockerRead(req.method,path)){
@@ -96,13 +101,28 @@ export function createDockerReadOnlyProxyServer({
    return
   }
   let upstream
+  const rejectUpstream=()=>{
+   if(res.writableEnded||res.destroyed)return
+   res.writeHead(503,{'content-type':'application/json','cache-control':'no-store'})
+   res.end('{"error":"docker-upstream-unavailable"}')
+  }
+  const deadline=setTimeout(()=>{
+   rejectUpstream()
+   upstream?.destroy(new Error('docker-upstream-deadline'))
+  },deadlineMs)
+  deadline.unref()
+  res.once('close',()=>{
+   clearTimeout(deadline)
+   // Client disconnected or response completed; close the Docker upstream.
+   upstream?.destroy()
+  })
   try {
    upstream=http.request({...dockerRequestOptions(),path,method:'GET',timeout:4000},incoming=>{
     const limit=2*1024*1024
     if(incoming.statusCode!==200){
-     incoming.resume()
-     res.writeHead(503,{'content-type':'application/json','cache-control':'no-store'})
-     res.end('{"error":"docker-upstream-unavailable"}')
+     // Do not consume or echo upstream error bodies; they may include secrets.
+     rejectUpstream()
+     incoming.destroy()
      return
     }
     const chunks=[]
@@ -110,6 +130,8 @@ export function createDockerReadOnlyProxyServer({
     incoming.on('data',chunk=>{
      bytes+=chunk.length
      if(bytes>limit){
+      // Reject immediately, without buffering the remaining JSON.
+      rejectUpstream()
       incoming.destroy()
       return
      }
@@ -126,18 +148,13 @@ export function createDockerReadOnlyProxyServer({
       res.end('{"error":"docker-upstream-unavailable"}')
      }
     })
-    incoming.on('error',()=>rejectUpstream())
+    incoming.on('error',rejectUpstream)
    })
-   function rejectUpstream(){
-    if(res.writableEnded)return
-    res.writeHead(503,{'content-type':'application/json','cache-control':'no-store'})
-    res.end('{"error":"docker-upstream-unavailable"}')
-   }
    upstream.on('timeout',()=>upstream.destroy(new Error('timeout')))
    upstream.on('error',rejectUpstream)
    upstream.end()
   }catch{
-   if(!res.writableEnded){res.writeHead(503);res.end()}
+   rejectUpstream()
   }
  })
 }

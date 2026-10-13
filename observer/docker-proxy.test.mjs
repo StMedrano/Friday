@@ -118,3 +118,80 @@ test('proxy denies raw container logs by default before contacting the Docker da
   await new Promise(resolve=>upstream.close(resolve))
  }
 })
+
+test('proxy enforces an absolute upstream deadline even if Docker keeps sending data',async()=>{
+ const upstream=http.createServer((_req,res)=>{
+  res.writeHead(200,{'content-type':'application/json'})
+  res.write('[')
+  const ticker=setInterval(()=>res.write(' '),20)
+  res.on('close',()=>clearInterval(ticker))
+ })
+ await new Promise(resolve=>upstream.listen(0,'127.0.0.1',resolve))
+ const proxy=createDockerReadOnlyProxyServer({
+  dockerRequestOptions:()=>({hostname:'127.0.0.1',port:upstream.address().port}),
+  maxUpstreamDurationMs:180,
+ })
+ await new Promise(resolve=>proxy.listen(0,'127.0.0.1',resolve))
+ try{
+  const controller=new AbortController()
+  const watchdog=setTimeout(()=>controller.abort(),2500)
+  try{
+   const response=await fetch('http://127.0.0.1:'+proxy.address().port+'/containers/json?all=1',{signal:controller.signal})
+   assert.equal(response.status,503)
+   assert.deepEqual(await response.json(),{error:'docker-upstream-unavailable'})
+  }finally{clearTimeout(watchdog)}
+ }finally{
+  proxy.closeAllConnections()
+  upstream.closeAllConnections()
+  await new Promise(resolve=>proxy.close(resolve))
+  await new Promise(resolve=>upstream.close(resolve))
+ }
+})
+
+test('proxy drops oversized Docker JSON without ever streaming unsanitized bytes',async()=>{
+ const sensitive='CREDENTIAL-DATA-MUST-NOT-ESCAPE'
+ const upstream=http.createServer((_req,res)=>{
+  res.writeHead(200,{'content-type':'application/json'})
+  res.end(JSON.stringify([{Id:'a'.repeat(64),Config:{Env:['TOKEN='+sensitive]},Padding:'z'.repeat(2*1024*1024)}]))
+ })
+ await new Promise(resolve=>upstream.listen(0,'127.0.0.1',resolve))
+ const proxy=createDockerReadOnlyProxyServer({
+  dockerRequestOptions:()=>({hostname:'127.0.0.1',port:upstream.address().port}),
+ })
+ await new Promise(resolve=>proxy.listen(0,'127.0.0.1',resolve))
+ try{
+  const response=await fetch('http://127.0.0.1:'+proxy.address().port+'/containers/json?all=1')
+  const result=await response.text()
+  assert.equal(response.status,503)
+  assert.equal(result,'{"error":"docker-upstream-unavailable"}')
+  assert.doesNotMatch(result,/CREDENTIAL-DATA-MUST-NOT-ESCAPE/)
+ }finally{
+  proxy.closeAllConnections()
+  upstream.closeAllConnections()
+  await new Promise(resolve=>proxy.close(resolve))
+  await new Promise(resolve=>upstream.close(resolve))
+ }
+})
+
+test('proxy does not echo Docker upstream error responses that may include credentials',async()=>{
+ const upstream=http.createServer((_req,res)=>{
+  res.writeHead(500,{'content-type':'application/json'})
+  res.end('{"message":"SECRET_UPSTREAM_ERROR_VALUE"}')
+ })
+ await new Promise(resolve=>upstream.listen(0,'127.0.0.1',resolve))
+ const proxy=createDockerReadOnlyProxyServer({
+  dockerRequestOptions:()=>({hostname:'127.0.0.1',port:upstream.address().port}),
+ })
+ await new Promise(resolve=>proxy.listen(0,'127.0.0.1',resolve))
+ try{
+  const response=await fetch('http://127.0.0.1:'+proxy.address().port+'/containers/json?all=1')
+  const body=await response.text()
+  assert.equal(response.status,503)
+  assert.doesNotMatch(body,/SECRET_UPSTREAM_ERROR_VALUE/)
+ }finally{
+  proxy.closeAllConnections()
+  upstream.closeAllConnections()
+  await new Promise(resolve=>proxy.close(resolve))
+  await new Promise(resolve=>upstream.close(resolve))
+ }
+})
