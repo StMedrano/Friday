@@ -56,9 +56,9 @@ sh scripts/verify-friday-staging.sh
 
 This uses a **synthetic** AUD and a disposable fake token file strictly for `docker compose config`; it does not invoke Cloudflare, run containers or change DNS.
 
-### Future VM100 staging deployment — requires separate user approval
+### Historical initial VM100 staging deployment procedure
 
-Do **not** execute these steps now. Once the reviewer and staging Access administrator approve:
+The isolated staging deployment was already approved and completed at `/home/stalin/staging/friday`. The alternative `/srv/staging/friday` paths below describe the original preparation procedure, not another installation to create. Do **not** rerun these steps for ordinary continuation; a new staging activation or teardown needs its own scoped authorization.
 
 1. On VM100 create a separate checkout under `/srv/staging/friday`, pin it to a specific, green commit of the **existing PR branch**. Never use `/srv/infrastructure/apps/friday` or any VM102 checkout. Verify commit SHA, image hashes, and free disk.
 2. Under `/srv/staging/friday/deploy/staging`, copy `.env.example` to a **private** `.env` and set the separately obtained `FRIDAY_STAGE_CF_ACCESS_AUD`. Do not use the production Friday AUD or production credentials.
@@ -77,13 +77,13 @@ Do **not** execute these steps now. Once the reviewer and staging Access adminis
 
 ### Rollout gate
 
-The above is a **preparation plan only**. A live staging activation can only occur after the user explicitly approves deploying *this* isolated staging stack and provides the staging application's AUD and permission to install/use a separate tunnel token **on VM100 only**. The production Friday release still requires separate Cloudflare/NPM acceptance, independent security review, a verified root-owned volume backup and copy-only migration, and separate cutover approval. Phase 2C remains disabled.
+The initial staging activation and later token rotation were specifically approved and completed. That approval does not authorize a new activation, teardown, credential rotation or production deployment. Continue with the existing isolated staging stack and the pending acceptance checks. The production Friday release still requires separate Cloudflare/NPM acceptance, independent security review, a verified root-owned volume backup and copy-only migration, and separate cutover approval. Phase 2C remains disabled.
 
 Official Cloudflare docs: [Self-hosted public application](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/self-hosted-public-app/), [tunnel published application route](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/routing-to-tunnel/), [run token-file](https://developers.cloudflare.com/cloudflare-one/networks/connectors/cloudflare-tunnel/configure-tunnels/run-parameters/).
 
 ## Staging reboot recovery (2026-10-13)
 
-The first approved VM100 staging deployment used `restart: "no"` for `friday-staging`. Following a VM100 host reboot on 2026-10-13, Docker restarted the `cloudflared-staging` connector (which already used `unless-stopped`), but left `friday-staging` exited. The controller had to be started manually. Both services now declare `restart: unless-stopped`, so they are eligible to restart when the Docker daemon starts after a host reboot, **unless an operator intentionally stopped them**. This is not a substitute for VM100 host uptime, Docker daemon availability, an independent watchdog, or recovery from a merely unhealthy-but-running process.
+The first approved VM100 staging deployment used `restart: "no"` for `friday-staging`. Following a VM100 host reboot on 2026-10-13, Docker restarted the `cloudflared-staging` connector (which already used `unless-stopped`), but left `friday-staging` exited. The controller had to be started manually. **Candidate source** at `511b9f70e237900fce24cbd0f0099c42c7bb3c97` declares `restart: unless-stopped` for both services; CI #437 passed. **Live app policy application remains pending while VM100 Desktop Commander is offline.** Only after the existing app policy is applied and verified are both live services eligible to restart when the Docker daemon starts after a host reboot, **unless an operator intentionally stopped them**. This is not a substitute for VM100 host uptime, Docker daemon availability, an independent watchdog, or recovery from a merely unhealthy-but-running process.
 
 **Production and Cloudflare caveats:** Do not restart the Docker daemon or reboot VM100 just to test this in production. Use the isolated CI container to confirm its actual Docker restart policy. The currently approved staged instance lives under `/home/stalin/staging/friday`; never apply this Compose file to VM102 or change NPM, the observer, or the Cloudflare Access application.
 

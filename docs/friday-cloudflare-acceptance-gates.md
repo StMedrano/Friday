@@ -1,4 +1,4 @@
-# Friday staging post-login security acceptance — 2026-10-12
+# Friday staging post-login security acceptance — 2026-10-13
 
 **Scope:** `https://friday-staging.mytechtactics.com`, Cloudflare team `mytechtactics.cloudflareaccess.com`, draft PR #29. The user reported the staging dashboard loads after a successful Access sign-in. The private staging controller runs separately from production Friday; **no production release is approved**.
 
@@ -24,9 +24,19 @@ VM100 inspected 2026-10-12: staging healthy, rootless UID 10001, read-only rootf
 - **Logout/expiry:** Only with user approval, navigate to `https://friday-staging.mytechtactics.com/cdn-cgi/access/logout` and confirm login is required again. Cloudflare logout may affect other Access applications. Cloudflare Access is authoritative for session revocation; offline origin JWT signature verification alone cannot determine whether an unexpired token has been revoked. The origin must stay inaccessible except through the protected tunnel.
 - **Independent reviewer:** PR #29 still needs an explicit review by someone independent of implementation and a separate production release approval.
 
-## Credential exposure and rotation — **not authorized yet**
+## Credential rotation — completed with staging-only approval
 
-Earlier user-run `docker run --token ...` commands retained the tunnel token in two **stopped** Docker container configurations. Transferring the correct token to a mode-0400 file on VM100 did **not** rotate/revoke it. Do not print the token, send it to chat/GitHub, or remove/restart production services.
+On 2026-10-12, the two obsolete stopped token-bearing connectors were guardedly verified and removed. On 2026-10-13, the user rotated the staging token in Cloudflare and privately staged its replacement. The approved staging-only cutover replaced the protected token file and recreated only the dedicated cloudflared sidecar. Four tunnel connections, no connection/token errors, internal health 200, origin anonymous 401 and public anonymous trusted-team 302 were verified. The temporary old-token backup and pending replacement were removed. The user then confirmed “I can login”; this is user-reported browser acceptance, not independent authenticated API capture.
+
+These steps are complete; **do not rotate again or recreate the connector merely to repeat this handoff**. This does not establish that all historical external token copies were erased. Production, NPM, Access policy and Phase 2C were unchanged.
+
+## Staging restart fix — verified in code, live application pending
+
+Commit `511b9f70e237900fce24cbd0f0099c42c7bb3c97` makes both staging services use `restart: unless-stopped`. CI #437 passed. The existing live staging app still needs its policy checked and, if unchanged, updated without recreation after VM100 reconnects. VM100 Desktop Commander was offline during the continuation check; no live policy change is claimed. Do not reboot VM100 or Docker for testing. See [staging reboot recovery](cloudflare-friday-staging-vm100.md#staging-reboot-recovery-2026-10-13).
+
+## Historical rotation procedure — for a separately authorized future rotation
+
+Before the completed cleanup, earlier user-run `docker run --token ...` commands retained the tunnel token in two **stopped** Docker container configurations. Merely transferring a token to a mode-0400 file does **not** rotate/revoke it. Do not print the token, send it to chat/GitHub, or remove/restart production services.
 
 Cloudflare recommends a controlled rotation through Zero Trust → Networking → Tunnels → **friday-staging-vm100** → Refresh/Rotate token. The old token cannot establish **new** connections after refresh, but existing tunnel connections remain until restarted. Because there is only **one active staging connector**, plan for brief staging downtime unless a second connector replica is staged. With separate user permission: refresh staging token, install it privately as UID 65532-readable file, recreate only the staging cloudflared sidecar, verify four connections, no-cookie 302 and allowed login, and only then remove obsolete stopped containers (separately approved). In case of trouble, do not touch NPM or VM102 production; restore staging from the approved private configuration.
 

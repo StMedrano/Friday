@@ -1,6 +1,21 @@
 # Friday — Ordered Finish Queue
 
-Work from top to bottom. Do not skip safety prerequisites to reach action features sooner.
+Use the current PR #29 queue first. Older P0–P10 entries below are historical product planning and must not trigger a repeat of completed rollout work. Do not skip safety prerequisites to reach action features sooner.
+
+## Current PR #29 release queue — 2026-10-13
+
+1. Resume existing draft `feat/friday-operator-auth-20261011`, not a new security implementation. Implementation baseline `511b9f70e237900fce24cbd0f0099c42c7bb3c97` passed CI #437.
+2. After VM100 reconnects, inspect only the existing staging app health, policy, ports/mounts and staging checkout. If still `restart: no`, apply the reviewed `unless-stopped` policy to its staging Compose service and existing container without recreation. Preserve the rotated connector. Verify both policies, stage health, anonymous edge protection and adjacent service health. **No Docker/VM reboot for testing; live application is not yet verified.**
+3. Complete an unlisted-identity denial test and sanitized Access log/policy evidence. Complete allowed viewer/API/operator-denial checks and logout/expiry acceptance with the required session-impact approval. Never collect JWTs/cookies or broaden Allow policy to make a test pass.
+4. Obtain a genuine independent review of the final candidate. CI, self-review and user-reported login do not replace this gate.
+5. Complete production Cloudflare/NPM forwarding and origin-isolation acceptance, then a verified offline backup and copy-only non-root volume migration under separate authorization. Do not change the root-owned production volume or deploy this draft directly.
+6. Obtain separate explicit merge and production cutover decisions only after the concrete candidate and release evidence are reviewable. Keep Phase 2C disabled.
+
+Token rotation, obsolete stopped-connector cleanup and post-rotation user-reported login are **complete**. Do not repeat them. VM102 production remains on healthy `friday-release:0fba466`; no production rollout is authorized by this queue.
+
+See [build checkpoint](BUILD_STATUS.md#current-security-release-checkpoint-2026-10-13), [Access acceptance](../friday-cloudflare-acceptance-gates.md), and [staging reboot recovery](../cloudflare-friday-staging-vm100.md#staging-reboot-recovery-2026-10-13).
+
+## Historical product queue
 
 ## P0 — VM100 observer baseline — completed; nic1 example migrated
 
