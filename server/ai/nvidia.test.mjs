@@ -49,3 +49,37 @@ test('HTTP/network/empty response errors are normalized without leaking upstream
   const invalid=createNvidiaProvider({fetchImpl:async()=>new Response('{}')})
   await assert.rejects(invalid.generate({providerConfig:local,request}),e=>e.kind==='invalid-response')
 })
+test('hosted NVIDIA credentials can only be sent to the exact HTTPS API root', async()=>{
+ let sent=0
+ const provider=createNvidiaProvider({fetchImpl:async()=>{sent++;return new Response('{}')}})
+ for(const baseUrl of [
+  'http://integrate.api.nvidia.com/v1',
+  'https://integrate.api.nvidia.com.evil.test/v1',
+  'https://integrate.api.nvidia.com:444/v1',
+  'https://other.example/v1',
+  'https://integrate.api.nvidia.com/v1/unexpected',
+  'https://integrate.api.nvidia.com',
+  'https://integrate.api.nvidia.com/v1?redirect=1',
+ ]) {
+  await assert.rejects(provider.generate({providerConfig:{...hosted,baseUrl},request}),e=>e.kind==='configuration',baseUrl)
+ }
+ assert.equal(sent,0)
+})
+
+test('NVIDIA API requests disallow redirects and never send secrets in URL, response or logs',async()=>{
+ const calls=[]
+ const provider=createNvidiaProvider({fetchImpl:async(url,init)=>{
+  calls.push({url,init})
+  return new Response(JSON.stringify({choices:[{message:{content:'ok'}}]}),{status:200})
+ }})
+ assert.equal((await provider.generate({providerConfig:hosted,request})).text,'ok')
+ assert.equal(calls.length,1)
+ assert.equal(calls[0].init.redirect,'error')
+ assert.equal(calls[0].url.includes('private-secret'),false)
+ assert.equal(JSON.stringify(calls[0].init.body).includes('private-secret'),false)
+})
+
+test('NVIDIA hosted errors never disclose secret or upstream response body',async()=>{
+ const provider=createNvidiaProvider({fetchImpl:async()=>new Response('secret private-secret from upstream',{status:401})})
+ await assert.rejects(provider.generate({providerConfig:hosted,request}),e=>e.kind==='authentication'&&!e.message.includes('private-secret'))
+})

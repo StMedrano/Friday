@@ -7,8 +7,15 @@ function endpoint(providerConfig, path) {
   try {
     const url = new URL(baseUrl)
     if (!['https:', 'http:'].includes(url.protocol) || url.username || url.password || url.search || url.hash) throw Error('invalid url')
-    // Only accept absolute configured API roots; do not let a provider-supplied relative path change origin.
-    return new URL(url.pathname.replace(/\/$/, '') + path, url.origin).toString()
+    // Never send a hosted API key to an env-supplied hostname or an insecure
+    // endpoint. The catalog API uses a single immutable HTTPS origin and /v1 root.
+    if (deployment === 'hosted' && (url.origin !== 'https://integrate.api.nvidia.com' || !['/v1','/v1/'].includes(url.pathname))) {
+      throw Error('untrusted hosted endpoint')
+    }
+    // Local/NIM endpoints are operator-configured, but a URL path must remain
+    // an API root rather than allowing caller-controlled cross-route requests.
+    if (deployment === 'local' && !['/v1','/v1/'].includes(url.pathname)) throw Error('invalid local API root')
+    return new URL('/v1' + path, url.origin).toString()
   } catch {
     throw providerFailure('nvidia', 'configuration')
   }
@@ -45,7 +52,7 @@ export function createNvidiaProvider({ fetchImpl = globalThis.fetch } = {}) {
     id: 'nvidia',
     async health({ providerConfig, signal } = {}) {
       const url = endpoint(providerConfig, '/models')
-      const payload = await send(fetchImpl, url, { method: 'GET', headers: headers(providerConfig), signal })
+      const payload = await send(fetchImpl, url, { method: 'GET', headers: headers(providerConfig), signal, redirect:'error' })
       if (!Array.isArray(payload?.data) || !payload.data.some(m => m?.id === providerConfig.model)) {
         throw providerFailure('nvidia', 'model-unavailable')
       }
@@ -60,7 +67,7 @@ export function createNvidiaProvider({ fetchImpl = globalThis.fetch } = {}) {
       const requested = Number.isSafeInteger(request.maxTokens) && request.maxTokens > 0 ? request.maxTokens : 768
       const configured = Number.isSafeInteger(providerConfig.maxTokens) && providerConfig.maxTokens > 0 ? providerConfig.maxTokens : 768
       const payload = await send(fetchImpl, url, {
-        method: 'POST', headers: headers(providerConfig), signal,
+        method: 'POST', headers: headers(providerConfig), signal, redirect:'error',
         body: JSON.stringify({model:providerConfig.model, messages:request.messages, max_tokens: Math.min(requested,configured)}),
       })
       const text = extractText(payload)

@@ -43,3 +43,31 @@ Health probes `GET /models` for the exact configured model ID; generation sends 
 ## Deployment prerequisites
 
 Phase 1 live acceptance must be documented and verified before exposing or deploying this phase. Tests and code review alone do not establish hosted free-tier eligibility or operational safety.
+## Safe one-request NVIDIA hosted-model verification
+
+The NVIDIA API Catalog documents an OpenAI-compatible `POST https://integrate.api.nvidia.com/v1/chat/completions` endpoint. Friday pins hosted calls to exactly that HTTPS host and `/v1` root, refuses host redirects, and never sends a hosted token to an operator-supplied alternate URL. These guarantees are enforced by the NVIDIA adapter tests. **A key alone does not prove that a model is currently free**; verify eligibility/limits/terms for your account and selected model in the NVIDIA dashboard before running inference. The documented Developer Program is intended for experimentation, not an authorization to use the hosted trial as a commercial production service.
+
+The private smoke test is opt-in and issues **at most one** bounded generation request. It does **not** activate Friday's production model fabric, register a model, call `GET /models`, start any agent, or execute any server action. It never prints your key, provider response body, or any generated text. Avoid putting secrets on the command line or in Git.
+
+On an authorized Linux development machine, save **only your NVIDIA API key** as a private file through a text editor, keeping it out of shell history:
+
+```sh
+umask 077
+mkdir -p "$HOME/.config/friday"
+chmod 700 "$HOME/.config/friday"
+nano "$HOME/.config/friday/nvidia-api.key"
+chmod 600 "$HOME/.config/friday/nvidia-api.key"
+```
+
+From a checkout containing this change, select the exact model ID shown in your NVIDIA API Catalog and run the gated test only after checking it is free for this account:
+
+```sh
+FRIDAY_NVIDIA_ALLOW_ONE_LIVE_TEST=yes \
+FRIDAY_NVIDIA_VERIFIED_FREE=yes \
+FRIDAY_NVIDIA_SMOKE_MODEL=meta/llama-3.1-8b-instruct \
+node scripts/check-nvidia-catalog.mjs
+```
+
+The model ID above is NVIDIA's documented quickstart **example**, not a verified promise that this model remains free or available for the user's account. Substitute your confirmed free-tier model. If the file is absent/insecure, billing has not been verified or explicit consent is missing, the script fails closed **without calling NVIDIA**. On success, it outputs a sanitized model identifier and status. Failures are generic categories; consult NVIDIA usage/limits in your own dashboard. The private file is for local verification only; do **not** deploy it into the browser-facing controller or publicly accessible VM volumes.
+
+A later staged deployment should inject `NVIDIA_API_KEY` from server-only secrets and configure `FRIDAY_NVIDIA_MODELS_JSON`, with the actual verified model ID and an explicit `billingClass: "free"` operator assertion. Keep `FRIDAY_MODEL_FABRIC_ENABLED=false` and `FRIDAY_NVIDIA_ENABLED=false` until Phase 1 and security acceptance are complete. Confirm `GET /v1/models` availability for that account before relying on the current model-fabric health gate; the separate smoke test intentionally avoids depending on that optional catalog API response.
