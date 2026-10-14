@@ -43,8 +43,41 @@ export async function checkNvidiaHosted({
  }finally{key=undefined}
 }
 
+// Read-only readiness is separate from inference consent and billing checks.
+// Catalog availability proves neither successful inference nor worker activation.
+export async function checkNvidiaCatalog({
+ env=process.env,
+ keyFile=keyFileDefault,
+ readFileImpl=readFile,
+ statImpl=stat,
+ fetchImpl=fetch,
+ uid=process.getuid?.(),
+}={}){
+ const notTested={inferenceTested:false}
+ if(env.FRIDAY_NVIDIA_ALLOW_CATALOG_CHECK!=='yes')return {ok:false,reason:'explicit-catalog-consent-required',...notTested}
+ const model=String(env.FRIDAY_NVIDIA_SMOKE_MODEL||'')
+ if(!ID.test(model))return {ok:false,reason:'model-id-not-configured',...notTested}
+ let key
+ try{
+  const meta=await statImpl(keyFile)
+  if(!meta.isFile() || (meta.mode&0o077)!==0 || (uid!==undefined&&meta.uid!==uid))return {ok:false,reason:'private-key-file-required',...notTested}
+  key=String(await readFileImpl(keyFile,'utf8')).trim()
+  if(key.length<20||key.length>4096||/\s/.test(key))return {ok:false,reason:'invalid-key-file',...notTested}
+ }catch{return {ok:false,reason:'private-key-file-required',...notTested}}
+ try{
+  await createNvidiaProvider({fetchImpl}).health({
+   providerConfig:{deployment:'hosted',baseUrl:FIXED_BASE_URL,apiKey:key,model},
+   signal:AbortSignal.timeout(15000),
+  })
+  return {ok:true,reason:'catalog-model-available',model,...notTested}
+ }catch(e){
+  const kinds=['authentication','timeout','rate-limited','upstream','invalid-response','model-unavailable','network','configuration']
+  return {ok:false,reason:'catalog-check-failed',kind:kinds.includes(e?.kind)?e.kind:'unknown',...notTested}
+ }finally{key=undefined}
+}
+
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
- const result=await checkNvidiaHosted()
+ const result=await (process.argv[2]==='--catalog'?checkNvidiaCatalog():checkNvidiaHosted())
  process.stdout.write(JSON.stringify(result)+'\n')
  if(!result.ok)process.exitCode=2
 }

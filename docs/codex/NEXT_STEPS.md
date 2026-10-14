@@ -1,5 +1,19 @@
 # Friday — Ordered Finish Queue
 
+## Feature-first continuation queue — 2026-10-14
+
+This queue reflects the latest operator direction and takes precedence over older release-first ordering below. Keep using PR #33's `feat/friday-group-workspace-20261013`; PR #31 is its design record. Continue source development and tests without changing production or staging.
+
+1. Require passing CI on the latest PR #33 head and retain the operational ledger in BUILD_STATUS. Group display is implemented; private business/work data and new workers remain disconnected.
+2. NVIDIA: use the new read-only catalog check to verify an operator-selected currently advertised model. The first selected model returned `model-unavailable`. Catalog acceptance is not inference or billing verification. Keep hosted inference disabled until account terms and a selected model are verified; the existing one-request inference probe has separate opt-in/free-tier guards.
+3. Plan and implement the next private Web Growth read or trusted group-work slice with explicit actor/project/group bindings before exposing customer/task/memory records. Do not invent backend addresses, credentials, grants or customer state.
+4. HomeLab activation stays read-only and individually scoped. Umbrel container restart is blocked until the actual target and authenticated, allowlisted, durably audited approval workflow are verified. No VM/host/Docker-daemon restart authority is implied.
+5. Track Cloudflare Access logout/relogin as an unresolved functionality defect. Troubleshooting must preserve Access policy and avoid changing live sessions or collecting JWT/cookie values incidentally.
+6. Perform deferred broad independent security review when feature implementation is complete. Before any merge/deployment, satisfy PR #29's remaining identity/session, origin-isolation, backup/migration and explicit cutover gates. Deferral never waives them.
+
+No merge, deployment, live worker activation, private data integration or Umbrel action was performed by this continuation.
+
+
 ## Group workspace release queue — 2026-10-13
 
 1. Obtain independent Task 4 and whole-branch reviews, then publish the separate feature PR stacked on the verified PR #29 candidate. Require passing CI for its exact final head; local checks do not replace CI.

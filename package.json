@@ -16,7 +16,8 @@
     "validate:shared-work-schema": "node scripts/validate-shared-work-schema.mjs supabase/migrations/202610090001_friday_shared_work.sql",
     "test:shared-work-db": "sh scripts/test-shared-work-postgres.sh",
     "validate:fabric-catalog": "node scripts/validate-fabric-catalog.mjs",
-    "verify:fabric-dormant": "node scripts/verify-fabric-dormant.mjs"
+    "verify:fabric-dormant": "node scripts/verify-fabric-dormant.mjs",
+    "check:nvidia-catalog": "node scripts/check-nvidia-catalog.mjs --catalog"
   },
   "dependencies": {
     "@vitejs/plugin-react": "5.2.0",

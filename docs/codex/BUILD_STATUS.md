@@ -1,5 +1,30 @@
 # Friday Build Status
 
+## Feature continuation and operational evidence — 2026-10-14
+
+Continued the existing PR #33 workspace on `feat/friday-group-workspace-20261013`, associated with the approved design in PR #31. Reconciled local `e45cf81` to published `92c2418b55b8ed2fa5f4b63744e69c01b539081a` after confirming both trees equal `df91f55fe5ca1a4f31468c8eeddc3ad3005e7238`; preserved the original local commit in `backup/group-local-e45cf81`. No duplicate implementation branch or PR was created.
+
+### What is operational
+
+| Capability | Evidence and limit |
+| --- | --- |
+| TechTactics/Web Growth, App Builder and HomeLab group screens/API | Implemented and locally tested in draft PR #33. Three groups / 19 roles; only existing Proxmox Observer is bound. New roles are planned definitions. This task did not deploy or establish authenticated live group acceptance. |
+| Private Web Growth leads, send state and customer records | Not connected to groups. No reads, data moves or outreach introduced. |
+| Group work, artifacts and memory | Not connected to the workspace; trusted actor/project/group authorization still required. Phase 2C remains dormant. |
+| HomeLab advisory operation | Existing read-only registry/Proxmox advisory code preserved; this task did not activate or verify live workers/adapters. |
+| NVIDIA readiness tool | New explicit read-only catalog mode, fixed NVIDIA HTTPS GET, private key-file checks, 15-second timeout, redirects refused, no retries or prompt body, sanitized result. Does not change runtime configuration or enable inference. |
+| NVIDIA live check | Private user-configured key file present. One catalog check from the development controller returned `model-unavailable` for `meta/llama-3.1-8b-instruct`. This proves no inference readiness and does not establish that the catalog endpoint authenticated the credential. No model output, key or raw response was logged. |
+| Cloudflare Access logout/relogin | **Unresolved functional regression:** operator reported inability to log back in after logout. No successful reproduction/fix or session acceptance is claimed. Access policies and identity controls were not weakened. |
+| Umbrel restart | **Not operational.** No target discovery or restart occurred. Must await authenticated RBAC, exact verified endpoint/container allowlists, durable audited approval, timeout/idempotency and post-action health verification. PR #32's foundation is separate; membership/model output cannot authorize execution. |
+| Production/staging/main | No deployment, service restart, runtime configuration change, merge or main-branch write in this continuation. Previous production health/rollback evidence below is historical; live health was not revalidated here. |
+
+Broad independent security review is deferred per the operator's feature-completion direction, but release prerequisites remain binding. PR #29 stays separate and draft. Existing checks and dormant boundaries continue to apply; deferral does not authorize an unsafe merge or bypass.
+
+### Verification for this slice
+
+Six catalog-readiness tests failed first for the absent function, then passed with implementation. Existing four inference-consent/redaction tests remained green. Fresh `FRIDAY_DOCKER_SOCKET_GID=999 make verify` passed: 114 frontend tests, 434 Node tests, production TypeScript/Vite build, and base/live/observer Compose configuration checks. No services were started by Compose validation. Exact-head GitHub CI must be checked after publication; prior CI #450 passed on baseline `92c2418`.
+
+
 ## Group workspace candidate — 2026-10-13
 
 Feature branch `feat/friday-group-workspace-20261013` is stacked on PR #29 candidate `138e42f`. This is source implementation evidence, not live deployment or activation. The reviewed Task 3 baseline was `91df14cc6bc125ed55dfb5d55d2670b0d68f2e53`.
