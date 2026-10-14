@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { Bot, ChevronRight, Search } from 'lucide-react'
+import AgentsWorkspaceHeader from './AgentsWorkspaceHeader'
 import {
   askFridayAgent,
   fetchFridayAgentGroups,
@@ -38,6 +40,7 @@ export default function AgentsWorkspace() {
   const [groupsUnavailable, setGroupsUnavailable] = useState(false)
   const [view, setView] = useState('all')
   const [memberId, setMemberId] = useState('')
+  const [roleQuery, setRoleQuery] = useState('')
   const askController = useRef<AbortController | null>(null)
 
   useEffect(() => {
@@ -65,8 +68,14 @@ export default function AgentsWorkspace() {
   const selected = useMemo(() => {
     const id = view === 'all' ? selectedId
       : member?.implementation === 'existing' && member.state !== 'unavailable' ? member.agentId : null
-    return agents.find(agent => agent.id === id) || null
-  }, [agents, selectedId, view, member])
+    const candidate = agents.find(agent => agent.id === id) || null
+    if (view === 'all' && candidate && !(candidate.name + ' ' + candidate.id).toLowerCase().includes(roleQuery.trim().toLowerCase())) return null
+    return candidate
+  }, [agents, selectedId, view, member, roleQuery])
+  const matchesQuery = (name: string, id: string) => (name + ' ' + id).toLowerCase().includes(roleQuery.trim().toLowerCase())
+  const visibleMembers = group?.members.filter(item => matchesQuery(item.name, item.id)) || []
+  const visibleAgents = agents.filter(item => matchesQuery(item.name, item.id))
+  const visibleCount = group ? visibleMembers.length : visibleAgents.length
   const canAsk = !!selected?.enabled && (view === 'all' || member?.state === 'configured')
 
   function clearReply() {
@@ -93,42 +102,42 @@ export default function AgentsWorkspace() {
   }
 
   return <section className="v3-agents-workspace" aria-label="Friday agents workspace">
-    <header className="v3-agents-hero">
-      <div>
-        <span className="v3-kicker">LOCAL AGENT REGISTRY</span>
-        <h2>Friday Agents</h2>
-        <p>Declared groups and Git-backed specialist agents. Configured does not mean running. Advisory only · No actions executed</p>
-      </div>
-      <div className="v3-agent-registry-actions">
-        <span className={`v3-agent-registry-state ${status?.status === 'ok' ? 'online' : ''}`}>
-          {unavailable ? 'Unavailable' : loading ? 'Loading' : status?.status || 'Unknown'}
-        </span>
-      </div>
-    </header>
+    <AgentsWorkspaceHeader workspace={workspace} status={status} loading={loading} unavailable={unavailable}
+      groupsUnavailable={groupsUnavailable} view={view} onViewChange={next => {
+        clearReply(); setView(next); setMemberId(''); setRoleQuery('')
+      }} />
 
-    <div className="v3-agent-authority">
-      <strong>Git is authoritative.</strong> Registry refresh runs during the trusted server startup or through an authenticated operator-only API. The browser cannot initiate a sync.
+    <div className="v3-agent-toolbar">
+      <div><h3>{group?.name || 'Registered agents'}</h3><p>{group ? 'Inspect a role and its declared availability.' : 'Git-backed definitions with advisory access.'}</p></div>
+      <div className="v3-agent-search">
+        <label htmlFor="v3-agent-role-search">Find a role</label>
+        <div><Search size={16} aria-hidden="true" /><input id="v3-agent-role-search" type="search"
+          placeholder="Search roles…" value={roleQuery} maxLength={100} onChange={event => {
+            const value = event.target.value
+            setRoleQuery(value)
+            const current = view === 'all' ? selected : member
+            if (current && !(current.name + ' ' + current.id).toLowerCase().includes(value.trim().toLowerCase())) {
+              clearReply()
+              if (view === 'all') setSelectedId('')
+              else setMemberId('')
+            }
+          }} /></div>
+      </div>
     </div>
-
-    {groupsUnavailable ? <div className="v3-agent-authority" role="status">Group workspace unavailable</div> : null}
-    <nav className="v3-agent-group-controls" aria-label="Agent groups">
-      {workspace?.groups.map(item => <button type="button" key={item.id} aria-pressed={view === item.id}
-        className="v3-agent-primary" onClick={() => { clearReply(); setView(item.id); setMemberId('') }}>
-        {item.name} · {item.members.length} roles
-      </button>)}
-      <button type="button" className="v3-agent-primary" aria-pressed={view === 'all'}
-        onClick={() => { clearReply(); setView('all'); setMemberId('') }}>All registered agents</button>
-    </nav>
-    <div className="v3-agent-authority">Work integration not connected</div>
+    <div className="v3-agent-work-notice"><span>Work integration not connected</span><small>Tasks and shared memory are not available in this workspace yet.</small></div>
+    {roleQuery.trim() && visibleCount === 0 ? <div className="v3-agent-empty" role="status">
+      <Search size={24} aria-hidden="true" /><h3>No matching roles</h3><p>Try another role name or clear your search.</p>
+      <button type="button" className="v3-agent-primary" onClick={() => setRoleQuery('')}>Clear search</button>
+    </div> : null}
     {workspace?.registryStatus === 'unavailable' && !unavailable ? <div className="v3-agent-authority" role="status">Group registry unavailable. Linked members are unavailable.</div> : null}
-    {group ? <div className="v3-agent-layout">
+    {group && visibleMembers.length > 0 ? <div className="v3-agent-layout">
       <aside className="v3-agent-list" aria-label={group.name + ' members'}>
-        {group.members.map(item => <button type="button" key={item.id}
+        {visibleMembers.map(item => <button type="button" key={item.id}
           className={'v3-agent-card ' + (memberId === item.id ? 'selected' : '')} aria-pressed={memberId === item.id}
           onClick={() => { clearReply(); setMemberId(item.id) }}>
-          <span className="v3-agent-dot" aria-hidden="true" />
+          <span className={"v3-agent-dot " + item.state} aria-hidden="true" />
           <span><strong>{item.name}</strong><small>{item.reason}</small></span>
-          <em>{item.state === 'catalogued' ? 'Planned' : item.state === 'configured' ? 'Configured' : item.state === 'disabled' ? 'Disabled' : 'Unavailable'}</em>
+          <em className={'v3-agent-state ' + item.state}>{item.state === 'catalogued' ? 'Planned' : item.state === 'configured' ? 'Configured' : item.state === 'disabled' ? 'Disabled' : 'Unavailable'}</em>
         </button>)}
       </aside>
       {member ? <article className="v3-agent-detail" aria-label="Group member detail">
@@ -136,7 +145,7 @@ export default function AgentsWorkspace() {
         <p>{member.reason}</p>
         <p>{member.agentId ? 'Registry binding: ' + member.agentId : 'Planned role · No registered binding'}</p>
         {!selected ? <button type="button" className="v3-agent-primary" disabled>Ask this agent</button> : null}
-      </article> : <div className="v3-agent-detail">Select a member to inspect its declared availability.</div>}
+      </article> : <div className="v3-agent-detail v3-agent-selection-empty"><Bot size={28} aria-hidden="true" /><h3>Select a role</h3><p>Inspect its availability, scope, and registry binding.</p><span><ChevronRight size={14} aria-hidden="true" />Choose a member from the list</span></div>}
     </div> : null}
 
     {unavailable && !agents.length ? <div className="v3-agent-empty" role="status">
@@ -149,18 +158,18 @@ export default function AgentsWorkspace() {
       <p>Approved Git definitions synchronize from the server; contact an operator if registry setup is pending.</p>
     </div> : null}
 
-    {(view === 'all' ? agents.length > 0 : !!selected) ? <div className={view === 'all' ? 'v3-agent-layout' : 'v3-agent-bound-detail'}>
+    {(view === 'all' ? visibleAgents.length > 0 : !!selected) ? <div className={view === 'all' ? 'v3-agent-layout' : 'v3-agent-bound-detail'}>
       {view === 'all' ? <aside className="v3-agent-list" aria-label="Registered agents">
-        {agents.map((agent) => <button
+        {visibleAgents.map((agent) => <button
           type="button"
           key={agent.id}
           className={`v3-agent-card ${selectedId === agent.id ? 'selected' : ''}`}
           onClick={() => { clearReply(); setSelectedId(agent.id) }}
           aria-pressed={selectedId === agent.id}
         >
-          <span className={`v3-agent-dot ${agent.enabled ? 'online' : ''}`} />
+          <span className={`v3-agent-dot ${agent.enabled ? 'configured' : 'disabled'}`} aria-hidden="true" />
           <span><strong>{agent.name}</strong><small>{agent.description || agent.id}</small></span>
-          <em>{agent.enabled ? 'Configured' : 'Disabled'}</em>
+          <em className={'v3-agent-state ' + (agent.enabled ? 'configured' : 'disabled')}>{agent.enabled ? 'Configured' : 'Disabled'}</em>
         </button>)}
       </aside> : null}
 
@@ -212,5 +221,6 @@ export default function AgentsWorkspace() {
         </div> : null}
       </article> : null}
     </div> : null}
+    <footer className="v3-agent-authority"><strong>Git is authoritative.</strong> Registry refresh runs during trusted server startup or through an authenticated operator-only API. The browser cannot initiate a sync.</footer>
   </section>
 }

@@ -213,3 +213,126 @@ describe('group availability', () => {
     expect(screen.getByRole('button', { name: 'Ask this agent' })).toBeDisabled()
   })
 })
+
+describe('workspace role discovery', () => {
+  it('filters group roles locally, clears hidden detail, and provides a recovery action', async () => {
+    const fetchMock = installFetch()
+    const user = userEvent.setup()
+    render(<AgentsWorkspace />)
+    await user.click(await screen.findByRole('button', { name: 'HomeLab · 7 roles' }))
+    await user.click(screen.getByRole('button', { name: /Proxmox Observer.*Configured/i }))
+    expect(screen.getByText('abc123checksum')).toBeInTheDocument()
+    const calls = fetchMock.mock.calls.length
+    await user.type(screen.getByRole('searchbox', { name: 'Find a role' }), 'network')
+    expect(screen.getByRole('button', { name: /Network Observer.*Planned/i })).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: /Proxmox Observer.*Configured/i })).not.toBeInTheDocument()
+    expect(screen.queryByText('abc123checksum')).not.toBeInTheDocument()
+    expect(fetchMock.mock.calls.length).toBe(calls)
+    await user.clear(screen.getByRole('searchbox', { name: 'Find a role' }))
+    await user.type(screen.getByRole('searchbox', { name: 'Find a role' }), 'no matching role')
+    expect(screen.getByText('No matching roles')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Clear search' }))
+    expect(screen.getByRole('button', { name: /Proxmox Observer.*Configured/i })).toBeInTheDocument()
+  })
+
+  it('resets search on keyboard group navigation and shows truthful configuration summary', async () => {
+    installFetch()
+    const user = userEvent.setup()
+    render(<AgentsWorkspace />)
+    await user.click(await screen.findByRole('button', { name: 'TechTactics · 7 roles' }))
+    await user.type(screen.getByRole('searchbox', { name: 'Find a role' }), 'designer')
+    expect(screen.queryByRole('button', { name: /Scout.*Planned/i })).not.toBeInTheDocument()
+    const home = screen.getByRole('button', { name: 'HomeLab · 7 roles' })
+    home.focus()
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('searchbox', { name: 'Find a role' })).toHaveValue('')
+    expect(screen.getByRole('button', { name: /Container Operations.*Planned/i })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Workspace summary' })).toHaveTextContent('19')
+    expect(screen.getByText('Configured members')).toBeInTheDocument()
+    expect(screen.queryByText(/19 active|19 running/i)).not.toBeInTheDocument()
+  })
+
+  it('filters registered agents without retaining a hidden ask form', async () => {
+    installFetch()
+    const user = userEvent.setup()
+    render(<AgentsWorkspace />)
+    await screen.findByText('abc123checksum')
+    await user.type(screen.getByRole('searchbox', { name: 'Find a role' }), 'does not exist')
+    expect(screen.getByText('No matching roles')).toBeInTheDocument()
+    expect(screen.queryByLabelText('Ask selected agent')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Clear search' }))
+    await user.click(screen.getByRole('button', { name: /Proxmox Observer.*Configured/i }))
+    expect(screen.getByLabelText('Ask selected agent')).toBeInTheDocument()
+  })
+
+  it('announces pending group reads instead of displaying made-up totals', async () => {
+    const fetchMock = installFetch()
+    const original = fetchMock.getMockImplementation()!
+    fetchMock.mockImplementation(async (input, init) => String(input) === '/api/agent-groups'
+      ? new Promise<Response>(() => {})
+      : original(input, init))
+    render(<AgentsWorkspace />)
+    expect(await screen.findByText('Loading group workspace…')).toBeInTheDocument()
+    expect(screen.queryByText('Declared roles')).not.toBeInTheDocument()
+  })
+})
+
+it('cancels pending inference when a role search hides the selected agent', async () => {
+  const fetchMock = installFetch()
+  const original = fetchMock.getMockImplementation()!
+  let resolve!: (response: Response) => void
+  let signal: AbortSignal | undefined
+  fetchMock.mockImplementation(async (input, init) => {
+    if (String(input).endsWith('/ask')) {
+      signal = init?.signal as AbortSignal
+      return new Promise<Response>(done => { resolve = done })
+    }
+    return original(input, init)
+  })
+  const user = userEvent.setup()
+  render(<AgentsWorkspace />)
+  await screen.findByText('abc123checksum')
+  await user.type(screen.getByLabelText('Ask selected agent'), 'Check VM 100')
+  await user.click(screen.getByRole('button', { name: 'Ask this agent' }))
+  await user.type(screen.getByRole('searchbox', { name: 'Find a role' }), 'missing')
+  expect(signal?.aborted).toBe(true)
+  await act(async () => { resolve(jsonResponse({ text: 'Hidden stale reply' })); await Promise.resolve() })
+  expect(screen.queryByText('Hidden stale reply')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Ask selected agent')).not.toBeInTheDocument()
+})
+
+it('keeps advisory-only context visible when group metadata is unavailable', async () => {
+  const fetchMock = installFetch()
+  const original = fetchMock.getMockImplementation()!
+  fetchMock.mockImplementation(async (input, init) => String(input) === '/api/agent-groups'
+    ? jsonResponse({}, 503) : original(input, init))
+  render(<AgentsWorkspace />)
+  await screen.findByText('Group workspace unavailable')
+  expect(screen.getByText('Advisory only · No actions executed')).toBeInTheDocument()
+})
+
+it('does not select a filtered-out agent when delayed registry data arrives', async () => {
+  const fetchMock = installFetch()
+  const original = fetchMock.getMockImplementation()!
+  let resolve!: (response: Response) => void
+  fetchMock.mockImplementation(async (input, init) => String(input) === '/api/agents'
+    ? new Promise<Response>(done => { resolve = done })
+    : original(input, init))
+  const user = userEvent.setup()
+  render(<AgentsWorkspace />)
+  await user.type(screen.getByRole('searchbox', { name: 'Find a role' }), 'network')
+  const networkAgent = { ...agent, id: 'network-observer', name: 'Network Observer' }
+  await act(async () => {
+    resolve(jsonResponse([agent, networkAgent]))
+    await Promise.resolve()
+  })
+  const network = await screen.findByRole('button', { name: /Network Observer.*Configured/i })
+  expect(screen.queryByRole('button', { name: /Proxmox Observer.*Configured/i })).not.toBeInTheDocument()
+  expect(screen.queryByText('abc123checksum')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Ask selected agent')).not.toBeInTheDocument()
+  await user.click(network)
+  expect(screen.getByLabelText('Ask selected agent')).toBeInTheDocument()
+  await user.type(screen.getByLabelText('Ask selected agent'), 'Check network')
+  await user.click(screen.getByRole('button', { name: 'Ask this agent' }))
+  await waitFor(() => expect(fetchMock).toHaveBeenCalledWith('/api/agents/network-observer/ask', expect.objectContaining({ method: 'POST' })))
+})

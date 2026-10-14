@@ -1,5 +1,12 @@
 # Friday — Ordered Finish Queue
 
+## UI continuation checkpoint — 2026-10-14
+
+The group workspace visual/search slice is implemented on the existing PR #33 branch. Local role filtering, readable state/metadata, responsive controls, keyboard focus and reduced-motion-aware interactions are complete in source. Focused UI review findings were fixed with regression tests; 121 frontend / 434 Node tests, build/Compose and Access/dormant fixture checks passed. Check the latest published-head CI before any readiness claim.
+
+Continue with the feature-first queue below. Private integrations and real worker acceptance are still separate. A later shell refinement can address legacy dashboard typography/navigation, but must preserve truthful operation and existing workflows. UI polish does not waive the unresolved Access relogin defect or release/approval requirements.
+
+
 ## Feature-first continuation queue — 2026-10-14
 
 This queue reflects the latest operator direction and takes precedence over older release-first ordering below. Keep using PR #33's `feat/friday-group-workspace-20261013`; PR #31 is its design record. Continue source development and tests without changing production or staging.

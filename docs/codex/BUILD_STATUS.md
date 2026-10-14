@@ -1,5 +1,21 @@
 # Friday Build Status
 
+## UI and role discovery continuation — 2026-10-14
+
+Continued the existing PR #33 implementation branch from `7eb9ccd95f147356b54c30e4cf7cd5b615fd772f` using the TechTactics UI Design workflow. This is source implementation and fixture-preview evidence, not a deployed application update.
+
+- Agents now uses readable 12–16px supporting/field text, a clearer title hierarchy, graphite panels, contextual group icons, state badges and visible selected/focus treatments. Configured markers are static and never imply running workers.
+- Header/summary/navigation presentation is separated into `AgentsWorkspaceHeader.tsx`; counts come from the received catalog and deduplicated configured bindings. Loading/unavailable metadata does not invent totals. Advisory/configuration notices remain visible even when group metadata fails.
+- Local role search filters the current group or registered list by name/ID, without network queries or persisted search. Group changes reset it; no-results offers Clear search. Hiding a selection clears prompt/detail/reply and aborts its pending ask. Delayed registry responses cannot render filtered-out agent detail or an ask form; an explicit visible selection still targets its own endpoint.
+- Motion uses fine-pointer 120ms feedback, optional 180ms opacity entry and a pending-only loading indicator. Reduced motion disables transitions, transforms and spinner animation. Keyboard controls have no sliding movement/delay. No animation library or new dependency.
+- `DESIGN.md` records the existing runtime token owners, workspace styling, responsive behavior and preserved semantic boundaries. Full-shell typography/navigation refinement remains separate.
+- Browser fixture checks at 320, 768, 1024 and 1440px showed no horizontal overflow. Desktop/phone previews, group selection, search, detail selection and keyboard focus were inspected. Sample supporting-text contrast was 6.74:1 / 7.00:1 and search/action control-border contrast 3.27:1. This is bounded verification, not a full WCAG or assistive-technology audit; reduced-motion handling was source-reviewed.
+- Four initial role-discovery tests failed before implementation and passed afterward. Additional cancellation coverage passed. The focused reviewer found a delayed-registry/filter race and loss of advisory copy during group failure; both received failing regressions before fixes and passed the follow-up independent UI review with no remaining actionable findings.
+- Final fresh `FRIDAY_DOCKER_SOCKET_GID=999 make verify` passed **121 frontend / 434 Node tests**, TypeScript/Vite build and three Compose configs. Postbuild signed Access fixture checks **6/6** and fabric dormant verification passed. Source scope is UI + design/handoff docs; no API/auth/runtime configuration changed. Exact published-head CI must be checked separately.
+
+Production, staging and main were not changed. Private Web Growth/customer/work/memory connections, live worker acceptance, NVIDIA inference verification, Access logout/relogin and authenticated allowlisted audited Umbrel approval remain unresolved as recorded below.
+
+
 ## Feature continuation and operational evidence — 2026-10-14
 
 Continued the existing PR #33 workspace on `feat/friday-group-workspace-20261013`, associated with the approved design in PR #31. Reconciled local `e45cf81` to published `92c2418b55b8ed2fa5f4b63744e69c01b539081a` after confirming both trees equal `df91f55fe5ca1a4f31468c8eeddc3ad3005e7238`; preserved the original local commit in `backup/group-local-e45cf81`. No duplicate implementation branch or PR was created.
