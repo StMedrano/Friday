@@ -57,3 +57,7 @@ Verification evidence belongs in `docs/codex/BUILD_STATUS.md` and the PR descrip
 GroupAdvisory owns a separate single-brief Friday proposal, not a registered specialist conversation. It is keyed to the exact group, has a visible task label, explicit submit/example controls, actual provider provenance and unavailable/retry states. Proposal output is advisory and not stored in shared work. Source backend policy, not a browser group label, constrains model behavior.
 
 HomeLabSnapshot owns current GET overview evidence and manual refresh. Pending refresh removes old evidence; failure never looks healthy. Mock mode is explicitly labeled. The service list owns its bounded native scroll region and keyboard focus; body scrolling remains natural. Group tools stack below 1200px and retain workspace text, field, focus and reduced-motion rules.
+
+## Private Web Growth evidence
+
+TechTactics has pipeline counts, selectable records, explicit refresh and source evidence. Permission/missing/malformed states remain explicit, failed refresh clears stale data. Private data never joins AI prompts. No send/approval/stage controls. Names/headings wrap, mobile list/detail stack,44px targets and visible keyboard focus preserve the existing workspace design. Source revision is reported, not verified.

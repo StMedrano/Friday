@@ -339,3 +339,30 @@ export async function fetchHomeLabEvidence(signal?: AbortSignal): Promise<HomeLa
     return { mode: body.mode, generatedAt: body.generatedAt, services, incidents }
   } catch { throw failure() }
 }
+
+export type WebGrowthLead = {
+ id: string; businessName: string; stage: string; discoveredAt: string; updatedAt: string
+ approvedForOutreach: boolean; approvedOutreachGeneratedAt: string | null
+ outreachStatus: string | null; outreachSentAt: string | null; score: number | null
+ auditCheckedAt: string | null; proposalAvailable: boolean; demoAvailable: boolean
+}
+export type WebGrowthSnapshot = {schemaVersion: '1'; projectId: 'techtactics-web-growth'; generatedAt: string; sourceRevision: string; sourceChecksum: string; leads: WebGrowthLead[]}
+export async function fetchWebGrowthSnapshot(signal?: AbortSignal): Promise<WebGrowthSnapshot> {
+ const failure=()=>new Error('Web Growth connection unavailable')
+ const response=await fetch('/api/web-growth',{method:'GET',signal:signal?AbortSignal.any([signal,AbortSignal.timeout(15000)]):AbortSignal.timeout(15000)})
+ if(response.status===403)throw Error('Reader permission required. Ask the owner to grant access to this project.')
+ if(response.status===401)throw Error('Sign in required to read this project.')
+ if(!response.ok)throw failure()
+ const body=await response.json()
+ const text=(x:unknown,max:number)=>typeof x==='string'&&x.trim().length>0&&x.length<=max
+ const date=(x:unknown)=>typeof x==='string'&&Number.isFinite(Date.parse(x))
+ const optionalDate=(x:unknown)=>x===null||date(x)
+ if(body?.schemaVersion!=='1'||body.projectId!=='techtactics-web-growth'||!date(body.generatedAt)||!text(body.sourceRevision,40)||! /^[a-f0-9]{7,40}$/.test(body.sourceRevision)||!text(body.sourceChecksum,64)||! /^[a-f0-9]{64}$/.test(body.sourceChecksum)||!Array.isArray(body.leads)||body.leads.length>1000)throw failure()
+ const ids=new Set<string>()
+ const leads=body.leads.map((lead:WebGrowthLead)=>{
+  if(!lead||!text(lead.id,128)||ids.has(lead.id)||!text(lead.businessName,256)||!['new','audited','qualified','demo_ready','approved','contacted','responded','proposal','won','lost'].includes(lead.stage)||!date(lead.discoveredAt)||!date(lead.updatedAt)||typeof lead.approvedForOutreach!=='boolean'||!optionalDate(lead.approvedOutreachGeneratedAt)||!(lead.outreachStatus===null||['pending','needs_review','sent'].includes(lead.outreachStatus))||!optionalDate(lead.outreachSentAt)||!(lead.score===null||(typeof lead.score==='number'&&Number.isFinite(lead.score)&&lead.score>=0&&lead.score<=100))||!optionalDate(lead.auditCheckedAt)||typeof lead.proposalAvailable!=='boolean'||typeof lead.demoAvailable!=='boolean')throw failure()
+  ids.add(lead.id)
+  return {id:lead.id,businessName:lead.businessName,stage:lead.stage,discoveredAt:lead.discoveredAt,updatedAt:lead.updatedAt,approvedForOutreach:lead.approvedForOutreach,approvedOutreachGeneratedAt:lead.approvedOutreachGeneratedAt,outreachStatus:lead.outreachStatus,outreachSentAt:lead.outreachSentAt,score:lead.score,auditCheckedAt:lead.auditCheckedAt,proposalAvailable:lead.proposalAvailable,demoAvailable:lead.demoAvailable}
+ })
+ return {schemaVersion:'1',projectId:'techtactics-web-growth',generatedAt:body.generatedAt,sourceRevision:body.sourceRevision,sourceChecksum:body.sourceChecksum,leads}
+}

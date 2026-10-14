@@ -269,3 +269,9 @@ Successful output includes `available:true`, the exact `groupId`, text, actual m
 ## HomeLab workspace observation panel
 
 Consumes the existing protected GET /api/overview with a bounded timeout. The client projects mode/timestamp, validated service identity/status/detail and incident summaries. It retains exact source identifiers, labels mock data as demo, clears old evidence on refresh, and shows unavailable on HTTP/schema/timeouts instead of substituting mock success. Refresh is an explicit read; there is no mutation or restart control.
+
+## Private Web Growth projection
+
+GET `/api/web-growth` requires live mode, signed Access and an explicit exact email in `FRIDAY_WEB_GROWTH_READER_EMAILS`. Group/operator status alone grants nothing. Queries rejected400, writes405 (same-origin guard may deny earlier), ungranted actor403, invalid Access401/unconfigured503, disabled/unavailable/malformed reader503. No-store, no mock private records, no empty fallback. Defaults are disabled/empty grants.
+
+Reader URL is HTTPS origin-only with no embedded credentials/query/path. Server-only token, fixed GET `/v1/friday/web-growth`, no redirects, eight-second timeout, 1MiB streamed response bound. Canonical snapshot: schemaVersion1, projectId techtactics-web-growth, generatedAt, reported sourceRevision hex7–40, original-byte SHA256 sourceChecksum, max1000 unique leads. Lead projection contains id/businessName/stage, discoveredAt/updatedAt, recorded approval/send flags/timestamps, nullable0–100score/auditCheckedAt and proposal/demo availability. No contact/address/messages/notes/sales text/credentials. Invalid record rejects entire snapshot. Reported revision is not deployment attestation; read timestamp is not record freshness. Companion source/configuration prerequisites are documented in `integrations/web-growth-reader/README.md`.

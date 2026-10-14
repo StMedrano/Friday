@@ -1,5 +1,12 @@
 # Friday — Ordered Finish Queue
 
+## Web Growth private connection checkpoint — 2026-10-14
+
+The protected read-only reader/Friday adapter/UI is implemented in PR #33 source, disabled by default. The identified VM100 service currently has anonymous reads and write routes; do not connect Friday to its raw API. VM100 remains inaccessible for verified deployment inspection. Next activation work must verify actual lead-file path/schema/revision and writer replacement strategy, establish reviewed private TLS reader transport and private token, approve named reader emails, then verify signed Access allowed/denied reads and no writes on a separately approved candidate. Do not treat public source or fixture tests as deployed security evidence. The original anonymous service needs its own authentication/write permission fix.
+
+Continue trusted work/project bindings before task/artifact persistence; no model or group membership may grant private access. Preserve Access relogin tracking, NVIDIA inference checks and authenticated allowlisted durable approval/audit prerequisites for Umbrel. No deployment/merge is included in this source continuation.
+
+
 ## Connected feature checkpoint — 2026-10-14
 
 Group-level Friday proposals and HomeLab read/refresh evidence are implemented in PR #33. A public App Builder brief succeeded through the configured Groq provider; browser fixture flow and isolated Access/invalid-body/quota tests verify the new route. These are advisory features, not autonomous specialists or deployment evidence.

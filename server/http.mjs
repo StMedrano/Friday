@@ -1,3 +1,5 @@
+import { readWebGrowth } from './adapters/web-growth.mjs'
+import { validateWebGrowthSnapshot } from './adapters/web-growth-schema.mjs'
 import { createServer } from 'node:http'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { createReadStream, existsSync, statSync } from 'node:fs'
@@ -162,6 +164,7 @@ export function createFridayServer({
   agentService = null,
   buildOverviewImpl = buildOverview,
   answerAssistantImpl = answerAssistant,
+  readWebGrowthImpl = readWebGrowth,
   verifyAccessImpl = createCloudflareAccessVerifier(),
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
@@ -226,6 +229,19 @@ export function createFridayServer({
         }
         accessUsage.set(key,state)
       }
+    }
+
+    if (url.pathname === '/api/web-growth') {
+      // A fixed private project grant is separate from group membership/operator role.
+      // Never connect private business data in the unauthenticated demo mode.
+      if (!authenticatedIdentity || config.mode !== 'live') return json(response,503,{error:'web-growth-authentication-required'})
+      if (!config.webGrowth?.readerEmails?.includes(authenticatedIdentity.email)) return json(response,403,{error:'web-growth-reader-required'})
+      if (request.method !== 'GET') return json(response,405,{error:'read-only-endpoint'})
+      if (url.search) return json(response,400,{error:'unexpected-query'})
+      if (config.webGrowth.enabled !== true) return json(response,503,{error:'web-growth-unavailable'})
+      try {
+        return json(response,200,validateWebGrowthSnapshot(await readWebGrowthImpl(config.webGrowth)))
+      } catch { return json(response,503,{error:'web-growth-unavailable'}) }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/agent-groups') {

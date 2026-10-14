@@ -1,3 +1,4 @@
+import WebGrowthWorkspace from './WebGrowthWorkspace'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bot, ChevronRight, Search } from 'lucide-react'
 import AgentsWorkspaceHeader from './AgentsWorkspaceHeader'
@@ -135,6 +136,7 @@ export default function AgentsWorkspace() {
     {group ? <div className={'v3-group-tools ' + (group.id === 'homelab' ? 'with-evidence' : '')}>
       <GroupAdvisory key={group.id} groupId={group.id} groupName={group.name}/>
       {group.id === 'homelab' ? <HomeLabSnapshot/> : null}
+      {group.id === 'techtactics' ? <WebGrowthWorkspace/> : null}
     </div> : null}
     {group && visibleMembers.length > 0 ? <div className="v3-agent-layout">
       <aside className="v3-agent-list" aria-label={group.name + ' members'}>

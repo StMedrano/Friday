@@ -34,7 +34,7 @@ export default function GroupAdvisory({ groupId, groupName }: { groupId: string;
     <span className="v3-kicker">FRIDAY ADVISORY</span>
     <h3>Work through a task with {groupName}</h3>
     <p>Friday can propose a plan or draft from your brief. This is not a running specialist and does not execute work.</p>
-    <p className="v3-group-privacy">Use non-sensitive task context. Existing AI provider settings apply; private records and shared memory are not connected.</p>
+    <p className="v3-group-privacy">Use non-sensitive task context. Existing AI provider settings apply; private records are not included in proposals and shared memory is not connected.</p>
     <form className="v3-agent-ask" onSubmit={submit}>
       <label htmlFor="v3-group-brief">Describe the task</label>
       <textarea id="v3-group-brief" value={prompt} onChange={event => setPrompt(event.target.value)}
