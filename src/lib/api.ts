@@ -273,3 +273,69 @@ export async function fetchFridayAgentGroups(signal?: AbortSignal): Promise<Grou
     throw groupUnavailable()
   }
 }
+
+export type GroupAdvice = FridayAssistantResponse & {
+  available: true
+  groupId: string
+  execution: FridayAgentExecution
+}
+
+export async function askFridayGroup(groupId: string, prompt: string, signal?: AbortSignal): Promise<GroupAdvice> {
+  const failure = () => new Error('Group advice unavailable. Check the configured AI provider and try again.')
+  try {
+    const response = await fetch('/api/group-advisory', {
+      method: 'POST', headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ groupId, prompt }),
+      signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(120000)]) : AbortSignal.timeout(120000),
+    })
+    const body = await response.json()
+    if (!response.ok || body?.available !== true || body.groupId !== groupId ||
+        body.execution?.performed !== false || !['cloud-ai', 'local-ai'].includes(body.mode) ||
+        typeof body.text !== 'string' || !body.text.trim() || body.text.length > 64000 ||
+        typeof body.provider !== 'string' || body.provider.length > 80 ||
+        (body.model != null && (typeof body.model !== 'string' || body.model.length > 256)) ||
+        (body.fallbackUsed !== undefined && typeof body.fallbackUsed !== 'boolean') ||
+        (body.attempts !== undefined && (!Array.isArray(body.attempts) || body.attempts.length > 10 ||
+          !body.attempts.every((item: Record<string, unknown>) => item && typeof item.provider === 'string' &&
+            item.provider.length <= 80 && typeof item.outcome === 'string' && item.outcome.length <= 80)))) throw failure()
+    return { available: true, groupId, text: body.text, mode: body.mode, provider: body.provider,
+      model: body.model, fallbackUsed: body.fallbackUsed, attempts: body.attempts,
+      execution: { performed: false, reason: 'Friday group assistance is advisory only.' } }
+  } catch { throw failure() }
+}
+
+export type HomeLabEvidence = {
+  mode: 'mock' | 'live'
+  generatedAt?: string
+  services: Array<{ id: string; name: string; host: string; status: string; detail: string }>
+  incidents: Array<{ id: string; title: string; detail: string; status: string; severity: string }>
+}
+
+export async function fetchHomeLabEvidence(signal?: AbortSignal): Promise<HomeLabEvidence> {
+  const failure = () => new Error('HomeLab observations unavailable')
+  try {
+    const response = await fetch('/api/overview', {
+      method: 'GET', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
+    })
+    const body = await response.json()
+    const text = (value: unknown, max = 2000) => typeof value === 'string' && value.length <= max
+    if (!response.ok || !['mock', 'live'].includes(body?.mode) || !Array.isArray(body.services) || body.services.length > 1000 ||
+        (body.incidents !== undefined && (!Array.isArray(body.incidents) || body.incidents.length > 1000)) ||
+        (body.generatedAt !== undefined && (!text(body.generatedAt, 64) || !Number.isFinite(Date.parse(body.generatedAt))))) throw failure()
+    const ids = new Set<string>()
+    const services = body.services.map((item: Record<string, unknown>) => {
+      if (!item || !text(item.id, 256) || !item.id || ids.has(item.id as string) || !text(item.name, 256) || !item.name ||
+          !text(item.host, 256) || !text(item.detail) || !['online', 'degraded', 'offline', 'maintenance'].includes(item.status as string)) throw failure()
+      ids.add(item.id as string)
+      return { id: item.id as string, name: item.name as string, host: item.host as string, detail: item.detail as string, status: item.status as string }
+    })
+    ids.clear()
+    const incidents = (body.incidents || []).map((item: Record<string, unknown>) => {
+      if (!item || !text(item.id, 256) || !item.id || ids.has(item.id as string) || !text(item.title, 256) ||
+          !text(item.detail) || !['open', 'resolved'].includes(item.status as string) || !['high', 'warning', 'info'].includes(item.severity as string)) throw failure()
+      ids.add(item.id as string)
+      return { id: item.id as string, title: item.title as string, detail: item.detail as string, status: item.status as string, severity: item.severity as string }
+    })
+    return { mode: body.mode, generatedAt: body.generatedAt, services, incidents }
+  } catch { throw failure() }
+}

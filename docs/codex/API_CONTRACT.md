@@ -252,3 +252,20 @@ separately before application to homelab production. This does not change
 the local-Ollama-only matched-agent contract or introduce an executor.
 
 See `docs/shared-work-phase2b.md`.
+## POST /api/group-advisory
+
+Authenticated non-executing Friday assistance for fixed public groups. This does not invoke a registered specialist or activate Phase 2C. Same-origin and the existing shared per-identity inference quota apply; live mode fails closed without verified Access identity.
+
+Request has exactly two fields:
+```json
+{"groupId":"app-builder","prompt":"Propose an implementation and QA plan for a booking app."}
+```
+Allowed group IDs are `techtactics`, `app-builder`, `homelab`; prompt is a nonempty string of at most 4000 characters. Actor, role, system-prompt, assignment, tool and history fields are rejected. Fixed server policy owns the group brief.
+
+TechTactics/App Builder receive no infrastructure snapshot or private business records. HomeLab receives fresh normalized overview evidence. The existing configured AI providers are tried sequentially; NVIDIA activation/provider configuration is unchanged. A deterministic infrastructure fallback is not a generated group plan and returns unavailable.
+
+Successful output includes `available:true`, the exact `groupId`, text, actual mode/provider/model and optional fallback provenance. `execution.performed` is always false. No shared work is created or stored, no private-data grant is inferred and no action is performed. Invalid brief returns 400, denied Access/origin/quota returns 401/403/429, unavailable AI returns 503, and internal failure returns a sanitized 502. Responses are no-store.
+
+## HomeLab workspace observation panel
+
+Consumes the existing protected GET /api/overview with a bounded timeout. The client projects mode/timestamp, validated service identity/status/detail and incident summaries. It retains exact source identifiers, labels mock data as demo, clears old evidence on refresh, and shows unavailable on HTTP/schema/timeouts instead of substituting mock success. Refresh is an explicit read; there is no mutation or restart control.

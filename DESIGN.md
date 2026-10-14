@@ -51,3 +51,9 @@ Pointer feedback is gated to hover-capable fine pointers. Pressed scale is .985 
 This continuation migrates the group workspace's tiny 7–10px labels to readable type. The older dashboard shell retains its established sizing and unrelated visuals; a full shell typography/navigation audit is a later bounded slice. The group workspace uses meaningful surface hierarchy and quiet dividers without decorative gradients or glass blur.
 
 Verification evidence belongs in `docs/codex/BUILD_STATUS.md` and the PR description. Browser fixture previews do not prove authenticated live acceptance or a complete WCAG audit.
+
+## Connected group tools
+
+GroupAdvisory owns a separate single-brief Friday proposal, not a registered specialist conversation. It is keyed to the exact group, has a visible task label, explicit submit/example controls, actual provider provenance and unavailable/retry states. Proposal output is advisory and not stored in shared work. Source backend policy, not a browser group label, constrains model behavior.
+
+HomeLabSnapshot owns current GET overview evidence and manual refresh. Pending refresh removes old evidence; failure never looks healthy. Mock mode is explicitly labeled. The service list owns its bounded native scroll region and keyboard focus; body scrolling remains natural. Group tools stack below 1200px and retain workspace text, field, focus and reduced-motion rules.

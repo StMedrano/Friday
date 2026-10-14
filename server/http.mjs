@@ -10,6 +10,7 @@ import { normalizeAssistantHistory, validateAssistantPrompt } from './assistant-
 import { validateAgentId, validateAgentPrompt, validateRegistrySyncBody } from './agents/input.mjs'
 import {createCloudflareAccessVerifier} from './security/cloudflare-access.mjs'
 import { getGroupWorkspace } from './agents/group-workspace.mjs'
+import { groupAdvisoryPolicy } from './agents/group-advisory.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -210,7 +211,7 @@ export function createFridayServer({
       // Small process-local resource guard; deployed ingress must also apply
       // distributed request quotas and abusive-client controls.
       const isExpensive=request.method==='POST'&&(
-        url.pathname==='/api/assistant'||url.pathname==='/api/agents/route'||
+        url.pathname==='/api/assistant'||url.pathname==='/api/group-advisory'||url.pathname==='/api/agents/route'||
         /^\/api\/agents\/[^/]+\/ask$/.test(url.pathname)||isOperatorMutation)
       if (isExpensive) {
         const time=Date.now()
@@ -368,6 +369,45 @@ export function createFridayServer({
         return json(response, result.accepted ? 200 : 400, result)
       } catch (error) {
         return json(response, 400, { accepted: false, mode: 'preview', reason: error.message })
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/group-advisory') {
+      const execution = { performed: false, reason: 'Friday group assistance is advisory only.' }
+      if (config.mode !== 'mock' && !authenticatedIdentity) {
+        return json(response, 503, { available: false, error: 'access-unconfigured', execution })
+      }
+      let body
+      try { body = await readBody(request) } catch {
+        return json(response, 400, { available: false, error: 'invalid-brief', execution })
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body) ||
+          Object.keys(body).length !== 2 || typeof body.groupId !== 'string' || typeof body.prompt !== 'string' ||
+          !Object.hasOwn(body, 'groupId') || !Object.hasOwn(body, 'prompt')) {
+        return json(response, 400, { available: false, error: 'invalid-brief', execution })
+      }
+      const systemPrompt = groupAdvisoryPolicy(body.groupId)
+      const validated = validateAssistantPrompt(body.prompt)
+      if (!systemPrompt || !validated.ok) {
+        return json(response, 400, { available: false, error: 'invalid-brief', execution })
+      }
+      try {
+        const overview = body.groupId === 'homelab'
+          ? await currentOverview({ config, monitoringRuntime, buildOverviewImpl }) : {}
+        const result = await answerAssistantImpl({ config, prompt: validated.prompt, overview, systemPrompt })
+        if (!result.available || result.mode === 'local-analysis') {
+          return json(response, 503, { available: false, groupId: body.groupId,
+            reason: 'Group advice requires an available AI provider. No plan was generated.', execution })
+        }
+        if (typeof result.text !== 'string' || !result.text.trim() ||
+            !['cloud-ai', 'local-ai'].includes(result.mode)) {
+          return json(response, 502, { available: false, error: 'group-advice-unavailable', execution })
+        }
+        return json(response, 200, { available: true, groupId: body.groupId,
+          text: result.text, mode: result.mode, provider: result.provider, model: result.model,
+          fallbackUsed: result.fallbackUsed, attempts: result.attempts, execution })
+      } catch {
+        return json(response, 502, { available: false, error: 'group-advice-unavailable', execution })
       }
     }
 

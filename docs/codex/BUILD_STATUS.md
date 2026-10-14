@@ -1,5 +1,23 @@
 # Friday Build Status
 
+## Connected group tools — 2026-10-14
+
+Continued PR #33 from `1ec70281ab44c2daf939306537e18fb5a9cf07ae`. The groups now have an operational **source** path for requesting Friday proposals and viewing HomeLab evidence, rather than only role metadata.
+
+- App Builder: operator brief -> protected group-advisory API -> existing sequential AI providers -> proposed requirements/architecture/implementation/QA advice with actual model provenance.
+- TechTactics/Web Growth: website audit/service/outreach draft advice through the same fixed-policy API. Existing leads, customer/approval/send state remain disconnected; no customer outreach or record writes.
+- HomeLab: current service/incident panel from the existing overview API, timestamp and explicit refresh, honest mock/unavailable states; group advice uses fresh normalized infrastructure state. No infrastructure actions.
+- Planned specialists remain planned. This is Friday assistance, not role execution, a worker scheduler, shared work/memory persistence, private-data authorization or a deployed agent activation.
+- POST /api/group-advisory accepts only fixed group ID and bounded prompt; rejects browser-supplied authority/context fields; preserves signed Access, same-origin and shared inference quota. Live unconfigured Access fails closed. No deterministic fallback is mislabeled as a business plan. New result metadata is projected/validated, with execution=false.
+- HomeLab client validates and projects only displayed evidence, clears stale snapshots before refresh, supports explicit retry and exposes a keyboard-focusable services scroller. Group navigation aborts client waits/discards late replies. Provider work already in progress may finish within existing server timeouts; browser cancellation is not an executor cancellation claim.
+- Six new HTTP tests failed before implementation and passed afterward. Seven component tests and a group-wiring test cover generation/provenance, no automatic inference, retry, invalid response, isolation, cancellation, refresh failure and mock/malformed evidence. Two minor review findings (fallback metadata validation and scroller focus) received failing regressions before fixes; follow-up review had no remaining actionable findings.
+- Full local verification: **129 frontend / 441 Node tests**, production build and three Compose validations passed. Postbuild signed Access 6/6 and dormant checks passed. The new route also passed a real synthetic signed-JWT HTTP acceptance test. Two pre-existing Dashboard act warnings (also present on baseline) remain test-harness warnings, not failures. These include fixtures, not live Access acceptance.
+- **Live provider smoke:** one public toy to-do app brief, no customer or infrastructure data, through the existing privately configured Groq adapter with App Builder server policy. Returned cloud-ai, `openai/gpt-oss-20b`, 2347 characters, no fallback; no key/raw model output logged. Confirms generation, not the correctness of a real customer project or authenticated browser acceptance. NVIDIA inference remains unverified.
+- Browser end-to-end fixture preview used the actual Friday HTTP route/library and built UI with synthetic providers/records. Proposal submission/provenance, group isolation, HomeLab read/refresh and mock labels worked. It did not alter or connect deployed services.
+
+Production, staging, main, lead stores, database grants and workers were unchanged. Access logout/relogin remains unresolved; Umbrel restart still requires the authenticated allowlisted durable approval/audit workflow. Broad independent security review remains deferred but mandatory before release. This candidate is not deployed; publish/CI evidence belongs in PR #33.
+
+
 ## UI and role discovery continuation — 2026-10-14
 
 Continued the existing PR #33 implementation branch from `7eb9ccd95f147356b54c30e4cf7cd5b615fd772f` using the TechTactics UI Design workflow. This is source implementation and fixture-preview evidence, not a deployed application update.

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Bot, ChevronRight, Search } from 'lucide-react'
 import AgentsWorkspaceHeader from './AgentsWorkspaceHeader'
+import GroupAdvisory from './GroupAdvisory'
+import HomeLabSnapshot from './HomeLabSnapshot'
 import {
   askFridayAgent,
   fetchFridayAgentGroups,
@@ -130,6 +132,10 @@ export default function AgentsWorkspace() {
       <button type="button" className="v3-agent-primary" onClick={() => setRoleQuery('')}>Clear search</button>
     </div> : null}
     {workspace?.registryStatus === 'unavailable' && !unavailable ? <div className="v3-agent-authority" role="status">Group registry unavailable. Linked members are unavailable.</div> : null}
+    {group ? <div className={'v3-group-tools ' + (group.id === 'homelab' ? 'with-evidence' : '')}>
+      <GroupAdvisory key={group.id} groupId={group.id} groupName={group.name}/>
+      {group.id === 'homelab' ? <HomeLabSnapshot/> : null}
+    </div> : null}
     {group && visibleMembers.length > 0 ? <div className="v3-agent-layout">
       <aside className="v3-agent-list" aria-label={group.name + ' members'}>
         {visibleMembers.map(item => <button type="button" key={item.id}

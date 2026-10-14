@@ -1,5 +1,16 @@
 # Friday — Ordered Finish Queue
 
+## Connected feature checkpoint — 2026-10-14
+
+Group-level Friday proposals and HomeLab read/refresh evidence are implemented in PR #33. A public App Builder brief succeeded through the configured Groq provider; browser fixture flow and isolated Access/invalid-body/quota tests verify the new route. These are advisory features, not autonomous specialists or deployment evidence.
+
+1. Check exact published-head CI and keep draft until release gates are met.
+2. Obtain authenticated live UI/read acceptance on an approved deployed candidate; do not infer deployment from source or provider smoke.
+3. Next business slice: authenticate and project the existing Web Growth read backend before exposing leads/approval/send state. Backend address/auth/read contract must be verified; no fabricated customer data or unsafe proxy.
+4. Next work slice: trusted actor/project/group bindings and reviewed private work APIs before durable tasks/artifacts/memory. Proposals currently remain browser-only.
+5. Preserve unresolved Access relogin, NVIDIA inference, worker activation and audited Umbrel action prerequisites. No incidental production/staging change or security bypass is authorized.
+
+
 ## UI continuation checkpoint — 2026-10-14
 
 The group workspace visual/search slice is implemented on the existing PR #33 branch. Local role filtering, readable state/metadata, responsive controls, keyboard focus and reduced-motion-aware interactions are complete in source. Focused UI review findings were fixed with regression tests; 121 frontend / 434 Node tests, build/Compose and Access/dormant fixture checks passed. Check the latest published-head CI before any readiness claim.
