@@ -6,9 +6,11 @@ Use local `C:/Users/medra/Documents/Codex/Friday` on `feat/friday-group-workspac
 
 1. Publish and verify this monitoring checkpoint on PR33 without force-push; preserve PR29 security dependency and PR31 design record.
 2. Keyboard focus containment/restoration and explicit bounded monitoring-history refresh/recovery are implemented with regressions. Preserve shared Home/Incidents state, stale clearing and distinct unavailable/demo states; check exact final-head CI rather than repeating completed UI work.
-3. Continue approved trusted project/actor bindings and persistence work through isolated development fixtures; public record APIs/real user storage require the explicit reviewed identity/project mapping and retention design. Group/model output grants no authority. Existing Phase2B internal services and Phase2C dormant policy must not be bypassed or duplicated.
+3. Pure internal identity/project-to-ActorContext mapping is now implemented and tested; do not duplicate it. Obtain the verified owner email and actual provisioned project IDs requested from the operator, then review the separate HTTP/storage boundary and retention/access design before exposing private work/conversation/memory records. No runtime wiring or real grants exist yet. Group/model output grants no authority. Reuse existing Phase2B services; keep Phase2C dormant.
 4. Complete remaining provider/model compatibility and feature UI work with source/fixture versus live evidence recorded separately. Do not read configured remote servers or activate inference during this local-only task.
 5. Before production review, record incomplete live Access relogin/role/origin acceptance, deployment transport/grants for Web Growth, backup/rollback and migration gates. No merge/deploy or HomeLab commands are authorized. Docker/make/database gates need a working local isolated runtime or exact-head CI; do not install/reconfigure system services incidentally.
+
+CI474 at recovery640b4e9 failed because its hosted runner ran out of disk while downloading the Trivy vulnerability database. Tests/build and preceding gates passed, but the scan is unverified. Keep the unchanged vulnerability gate and require a successful fresh exact-head run; never label the failed scan a clean vulnerability result.
 
 ## Web Growth private connection checkpoint — 2026-10-14
 
