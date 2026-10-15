@@ -61,7 +61,8 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => {
-    if (active !== 'Incidents' && (active !== 'Overview' || !connected || overview.mode !== 'live')) return
+    // Share one authenticated history read across Home and Incidents navigation.
+    if (!connected || overview.mode !== 'live') return
     const controller = new AbortController()
     setHistory([])
     setHistoryLoading(true)
@@ -76,7 +77,7 @@ export default function Dashboard() {
       })
       .finally(() => { if (!controller.signal.aborted) setHistoryLoading(false) })
     return () => controller.abort()
-  }, [active, connected, overview.mode])
+  }, [connected, overview.mode])
 
   useEffect(() => {
     if (active !== 'Overview') return
