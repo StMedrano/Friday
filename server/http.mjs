@@ -163,6 +163,7 @@ export function createFridayServer({
   monitoringRuntime = null,
   agentRegistryService = null,
   agentService = null,
+  projectTasks = null,
   buildOverviewImpl = buildOverview,
   answerAssistantImpl = answerAssistant,
   readWebGrowthImpl = readWebGrowth,
@@ -215,6 +216,7 @@ export function createFridayServer({
       // Small process-local resource guard; deployed ingress must also apply
       // distributed request quotas and abusive-client controls.
       const isExpensive=request.method==='POST'&&(
+        /^\/api\/projects\/[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\/tasks$/.test(url.pathname)||
         url.pathname==='/api/assistant'||url.pathname==='/api/group-advisory'||url.pathname==='/api/agents/route'||
         /^\/api\/agents\/[^/]+\/ask$/.test(url.pathname)||isOperatorMutation)
       if (isExpensive) {
@@ -229,6 +231,26 @@ export function createFridayServer({
           if(accessUsage.size>=2000)accessUsage.clear()
         }
         accessUsage.set(key,state)
+      }
+    }
+
+    const projectTaskRoute=/^\/api\/projects\/([A-Za-z0-9][A-Za-z0-9_.-]{0,127})\/tasks$/.exec(url.pathname)
+    if (url.pathname === '/api/projects' || projectTaskRoute) {
+      // Explicit local-development injection only; bootstrap never creates this service.
+      if (!authenticatedIdentity || config.mode !== 'live' || !projectTasks) return json(response,503,{error:'project-tasks-unavailable'})
+      if (url.search) return json(response,400,{error:'unexpected-query'})
+      if (request.method!=='GET' && !(projectTaskRoute && request.method==='POST')) return json(response,405,{error:'method-not-allowed'})
+      if (request.method==='POST' && (request.headers.origin!==config.access.publicOrigin || !String(request.headers['content-type']||'').startsWith('application/json'))) return json(response,403,{error:'origin-or-content-type-denied'})
+      try {
+        if (!projectTaskRoute) return json(response,200,{projects:await projectTasks.projects(authenticatedIdentity)})
+        const projectId=projectTaskRoute[1]
+        if (request.method==='GET') return json(response,200,{tasks:await projectTasks.list(authenticatedIdentity,projectId)})
+        let body
+        try {body=await readBody(request)}catch{return json(response,400,{error:'invalid-input'})}
+        return json(response,201,{task:await projectTasks.create(authenticatedIdentity,projectId,body)})
+      } catch(error) {
+        const status={ 'not-authorized':403,'invalid-input':400,'idempotency-conflict':409 }[error?.kind]||503
+        return json(response,status,{error:status===503?'project-tasks-unavailable':error.kind})
       }
     }
 

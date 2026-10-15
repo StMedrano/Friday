@@ -1,5 +1,14 @@
 # Friday Build Status
 
+Local slice verification: 170 frontend tests /480 Node tests (zero skips), production build and 2/2 built-browser regressions passed. npm audit: zero vulnerabilities. Fresh exact-head CI is required for isolated real Postgres, Compose/container and scans; local make remains absent. Browser fixture persistence is synthetic, not live Supabase acceptance.
+
+## Local trusted project/task vertical slice
+
+The Tasks workspace now selects provisioned projects, lists validated records and creates tasks through existing WorkService/PostgREST persistence. New server injection is disabled by default and absent from bootstrap; no real identity, credentials, private catalog/service or grants are configured. Signed Access owner identity is checked before catalog reads; current provisioned friday_projects IDs determine every operation. Operator/group/model claims grant nothing. Routes are limited to project GET and task GET/POST, exact write Origin/JSON and existing per-identity quota. Task responses omit principals/fingerprints/storage details; malformed or failed reads/writes never become empty/saved success. No agent/claim/memory/infrastructure operations are exposed.
+
+Failing-first domain/HTTP/UI and committed Playwright regressions cover scope denial, catalog validation, creation/reload, failure draft retention, desktop/390px browser behavior and malformed PostgREST handling. One scoped reviewer identified that existing task repository lists hid malformed data as empty; fixed with a failing adapter-through-access regression. No migration was needed; added disposable SQL regression tests existing FK/check/unique constraints and persisted reload. Local Docker/make remain unavailable: exact-head CI must run real isolated Postgres/container checks. Only @playwright/test1.64.1 was added, dev-only and exactly locked; dependency audit returned zero vulnerabilities. Evaluation/plan: docs/superpowers/plans/local-project-task-slice.md. Full final counts and CI are recorded on PR33 after verification; no live operational/persistence claim follows from fixtures.
+
+
 Latest CI evidence: scanner fix63bd95a passed CI476, including all image scans and isolated Postgres/container/safety gates. Owner compilera1ded9c has local167/471 tests/build proof; exact final-head CI is tracked on draft PR33. Source remains development-only, not deployed or production-ready.
 
 ## Owner project-snapshot policy continuation

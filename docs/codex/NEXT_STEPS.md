@@ -1,5 +1,10 @@
 # Friday — Ordered Finish Queue
 
+## Project/task slice continuation
+
+Project list/task list/create UI and the optional identity/catalog-bound HTTP adapter are implemented locally; do not rebuild them or add another framework. Review docs/superpowers/plans/local-project-task-slice.md and exact-head CI. Runtime bootstrap remains disconnected. Before real private records: review server-only configuration/transport, catalog ownership, retention/erasure, backup and real Access session/relogin acceptance. All-project owner intent is supplied; no agent/memory/tool grants follow. Keep PR33 draft; no private-service connections, worker activation, grant changes or deployments are authorized. No migration added. Local make/Docker are unavailable, so real disposable SQL and container proof must come from CI, independently of local synthetic browser persistence.
+
+
 ## Latest local verification follow-up
 
 Scanner fix63bd95a passed CI476, including scans and isolated container/database checks. Owner project snapshot compilera1ded9c passed 167 frontend /471 Node tests and build locally; require successful exact-head CI. Owner identity/all-project intent are supplied; do not ask again or commit the identity. Next: review the private project/work HTTP and storage boundary, using the trusted provisioned catalog and no agent/memory/tool grants. No runtime access is configured yet.

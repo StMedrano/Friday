@@ -5,6 +5,7 @@ import { useFridaySession } from '../hooks/useFridaySession'
 import { usePhoneLayout } from '../hooks/usePhoneLayout'
 import { useModalFocus } from '../hooks/useModalFocus'
 import ActiveIncidents from '../components/ActiveIncidents'
+import ProjectTasksWorkspace from '../components/ProjectTasksWorkspace'
 import ActivityTimeline from '../components/ActivityTimeline'
 import AgentsWorkspace from '../components/AgentsWorkspace'
 import FridayComposer from '../components/FridayComposer'
@@ -171,7 +172,7 @@ export default function Dashboard() {
             query={query}
             onQueryChange={setQuery}
             onSubmit={submitFriday}
-          /> : active === 'Agents' ? <AgentsWorkspace/> : active === 'Incidents' ? <IncidentsWorkspace
+          /> : active === 'Agents' ? <AgentsWorkspace/> : active === 'Tasks' ? <ProjectTasksWorkspace/> : active === 'Incidents' ? <IncidentsWorkspace
             incidents={incidents}
             monitoring={overview.monitoring}
             history={history}
@@ -249,6 +250,7 @@ export default function Dashboard() {
             <section className="v3-section"><div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><span>{online} online</span></div><div className="v3-services">{overview.services.map(s => <button key={s.id} onClick={() => navigate('Applications')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span><em>{s.updated}</em></button>)}</div></section>
           </> : active === 'FRIDAY' ? <FridayWorkspace session={friday} query={query} onQueryChange={setQuery} onSubmit={submitFriday}/>
             : active === 'Agents' ? <AgentsWorkspace/>
+            : active === 'Tasks' ? <ProjectTasksWorkspace/>
             : active === 'Incidents' ? <IncidentsWorkspace incidents={incidents} monitoring={overview.monitoring} history={history} historyError={historyError} historyLoading={historyLoading} onRefreshHistory={refreshHistory} selectedIncident={selectedIncident} onSelectIncident={viewDiagnosis} onClearSelection={() => setSelectedIncidentId(null)}/>
             : <DetailView active={active} overview={overview} />}
         </main>

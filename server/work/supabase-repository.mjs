@@ -48,10 +48,16 @@ export function createSupabaseWorkRepository({baseUrl,serviceKey,fetchImpl=globa
   throw safeWorkError('idempotency-conflict')
  }
  return Object.freeze({
+  listProjects:async()=>{
+   const rows=await request('/rest/v1/friday_projects?select=id,name&order=id.asc&limit=51')
+   if(!Array.isArray(rows))throw safeWorkError('storage-unavailable')
+   return rows
+  },
   get:(id)=>first('/rest/v1/friday_work_items?id=eq.'+encode(id)+'&select=*'),
   list:async({projectId,limit=20})=>{
    const rows=await request('/rest/v1/friday_work_items?project_id=eq.'+encode(projectId)+'&select=*&order=created_at.desc&limit='+Math.min(50,limit))
-   return Array.isArray(rows)?rows.map(normalized):[]
+   if(!Array.isArray(rows))throw safeWorkError('storage-unavailable')
+   return rows.map(normalized)
   },
   getClaim:(id)=>first('/rest/v1/friday_work_claims?id=eq.'+encode(id)+'&select=*'),
   create:(row)=>insertOnce('friday_work_items','creator_principal',{
