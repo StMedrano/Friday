@@ -4,6 +4,19 @@ import { describe, expect, it, vi } from 'vitest'
 import MobileNavigation from './MobileNavigation'
 
 describe('MobileNavigation', () => {
+  it('contains focus in More and returns focus to its trigger',async()=>{
+    const user=userEvent.setup()
+    render(<MobileNavigation active="Overview" activeIncidents={0} onNavigate={()=>{}}/> )
+    const more=screen.getByRole('button',{name:'More'})
+    await user.click(more)
+    expect(screen.getByRole('button',{name:'Applications'})).toHaveFocus()
+    await user.tab({shift:true})
+    expect(screen.getByRole('button',{name:'Settings'})).toHaveFocus()
+    await user.tab()
+    expect(screen.getByRole('button',{name:'Applications'})).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(more).toHaveFocus()
+  })
   it('renders five primary destinations and maps Home to Overview', async () => {
     const onNavigate = vi.fn()
     const user = userEvent.setup()

@@ -1,5 +1,9 @@
 # Friday interface design
 
+## Verified external reference and modal behavior
+
+The supplied AIDesigner shared Friday concept (`https://www.aidesigner.ai/share/155feecb-0449-41e6-a1bf-5bdc90840985`) was inspected at desktop1440/1600 and phone390px. The layout reference is a labeled sidebar, prominent composer, wrapping task shortcuts, calm dark panels and a wide-screen events rail. Rendered motion includes150ms feedback, a300ms sidebar transition and decorative spinner/shimmer/pulses. Adapt the layout while preserving Friday's existing tokens, reduced motion and factual API states; prototype active-worker/backup/approval claims are not operational data. The concept's phone menu was inert and activity rows cramped; don't reproduce those behaviors. The real command palette and mobile More dialog now contain keyboard focus and restore their opener; only the top stacked dialog handles Escape. No actions or private record grants follow from visual controls.
+
 Friday is an operator workspace for TechTactics/Web Growth, App Builder and HomeLab. Its primary job is to make real availability and advisory scope easy to inspect. Calm density, readable status and safe decisions take precedence over decoration.
 
 ## Ownership and existing identity

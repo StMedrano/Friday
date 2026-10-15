@@ -92,6 +92,26 @@ describe('Dashboard truthful agent status', () => {
     expect(screen.getByRole('button', { name: 'Expand navigation' })).toBeInTheDocument()
   })
 
+  it.each([false,true])('contains keyboard focus and restores the opener after closing (phone=%s)',async phone=>{
+    mocks.phone=phone
+    const user=userEvent.setup()
+    render(<Dashboard/> )
+    const opener=screen.getByRole('button',{name:phone?'Search Friday views':'Search or command'})
+    await user.click(opener)
+    const search=screen.getByRole('textbox',{name:'Search Friday views'})
+    expect(search).toHaveFocus()
+    await user.tab({shift:true})
+    expect(screen.getByRole('button',{name:'Open Settings'})).toHaveFocus()
+    await user.tab()
+    expect(search).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(opener).toHaveFocus()
+    await user.keyboard('{Control>}k{/Control}')
+    await user.type(screen.getByRole('textbox',{name:'Search Friday views'}),'no-match-fixture')
+    await user.click(screen.getByRole('button',{name:'Close search'}))
+    expect(opener).toHaveFocus()
+  })
+
   it('offers phone navigation search without a live-action promise', async () => {
     mocks.phone = true
     const user = userEvent.setup()
@@ -101,6 +121,22 @@ describe('Dashboard truthful agent status', () => {
     expect(screen.getByText('Actions not enabled')).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Close search' }))
     expect(screen.queryByRole('dialog', { name: 'Friday command palette' })).not.toBeInTheDocument()
+  })
+
+  it('dismisses only the top dialog when search opens above mobile More',async()=>{
+    mocks.phone=true
+    const user=userEvent.setup()
+    render(<Dashboard/> )
+    await user.click(screen.getByRole('button',{name:'More'}))
+    expect(screen.getByRole('button',{name:'Applications'})).toHaveFocus()
+    await user.keyboard('{Control>}k{/Control}')
+    expect(screen.getByRole('textbox',{name:'Search Friday views'})).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(screen.getByRole('dialog',{name:'More FRIDAY views'})).toBeInTheDocument()
+    expect(screen.getByRole('button',{name:'Applications'})).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('button',{name:'More'})).toHaveFocus()
   })
 
   it('shows honest group quick links rather than invented running agents', async () => {

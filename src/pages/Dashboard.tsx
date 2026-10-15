@@ -3,6 +3,7 @@ import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRi
 import { fetchFridayAgentGroups, fetchMonitoringHistory, useFridayOverview, type GroupWorkspace, type FridayIncident, type MonitoringEvent } from '../lib/api'
 import { useFridaySession } from '../hooks/useFridaySession'
 import { usePhoneLayout } from '../hooks/usePhoneLayout'
+import { useModalFocus } from '../hooks/useModalFocus'
 import ActiveIncidents from '../components/ActiveIncidents'
 import ActivityTimeline from '../components/ActivityTimeline'
 import AgentsWorkspace from '../components/AgentsWorkspace'
@@ -33,6 +34,7 @@ export default function Dashboard() {
   const [query, setQuery] = useState('')
   const [railExpanded, setRailExpanded] = useState(true)
   const [commandOpen, setCommandOpen] = useState(false)
+  const {dialogRef:commandDialogRef,rememberFocus}=useModalFocus(commandOpen,isPhone,()=>setCommandOpen(false))
   const [commandQuery, setCommandQuery] = useState('')
   const [history, setHistory] = useState<MonitoringEvent[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
@@ -46,19 +48,25 @@ export default function Dashboard() {
   const metrics = useMemo(() => overview.resources.slice(0, 3), [overview.resources])
   const commandResults = nav.filter(([label]) => label.toLowerCase().includes(commandQuery.trim().toLowerCase()))
 
+  function openCommandPalette(){
+    rememberFocus()
+    setCommandQuery('')
+    setCommandOpen(true)
+  }
+
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
         event.preventDefault()
-        setCommandQuery('')
-        setCommandOpen(open => !open)
+        if(commandOpen)setCommandOpen(false)
+        else openCommandPalette()
       } else if (event.key === 'Escape') {
         setCommandOpen(false)
       }
     }
     window.addEventListener('keydown', onKeyDown)
     return () => window.removeEventListener('keydown', onKeyDown)
-  }, [])
+  }, [commandOpen])
 
   useEffect(() => {
     // Share one authenticated history read across Home and Incidents navigation.
@@ -113,7 +121,7 @@ export default function Dashboard() {
   const palette = commandOpen ? <div className="v3-command-backdrop" role="presentation" onMouseDown={(event) => {
     if (event.target === event.currentTarget) setCommandOpen(false)
   }}>
-    <section className="v3-command-dialog" role="dialog" aria-modal="true" aria-label="Friday command palette">
+    <section ref={commandDialogRef} className="v3-command-dialog" role="dialog" aria-modal="true" aria-label="Friday command palette">
       <div className="v3-command-search-row">
         <Search size={18} aria-hidden="true"/>
         <input autoFocus aria-label="Search Friday views" placeholder="Search Friday workspaces…" value={commandQuery} onChange={event => setCommandQuery(event.target.value)}/>
@@ -133,7 +141,7 @@ export default function Dashboard() {
       <div className="v3-workspace">
         <header className="v3-mobile-header">
           <div className="v3-mobile-brand"><span className="v3-live-dot"/><strong>FRIDAY</strong><small>AI OPERATIONS</small></div>
-          <div className="v3-mobile-head-actions"><button type="button" className="v3-mobile-search-button" aria-label="Search Friday views" onClick={() => setCommandOpen(true)}><Search size={18}/></button><div className={`v3-mobile-status ${connected ? 'online' : 'warning'}`}><i/>{connected ? (overview.mode === 'mock' ? 'DEMO' : 'CONNECTED') : 'PREVIEW'}</div></div>
+          <div className="v3-mobile-head-actions"><button type="button" className="v3-mobile-search-button" aria-label="Search Friday views" onClick={openCommandPalette}><Search size={18}/></button><div className={`v3-mobile-status ${connected ? 'online' : 'warning'}`}><i/>{connected ? (overview.mode === 'mock' ? 'DEMO' : 'CONNECTED') : 'PREVIEW'}</div></div>
         </header>
         <main className="v3-main">
           <div role="status">Actions not enabled</div>
@@ -186,7 +194,7 @@ export default function Dashboard() {
       <div className="v3-workspace">
         <header className="v3-topbar">
           <div><strong>FRIDAY</strong><span>AI OPERATIONS CONTROL</span></div>
-          <button type="button" className="v3-search" aria-label="Search or command" onClick={() => {setCommandQuery(''); setCommandOpen(true)}}><Search size={16}/><span>Search or command</span><kbd>Ctrl K</kbd></button>
+          <button type="button" className="v3-search" aria-label="Search or command" onClick={openCommandPalette}><Search size={16}/><span>Search or command</span><kbd>Ctrl K</kbd></button>
           <div className="v3-system"><i /> {connected ? (overview.mode === 'mock' ? 'DEMO DATA' : 'API CONNECTED') : 'DATA UNAVAILABLE'}</div>
         </header>
 

@@ -1,5 +1,9 @@
 # Friday Build Status
 
+## Keyboard navigation continuation
+
+The existing command palette and phone More sheet now contain Tab/Shift+Tab focus, place initial focus inside the dialog and restore the captured opener after dismissal. Escape dismisses only the top dialog when Ctrl/Cmd+K opens search above More. Closing/navigation/unmount/layout changes remove document listeners and stack entries. Existing reduced-motion styling, view-only shortcuts and API boundaries are unchanged. Added failing desktop/phone focus regressions, then failing More/stacked-dialog regressions before implementing the shared focus hook. Focused16/16 tests pass; scoped reviewer found no actionable lifecycle defects. Fresh local WSL verification passed162 frontend /463 Node tests (no skips) and the production build. Built-UI browser checks verified desktop wrap/restoration and phone stacked dismissal/focus with mock data and no horizontal overflow. Exact-head CI is checked separately in PR33. Monitoring predecessor `0c6a11d` passed CI472, including isolated container/database/security verification; postbuild Access6/6 also passed locally. Local make/Docker availability remains unchanged.
+
 ## Local PC monitoring availability checkpoint
 
 Resumed PR #33 from verified GitHub head `9f4ea4a9dc4bc14bb13d7a12d7729206cf9b732b` (its CI passed). No existing Friday checkout was found in the inspected Windows development folders or local WSL home directories. Cloned the authorized existing branch into `C:/Users/medra/Documents/Codex/Friday`; preserved source/untracked files, used no reset/clean, merge or deployment. GitHub CLI account and remote branch access verified. Host Windows Node24 remains unchanged; official checksum-verified portable Node22.22.1 was used. Locked dependencies installed with npm ci. Repo-local LF checkout handling supports Linux scripts without changing GitHub content outside this patch.
