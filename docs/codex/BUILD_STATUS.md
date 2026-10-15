@@ -1,5 +1,7 @@
 # Friday Build Status
 
+Latest CI evidence: scanner fix63bd95a passed CI476, including all image scans and isolated Postgres/container/safety gates. Owner compilera1ded9c has local167/471 tests/build proof; exact final-head CI is tracked on draft PR33. Source remains development-only, not deployed or production-ready.
+
 ## Owner project-snapshot policy continuation
 
 The internal owner-policy compiler expands a trusted server-owned project catalog snapshot into explicit project bindings, with no wildcard, agent or memory grants. Empty catalogs grant nothing; malformed/duplicate/oversized catalogs and extra authority fields reject. Rebuild on catalog changes; the bounded maximum is 50 projects and fails closed beyond that. Tests use synthetic identity only. No HTTP/config/storage wiring, actual grants or remote reads were added. Two failing-first regressions, 11 focused work tests and scoped source review passed. Full WSL verification passed 167 frontend /471 Node tests (no skips), plus production build. Exact-head CI remains a separate gate. The operator's owner designation is supplied; no need to request it again.

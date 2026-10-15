@@ -2,7 +2,7 @@
 
 ## Latest local verification follow-up
 
-Fix the scanner's 256 MiB temporary mount capacity issue (CI474/475), then require successful exact-head CI. The owner's identity and all-project intent are supplied; do not ask for them again. Keep the actual identity private, and implement trusted catalog-backed project expansion separately from agent/memory/tool grants. No runtime access is configured yet.
+Scanner fix63bd95a passed CI476, including scans and isolated container/database checks. Owner project snapshot compilera1ded9c passed 167 frontend /471 Node tests and build locally; require successful exact-head CI. Owner identity/all-project intent are supplied; do not ask again or commit the identity. Next: review the private project/work HTTP and storage boundary, using the trusted provisioned catalog and no agent/memory/tool grants. No runtime access is configured yet.
 
 
 ## Local PC continuation queue
@@ -11,7 +11,7 @@ Use local `C:/Users/medra/Documents/Codex/Friday` on `feat/friday-group-workspac
 
 1. Publish and verify this monitoring checkpoint on PR33 without force-push; preserve PR29 security dependency and PR31 design record.
 2. Keyboard focus containment/restoration and explicit bounded monitoring-history refresh/recovery are implemented with regressions. Preserve shared Home/Incidents state, stale clearing and distinct unavailable/demo states; check exact final-head CI rather than repeating completed UI work.
-3. Pure internal identity/project-to-ActorContext mapping is now implemented and tested; do not duplicate it. Obtain the verified owner email and actual provisioned project IDs requested from the operator, then review the separate HTTP/storage boundary and retention/access design before exposing private work/conversation/memory records. No runtime wiring or real grants exist yet. Group/model output grants no authority. Reuse existing Phase2B services; keep Phase2C dormant.
+3. Pure internal identity/project-to-ActorContext mapping is now implemented and tested; do not duplicate it. Use the supplied owner designation and trusted project-ID snapshot compiler, then review the separate HTTP/storage boundary and retention/access design before exposing private work/conversation/memory records. No runtime wiring or real grants exist yet. Group/model output grants no authority. Reuse existing Phase2B services; keep Phase2C dormant.
 4. Complete remaining provider/model compatibility and feature UI work with source/fixture versus live evidence recorded separately. Do not read configured remote servers or activate inference during this local-only task.
 5. Before production review, record incomplete live Access relogin/role/origin acceptance, deployment transport/grants for Web Growth, backup/rollback and migration gates. No merge/deploy or HomeLab commands are authorized. Docker/make/database gates need a working local isolated runtime or exact-head CI; do not install/reconfigure system services incidentally.
 
