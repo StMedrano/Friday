@@ -1,5 +1,12 @@
 # Friday Build Status
 
+## Task read and uncertain-save recovery
+
+Continued from verified4a9d54f / successful CI479. A failing component regression reproduced creation remaining enabled after a failed task list. Creation now requires a validated successful task read; failure keeps the draft and unavailable state until explicit successful refresh. The submit handler also rejects programmatic submission before records load. Empty-state text requires validated loaded records. Two new browser regressions exercise read failure/recovery and a committed synthetic storage write whose response is lost: unchanged retry recovers the same request and exactly one stored task. No new schema, dependency, API, identity grant, provider or bootstrap wiring. Source review found no further concrete defects.
+
+Local Node22 WSL full suite:172 frontend /480 Node tests passed, no skips; production build passed. Built Edge desktop/390px regression suite:4/4 passed. Exact-head CI is recorded on PR33. Local make/Docker limitations remain; no private service, live acceptance, worker activation or infrastructure command was used. PR33 remains draft.
+
+
 Local slice verification: 170 frontend tests /480 Node tests (zero skips), production build and 2/2 built-browser regressions passed. npm audit: zero vulnerabilities. Fresh exact-head CI is required for isolated real Postgres, Compose/container and scans; local make remains absent. Browser fixture persistence is synthetic, not live Supabase acceptance.
 
 ## Local trusted project/task vertical slice

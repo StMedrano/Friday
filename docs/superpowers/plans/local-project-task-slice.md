@@ -29,3 +29,7 @@ Rollback: remove the new optional server injection/routes and Tasks component im
 ## Remaining activation gates
 
 Review runtime configuration and trusted catalog connectivity, private credentials/transport, real Access sessions including unresolved relogin, request quotas and distributed ingress limits, retention/erasure and backup/restore before storing real private records. No local fixture or CI proves production grants, actual storage deployment, live acceptance or production readiness. Keep PR33 draft and preserve PR29/31 dependencies.
+
+## Recovery follow-up
+
+Creation must wait for a successful validated task list in the selected project. A failed/malformed read must not authorize UI submission or display a verified empty list. Explicit refresh preserves the draft and enables creation only after valid records load. Verify both disabled button and submit-handler guard. Existing idempotent save behavior is exercised through the real adapter/HTTP/UI fixture with a committed write followed by a lost response: unchanged retry must recover one original task. This is local source/fixture work only; no API or database change is required.

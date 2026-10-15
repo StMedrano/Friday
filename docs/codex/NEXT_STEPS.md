@@ -1,5 +1,7 @@
 # Friday — Ordered Finish Queue
 
+Latest task reliability checkpoint: task creation waits for a validated list read; failed reads retain the draft until successful explicit refresh. Committed-but-unconfirmed save retry is browser-tested with exactly one stored synthetic task. Preserve unchanged request IDs across retries. Require exact-head CI; do not duplicate the completed project/task UI and recovery implementation or connect private runtime services incidentally.
+
 ## Project/task slice continuation
 
 Project list/task list/create UI and the optional identity/catalog-bound HTTP adapter are implemented locally; do not rebuild them or add another framework. Review docs/superpowers/plans/local-project-task-slice.md and exact-head CI. Runtime bootstrap remains disconnected. Before real private records: review server-only configuration/transport, catalog ownership, retention/erasure, backup and real Access session/relogin acceptance. All-project owner intent is supplied; no agent/memory/tool grants follow. Keep PR33 draft; no private-service connections, worker activation, grant changes or deployments are authorized. No migration added. Local make/Docker are unavailable, so real disposable SQL and container proof must come from CI, independently of local synthetic browser persistence.

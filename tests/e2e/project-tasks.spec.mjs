@@ -1,4 +1,30 @@
 import {test,expect} from '@playwright/test'
+test('unconfirmed committed save retries without creating a duplicate',async({page})=>{
+ await page.goto('/');await page.getByRole('button',{name:'Tasks',exact:true}).click()
+ await page.getByLabel('Project',{exact:true}).selectOption('project-a')
+ await page.getByLabel('Task title').fill('Lost response fixture');await page.getByLabel('Objective',{exact:true}).fill('Verify retry recovery')
+ await page.getByRole('button',{name:'Create task',exact:true}).click()
+ await expect(page.getByRole('alert')).toContainText('Task storage unavailable')
+ await expect(page.getByLabel('Task title')).toHaveValue('Lost response fixture')
+ await page.getByRole('button',{name:'Create task',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'Lost response fixture'})).toHaveCount(1)
+ const response=await page.request.get('/api/projects/project-a/tasks')
+ const body=await response.json();expect(body.tasks.filter(row=>row.title==='Lost response fixture')).toHaveLength(1)
+})
+
+test('failed task read preserves draft and requires refresh before creation',async({page})=>{
+ let fail=true
+ await page.route('**/api/projects/project-a/tasks',route=>fail?route.fulfill({status:503,contentType:'application/json',body:'{"error":"project-tasks-unavailable"}'}):route.continue())
+ await page.goto('/');await page.getByRole('button',{name:'Tasks',exact:true}).click();await page.getByLabel('Project',{exact:true}).selectOption('project-a')
+ await expect(page.getByRole('alert')).toContainText('Task storage unavailable')
+ await page.getByLabel('Task title').fill('Preserved draft');await page.getByLabel('Objective',{exact:true}).fill('Wait for records')
+ await expect(page.getByRole('button',{name:'Create task',exact:true})).toBeDisabled()
+ await expect(page.getByText('No tasks recorded in this project.')).toHaveCount(0)
+ fail=false;await page.getByRole('button',{name:'Refresh tasks',exact:true}).click()
+ await expect(page.getByRole('button',{name:'Create task',exact:true})).toBeEnabled()
+ await expect(page.getByLabel('Task title')).toHaveValue('Preserved draft')
+})
+
 test('create and reload a persisted fixture task; denied/failed writes never appear saved',async({page})=>{
  await page.goto('/')
  await page.getByRole('button',{name:'Tasks',exact:true}).click()

@@ -20,7 +20,9 @@ const repository=createSupabaseWorkRepository({baseUrl:'https://fixture.invalid'
   if(body.title==='Fail fixture write')return {ok:false,status:503}
   const prior=rows.find(row=>row.creator_principal===body.creator_principal&&row.request_id===body.request_id)
   if(prior)return {ok:true,json:async()=>[]}
-  const row={...body,id:randomUUID(),status:'ready',version:1};rows.push(row);await writeFile(file,JSON.stringify(rows));return {ok:true,json:async()=>[row]}
+  const row={...body,id:randomUUID(),status:'ready',version:1};rows.push(row);await writeFile(file,JSON.stringify(rows))
+  if(body.title==='Lost response fixture')return {ok:false,status:503}
+  return {ok:true,json:async()=>[row]}
  }
  return {ok:true,json:async()=>rows.filter(row=>path.searchParams.has('project_id')?row.project_id===path.searchParams.get('project_id').slice(3):row.request_id===path.searchParams.get('request_id')?.slice(3))}
 }})
