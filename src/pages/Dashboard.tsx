@@ -254,6 +254,17 @@ function AgentConfiguration({ groups, unavailable, onNavigate }: {
           : 'Loading agent configuration…'}</b><small>Configured does not mean running.</small></span></div>
       <div><span><b>Work integration not connected.</b></span></div>
     </div>
+    {groups && groups.registryStatus !== 'unavailable' && <div className="v3-group-quick-links" aria-label="Agent groups">
+      {groups.groups.map(group => {
+        const configuredCount = new Set(group.members.filter(member => member.state === 'configured' && member.agentId).map(member => member.agentId)).size
+        const plannedCount = group.members.filter(member => member.implementation === 'planned').length
+        return <button type="button" key={group.id} aria-label={`Open ${group.name} group`} onClick={onNavigate}>
+          <span className="v3-group-letter" aria-hidden="true">{group.name.slice(0, 1)}</span>
+          <span className="v3-group-summary"><strong>{group.name}</strong><small>{configuredCount} configured · {plannedCount} planned</small></span>
+          <ChevronRight size={16} aria-hidden="true"/>
+        </button>
+      })}
+    </div>}
     <div className="v3-section-head"><button type="button" onClick={onNavigate}>View Agents configuration <ChevronRight size={15}/></button></div>
   </section>
 }
