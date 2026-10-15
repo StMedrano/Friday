@@ -38,10 +38,16 @@ The source review found no additional confirmed authentication bypass in its lim
 
 ## Outstanding manual/access-policy acceptance
 
+### Unresolved production logout/relogin regression — reported 2026-10-14
+
+The operator reports that after logging out of Friday production through Cloudflare Access, a new login could not be completed. Nearby observations included the production hostname reaching the Access login screen and then returning a 502, 404, or another error, while the isolated staging application remained available. These are user-reported symptoms, not a confirmed origin, tunnel, policy, cookie, or Friday application diagnosis. No JWT, cookie, Access token, secret, or response body was collected, and no production or staging configuration was changed while recording the defect.
+
+Treat this as an open release-blocking session regression. Reproduce only through a separately approved, non-destructive production acceptance window; record timestamps and sanitized status/Access decision metadata, compare the protected hostname, tunnel/origin health and Access authentication logs, and verify a fresh browser session. Do not broaden the Allow policy, add a Bypass/Everyone rule, disable origin verification, rotate credentials, recreate a connector, or weaken Friday authentication to make relogin succeed. Successful staging login does not close this production defect.
+
 - **Unlisted identity:** In InPrivate, sign in with a separate email address **not on Friday Staging's Allow policy**. Confirm Cloudflare denies access. Do not broaden Include (OR), use Everyone/Bypass, or add the unauthorized test email to the policy. Capture status and time only; never capture login tokens.
 - **Allowed viewer:** Confirm the dashboard, assets, Inventory and `/api/overview` load after login. Test that operator-only mutations remain denied; staging intentionally configures no operator email allowlist.
 - **Logs:** Zero Trust → Insights → Logs → Access authentication logs. Filter by `Friday Staging` and verify that intended allowed/denied identity decisions are recorded; omit personal identifiers in PR evidence.
-- **Logout/expiry:** Only with user approval, navigate to `https://friday-staging.mytechtactics.com/cdn-cgi/access/logout` and confirm login is required again. Cloudflare logout may affect other Access applications. Cloudflare Access is authoritative for session revocation; offline origin JWT signature verification alone cannot determine whether an unexpired token has been revoked. The origin must stay inaccessible except through the protected tunnel.
+- **Logout/expiry:** Only with user approval, navigate to `https://friday-staging.mytechtactics.com/cdn-cgi/access/logout` and confirm login is required again. Cloudflare logout may affect other Access applications. Cloudflare Access is authoritative for session revocation; offline origin JWT signature verification alone cannot determine whether an unexpired token has been revoked. The origin must stay inaccessible except through the protected tunnel. Do not repeat this against production until the regression above has an approved diagnostic window and rollback plan.
 - **Independent reviewer:** PR #29 still needs an explicit review by someone independent of implementation and a separate production release approval.
 
 ## Credential rotation — completed with staging-only approval
