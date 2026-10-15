@@ -4,6 +4,7 @@ import { fetchFridayAgentGroups, fetchMonitoringHistory, useFridayOverview, type
 import { useFridaySession } from '../hooks/useFridaySession'
 import { usePhoneLayout } from '../hooks/usePhoneLayout'
 import ActiveIncidents from '../components/ActiveIncidents'
+import ActivityTimeline from '../components/ActivityTimeline'
 import AgentsWorkspace from '../components/AgentsWorkspace'
 import FridayComposer from '../components/FridayComposer'
 import FridayConversation from '../components/FridayConversation'
@@ -35,6 +36,7 @@ export default function Dashboard() {
   const [commandQuery, setCommandQuery] = useState('')
   const [history, setHistory] = useState<MonitoringEvent[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null)
   const online = overview.services.filter(s => s.status === 'online').length
   const health = Math.round((online / Math.max(overview.services.length, 1)) * 100)
@@ -59,19 +61,22 @@ export default function Dashboard() {
   }, [])
 
   useEffect(() => {
-    if (active !== 'Incidents') return
+    if (active !== 'Incidents' && (active !== 'Overview' || !connected || overview.mode !== 'live')) return
     const controller = new AbortController()
+    setHistory([])
+    setHistoryLoading(true)
     setHistoryError(null)
     fetchMonitoringHistory(controller.signal)
-      .then(setHistory)
-      .catch((error) => {
-        if (error?.name !== 'AbortError') {
+      .then(data => { if (!controller.signal.aborted) setHistory(data) })
+      .catch(error => {
+        if (error?.name !== 'AbortError' && !controller.signal.aborted) {
           setHistory([])
           setHistoryError('History unavailable')
         }
       })
+      .finally(() => { if (!controller.signal.aborted) setHistoryLoading(false) })
     return () => controller.abort()
-  }, [active])
+  }, [active, connected, overview.mode])
 
   useEffect(() => {
     if (active !== 'Overview') return
@@ -141,6 +146,9 @@ export default function Dashboard() {
             onSubmit={submitFriday}
             onNavigate={navigate}
             onSelectIncident={viewDiagnosis}
+            activityEvents={history}
+            activityLoading={historyLoading}
+            activityError={historyError}
           /> : active === 'FRIDAY' ? <FridayWorkspace
             session={friday}
             query={query}
@@ -218,6 +226,8 @@ export default function Dashboard() {
               <div className="v3-panel"><div className="v3-section-head"><div><span className="v3-kicker">TELEMETRY</span><h2>VM 100 · Infrastructure</h2></div><span className="v3-live"><i/> LIVE</span></div><div className="v3-metrics">{metrics.map((m, i) => <div key={m.label}><span>{i === 0 ? <Cpu/> : i === 1 ? <MemoryStick/> : <HardDrive/>}{m.label}</span><strong>{m.value}%</strong><div><i style={{width:`${m.value}%`}}/></div><small>{m.helper}</small></div>)}</div></div>
               <AgentConfiguration groups={groups} unavailable={groupsUnavailable} onNavigate={() => navigate('Agents')}/>
             </section>
+
+            <ActivityTimeline connected={connected} mode={overview.mode} events={history} examples={overview.activities} loading={historyLoading} error={historyError} onOpenIncidents={() => navigate('Incidents')}/>
 
             <section className="v3-section"><div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><span>{online} online</span></div><div className="v3-services">{overview.services.map(s => <button key={s.id} onClick={() => navigate('Applications')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span><em>{s.updated}</em></button>)}</div></section>
           </> : active === 'FRIDAY' ? <FridayWorkspace session={friday} query={query} onQueryChange={setQuery} onSubmit={submitFriday}/>
