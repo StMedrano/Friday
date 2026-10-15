@@ -1,5 +1,12 @@
 # Friday Build Status
 
+## Evidence-backed activity timeline — 2026-10-14
+
+Continued the existing PR #33 branch to improve the previously preview-only Friday desktop/mobile dashboard. Added a shared ActivityTimeline component and tests. Live data comes only from the existing signed Access-protected /api/monitoring/history read; most recent events first, bounded to five. The client uses a shared read across Overview and Incidents rather than duplicate calls on navigation. Errors, empty data and preview-not-connected are distinct. Explicit mock mode displays only labeled demo examples. This timeline does not claim AI agent task execution or fabricate GitHub/project/approval events. It links to the existing Incidents viewer and does not implement privileged actions.
+
+The new UI follows existing graphite/cyan visual language, uses read-only text status and timestamps, and has narrow-phone and reduced-motion styles. Added unit tests for ordering, provenance, permission-safe display states and navigation; existing dashboard history test initially surfaced a duplicate read and the behavior was fixed. The full CI Test step on the implementation head `faf0fb4` passed; downstream build/container/security CI validation remained in progress when recorded. No server API changes, credentials, live customer reads, runtime activation, staging change or production deployment occurred.
+
+
 ## Friday command-center shell refinement — 2026-10-14
 
 The established Friday UI preview inspired a focused existing-shell enhancement on draft PR #33, not a wholesale dashboard replacement. Desktop navigation is now expandable with visible workspace labels; the top-bar Search or command button and Ctrl/Cmd+K open a searchable list of existing Friday views; Escape/backdrop/Close dismiss it. Mobile has its own search entry point. The old fixed Approvals 2 badge was removed because no backed approval queue/count exists. Top-bar connection wording now distinguishes live API, mock/demo and unavailable data; command UI states clearly that infrastructure actions are not enabled. Transitions are subtle and reduced-motion-aware.
