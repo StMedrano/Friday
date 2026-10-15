@@ -15,6 +15,7 @@ export default function IncidentsWorkspace({
   history,
   historyError,
   historyLoading = false,
+  onRefreshHistory,
   selectedIncident,
   onSelectIncident,
   onClearSelection,
@@ -24,6 +25,7 @@ export default function IncidentsWorkspace({
   history: MonitoringEvent[]
   historyError?: string | null
   historyLoading?: boolean
+  onRefreshHistory?: () => void
   selectedIncident?: FridayIncident | null
   onSelectIncident?: (incident: FridayIncident) => void
   onClearSelection?: () => void
@@ -60,7 +62,7 @@ export default function IncidentsWorkspace({
     </section>
 
     <section className="v3-section">
-      <div className="v3-section-head"><div><span className="v3-kicker">MONITORING AUDIT</span><h2>Health history</h2></div><span>{historyLoading || historyError ? 'History not verified' : `${history.length} recent events`}</span></div>
+      <div className="v3-section-head"><div><span className="v3-kicker">MONITORING AUDIT</span><h2>Health history</h2></div><span>{historyLoading || historyError ? 'History not verified' : `${history.length} recent events`}</span>{onRefreshHistory&&<button type="button" className="v3-readonly-action" aria-label="Refresh monitoring history" disabled={historyLoading} onClick={onRefreshHistory}>Refresh</button>}</div>
       <div className="v3-panel v3-incident-history-list">
         {historyLoading ? <div className="v3-history-empty" role="status">Loading monitoring history…</div> : historyError ? <div className="v3-history-error">{historyError}</div> : history.length === 0 ? <div className="v3-history-empty">No monitoring history is available yet.</div> : history.map((event) => <div className="v3-history-row" key={event.id}>
           <Activity size={16}/><span><b>{event.detail}</b><small>{event.serviceName || event.source}{event.host ? ` · ${event.host}` : ''}</small></span><em>{event.type.replaceAll('-', ' ')}</em><p>{displayTime(event.at)}</p>

@@ -3,13 +3,13 @@ import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { GroupWorkspace } from '../lib/api'
 
-const mocks = vi.hoisted(() => ({ groups: vi.fn(), phone: false }))
+const mocks = vi.hoisted(() => ({ groups: vi.fn(), history:vi.fn(),phone: false,connected:true,mode:'live' as 'live'|'mock' }))
 vi.mock('../lib/api', () => ({
-  useFridayOverview: () => ({ connected: true, overview: {
-    mode: 'live', sites: [], services: [], alerts: [], resources: [], activities: [], incidents: [], monitoring: null,
+  useFridayOverview: () => ({ connected: mocks.connected, overview: {
+    mode: mocks.mode, sites: [], services: [], alerts: [], resources: [], activities: [], incidents: [], monitoring: null,
   } }),
   fetchFridayAgentGroups: (...args: unknown[]) => mocks.groups(...args),
-  fetchMonitoringHistory: vi.fn(async () => []),
+  fetchMonitoringHistory: (...args:unknown[])=>mocks.history(...args),
   askFridayAssistant: vi.fn(),
 }))
 vi.mock('../hooks/usePhoneLayout', () => ({ usePhoneLayout: () => mocks.phone }))
@@ -26,7 +26,22 @@ const workspace: GroupWorkspace = {
 }
 
 describe('Dashboard truthful agent status', () => {
-  beforeEach(() => { mocks.phone = false; mocks.groups.mockReset(); mocks.groups.mockResolvedValue(workspace) })
+  beforeEach(() => { mocks.phone = false; mocks.connected=true;mocks.mode='live';mocks.history.mockReset().mockResolvedValue([]);mocks.groups.mockReset(); mocks.groups.mockResolvedValue(workspace) })
+
+  it.each(['disconnected','mock'] as const)('clears previous live history when overview becomes %s',async state=>{
+    mocks.history.mockResolvedValue([{id:'old',type:'incident-opened',at:'2026-10-15T00:00:00Z',source:'fixture',detail:'Fixture old live record'}])
+    const user=userEvent.setup()
+    const view=render(<Dashboard/> )
+    await screen.findByText('Fixture old live record')
+    await user.click(screen.getByRole('button',{name:'Incidents'}))
+    expect(screen.getByText('Fixture old live record')).toBeInTheDocument()
+    if(state==='disconnected')mocks.connected=false
+    else mocks.mode='mock'
+    view.rerender(<Dashboard/> )
+    await waitFor(()=>expect(screen.queryByText('Fixture old live record')).not.toBeInTheDocument())
+    expect(screen.queryByRole('button',{name:'Refresh monitoring history'})).not.toBeInTheDocument()
+    expect(screen.queryByText('0 recent events')).not.toBeInTheDocument()
+  })
 
   it('shows registry-configured counts without claiming active workers or a policy toggle', async () => {
     render(<Dashboard />)

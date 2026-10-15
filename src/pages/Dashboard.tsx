@@ -39,6 +39,7 @@ export default function Dashboard() {
   const [history, setHistory] = useState<MonitoringEvent[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyRefresh, setHistoryRefresh] = useState(0)
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null)
   const online = overview.services.filter(s => s.status === 'online').length
   const health = Math.round((online / Math.max(overview.services.length, 1)) * 100)
@@ -70,7 +71,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     // Share one authenticated history read across Home and Incidents navigation.
-    if (!connected || overview.mode !== 'live') return
+    if (!connected || overview.mode !== 'live') {
+      setHistory([])
+      setHistoryLoading(false)
+      setHistoryError(connected ? 'Demo mode — live monitoring history is not connected' : 'Monitoring history unavailable')
+      return
+    }
     const controller = new AbortController()
     setHistory([])
     setHistoryLoading(true)
@@ -85,7 +91,9 @@ export default function Dashboard() {
       })
       .finally(() => { if (!controller.signal.aborted) setHistoryLoading(false) })
     return () => controller.abort()
-  }, [connected, overview.mode])
+  }, [connected, overview.mode,historyRefresh])
+
+  const refreshHistory=connected&&overview.mode==='live'?()=>setHistoryRefresh(value=>value+1):undefined
 
   useEffect(() => {
     if (active !== 'Overview') return
@@ -157,7 +165,7 @@ export default function Dashboard() {
             onSelectIncident={viewDiagnosis}
             activityEvents={history}
             activityLoading={historyLoading}
-            activityError={historyError}
+            activityError={historyError} onRefreshHistory={refreshHistory}
           /> : active === 'FRIDAY' ? <FridayWorkspace
             session={friday}
             query={query}
@@ -167,7 +175,7 @@ export default function Dashboard() {
             incidents={incidents}
             monitoring={overview.monitoring}
             history={history}
-            historyError={historyError} historyLoading={historyLoading}
+            historyError={historyError} historyLoading={historyLoading} onRefreshHistory={refreshHistory}
             selectedIncident={selectedIncident}
             onSelectIncident={viewDiagnosis}
             onClearSelection={() => setSelectedIncidentId(null)}
@@ -236,12 +244,12 @@ export default function Dashboard() {
               <AgentConfiguration groups={groups} unavailable={groupsUnavailable} onNavigate={() => navigate('Agents')}/>
             </section>
 
-            <ActivityTimeline connected={connected} mode={overview.mode} events={history} examples={overview.activities} loading={historyLoading} error={historyError} onOpenIncidents={() => navigate('Incidents')}/>
+            <ActivityTimeline connected={connected} mode={overview.mode} events={history} examples={overview.activities} loading={historyLoading} error={historyError} onRefresh={refreshHistory} onOpenIncidents={() => navigate('Incidents')}/>
 
             <section className="v3-section"><div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><span>{online} online</span></div><div className="v3-services">{overview.services.map(s => <button key={s.id} onClick={() => navigate('Applications')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span><em>{s.updated}</em></button>)}</div></section>
           </> : active === 'FRIDAY' ? <FridayWorkspace session={friday} query={query} onQueryChange={setQuery} onSubmit={submitFriday}/>
             : active === 'Agents' ? <AgentsWorkspace/>
-            : active === 'Incidents' ? <IncidentsWorkspace incidents={incidents} monitoring={overview.monitoring} history={history} historyError={historyError} historyLoading={historyLoading} selectedIncident={selectedIncident} onSelectIncident={viewDiagnosis} onClearSelection={() => setSelectedIncidentId(null)}/>
+            : active === 'Incidents' ? <IncidentsWorkspace incidents={incidents} monitoring={overview.monitoring} history={history} historyError={historyError} historyLoading={historyLoading} onRefreshHistory={refreshHistory} selectedIncident={selectedIncident} onSelectIncident={viewDiagnosis} onClearSelection={() => setSelectedIncidentId(null)}/>
             : <DetailView active={active} overview={overview} />}
         </main>
       </div>

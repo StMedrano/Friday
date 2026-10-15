@@ -167,7 +167,7 @@ export async function askFridayAgent(agentId: string, prompt: string, signal?: A
 }
 
 export async function fetchMonitoringHistory(signal?: AbortSignal): Promise<MonitoringEvent[]> {
-  const response = await fetch('/api/monitoring/history', { signal })
+  const response = await fetch('/api/monitoring/history', { method:'GET', signal:signal?AbortSignal.any([signal,AbortSignal.timeout(15000)]):AbortSignal.timeout(15000) })
   if (!response.ok) {
     const failure = await response.json().catch(() => null)
     const message = response.status === 503 && failure?.error === 'monitoring-disabled' ? 'Monitoring disabled'

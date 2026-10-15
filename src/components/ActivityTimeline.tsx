@@ -10,6 +10,7 @@ type ActivityTimelineProps = {
   loading: boolean
   error: string | null
   onOpenIncidents: () => void
+  onRefresh?: () => void
 }
 
 function eventTitle(type: string): string {
@@ -22,7 +23,7 @@ function observedTime(value: string): string {
 }
 
 export default function ActivityTimeline({
-  connected, mode, events, examples, loading, error, onOpenIncidents,
+  connected, mode, events, examples, loading, error, onOpenIncidents,onRefresh,
 }: ActivityTimelineProps) {
   const showLive = connected && mode === 'live'
   const showMock = connected && mode === 'mock'
@@ -34,9 +35,10 @@ export default function ActivityTimeline({
   return <section className="v3-activity-panel" aria-label="Operational activity timeline">
     <div className="v3-activity-heading">
       <div><span className="v3-kicker">MONITORING HISTORY</span><h2>Recent activity</h2></div>
-      {showLive && <button type="button" onClick={onOpenIncidents} aria-label="Open monitoring history">
-        View history <ArrowUpRight size={15}/>
-      </button>}
+      {showLive && <div className="v3-activity-actions">
+        {onRefresh&&<button type="button" onClick={onRefresh} disabled={loading} aria-label="Refresh monitoring history">{loading?'Loading…':'Refresh'}</button>}
+        <button type="button" onClick={onOpenIncidents} aria-label="Open monitoring history">View history <ArrowUpRight size={15}/></button>
+      </div>}
     </div>
     <div className="v3-activity-provenance">
       <Activity size={14} aria-hidden="true"/>

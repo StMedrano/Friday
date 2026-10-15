@@ -1,9 +1,22 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { fetchMonitoringHistory } from './api'
 
-afterEach(() => vi.unstubAllGlobals())
+afterEach(() => {vi.unstubAllGlobals();vi.restoreAllMocks()})
 
 describe('read-only monitoring history response', () => {
+  it('bounds the GET wait and combines caller cancellation',async()=>{
+    const timeout=vi.spyOn(AbortSignal,'timeout')
+    const fetchMock=vi.fn(async(_url:RequestInfo|URL,_init?:RequestInit)=>new Response(JSON.stringify({events:[]})))
+    vi.stubGlobal('fetch',fetchMock)
+    const controller=new AbortController()
+    await fetchMonitoringHistory(controller.signal)
+    expect(timeout).toHaveBeenCalledWith(15000)
+    const request=fetchMock.mock.calls[0][1]!
+    expect(request.method).toBe('GET')
+    expect(request.signal?.aborted).toBe(false)
+    controller.abort()
+    expect(request.signal?.aborted).toBe(true)
+  })
   it.each([
     [503, 'monitoring-disabled', 'Monitoring disabled'],
     [503, 'monitoring-history-unavailable', 'Monitoring history unavailable'],
@@ -19,7 +32,7 @@ describe('read-only monitoring history response', () => {
     const controller = new AbortController()
 
     await expect(fetchMonitoringHistory(controller.signal)).resolves.toEqual([])
-    expect(fetchMock).toHaveBeenCalledWith('/api/monitoring/history', { signal: controller.signal })
+    expect(fetchMock).toHaveBeenCalledWith('/api/monitoring/history', expect.objectContaining({method:'GET',signal:expect.any(AbortSignal)}))
   })
 
   it.each([
