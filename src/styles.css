@@ -39,3 +39,17 @@
 @media(max-width:1150px){.v3-shell-expanded .v3-friday{grid-template-columns:160px minmax(0,1fr)}.v3-shell-expanded .v3-health{display:none}}
 @media(max-width:700px){.v3-phone-shell .v3-workspace{margin-left:0}.v3-command-backdrop{padding:66px 10px 12px}.v3-command-dialog{max-height:75dvh}.v3-command-search-row{padding:0 12px}.v3-command-search-row input{font-size:13px}.v3-mobile-brand small{display:none}}
 @media(prefers-reduced-motion:reduce){.v3-rail,.v3-workspace,.v3-search,.v3-shell-expanded .v3-panel,.v3-shell-expanded .v3-friday,.v3-command-dialog{transition:none!important;animation:none!important}}
+
+
+/* Live catalog summary: configured means defined, not executing. */
+.v3-group-quick-links{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:8px;margin:13px 0 16px}
+.v3-group-quick-links button{min-height:66px;display:flex;align-items:center;gap:10px;min-width:0;padding:10px;border:1px solid var(--line);border-radius:12px;background:#101923;text-align:left;cursor:pointer;transition:border-color .18s ease,transform .18s ease}
+.v3-group-quick-links button:hover,.v3-group-quick-links button:focus-visible{border-color:rgba(103,217,255,.38);background:#142130}
+.v3-group-quick-links button:focus-visible{outline:2px solid var(--cyan);outline-offset:2px}
+.v3-group-letter{width:32px;height:32px;flex:0 0 32px;border:1px solid rgba(103,217,255,.22);border-radius:10px;color:var(--cyan);background:rgba(103,217,255,.07);display:grid;place-items:center;font-size:14px;font-weight:800}
+.v3-group-summary{min-width:0;flex:1;display:grid;gap:5px}
+.v3-group-summary strong{font-size:11px;overflow-wrap:anywhere}
+.v3-group-summary small{font-size:9px;color:#8b9baa;line-height:1.4}
+.v3-group-quick-links button>svg{flex:0 0 auto;color:#73899d}
+@media(max-width:700px){.v3-group-quick-links{grid-template-columns:1fr}.v3-group-quick-links button{min-height:56px}}
+@media(prefers-reduced-motion:reduce){.v3-group-quick-links button{transition:none!important}}
