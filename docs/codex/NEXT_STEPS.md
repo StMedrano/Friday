@@ -1,5 +1,10 @@
 # Friday — Ordered Finish Queue
 
+## Latest local verification follow-up
+
+Fix the scanner's 256 MiB temporary mount capacity issue (CI474/475), then require successful exact-head CI. The owner's identity and all-project intent are supplied; do not ask for them again. Keep the actual identity private, and implement trusted catalog-backed project expansion separately from agent/memory/tool grants. No runtime access is configured yet.
+
+
 ## Local PC continuation queue
 
 Use local `C:/Users/medra/Documents/Codex/Friday` on `feat/friday-group-workspace-20261013`, not the historical remote controller checkout. Monitoring-history missing-runtime/disabled/malformed handling is now fixed in source with failing-first regressions. Local WSL Node22 tests/build passed with the documented prebuild skip. Make and Docker are unavailable locally; require exact-head CI and do not claim those local gates passed.

@@ -1,5 +1,12 @@
 # Friday Build Status
 
+## Scanner temporary-storage correction
+
+CI474 and CI475 failed while downloading the Trivy database into the scanner container's 256 MiB /tmp tmpfs. This was a scanner mount capacity defect, not verified host disk exhaustion or a vulnerability finding. The scanner now uses a unique disk-backed temporary directory beside its isolated cache; cleanup removes only that task-owned directory. The pinned image, non-root UID, read-only root filesystem/input, dropped capabilities, no daemon access and HIGH/CRITICAL failure gate remain. A failing-first storage regression and scoped source review passed; exact-head CI must confirm actual scans. Local Docker/make are still unavailable.
+
+The operator supplied the verified owner designation and requested all projects. Keep that private identity in future server-side configuration, outside committed fixtures. All-project access must resolve against trusted provisioned project IDs and must not grant agent execution or memory permissions. Runtime work access remains disabled pending the reviewed HTTP/storage boundary.
+
+
 ## Trusted work actor mapping foundation
 
 Added the pure internal validator/resolver in `server/work/actor-bindings.mjs` under the existing approved Phase2B ActorContext boundary. The server-owned versioned policy has bounded explicit email/principal/project/agent entries; unknown keys and normalized duplicate identities/grants reject the entire policy. A verified identity selects only its named project grant. Principal and assignment eligibility come solely from that policy, memory scopes are always empty, and extra caller authority fields/operator/group claims do not grant access. The existing WorkService agentAuthorizer still denies claims separately; a mapped agent cannot cause a claim mutation by itself. No HTTP/config/bootstrap wiring, actual grants, worker activation, database reads/writes or migrations were added. Exact owner/project mapping remains requested, not inferred from Git author email.
