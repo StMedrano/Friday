@@ -1,5 +1,12 @@
 # Friday Build Status
 
+## Friday command-center shell refinement — 2026-10-14
+
+The established Friday UI preview inspired a focused existing-shell enhancement on draft PR #33, not a wholesale dashboard replacement. Desktop navigation is now expandable with visible workspace labels; the top-bar Search or command button and Ctrl/Cmd+K open a searchable list of existing Friday views; Escape/backdrop/Close dismiss it. Mobile has its own search entry point. The old fixed Approvals 2 badge was removed because no backed approval queue/count exists. Top-bar connection wording now distinguishes live API, mock/demo and unavailable data; command UI states clearly that infrastructure actions are not enabled. Transitions are subtle and reduced-motion-aware.
+
+Added Testing Library coverage for desktop search/navigation, keyboard toggle/dismissal, collapsed nav and phone search. The code was committed as test-first 739277b, implementation 117fc45 and styles c5c6a3f. The required CI Test step on c5c6a3f passed; the broader exact-head CI run #38673202511 had not finished at documentation time. No live AIDesigner inspection was possible; this is based on the user-approved concept preview, not a verified capture of the external site. No staging/production deployment, infrastructure mutation, new worker or approval API was introduced. The legacy optional views still use existing read-only placeholders; future project/task/approval tiles must only display evidence from trusted APIs.
+
+
 ## Private Web Growth reader source — 2026-10-14
 
 Continued the same PR #33 branch from `67895ead892de292938650b8080f13343914ac7d`. The operator identified VM100 Docker `web-growth-agent`, port 4317, `https://techtactics.mytechtactics.com`, internal `http://infrastructure.mytechtactics.com:4317`, workspace `/srv/docker/techtactics-web-growth/repo/web-growth-agent`. Operator reports deployed GET `/api/leads` and `/api/report` accept anonymous requests; writes are also exposed. **That deployment remains unsecured for this connection and is not used by Friday.** Public repository version-1 store/types informed this implementation; the deployed checkout/revision/file path has not been verified. VM100 connector was offline; SSH hostname verification failed. No trust bypass, live customer read or deployment occurred.
