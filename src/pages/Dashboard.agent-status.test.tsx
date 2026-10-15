@@ -103,4 +103,16 @@ describe('Dashboard truthful agent status', () => {
     expect(screen.queryByRole('dialog', { name: 'Friday command palette' })).not.toBeInTheDocument()
   })
 
+  it('shows honest group quick links rather than invented running agents', async () => {
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    const homelab = await screen.findByRole('button', { name: 'Open HomeLab group' })
+    expect(homelab).toHaveTextContent('HomeLab')
+    expect(homelab).toHaveTextContent('1 configured')
+    expect(homelab).toHaveTextContent('1 planned')
+    expect(homelab).not.toHaveTextContent('running')
+    await user.click(homelab)
+    expect(screen.getByText('Group workspace destination')).toBeInTheDocument()
+  })
+
 })
