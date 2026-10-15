@@ -14,6 +14,7 @@ export default function IncidentsWorkspace({
   monitoring,
   history,
   historyError,
+  historyLoading = false,
   selectedIncident,
   onSelectIncident,
   onClearSelection,
@@ -22,12 +23,13 @@ export default function IncidentsWorkspace({
   monitoring?: MonitoringSummary | null
   history: MonitoringEvent[]
   historyError?: string | null
+  historyLoading?: boolean
   selectedIncident?: FridayIncident | null
   onSelectIncident?: (incident: FridayIncident) => void
   onClearSelection?: () => void
 }) {
   const resolved = incidents.filter((incident) => incident.status === 'resolved').slice().sort((a, b) => String(b.resolvedAt || '').localeCompare(String(a.resolvedAt || '')))
-  const monitoringStatus = monitoring?.status || 'disabled'
+  const monitoringStatus = monitoring?.status || 'unavailable'
 
   return <section className="v3-detail v3-incidents-workspace">
     <div className="v3-detail-hero">
@@ -36,7 +38,7 @@ export default function IncidentsWorkspace({
     </div>
 
     <div className="v3-monitoring-strip">
-      <article><ShieldCheck/><span><b>Monitoring {monitoringStatus.toUpperCase()}</b><small>{monitoring?.lastError || 'Read-only health evaluation is operating within policy.'}</small></span></article>
+      <article><ShieldCheck/><span><b>Monitoring {monitoringStatus.toUpperCase()}</b><small>{monitoring?.lastError || (monitoringStatus === 'ok' ? 'Read-only health evaluation is operating within policy.' : monitoringStatus === 'disabled' ? 'Monitoring is disabled.' : 'Monitoring health cannot be verified.')}</small></span></article>
       <article><Activity/><span><b>{monitoring?.activeIncidents ?? incidents.filter((incident) => incident.status === 'open').length} active incidents</b><small>Last poll: {displayTime(monitoring?.lastPollAt)}</small></span></article>
       <article><CheckCircle2/><span><b>{resolved.length} resolved</b><small>Resolution history is retained in FRIDAY-owned monitoring state.</small></span></article>
     </div>
@@ -58,9 +60,9 @@ export default function IncidentsWorkspace({
     </section>
 
     <section className="v3-section">
-      <div className="v3-section-head"><div><span className="v3-kicker">MONITORING AUDIT</span><h2>Health history</h2></div><span>{history.length} recent events</span></div>
+      <div className="v3-section-head"><div><span className="v3-kicker">MONITORING AUDIT</span><h2>Health history</h2></div><span>{historyLoading || historyError ? 'History not verified' : `${history.length} recent events`}</span></div>
       <div className="v3-panel v3-incident-history-list">
-        {historyError ? <div className="v3-history-error">{historyError}</div> : history.length === 0 ? <div className="v3-history-empty">No monitoring history is available yet.</div> : history.map((event) => <div className="v3-history-row" key={event.id}>
+        {historyLoading ? <div className="v3-history-empty" role="status">Loading monitoring history…</div> : historyError ? <div className="v3-history-error">{historyError}</div> : history.length === 0 ? <div className="v3-history-empty">No monitoring history is available yet.</div> : history.map((event) => <div className="v3-history-row" key={event.id}>
           <Activity size={16}/><span><b>{event.detail}</b><small>{event.serviceName || event.source}{event.host ? ` · ${event.host}` : ''}</small></span><em>{event.type.replaceAll('-', ' ')}</em><p>{displayTime(event.at)}</p>
         </div>)}
       </div>

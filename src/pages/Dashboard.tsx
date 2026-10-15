@@ -72,7 +72,7 @@ export default function Dashboard() {
       .catch(error => {
         if (error?.name !== 'AbortError' && !controller.signal.aborted) {
           setHistory([])
-          setHistoryError('History unavailable')
+          setHistoryError(['Monitoring disabled','Monitoring history response invalid'].includes(error?.message) ? error.message : 'Monitoring history unavailable')
         }
       })
       .finally(() => { if (!controller.signal.aborted) setHistoryLoading(false) })
@@ -159,7 +159,7 @@ export default function Dashboard() {
             incidents={incidents}
             monitoring={overview.monitoring}
             history={history}
-            historyError={historyError}
+            historyError={historyError} historyLoading={historyLoading}
             selectedIncident={selectedIncident}
             onSelectIncident={viewDiagnosis}
             onClearSelection={() => setSelectedIncidentId(null)}
@@ -233,7 +233,7 @@ export default function Dashboard() {
             <section className="v3-section"><div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><span>{online} online</span></div><div className="v3-services">{overview.services.map(s => <button key={s.id} onClick={() => navigate('Applications')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span><em>{s.updated}</em></button>)}</div></section>
           </> : active === 'FRIDAY' ? <FridayWorkspace session={friday} query={query} onQueryChange={setQuery} onSubmit={submitFriday}/>
             : active === 'Agents' ? <AgentsWorkspace/>
-            : active === 'Incidents' ? <IncidentsWorkspace incidents={incidents} monitoring={overview.monitoring} history={history} historyError={historyError} selectedIncident={selectedIncident} onSelectIncident={viewDiagnosis} onClearSelection={() => setSelectedIncidentId(null)}/>
+            : active === 'Incidents' ? <IncidentsWorkspace incidents={incidents} monitoring={overview.monitoring} history={history} historyError={historyError} historyLoading={historyLoading} selectedIncident={selectedIncident} onSelectIncident={viewDiagnosis} onClearSelection={() => setSelectedIncidentId(null)}/>
             : <DetailView active={active} overview={overview} />}
         </main>
       </div>

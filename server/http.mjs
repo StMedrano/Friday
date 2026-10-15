@@ -1,3 +1,4 @@
+import { projectMonitoringHistory } from './monitoring/history.mjs'
 import { readWebGrowth } from './adapters/web-growth.mjs'
 import { validateWebGrowthSnapshot } from './adapters/web-growth-schema.mjs'
 import { createServer } from 'node:http'
@@ -268,7 +269,13 @@ export function createFridayServer({
     }
 
     if (request.method === 'GET' && url.pathname === '/api/monitoring/history') {
-      return json(response, 200, monitoringRuntime?.getHistory?.() || { events: [] })
+      if (config.monitoring?.enabled === false) return json(response,503,{error:'monitoring-disabled'})
+      if (typeof monitoringRuntime?.getHistory !== 'function') return json(response,503,{error:'monitoring-history-unavailable'})
+      let history
+      try { history=await monitoringRuntime.getHistory() }
+      catch { return json(response,503,{error:'monitoring-history-unavailable'}) }
+      try { return json(response,200,projectMonitoringHistory(history)) }
+      catch { return json(response,502,{error:'monitoring-history-invalid'}) }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/agents') {

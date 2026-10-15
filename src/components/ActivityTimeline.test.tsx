@@ -15,6 +15,11 @@ const events: MonitoringEvent[] = [
 const base = { connected: true, mode: 'live' as const, events, examples: samples, loading: false, error: null, onOpenIncidents: vi.fn() }
 
 describe('ActivityTimeline', () => {
+  it.each(['Monitoring disabled','Monitoring history response invalid'])('shows %s without claiming empty history',message=>{
+    render(<ActivityTimeline {...base} events={[]} error={message}/>)
+    expect(screen.getByRole('status')).toHaveTextContent(message)
+    expect(screen.queryByText('No monitoring events recorded')).not.toBeInTheDocument()
+  })
   it('shows verified monitoring history in most-recent-first order and never inserts examples into live data', () => {
     render(<ActivityTimeline {...base}/>)
     const list = screen.getByRole('list', { name: 'Recent monitoring events' })

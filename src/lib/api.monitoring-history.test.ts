@@ -4,6 +4,15 @@ import { fetchMonitoringHistory } from './api'
 afterEach(() => vi.unstubAllGlobals())
 
 describe('read-only monitoring history response', () => {
+  it.each([
+    [503, 'monitoring-disabled', 'Monitoring disabled'],
+    [503, 'monitoring-history-unavailable', 'Monitoring history unavailable'],
+    [502, 'monitoring-history-invalid', 'Monitoring history response invalid'],
+    [500, 'PRIVATE', 'Monitoring history unavailable'],
+  ])('distinguishes safe availability errors (%s %s)', async (status,error,message) => {
+    vi.stubGlobal('fetch',vi.fn(async()=>new Response(JSON.stringify({error}),{status:status as number})))
+    await expect(fetchMonitoringHistory()).rejects.toThrow(message as string)
+  })
   it('returns an empty list only when a valid successful response explicitly reports no events', async () => {
     const fetchMock = vi.fn(async () => new Response(JSON.stringify({ events: [] }), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
@@ -22,7 +31,7 @@ describe('read-only monitoring history response', () => {
     { events: [{ id: 'e1', type: 'incident-opened', at: '2026-10-15T00:00:00.000Z', source: 'monitor' }] },
   ])('rejects malformed monitoring history instead of silently displaying no incidents (%j)', async body => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(body), { status: 200 })))
-    await expect(fetchMonitoringHistory()).rejects.toThrow('Friday monitoring history unavailable')
+    await expect(fetchMonitoringHistory()).rejects.toThrow('Monitoring history response invalid')
   })
 
   it('retains valid read-only events in the original server order', async () => {

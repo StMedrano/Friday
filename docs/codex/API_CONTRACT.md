@@ -26,6 +26,8 @@ Returns FRIDAY-owned monitoring incidents. There is no incident mutation endpoin
 
 Returns bounded recent FRIDAY-owned monitoring events newest-first. History must not contain provider credentials, authorization headers, or raw application logs.
 
+Availability is explicit: HTTP 503 `monitoring-disabled` when configured off; 503 `monitoring-history-unavailable` if the reader is missing or throws; 502 `monitoring-history-invalid` if its result is malformed. Only a validated successful read may return HTTP 200 `{events: []}`. Reads are awaited, bounded to 5000 unique records and projected onto id/type/at/source/detail plus optional host/serviceId/serviceName. Failures never carry fabricated empty events or raw exception details. Existing signed Access and GET-only boundaries apply. History availability is not proof that incidents are absent or that current polling is healthy.
+
 ### `GET /api/incidents/:incidentId/diagnostics`
 
 Returns the persisted safe diagnostic report for one existing incident when diagnostics are supported/enabled.

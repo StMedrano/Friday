@@ -168,8 +168,14 @@ export async function askFridayAgent(agentId: string, prompt: string, signal?: A
 
 export async function fetchMonitoringHistory(signal?: AbortSignal): Promise<MonitoringEvent[]> {
   const response = await fetch('/api/monitoring/history', { signal })
-  if (!response.ok) throw new Error(`Friday monitoring history ${response.status}`)
-  const body: unknown = await response.json()
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null)
+    const message = response.status === 503 && failure?.error === 'monitoring-disabled' ? 'Monitoring disabled'
+      : response.status === 502 && failure?.error === 'monitoring-history-invalid' ? 'Monitoring history response invalid'
+      : 'Monitoring history unavailable'
+    throw new Error(message)
+  }
+  const body: unknown = await response.json().catch(() => { throw new Error('Monitoring history response invalid') })
   const events = body && typeof body === 'object' && !Array.isArray(body)
     ? (body as { events?: unknown }).events : undefined
   const validText = (value: unknown): value is string => typeof value === 'string' && value.length <= 2000
@@ -184,7 +190,7 @@ export async function fetchMonitoringHistory(signal?: AbortSignal): Promise<Moni
       ['host', 'serviceId', 'serviceName'].every(key => event[key] === undefined || validText(event[key]))
   }
   if (!Array.isArray(events) || events.length > 5000 || !events.every(validEvent)) {
-    throw new Error('Friday monitoring history unavailable')
+    throw new Error('Monitoring history response invalid')
   }
   return events
 }

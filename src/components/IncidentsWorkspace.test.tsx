@@ -56,6 +56,18 @@ const history = [{
 }]
 
 describe('IncidentsWorkspace', () => {
+  it('shows a pending read instead of zero or empty history',()=>{
+    render(<IncidentsWorkspace incidents={[]} history={[]} historyLoading/>)
+    expect(screen.getByRole('status')).toHaveTextContent('Loading monitoring history')
+    expect(screen.queryByText('0 recent events')).not.toBeInTheDocument()
+    expect(screen.queryByText('No monitoring history is available yet.')).not.toBeInTheDocument()
+  })
+  it('does not label an unavailable history read as zero recent events',()=>{
+    render(<IncidentsWorkspace incidents={[]} history={[]} historyError="Monitoring history unavailable"/>)
+    expect(screen.queryByText('0 recent events')).not.toBeInTheDocument()
+    expect(screen.queryByText(/operating within policy/i)).not.toBeInTheDocument()
+    expect(screen.getByText('Monitoring UNAVAILABLE')).toBeInTheDocument()
+  })
   it('shows active, resolved, monitoring status, and recent history without remediation controls', () => {
     render(<IncidentsWorkspace incidents={[active, resolved]} monitoring={monitoring} history={history} />)
 

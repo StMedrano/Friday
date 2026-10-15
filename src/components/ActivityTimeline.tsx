@@ -43,7 +43,7 @@ export default function ActivityTimeline({
       {showLive ? 'Observed data' : showMock ? 'Demo examples' : 'Preview only — not connected to Friday'}
     </div>
     {showLive ? loading ? <p className="v3-activity-empty" role="status">Loading monitoring history…</p>
-      : error ? <p className="v3-activity-empty" role="status">Monitoring history unavailable</p>
+      : error ? <p className="v3-activity-empty" role="status">{['Monitoring disabled','Monitoring history response invalid'].includes(error) ? error : 'Monitoring history unavailable'}</p>
       : history.length ? <ol className="v3-activity-items" aria-label="Recent monitoring events">
         {history.map(event => <li key={event.id} className="v3-activity-item">
           <span className="v3-activity-mark" aria-hidden="true"/>

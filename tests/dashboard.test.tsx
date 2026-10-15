@@ -83,6 +83,18 @@ afterEach(() => {
 })
 
 describe('Friday v3 command center', () => {
+  it.each([[false,'monitoring-disabled',503,'Monitoring disabled'],[true,'monitoring-history-invalid',502,'Monitoring history response invalid']] as const)('propagates monitoring state across Home and Incidents (phone=%s)',async(phone,error,status,message)=>{
+    installMatchMedia(phone)
+    const fallback=liveFetch()
+    vi.stubGlobal('fetch',vi.fn(async(input:RequestInfo|URL)=>String(input)==='/api/monitoring/history'?new Response(JSON.stringify({error}),{status}):fallback(input)))
+    const user=userEvent.setup()
+    render(<Dashboard/> )
+    expect(await screen.findByText(message)).toBeInTheDocument()
+    if(phone)await user.click(screen.getByRole('button',{name:/^Incidents/}))
+    else await user.click(screen.getByTitle('Incidents'))
+    expect(await screen.findByText(message)).toBeInTheDocument()
+    expect(screen.queryByText('0 recent events')).not.toBeInTheDocument()
+  })
   it('presents the authoritative Friday command surface and live infrastructure data', () => {
     installMatchMedia(false)
     render(<Dashboard />)
