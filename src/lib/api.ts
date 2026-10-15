@@ -166,11 +166,27 @@ export async function askFridayAgent(agentId: string, prompt: string, signal?: A
   return body
 }
 
-export async function fetchMonitoringHistory(signal?: AbortSignal) {
+export async function fetchMonitoringHistory(signal?: AbortSignal): Promise<MonitoringEvent[]> {
   const response = await fetch('/api/monitoring/history', { signal })
   if (!response.ok) throw new Error(`Friday monitoring history ${response.status}`)
-  const body = await response.json() as { events?: MonitoringEvent[] }
-  return Array.isArray(body.events) ? body.events : []
+  const body: unknown = await response.json()
+  const events = body && typeof body === 'object' && !Array.isArray(body)
+    ? (body as { events?: unknown }).events : undefined
+  const validText = (value: unknown): value is string => typeof value === 'string' && value.length <= 2000
+  const validEvent = (value: unknown): value is MonitoringEvent => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+    const event = value as Record<string, unknown>
+    return validText(event.id) && event.id.length > 0 &&
+      validText(event.type) && event.type.length > 0 &&
+      validText(event.at) && Number.isFinite(Date.parse(event.at)) &&
+      validText(event.source) && event.source.length > 0 &&
+      validText(event.detail) &&
+      ['host', 'serviceId', 'serviceName'].every(key => event[key] === undefined || validText(event[key]))
+  }
+  if (!Array.isArray(events) || events.length > 5000 || !events.every(validEvent)) {
+    throw new Error('Friday monitoring history unavailable')
+  }
+  return events
 }
 
 function incidentPath(id: string, suffix: 'diagnostics' | 'logs') { return `/api/incidents/${encodeURIComponent(id)}/${suffix}` }
