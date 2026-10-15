@@ -19,3 +19,7 @@ Agent IDs are assignment eligibility only. The existing work-service agentAuthor
 5. Document source capability versus unconfigured runtime, commit/push on PR33 and retain draft state.
 
 Ruling: build an internal mapping adapter now; defer browser APIs/provisioned project grants until the exact identity/project mapping and storage/access review exist. This advances the approved architecture without treating a catalog group or model identity as authorization.
+
+## Owner designation follow-up
+
+The operator supplied a private verified owner identity and requested all projects. Implement a pure internal compiler from that server-owned identity/principal and a trusted provisioned project-ID snapshot into the existing exact binding schema. Reject wildcard IDs, normalized duplicates, invalid IDs, oversized catalogs and extra authority keys. Give no agent or memory grants. Empty catalog grants no projects. Rebuild the snapshot on catalog change; never accept catalog IDs or identity from request/model data. Maximum 50 projects fails closed until a reviewed pagination/scale policy exists. Real identity is not committed, and HTTP/bootstrap/storage wiring remains disabled. Failing-first owner expansion and privilege rejection regressions are required.

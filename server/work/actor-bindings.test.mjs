@@ -1,10 +1,24 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {validateWorkActorBindings,resolveTrustedWorkActor} from './actor-bindings.mjs'
+import {validateWorkActorBindings,resolveTrustedWorkActor,createOwnerWorkBindings} from './actor-bindings.mjs'
 import {createWorkService} from './work-service.mjs'
 
 const policy=()=>({schemaVersion:'1',bindings:[{email:'owner@example.test',principalId:'owner-fixture',projects:[{projectId:'project-a',agentIds:['coder']},{projectId:'project-b',agentIds:['reviewer']}]}]})
 const identity={ok:true,email:'owner@example.test',operator:false}
+
+test('owner policy expands only trusted catalog project IDs without agent or memory grants',()=>{
+ const projectIds=['project-a','project-b']
+ const result=createOwnerWorkBindings({email:identity.email,principalId:'owner-fixture',projectIds})
+ projectIds.push('project-untrusted')
+ for(const projectId of ['project-a','project-b'])assert.deepEqual(resolveTrustedWorkActor({identity,projectId,policy:result}),{principalId:'owner-fixture',allowedProjectIds:[projectId],allowedAgentIds:[],allowedMemoryScopes:[]})
+ assert.throws(()=>resolveTrustedWorkActor({identity,projectId:'project-untrusted',policy:result}),error=>error.kind==='not-authorized')
+ assert.deepEqual(createOwnerWorkBindings({email:identity.email,principalId:'owner-fixture',projectIds:[]}).bindings[0].projects,[])
+})
+
+test('owner policy rejects ambiguous catalog entries and caller-supplied authority',()=>{
+ const input={email:identity.email,principalId:'owner-fixture',projectIds:['project-a']}
+ for(const patch of [{projectIds:['project-a',' project-a ']},{projectIds:['*']},{projectIds:['']},{projectIds:new Array(51).fill('a')},{agentIds:['coder']},{memoryScopes:['global']},{email:''},{principalId:''}])assert.throws(()=>createOwnerWorkBindings({...input,...patch}))
+})
 test('verified identity gets only its explicitly selected project and no memory permissions',()=>{
  const actor=resolveTrustedWorkActor({identity,projectId:'project-a',policy:policy()})
  assert.deepEqual(actor,{principalId:'owner-fixture',allowedProjectIds:['project-a'],allowedAgentIds:['coder'],allowedMemoryScopes:[]})

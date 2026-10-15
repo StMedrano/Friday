@@ -1,5 +1,10 @@
 # Friday Build Status
 
+## Owner project-snapshot policy continuation
+
+The internal owner-policy compiler expands a trusted server-owned project catalog snapshot into explicit project bindings, with no wildcard, agent or memory grants. Empty catalogs grant nothing; malformed/duplicate/oversized catalogs and extra authority fields reject. Rebuild on catalog changes; the bounded maximum is 50 projects and fails closed beyond that. Tests use synthetic identity only. No HTTP/config/storage wiring, actual grants or remote reads were added. Two failing-first regressions, 11 focused work tests and scoped source review passed. Full WSL verification passed 167 frontend /471 Node tests (no skips), plus production build. Exact-head CI remains a separate gate. The operator's owner designation is supplied; no need to request it again.
+
+
 ## Scanner temporary-storage correction
 
 CI474 and CI475 failed while downloading the Trivy database into the scanner container's 256 MiB /tmp tmpfs. This was a scanner mount capacity defect, not verified host disk exhaustion or a vulnerability finding. The scanner now uses a unique disk-backed temporary directory beside its isolated cache; cleanup removes only that task-owned directory. The pinned image, non-root UID, read-only root filesystem/input, dropped capabilities, no daemon access and HIGH/CRITICAL failure gate remain. A failing-first storage regression and scoped source review passed; exact-head CI must confirm actual scans. Local Docker/make are still unavailable.

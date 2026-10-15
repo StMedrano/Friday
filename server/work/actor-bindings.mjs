@@ -13,6 +13,17 @@ function email(value){
 }
 
 // Internal server-owned configuration only. Never pass a request body as policy.
+// projectIds must come from the trusted provisioned project catalog, never a caller.
+// Rebuild this snapshot when the catalog changes; '*' is never an authorization ID.
+export function createOwnerWorkBindings(input){
+ if(!exact(input,['email','principalId','projectIds']))throw safeWorkError('invalid-input')
+ const projects=array(input.projectIds,50).map(projectId=>{
+  if(typeof projectId!=='string'||projectId.trim()==='*')throw safeWorkError('invalid-input')
+  return {projectId,agentIds:[]}
+ })
+ return validateWorkActorBindings({schemaVersion:'1',bindings:[{email:input.email,principalId:input.principalId,projects}]})
+}
+
 export function validateWorkActorBindings(value){
  if(!exact(value,['schemaVersion','bindings'])||value.schemaVersion!=='1')throw safeWorkError('invalid-input')
  const bindings=array(value.bindings,100).map(binding=>{
