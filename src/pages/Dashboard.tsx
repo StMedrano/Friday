@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, Gauge, HardDrive, Home, MemoryStick, Network, Search, Server, Settings, ShieldCheck, Sparkles, TerminalSquare } from 'lucide-react'
+import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, Gauge, HardDrive, Home, MemoryStick, Network, PanelLeftClose, PanelLeftOpen, Search, Server, Settings, ShieldCheck, Sparkles, TerminalSquare, X } from 'lucide-react'
 import { fetchFridayAgentGroups, fetchMonitoringHistory, useFridayOverview, type GroupWorkspace, type FridayIncident, type MonitoringEvent } from '../lib/api'
 import { useFridaySession } from '../hooks/useFridaySession'
 import { usePhoneLayout } from '../hooks/usePhoneLayout'
@@ -30,6 +30,9 @@ export default function Dashboard() {
   const [groups, setGroups] = useState<GroupWorkspace | null>(null)
   const [groupsUnavailable, setGroupsUnavailable] = useState(false)
   const [query, setQuery] = useState('')
+  const [railExpanded, setRailExpanded] = useState(true)
+  const [commandOpen, setCommandOpen] = useState(false)
+  const [commandQuery, setCommandQuery] = useState('')
   const [history, setHistory] = useState<MonitoringEvent[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null)
@@ -39,6 +42,21 @@ export default function Dashboard() {
   const selectedIncident = incidents.find((incident) => incident.id === selectedIncidentId) ?? null
   const activeIncidents = overview.monitoring?.activeIncidents ?? incidents.filter((incident) => incident.status === 'open').length
   const metrics = useMemo(() => overview.resources.slice(0, 3), [overview.resources])
+  const commandResults = nav.filter(([label]) => label.toLowerCase().includes(commandQuery.trim().toLowerCase()))
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setCommandQuery('')
+        setCommandOpen(open => !open)
+      } else if (event.key === 'Escape') {
+        setCommandOpen(false)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [])
 
   useEffect(() => {
     if (active !== 'Incidents') return
@@ -75,6 +93,8 @@ export default function Dashboard() {
   }
 
   function navigate(destination: string) {
+    setCommandOpen(false)
+    setCommandQuery('')
     setActive(destination)
     if (destination !== 'Incidents') setSelectedIncidentId(null)
   }
@@ -84,12 +104,30 @@ export default function Dashboard() {
     setActive('Incidents')
   }
 
+  const palette = commandOpen ? <div className="v3-command-backdrop" role="presentation" onMouseDown={(event) => {
+    if (event.target === event.currentTarget) setCommandOpen(false)
+  }}>
+    <section className="v3-command-dialog" role="dialog" aria-modal="true" aria-label="Friday command palette">
+      <div className="v3-command-search-row">
+        <Search size={18} aria-hidden="true"/>
+        <input autoFocus aria-label="Search Friday views" placeholder="Search Friday workspaces…" value={commandQuery} onChange={event => setCommandQuery(event.target.value)}/>
+        <button type="button" onClick={() => setCommandOpen(false)} aria-label="Close search"><X size={18}/></button>
+      </div>
+      <div className="v3-command-results">
+        {commandResults.length ? commandResults.map(([label, Icon]) => <button type="button" key={label} onClick={() => navigate(label)} aria-label={`Open ${label}`}>
+          <Icon size={18}/><span>{label}</span><ChevronRight size={15} aria-hidden="true"/>
+        </button>) : <p role="status">No matching Friday workspace.</p>}
+      </div>
+      <p className="v3-command-help">Navigate existing views only. Infrastructure actions are not enabled.</p>
+    </section>
+  </div> : null
+
   if (isPhone) {
     return <div className="v3-shell v3-phone-shell">
       <div className="v3-workspace">
         <header className="v3-mobile-header">
           <div className="v3-mobile-brand"><span className="v3-live-dot"/><strong>FRIDAY</strong><small>AI OPERATIONS</small></div>
-          <div className={`v3-mobile-status ${connected ? 'online' : 'warning'}`}><i/>{connected ? 'LIVE' : 'SAFE'}</div>
+          <div className="v3-mobile-head-actions"><button type="button" className="v3-mobile-search-button" aria-label="Search Friday views" onClick={() => setCommandOpen(true)}><Search size={18}/></button><div className={`v3-mobile-status ${connected ? 'online' : 'warning'}`}><i/>{connected ? (overview.mode === 'mock' ? 'DEMO' : 'CONNECTED') : 'PREVIEW'}</div></div>
         </header>
         <main className="v3-main">
           <div role="status">Actions not enabled</div>
@@ -121,22 +159,26 @@ export default function Dashboard() {
         </main>
       </div>
       <MobileNavigation active={active} activeIncidents={activeIncidents} onNavigate={navigate}/>
+      {palette}
     </div>
   }
 
   return (
-    <div className="v3-shell">
-      <aside className="v3-rail">
-        <button className="v3-logo" onClick={() => navigate('Overview')} aria-label="FRIDAY home"><span /></button>
-        <nav>{nav.map(([label, Icon]) => <button key={label} className={active === label ? 'active' : ''} onClick={() => navigate(label)} title={label}><Icon size={19}/>{label === 'Approvals' && <i>2</i>}{label === 'Incidents' && activeIncidents > 0 && <i>{activeIncidents}</i>}</button>)}</nav>
-        <div className="v3-avatar">SM</div>
+    <div className={`v3-shell ${railExpanded ? "v3-shell-expanded" : ""}`}>
+      <aside className={`v3-rail ${railExpanded ? "expanded" : ""}`}>
+        <button className="v3-logo" onClick={() => navigate('Overview')} aria-label="FRIDAY home"><span /><strong className="v3-logo-label">Friday</strong></button>
+        <nav aria-label="Friday workspaces">{nav.map(([label, Icon]) => <button type="button" key={label} className={active === label ? 'active' : ''} aria-label={label} aria-current={active === label ? 'page' : undefined} onClick={() => navigate(label)} title={label}><Icon size={19}/><span className="v3-rail-label">{label}</span>{label === 'Incidents' && activeIncidents > 0 && <i>{activeIncidents}</i>}</button>)}</nav>
+        <button type="button" className="v3-rail-toggle" onClick={() => setRailExpanded(open => !open)} aria-label={railExpanded ? 'Collapse navigation' : 'Expand navigation'}>
+          {railExpanded ? <PanelLeftClose size={18}/> : <PanelLeftOpen size={18}/>}<span className="v3-rail-label">{railExpanded ? 'Collapse' : 'Expand'}</span>
+        </button>
+        <div className="v3-avatar" aria-label="Operator initials">SM</div>
       </aside>
 
       <div className="v3-workspace">
         <header className="v3-topbar">
           <div><strong>FRIDAY</strong><span>AI OPERATIONS CONTROL</span></div>
-          <button className="v3-search"><Search size={16}/><span>Search or command</span><kbd>Ctrl K</kbd></button>
-          <div className="v3-system"><i /> SYSTEM OPERATIONAL</div>
+          <button type="button" className="v3-search" aria-label="Search or command" onClick={() => {setCommandQuery(''); setCommandOpen(true)}}><Search size={16}/><span>Search or command</span><kbd>Ctrl K</kbd></button>
+          <div className="v3-system"><i /> {connected ? (overview.mode === 'mock' ? 'DEMO DATA' : 'API CONNECTED') : 'DATA UNAVAILABLE'}</div>
         </header>
 
         <main className="v3-main">
@@ -184,6 +226,7 @@ export default function Dashboard() {
             : <DetailView active={active} overview={overview} />}
         </main>
       </div>
+      {palette}
     </div>
   )
 }
