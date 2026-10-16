@@ -36,6 +36,24 @@ Performs explicit read-only bounded log inspection. Raw log text is response-onl
 
 There is no diagnostic remediation endpoint.
 
+## Local repository metadata
+
+### `GET /api/repositories`
+
+Returns enabled repositories from the server-side local registry. Response metadata includes ID, display name, remote without URL credentials or query parameters, default branch, and access mode. It never includes local filesystem paths or per-repository exclusions. Missing or invalid registry data returns a generic `503`; the route has no mutation methods.
+
+The file named by `FRIDAY_REPOSITORY_REGISTRY_PATH` is excluded from Git and the container build context. Registry path resolution accepts only explicitly registered Git working trees, rejects traversal and symlink escapes, and refuses secret, dependency, and build paths.
+
+### Read-only repository tools
+
+- `GET /api/repositories/:id/status` returns the branch and a dirty flag, without file names.
+- `GET /api/repositories/:id/files?path=.&limit=100` returns at most 200 in-root file paths. Directory traversal is depth- and entry-bounded.
+- `GET /api/repositories/:id/file?path=README.md` returns UTF-8 text for a regular file no larger than 64 KiB. Files containing NUL bytes or invalid UTF-8 are rejected with HTTP 400 (`repository-request-rejected`).
+
+All paths resolve under an enabled registered Git root and repeat exclusion checks after symlink resolution. Failures return a generic rejection; arbitrary shell, Git arguments, write methods, and repository mutation are not exposed.
+
+The Repositories workspace uses these GET routes only. It displays registered metadata, branch/dirty status, file paths, and selected text; it does not perform repository writes or execute code.
+
 ## `POST /api/commands/preview`
 
 Deterministic safety classifier. It never executes infrastructure work.

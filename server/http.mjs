@@ -1,5 +1,6 @@
 import { createServer } from 'node:http'
 import { createHash, timingSafeEqual } from 'node:crypto'
+import { toPublicRepository } from './repositories/repository.mjs'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -13,6 +14,7 @@ import {createCloudflareAccessVerifier} from './security/cloudflare-access.mjs'
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
 const SAFE_INCIDENT_ID = /^[A-Za-z0-9_.-]{1,256}$/
+const SAFE_REPOSITORY_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/
 const NO_AGENT_EXECUTION = { performed: false, reason: 'Phase 1 agents are advisory only.' }
 
 function matchedRoutingProvenance(route = {}) {
@@ -141,6 +143,14 @@ function parseAgentAskRoute(pathname) {
   return validated.ok ? { invalid: false, agentId: validated.id } : { invalid: true }
 }
 
+function parseRepositoryToolRoute(pathname) {
+  const match = String(pathname || '').match(/^\/api\/repositories\/([^/]+)\/(status|files|file)$/)
+  if (!match) return null
+  let id
+  try { id = decodeURIComponent(match[1]) } catch { return { invalid: true } }
+  return SAFE_REPOSITORY_ID.test(id) ? { id, tool: match[2] } : { invalid: true }
+}
+
 async function currentOverview({ config, monitoringRuntime, buildOverviewImpl }) {
   const cached = monitoringRuntime?.getOverview?.()
   if (config.monitoring?.enabled && cached) {
@@ -158,6 +168,7 @@ export function createFridayServer({
   monitoringRuntime = null,
   agentRegistryService = null,
   agentService = null,
+  repositoryRegistry = null,
   buildOverviewImpl = buildOverview,
   answerAssistantImpl = answerAssistant,
   verifyAccessImpl = createCloudflareAccessVerifier(),
@@ -248,6 +259,37 @@ export function createFridayServer({
         return json(response, 200, await agentRegistryService.list())
       } catch {
         return json(response, 503, { error: 'agent-registry-unavailable' })
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/repositories') {
+      if (!repositoryRegistry) return json(response, 503, { error: 'repository-registry-unavailable' })
+      try {
+        const repositories = await repositoryRegistry.list()
+        return json(response, 200, repositories.map(toPublicRepository))
+      } catch {
+        return json(response, 503, { error: 'repository-registry-unavailable' })
+      }
+    }
+
+    const repositoryToolRoute = parseRepositoryToolRoute(url.pathname)
+    if (request.method === 'GET' && repositoryToolRoute) {
+      if (repositoryToolRoute.invalid) return json(response, 400, { error: 'invalid-repository-id' })
+      if (!repositoryRegistry) return json(response, 503, { error: 'repository-registry-unavailable' })
+      try {
+        if (repositoryToolRoute.tool === 'status') return json(response, 200, await repositoryRegistry.status(repositoryToolRoute.id))
+        if (repositoryToolRoute.tool === 'files') {
+          const rawLimit = url.searchParams.get('limit')
+          const limit = rawLimit === null ? 100 : Number(rawLimit)
+          return json(response, 200, await repositoryRegistry.listFiles(repositoryToolRoute.id, {
+            path: url.searchParams.get('path') || '.', limit,
+          }))
+        }
+        const path = url.searchParams.get('path')
+        if (!path) return json(response, 400, { error: 'repository-file-path-required' })
+        return json(response, 200, { path, content: await repositoryRegistry.readFile(repositoryToolRoute.id, path) })
+      } catch {
+        return json(response, 400, { error: 'repository-request-rejected' })
       }
     }
 

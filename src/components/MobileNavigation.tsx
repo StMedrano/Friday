@@ -7,7 +7,7 @@ type MobileNavigationProps = {
   onNavigate: (destination: string) => void
 }
 
-const secondary = ['Applications', 'Agents', 'Tasks', 'Approvals', 'Memory', 'Audit', 'Settings']
+const secondary = ['Applications', 'Agents', 'Repositories', 'Tasks', 'Approvals', 'Memory', 'Audit', 'Settings']
 
 export default function MobileNavigation({ active, activeIncidents, onNavigate }: MobileNavigationProps) {
   const [moreOpen, setMoreOpen] = useState(false)

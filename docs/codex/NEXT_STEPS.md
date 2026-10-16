@@ -93,6 +93,13 @@ Implemented source behavior:
 
 Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execution, restart endpoints, or cloud fallback for matched agents as part of this rollout.
 
+## Repository-aware agent platform — in progress (issue #20)
+
+- Server-side registry and bounded GET-only repository tools are implemented in draft PR #35.
+- Repositories workspace supports desktop and mobile browsing, Git status, safe file listing, and bounded text preview.
+- Remaining: repository-scoped task flow and live acceptance after explicit checkout registration. No shell execution or repository writes.
+- Do not mount live roots, deploy, or merge without owner review.
+
 ## P6 — Complete real read-only visibility
 
 1. Keep Proxmox on its dedicated read-only token.

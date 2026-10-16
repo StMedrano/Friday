@@ -16,6 +16,7 @@ RUN addgroup -S -g 10001 friday && adduser -S -D -H -u 10001 -G friday friday &&
 # is not used to serve Friday and carries high/critical advisories.
 # Keep npm in the separate build stage for reproducible package installation.
 RUN apk upgrade --no-cache \
+    && apk add --no-cache git \
     && rm -rf /usr/local/lib/node_modules \
     && rm -f /usr/local/bin/npm /usr/local/bin/npx /usr/local/bin/corepack \
     && rm -rf /opt/yarn-v1.22.22 \
