@@ -1,4 +1,5 @@
 import { createServer } from 'node:http'
+import { toPublicRepository } from './repositories/repository.mjs'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -142,6 +143,7 @@ export function createFridayServer({
   monitoringRuntime = null,
   agentRegistryService = null,
   agentService = null,
+  repositoryRegistry = null,
   buildOverviewImpl = buildOverview,
   answerAssistantImpl = answerAssistant,
 } = {}) {
@@ -180,6 +182,16 @@ export function createFridayServer({
         return json(response, 200, await agentRegistryService.list())
       } catch {
         return json(response, 503, { error: 'agent-registry-unavailable' })
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/repositories') {
+      if (!repositoryRegistry) return json(response, 503, { error: 'repository-registry-unavailable' })
+      try {
+        const repositories = await repositoryRegistry.list()
+        return json(response, 200, repositories.map(toPublicRepository))
+      } catch {
+        return json(response, 503, { error: 'repository-registry-unavailable' })
       }
     }
 

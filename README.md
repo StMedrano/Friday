@@ -34,6 +34,8 @@ Friday's live adapters and AI surfaces are read-only/advisory. No restart/delete
 
 Infrastructure-changing actions remain blocked until authentication/RBAC, durable append-only action audit, explicit approval, and a global automation kill switch are implemented and tested.
 
+The local Repository Registry accepts only explicitly registered Git working trees. Its JSON file stays server-side and out of version control and container images. Lookup and path resolution remain read-only; canonical-path checks reject traversal, symlink escapes, and secret, build, or dependency paths. The safe `GET /api/repositories` endpoint returns metadata without local paths or embedded credentials. Copy `repositories.example.json`, set a mounted checkout path, then explicitly enable the entry. Explorer tools remain follow-up work.
+
 # Local Agent Platform Phase 1
 
 Draft PR #19 implements the first local-only advisory agent platform. Source implementation is complete; **live VM102/Supabase/API/UI acceptance is still required before merge readiness**.

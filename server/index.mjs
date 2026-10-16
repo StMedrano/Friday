@@ -8,6 +8,7 @@ import { createSupabaseRegistryClient } from './agents/supabase-client.mjs'
 import { createAgentRegistryService } from './agents/registry-service.mjs'
 import { syncAgentRegistry } from './agents/registry-sync.mjs'
 import { createAgentService } from './agents/agent-service.mjs'
+import { LocalRepositoryRegistry } from './repositories/repository.mjs'
 
 const config = getConfig()
 const store = createFileMonitoringStore({ statePath: config.monitoring.statePath })
@@ -47,7 +48,8 @@ if (config.agents.registry.enabled) {
   }
 }
 
-const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService })
+const repositoryRegistry = new LocalRepositoryRegistry({ registryPath: config.repositories.registryPath })
+const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry })
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`Friday listening on 0.0.0.0:${config.port} (${config.mode} mode)`)
 })

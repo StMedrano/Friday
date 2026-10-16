@@ -78,6 +78,7 @@ export function getConfig(env = process.env) {
       statePath: env.FRIDAY_MONITORING_STATE_PATH || '/data/monitoring-state.json',
       historyLimit: positiveNumber(env.FRIDAY_MONITORING_HISTORY_LIMIT, 2000),
     },
+    repositories: { registryPath: env.FRIDAY_REPOSITORY_REGISTRY_PATH || './repositories.json' },
     diagnostics: {
       enabled: enabled(env.FRIDAY_DIAGNOSTICS_ENABLED),
     },
