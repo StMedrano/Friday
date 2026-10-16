@@ -52,8 +52,10 @@ function matchesPattern(pattern, pathname) {
     .replace(/[.+^${}()|[\]\\]/g, '\\$&')
     .replace(/\*\*/g, '\u0000')
     .replace(/\*/g, '[^/]*')
+    .replace(/\?/g, '[^/]')
+    .replace(/\u0000\//g, '(?:.*/)?')
     .replace(/\u0000/g, '.*')
-  return new RegExp(`^${escaped}$`).test(pathname)
+  return new RegExp(`^${escaped}$`, 's').test(pathname)
 }
 
 function isExcluded(pathname, extra = []) {
@@ -71,11 +73,12 @@ function isExcluded(pathname, extra = []) {
 }
 
 function parseEntry(value, index) {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+  if (!value || typeof value !== 'object' || Array.isArray(value)
+    || (value.enabled !== undefined && typeof value.enabled !== 'boolean')) {
     throw new Error(`Repository registry entry ${index} is invalid`)
   }
   if (value.enabled === false) return null
-  if (!ID.test(String(value.id || '')) || typeof value.name !== 'string' || !value.name.trim()
+  if (typeof value.id !== 'string' || !ID.test(value.id) || typeof value.name !== 'string' || !value.name.trim()
     || value.name.length > 120 || typeof value.path !== 'string' || !value.path.trim()
     || !MODES.has(value.mode)) {
     throw new Error(`Repository registry entry ${index} is invalid`)
@@ -215,6 +218,7 @@ export class LocalRepositoryRegistry {
       },
     })
     const [header, ...changes] = stdout.trimEnd().split('\n')
-    return { branch: header?.startsWith('## ') ? header.slice(3).split('...')[0] : 'unknown', dirty: changes.length > 0 }
+    const branch = header?.startsWith('## ') ? header.slice(3).replace(/^No commits yet on /, '').split('...')[0] : 'unknown'
+    return { branch, dirty: changes.length > 0 }
   }
 }

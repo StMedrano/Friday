@@ -212,6 +212,7 @@ export function createFridayServer({
         if (repositoryToolRoute.tool === 'status') return json(response, 200, await repositoryRegistry.status(repositoryToolRoute.id))
         if (repositoryToolRoute.tool === 'files') {
           const rawLimit = url.searchParams.get('limit')
+          if (rawLimit !== null && !/^\d+$/.test(rawLimit)) throw new Error('File list limit is invalid')
           const limit = rawLimit === null ? 100 : Number(rawLimit)
           return json(response, 200, await repositoryRegistry.listFiles(repositoryToolRoute.id, {
             path: url.searchParams.get('path') || '.', limit,
