@@ -4,6 +4,12 @@ This is the source-of-truth handoff ledger for coding agents. Update it when a m
 
 ## Current security release checkpoint — 2026-10-13
 
+### Authentication source policy — 2026-10-16
+
+- Friday's intended normal login is Authentik through Cloudflare Access Generic OIDC. Cloudflare One-time PIN is a manually activated break-glass method only during a confirmed Authentik outage; Cloudflare does not dynamically gate a second IdP on upstream availability.
+- Friday grants Operator status only when the signed Access JWT contains `custom.friday_auth_source="authentik"` and its signed email is in the operator allowlist. Fallback Access sessions without this claim remain Viewer-only.
+- The verifier and staging tests enforce this role boundary. Live Authentik OIDC configuration, custom-claim forwarding, outage/recovery acceptance, and production changes remain pending. See [authentication failover runbook](../friday-authentication-failover.md).
+
 This checkpoint takes precedence over the older rollout entries below. Those dated entries remain historical evidence, not instructions to repeat PR #19 deployment.
 
 - Continue existing **draft PR #29**, branch `feat/friday-operator-auth-20261011`. Verified implementation baseline: `511b9f70e237900fce24cbd0f0099c42c7bb3c97`; [Friday CI #437](https://github.com/StMedrano/Friday/actions/runs/38409074041) succeeded. Subsequent documentation-only revisions do not imply a new runtime deployment.

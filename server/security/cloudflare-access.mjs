@@ -74,7 +74,7 @@ export function createCloudflareAccessVerifier({fetchImpl=fetch,now=()=>Date.now
    // Key retrieval may outlast the identity; check expiry at authorization time.
    if(payload.exp<=Math.floor(now()/1000))return INVALID
    const email=payload.email.toLowerCase()
-   return {ok:true,email,operator:configuration.operatorEmails.includes(email)}
+   return {ok:true,email,operator:configuration.operatorEmails.includes(email)&&payload.custom?.friday_auth_source==='authentik'}
   }catch{return SERVICE_UNAVAILABLE}
  }
 }
