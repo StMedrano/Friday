@@ -16,6 +16,8 @@ test('CI scans exact built image through a tar with no scanner Docker daemon soc
  assert.match(workflow,/sh scripts\/scan-controller-image\.sh friday-ci/)
  assert.match(script,/docker save /)
  assert.match(script,/--input \/scan\/controller\.tar/)
+ assert.match(script,/TMPDIR=\/cache\/tmp/)
+ assert.doesNotMatch(script,/--tmpfs \/tmp/)
  assert.match(script,/--severity HIGH,CRITICAL/)
  assert.match(script,/--exit-code 1/)
  assert.doesNotMatch(script,/docker\.sock/)
