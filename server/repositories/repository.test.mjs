@@ -59,6 +59,35 @@ test('lists bounded repository files and reads only small in-root files', async 
   })
 })
 
+test('bounds repository directory entries across the full traversal', async () => {
+  await fixture(async ({ root, registry }) => {
+    for (const name of ['a', 'b', 'c']) {
+      const parent = join(root, name)
+      await mkdir(parent)
+      await Promise.all(Array.from({ length: 400 }, (_, index) => mkdir(join(parent, `empty-${index}`))))
+    }
+    await mkdir(join(root, 'z-last'))
+    await writeFile(join(root, 'z-last', 'target.txt'), 'bounded')
+
+    const files = await registry.listFiles('friday')
+    assert.ok(files.length < 200)
+    assert.ok(!files.includes('z-last/target.txt'))
+  })
+})
+
+test('repository reads reject binary and malformed UTF-8 without corrupting valid text', async () => {
+  await fixture(async ({ root, registry }) => {
+    for (const content of [Buffer.from('text\0binary'), Buffer.from([0xc3, 0x28])]) {
+      await writeFile(join(root, 'content.txt'), content)
+      await assert.rejects(registry.readFile('friday', 'content.txt'), /UTF-8 text/i)
+    }
+    for (const content of ['', 'Café 日本語 😀\n', '\uFEFFUTF-8 with BOM\n', 'x'.repeat(65_536)]) {
+      await writeFile(join(root, 'content.txt'), content)
+      assert.equal(await registry.readFile('friday', 'content.txt'), content)
+    }
+  })
+})
+
 test('repository status is read-only and scoped to registered roots', async () => {
   await fixture(async ({ root, registry }) => {
     execFileSync('git', ['-C', root, 'init', '-q'])

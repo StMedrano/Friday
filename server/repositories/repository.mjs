@@ -2,6 +2,7 @@ import { lstat, open, opendir, readFile, realpath, stat } from 'node:fs/promises
 import { isAbsolute, relative, resolve, sep } from 'node:path'
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import { isUtf8 } from 'node:buffer'
 
 const execFileAsync = promisify(execFile)
 const MAX_READ_BYTES = 64 * 1024
@@ -155,8 +156,9 @@ export class LocalRepositoryRegistry {
     if (!(await stat(start)).isDirectory()) throw new Error('Path is not a directory')
     const files = []
     const visited = new Set()
+    let entriesSeen = 0
     const walk = async (directory, depth) => {
-      if (depth > 20 || files.length >= limit) return
+      if (depth > 20 || files.length >= limit || entriesSeen >= MAX_DIRECTORY_ENTRIES) return
       const canonical = await realpath(directory)
       if (visited.has(canonical)) return
       visited.add(canonical)
@@ -167,6 +169,8 @@ export class LocalRepositoryRegistry {
         entries.push(entry)
       }
       entries.sort((a, b) => a.name.localeCompare(b.name))
+      entries.length = Math.min(entries.length, MAX_DIRECTORY_ENTRIES - entriesSeen)
+      entriesSeen += entries.length
       for (const entry of entries) {
         if (files.length >= limit) break
         const candidate = resolve(directory, entry.name)
@@ -192,7 +196,9 @@ export class LocalRepositoryRegistry {
       const buffer = Buffer.alloc(MAX_READ_BYTES + 1)
       const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0)
       if (bytesRead > MAX_READ_BYTES) throw new Error('File exceeds the read size limit')
-      return buffer.subarray(0, bytesRead).toString('utf8')
+      const content = buffer.subarray(0, bytesRead)
+      if (content.includes(0) || !isUtf8(content)) throw new Error('File is not UTF-8 text')
+      return content.toString('utf8')
     } finally { await handle.close() }
   }
 
