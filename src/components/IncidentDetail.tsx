@@ -127,7 +127,7 @@ export default function IncidentDetail({ incident, onBack }: { incident: FridayI
       {logsError && <p className="v3-diagnostic-error">{logsError}</p>}
       {logs && <>
         {logs.truncated && <p className="v3-diagnostic-truncated">Log output was truncated at the approved safety boundary.</p>}
-        <pre className="v3-diagnostic-logs">{logs.logs}</pre>
+        <pre className="v3-diagnostic-logs" role="region" aria-label="Sanitized diagnostic logs" tabIndex={0}>{logs.logs}</pre>
       </>}
     </section>}
 

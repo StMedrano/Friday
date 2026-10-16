@@ -100,6 +100,29 @@ test('container that exits before five minutes retains startup configuration fai
   assert.ok(report.likelyCauses.includes('Application or startup configuration failure is likely.'))
 })
 
+test('unavailable runtime timestamps do not imply a startup failure', () => {
+  for (const timestamps of [
+    { startedAt: '', finishedAt: '' },
+    { startedAt: null },
+    { finishedAt: null },
+    { startedAt: 'invalid' },
+    { finishedAt: 'invalid' },
+    { finishedAt: '2026-08-17T00:00:00.000Z' },
+  ]) {
+    const report = buildDiagnosticReport({
+      incident: incident(),
+      inspect: inspect(timestamps),
+      overview: overview(2),
+      now: '2026-08-20T01:00:00.000Z',
+    })
+
+    assert.ok(report.findings.includes('The container exited with a non-zero code without evidence of an OOM termination; runtime duration was unavailable.'), JSON.stringify(timestamps))
+    assert.deepEqual(report.likelyCauses, ['An application or configuration failure is likely, but startup versus runtime timing cannot be determined.'])
+    assert.equal(report.findings.some((value) => /application\/startup failure|runtime\/application failure/i.test(value)), false)
+    assert.ok(report.recommendations.includes('Inspect recent sanitized application logs and recent configuration/deployment changes.'))
+  }
+})
+
 test('OOM termination is diagnosed from the explicit OOM flag', () => {
   const report = buildDiagnosticReport({
     incident: incident(),

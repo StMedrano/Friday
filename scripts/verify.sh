@@ -16,20 +16,20 @@ if command -v docker >/dev/null 2>&1; then
 fi
 
 check_http_endpoints() {
-  curl -fsS "http://127.0.0.1:${PORT}/healthz" >/dev/null 2>&1 &&
-    curl -fsS "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1 &&
-    curl -fsS "http://127.0.0.1:${PORT}/api/overview" >/dev/null 2>&1
+  curl -fsS --max-time 5 "http://127.0.0.1:${PORT}/healthz" >/dev/null 2>&1 &&
+    curl -fsS --max-time 5 "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1 &&
+    curl -fsS --max-time 5 "http://127.0.0.1:${PORT}/api/overview" >/dev/null 2>&1
 }
 
 if command -v curl >/dev/null 2>&1; then
   attempt=1
   while ! check_http_endpoints; do
     if [ "$attempt" -ge "$MAX_ATTEMPTS" ]; then
-      echo "Friday health and overview endpoints did not become ready within 30 seconds" >&2
+      echo "Friday health and overview endpoints did not become ready after ${MAX_ATTEMPTS} attempts" >&2
       exit 1
     fi
     if [ "$attempt" -eq 1 ]; then
-      echo "Friday endpoints are still starting; retrying for up to 30 seconds..."
+      echo "Friday endpoints are still starting; retrying up to ${MAX_ATTEMPTS} attempts (2 seconds apart; 5 seconds per HTTP request)..."
     fi
     sleep "$RETRY_DELAY_SECONDS"
     attempt=$((attempt + 1))

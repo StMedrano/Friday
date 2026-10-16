@@ -14,6 +14,7 @@ async function runVerify({ curlMode }) {
   const root = await mkdtemp(join(tmpdir(), 'friday-verify-test-'))
   const bin = join(root, 'bin')
   const countFile = join(root, 'curl-count')
+  const argsFile = join(root, 'curl-args')
   await import('node:fs/promises').then(({ mkdir }) => mkdir(bin))
   await writeFile(countFile, '0\n', 'utf8')
 
@@ -28,7 +29,7 @@ exit 0
   const curlBody = curlMode === 'fail-once'
     ? `count=$(cat "$VERIFY_CURL_COUNT_FILE"); count=$((count + 1)); printf '%s\\n' "$count" > "$VERIFY_CURL_COUNT_FILE"; if [ "$count" -eq 1 ]; then exit 56; fi; exit 0`
     : `count=$(cat "$VERIFY_CURL_COUNT_FILE"); count=$((count + 1)); printf '%s\\n' "$count" > "$VERIFY_CURL_COUNT_FILE"; exit 56`
-  await makeExecutable(join(bin, 'curl'), `#!/usr/bin/env sh\n${curlBody}\n`)
+  await makeExecutable(join(bin, 'curl'), `#!/usr/bin/env sh\nprintf '%s\\n' \"$*\" >> \"$VERIFY_CURL_ARGS_FILE\"\n${curlBody}\n`)
 
   const result = spawnSync('sh', ['scripts/verify.sh'], {
     cwd: process.cwd(),
@@ -36,12 +37,14 @@ exit 0
       ...process.env,
       PATH: `${bin}:${process.env.PATH}`,
       VERIFY_CURL_COUNT_FILE: countFile,
+      VERIFY_CURL_ARGS_FILE: argsFile,
     },
     encoding: 'utf8',
   })
   const count = Number((await readFile(countFile, 'utf8')).trim())
+  const calls = (await readFile(argsFile, 'utf8')).trim().split('\n')
   await rm(root, { recursive: true, force: true })
-  return { result, count }
+  return { result, count, calls }
 }
 
 test('verify retries a transient HTTP startup failure and succeeds once endpoints become available', async () => {
@@ -53,5 +56,17 @@ test('verify retries a transient HTTP startup failure and succeeds once endpoint
 test('verify retries repeated HTTP startup failures before returning failure', async () => {
   const { result, count } = await runVerify({ curlMode: 'always-fail' })
   assert.notEqual(result.status, 0)
-  assert.ok(count > 1, `expected more than one curl attempt, got ${count}`)
+  assert.equal(count, 16, 'stop after the bounded retry count')
+})
+
+test('verify bounds every HTTP request, including health and overview checks after recovery', async () => {
+  const { result, calls } = await runVerify({ curlMode: 'fail-once' })
+  assert.equal(result.status, 0)
+  assert.equal(calls.length, 4)
+  for (const call of calls) {
+    assert.match(call, /(?:^| )--max-time 5(?: |$)/)
+  }
+  assert.deepEqual(calls.map((call) => new URL(call.split(' ').at(-1)).pathname), [
+    '/healthz', '/healthz', '/api/health', '/api/overview',
+  ])
 })

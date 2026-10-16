@@ -93,6 +93,8 @@ make update
 make health
 ```
 
+`make health` checks `/healthz`, `/api/health`, and `/api/overview` with a five-second timeout per HTTP request. It retries up to 16 attempts, two seconds apart, before failing. HTTP request time is additional to the retry delays.
+
 The updater must preserve the production `.env`, refuse unexplained dirty source state, and avoid mounting the VM102 Docker socket unless local Docker observation is explicitly intended.
 
 ## Phase 1 Supabase migration
