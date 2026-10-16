@@ -30,6 +30,8 @@ Returns bounded recent FRIDAY-owned monitoring events newest-first. History must
 
 Returns the persisted safe diagnostic report for one existing incident when diagnostics are supported/enabled.
 
+For non-zero container exits without an OOM flag, new reports distinguish startup from runtime failures only when both timestamps establish a valid duration. Missing, invalid, or reversed timestamps leave that timing undetermined.
+
 ### `GET /api/incidents/:incidentId/logs`
 
 Performs explicit read-only bounded log inspection. Raw log text is response-only and is not persisted.

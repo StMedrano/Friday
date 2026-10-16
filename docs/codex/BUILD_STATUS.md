@@ -65,6 +65,16 @@ The following capabilities are already part of `main`:
 
 PR #14 is merged; the old “finish the Friday Assistant experience” milestone is retired.
 
+### Issue #21 — focused diagnostics follow-up, 2026-10-15
+
+Implemented on `fix/diagnostics-polish-issue-21` from current `main`, preserving existing startup/runtime classification and bounded startup retries:
+
+- Missing, invalid, or reversed runtime timestamps produce a neutral non-zero-exit diagnosis instead of implying a startup failure.
+- Each health-script HTTP request has a five-second timeout; the existing 16-attempt limit remains, and documentation distinguishes request time from retry delays.
+- Inspected log lines stay unwrapped on desktop and phone, with horizontal scrolling confined to the log panel and visible keyboard focus.
+
+Failing-first regressions were observed. Local Node 22 `make verify` passed: 86 frontend tests, 337 server/observer/script tests, production build, and all three Compose validations. Built-UI Chromium checks at 1440px and 390px verified exact log text, panel-only scrolling, tab focus, and arrow-key scrolling using synthetic HTTP data. These results do not establish GitHub CI, merge readiness, deployment, or live VM102 acceptance.
+
 ## Local Agent Platform Phase 1 — implemented in draft PR #19
 
 Source branch: `feature/friday-local-agent-platform-phase1-20260830`.

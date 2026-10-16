@@ -1,9 +1,12 @@
-@media(max-width:700px){
-  .v3-phone-shell .v3-diagnostic-logs{
-    overflow-x:auto;
-    overflow-y:auto;
-    white-space:pre;
-    overflow-wrap:normal;
-    word-break:normal;
-  }
+.v3-diagnostic-logs,
+.v3-phone-shell .v3-diagnostic-logs{
+  overflow-x:auto;
+  overflow-y:auto;
+  white-space:pre;
+  overflow-wrap:normal;
+  word-break:normal;
+}
+.v3-diagnostic-logs:focus-visible{
+  outline:2px solid var(--cyan);
+  outline-offset:2px;
 }

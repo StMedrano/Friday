@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import IncidentDetail from './IncidentDetail'
 import * as api from '../lib/api'
 import type { FridayIncident } from '../lib/api'
+import monitoringCss from '../monitoring.css?inline'
+import diagnosticsPolishCss from '../diagnostics-polish.css?inline'
 
 vi.mock('../lib/api', async () => {
   const actual = await vi.importActual<typeof import('../lib/api')>('../lib/api')
@@ -89,6 +91,23 @@ describe('IncidentDetail', () => {
     expect(await screen.findByText(/diagnostics not supported/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /inspect logs/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /restart|repair|execute/i })).not.toBeInTheDocument()
+  })
+
+  it('keeps inspected log lines intact in a keyboard-accessible scroll panel', async () => {
+    const logOutput = `2026-10-15T18:00:00Z ${'long diagnostic detail '.repeat(50)}\n  indented next line`
+    vi.mocked(api.fetchIncidentDiagnostics).mockResolvedValue({
+      incidentId: 'i1', status: 'available', facts: [], findings: [], recommendations: [], logsAvailable: true,
+    })
+    vi.mocked(api.fetchIncidentLogs).mockResolvedValue({ incidentId: 'i1', tail: 100, logs: logOutput, truncated: false })
+    const user = userEvent.setup()
+    render(<><style>{monitoringCss + diagnosticsPolishCss}</style><IncidentDetail incident={incident} /></>)
+
+    await user.click(await screen.findByRole('button', { name: /inspect logs.*read only/i }))
+    const panel = await screen.findByText((_, element) => element?.tagName === 'PRE' && element.textContent === logOutput)
+    expect(panel).toHaveStyle('white-space: pre; overflow-x: auto; overflow-wrap: normal; word-break: normal; max-width: 100%')
+    expect(screen.getByRole('region', { name: 'Sanitized diagnostic logs' })).toBe(panel)
+    await user.tab()
+    expect(panel).toHaveFocus()
   })
 
   it('keeps diagnostic and log failures explicitly non-mutating', async () => {
