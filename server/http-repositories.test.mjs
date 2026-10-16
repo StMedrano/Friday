@@ -43,3 +43,21 @@ test('repository API hides registry failures and exposes no mutation methods', a
     }
   })
 })
+
+test('repository explorer endpoints expose bounded status, paths, and file contents only', async () => {
+  const calls = []
+  await withServer({ repositoryRegistry: {
+    async list() { return [{ id: 'friday', name: 'Friday', mode: 'read-only', enabled: true }] },
+    async status(id) { calls.push(['status', id]); return { branch: 'main', dirty: false } },
+    async listFiles(id, options) { calls.push(['list', id, options]); return ['README.md'] },
+    async readFile(id, path) { calls.push(['read', id, path]); return 'safe text' },
+  } }, async (base) => {
+    assert.deepEqual(await (await fetch(`${base}/api/repositories/friday/status`)).json(), { branch: 'main', dirty: false })
+    assert.deepEqual(await (await fetch(`${base}/api/repositories/friday/files?path=docs&limit=25`)).json(), ['README.md'])
+    assert.deepEqual(await (await fetch(`${base}/api/repositories/friday/file?path=README.md`)).json(), { path: 'README.md', content: 'safe text' })
+    assert.equal((await fetch(`${base}/api/repositories/friday/file?path=README.md`, { method: 'POST' })).status, 404)
+    assert.deepEqual(calls, [
+      ['status', 'friday'], ['list', 'friday', { path: 'docs', limit: 25 }], ['read', 'friday', 'README.md'],
+    ])
+  })
+})

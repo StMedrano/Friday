@@ -42,7 +42,15 @@ There is no diagnostic remediation endpoint.
 
 Returns enabled repositories from the server-side local registry. Response metadata includes ID, display name, remote without URL credentials or query parameters, default branch, and access mode. It never includes local filesystem paths or per-repository exclusions. Missing or invalid registry data returns a generic `503`; the route has no mutation methods.
 
-The file named by `FRIDAY_REPOSITORY_REGISTRY_PATH` is excluded from Git and the container build context. Registry path resolution accepts only explicitly registered Git working trees, rejects traversal and symlink escapes, and refuses secret, dependency, and build paths. This endpoint does not provide repository file tools.
+The file named by `FRIDAY_REPOSITORY_REGISTRY_PATH` is excluded from Git and the container build context. Registry path resolution accepts only explicitly registered Git working trees, rejects traversal and symlink escapes, and refuses secret, dependency, and build paths.
+
+### Read-only repository tools
+
+- `GET /api/repositories/:id/status` returns the branch and a dirty flag, without file names.
+- `GET /api/repositories/:id/files?path=.&limit=100` returns at most 200 in-root file paths. Directory traversal is depth- and entry-bounded.
+- `GET /api/repositories/:id/file?path=README.md` returns UTF-8 text for a regular file no larger than 64 KiB.
+
+All paths resolve under an enabled registered Git root and repeat exclusion checks after symlink resolution. Failures return a generic rejection; arbitrary shell, Git arguments, write methods, and repository mutation are not exposed.
 
 ## `POST /api/commands/preview`
 

@@ -69,7 +69,7 @@ PR #14 is merged; the old “finish the Friday Assistant experience” milestone
 
 Issue #20 starts the repository-aware, read-only agent milestone. The local registry foundation accepts explicitly registered Git working trees from the server-only `FRIDAY_REPOSITORY_REGISTRY_PATH` JSON file. `GET /api/repositories` returns safe metadata without local paths, exclusion policy, or URL credentials. Path resolution rejects traversal, symlink escapes, secrets, and dependency/build trees. The registry file stays out of Git and the container build context.
 
-Explorer tools, repository-scoped task flow, and the Repositories workspace remain unfinished. No repository write, commit, push, or deployment action is exposed by this slice. Source verification does not establish VM102 integration or live acceptance.
+Read-only Explorer tools now expose Git branch/dirty status, bounded file listings, and bounded text reads for registered roots. Paths remain canonicalized and exclusion-checked; reads cap at 64 KiB. Repository-scoped task flow and the Repositories workspace remain unfinished. No repository write, commit, push, or deployment action is exposed by this slice. Source verification does not establish VM102 integration or live acceptance.
 
 ## Local Agent Platform Phase 1 — implemented in draft PR #19
 

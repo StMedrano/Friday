@@ -3,6 +3,7 @@ import { mkdtemp, mkdir, readFile, rm, symlink, writeFile } from 'node:fs/promis
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import { execFileSync } from 'node:child_process'
 import test from 'node:test'
 import { LocalRepositoryRegistry, toPublicRepository } from './repository.mjs'
 
@@ -43,6 +44,31 @@ test('loads only enabled Git repositories and returns safe public metadata', asy
     assert.deepEqual(await registry.resolvePath('friday', 'src/index.mjs'), join(root, 'src', 'index.mjs'))
     assert.equal(await readFile(await registry.resolvePath('friday', 'README.md'), 'utf8'), 'fixture\n')
     assert.equal(await registry.get('missing'), null)
+  })
+})
+
+test('lists bounded repository files and reads only small in-root files', async () => {
+  await fixture(async ({ root, registry }) => {
+    assert.deepEqual(await registry.listFiles('friday'), ['README.md', 'src/index.mjs'])
+    assert.deepEqual(await registry.listFiles('friday', { path: 'src' }), ['src/index.mjs'])
+    assert.equal(await registry.readFile('friday', 'src/index.mjs'), 'export const safe = true\n')
+    await writeFile(join(root, 'large.txt'), 'x'.repeat(65_537))
+    await assert.rejects(registry.readFile('friday', 'large.txt'), /size limit/i)
+    await assert.rejects(registry.readFile('friday', 'src'), /regular file/i)
+    await assert.rejects(registry.listFiles('friday', { limit: 201 }), /limit/i)
+  })
+})
+
+test('repository status is read-only and scoped to registered roots', async () => {
+  await fixture(async ({ root, registry }) => {
+    execFileSync('git', ['-C', root, 'init', '-q'])
+    execFileSync('git', ['-C', root, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'add', 'README.md', 'src/index.mjs'])
+    execFileSync('git', ['-C', root, '-c', 'user.name=Fixture', '-c', 'user.email=fixture@example.test', 'commit', '-qm', 'fixture'])
+    await writeFile(join(root, 'README.md'), 'changed\n')
+    const status = await registry.status('friday')
+    assert.equal(typeof status.branch, 'string')
+    assert.equal(status.dirty, true)
+    assert.equal(await registry.status('missing').then(() => false, () => true), true)
   })
 })
 

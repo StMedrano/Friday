@@ -1,5 +1,12 @@
-import { lstat, readFile, realpath, stat } from 'node:fs/promises'
+import { lstat, open, opendir, readFile, realpath, stat } from 'node:fs/promises'
 import { isAbsolute, relative, resolve, sep } from 'node:path'
+import { execFile } from 'node:child_process'
+import { promisify } from 'node:util'
+
+const execFileAsync = promisify(execFile)
+const MAX_READ_BYTES = 64 * 1024
+const MAX_LIST_LIMIT = 200
+const MAX_DIRECTORY_ENTRIES = 1000
 
 const ID = /^[a-z0-9][a-z0-9._-]{0,63}$/
 const MODES = new Set(['read-only', 'development', 'pr-enabled'])
@@ -139,5 +146,68 @@ export class LocalRepositoryRegistry {
     const canonical = rel.replaceAll(sep, '/') || '.'
     if (isExcluded(canonical, repository.exclude)) throw new Error('Path is excluded')
     return candidate
+  }
+
+  async listFiles(id, { path = '.', limit = 100 } = {}) {
+    if (!Number.isInteger(limit) || limit < 1 || limit > MAX_LIST_LIMIT) throw new Error('File list limit is invalid')
+    const root = await this.resolvePath(id, '.')
+    const start = path === '.' ? root : await this.resolvePath(id, path)
+    if (!(await stat(start)).isDirectory()) throw new Error('Path is not a directory')
+    const files = []
+    const visited = new Set()
+    const walk = async (directory, depth) => {
+      if (depth > 20 || files.length >= limit) return
+      const canonical = await realpath(directory)
+      if (visited.has(canonical)) return
+      visited.add(canonical)
+      const handle = await opendir(directory)
+      const entries = []
+      for await (const entry of handle) {
+        if (entries.length >= MAX_DIRECTORY_ENTRIES) break
+        entries.push(entry)
+      }
+      entries.sort((a, b) => a.name.localeCompare(b.name))
+      for (const entry of entries) {
+        if (files.length >= limit) break
+        const candidate = resolve(directory, entry.name)
+        let safePath
+        try { safePath = await this.resolvePath(id, relative(root, candidate)) }
+        catch { continue }
+        const info = await stat(safePath)
+        if (info.isDirectory()) await walk(safePath, depth + 1)
+        else if (info.isFile()) files.push(relative(root, safePath).split(sep).join('/'))
+      }
+    }
+    await walk(start, 0)
+    return files.sort()
+  }
+
+  async readFile(id, requested) {
+    const pathname = await this.resolvePath(id, requested)
+    const info = await stat(pathname)
+    if (!info.isFile()) throw new Error('Path is not a regular file')
+    if (info.size > MAX_READ_BYTES) throw new Error('File exceeds the read size limit')
+    const handle = await open(pathname, 'r')
+    try {
+      const buffer = Buffer.alloc(MAX_READ_BYTES + 1)
+      const { bytesRead } = await handle.read(buffer, 0, buffer.length, 0)
+      if (bytesRead > MAX_READ_BYTES) throw new Error('File exceeds the read size limit')
+      return buffer.subarray(0, bytesRead).toString('utf8')
+    } finally { await handle.close() }
+  }
+
+  async status(id) {
+    const repository = await this.get(id)
+    if (!repository) throw new Error('Repository is not registered or enabled')
+    const root = await this.resolvePath(id, '.')
+    const { stdout } = await execFileAsync('git', ['-C', root, 'status', '--porcelain=v1', '--branch', '--untracked-files=no'], {
+      encoding: 'utf8', timeout: 3000, maxBuffer: 16 * 1024,
+      env: {
+        ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_CONFIG_NOSYSTEM: '1',
+        GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.fsmonitor', GIT_CONFIG_VALUE_0: 'false',
+      },
+    })
+    const [header, ...changes] = stdout.trimEnd().split('\n')
+    return { branch: header?.startsWith('## ') ? header.slice(3).split('...')[0] : 'unknown', dirty: changes.length > 0 }
   }
 }
