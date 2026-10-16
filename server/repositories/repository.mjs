@@ -210,7 +210,8 @@ export class LocalRepositoryRegistry {
       encoding: 'utf8', timeout: 3000, maxBuffer: 16 * 1024,
       env: {
         ...process.env, GIT_OPTIONAL_LOCKS: '0', GIT_CONFIG_NOSYSTEM: '1',
-        GIT_CONFIG_COUNT: '1', GIT_CONFIG_KEY_0: 'core.fsmonitor', GIT_CONFIG_VALUE_0: 'false',
+        GIT_CONFIG_COUNT: '2', GIT_CONFIG_KEY_0: 'core.fsmonitor', GIT_CONFIG_VALUE_0: 'false',
+        GIT_CONFIG_KEY_1: 'safe.directory', GIT_CONFIG_VALUE_1: root,
       },
     })
     const [header, ...changes] = stdout.trimEnd().split('\n')
