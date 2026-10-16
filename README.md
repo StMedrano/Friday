@@ -34,7 +34,7 @@ Friday's live adapters and AI surfaces are read-only/advisory. No restart/delete
 
 Infrastructure-changing actions remain blocked until authentication/RBAC, durable append-only action audit, explicit approval, and a global automation kill switch are implemented and tested.
 
-The local Repository Registry accepts only explicitly registered Git working trees. Its JSON file stays server-side and out of version control and container images. Lookup and path resolution remain read-only; canonical-path checks reject traversal, symlink escapes, and secret, build, or dependency paths. `GET /api/repositories` returns safe metadata; `GET /api/repositories/:id/status`, `/files`, and `/file?path=...` provide scoped Git status, bounded file lists, and text reads (64 KiB maximum). No shell or write operation is exposed. Copy `repositories.example.json`, set a mounted checkout path, then explicitly enable the entry.
+The local Repository Registry accepts only explicitly registered Git working trees. Its JSON file stays server-side and out of version control and container images. Lookup and path resolution remain read-only; canonical-path checks reject traversal, symlink escapes, and secret, build, or dependency paths. The Repositories workspace uses `GET /api/repositories` for safe metadata and `GET /api/repositories/:id/status`, `/files`, and `/file?path=...` for scoped Git status, bounded file lists, and text reads (64 KiB maximum). No shell or write operation is exposed. Copy `repositories.example.json`, set a mounted checkout path, then explicitly enable the entry.
 
 # Local Agent Platform Phase 1
 

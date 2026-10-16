@@ -52,6 +52,8 @@ The file named by `FRIDAY_REPOSITORY_REGISTRY_PATH` is excluded from Git and the
 
 All paths resolve under an enabled registered Git root and repeat exclusion checks after symlink resolution. Failures return a generic rejection; arbitrary shell, Git arguments, write methods, and repository mutation are not exposed.
 
+The Repositories workspace uses these GET routes only. It displays registered metadata, branch/dirty status, file paths, and selected text; it does not perform repository writes or execute code.
+
 ## `POST /api/commands/preview`
 
 Deterministic safety classifier. It never executes infrastructure work.
