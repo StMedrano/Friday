@@ -38,9 +38,8 @@ export async function buildOverview(config, adapters = {}) {
   const getVm100ObserverServices = adapters.getVm100ObserverServices || defaultGetVm100ObserverServices
   const getEndpointServices = adapters.getEndpointServices || defaultGetEndpointServices
 
-  const mock = getMockOverview()
   if (config.mode !== 'live') {
-    return { ...normalizeOverview(mock), integrations: integrationSummary({}) }
+    return { ...normalizeOverview(getMockOverview()), integrations: integrationSummary({}) }
   }
 
   const docker = await safe('docker', () => getDockerServices(config.docker))
@@ -52,13 +51,10 @@ export async function buildOverview(config, adapters = {}) {
 
   return {
     ...normalizeOverview({
-      ...mock,
       mode: 'live',
-      services: liveServices.length ? liveServices : mock.services,
-      alerts: [
-        ...(liveServices.length ? [] : mock.alerts),
-        ...errors.map((message, index) => ({ id: `integration-${index}`, title: 'Integration degraded', detail: message, severity: 'warning', source: 'Friday' })),
-      ],
+      // Missing live telemetry stays unavailable; sample data is for mock mode only.
+      services: liveServices,
+      alerts: errors.map((message, index) => ({ id: `integration-${index}`, title: 'Integration degraded', detail: message, severity: 'warning', source: 'Friday' })),
     }),
     integrations: integrationSummary({
       docker: config.docker.enabled,

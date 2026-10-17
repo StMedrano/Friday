@@ -2,6 +2,13 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getConfig } from './config.mjs'
 
+test('repository registry defaults to a server-side path and accepts explicit configuration', () => {
+  assert.deepEqual(getConfig({}).repositories, { registryPath: './repositories.json' })
+  assert.deepEqual(getConfig({ FRIDAY_REPOSITORY_REGISTRY_PATH: '/data/repositories.json' }).repositories, {
+    registryPath: '/data/repositories.json',
+  })
+})
+
 test('AI config exposes the Groq Gemini Ollama chain and keeps credentials server-side', () => {
   const config = getConfig({
     FRIDAY_AI_ENABLED: 'true',
@@ -50,6 +57,47 @@ test('cloud providers require explicit models while OpenAI keeps its legacy defa
   assert.equal(config.ai.providers.ollama.model, 'qwen3:4b-instruct')
   assert.equal(config.ai.providers.ollama.context, 8192)
   assert.equal(config.ai.providers.ollama.maxTokens, 512)
+})
+
+test('agent model profiles stay local-only and server-side', () => {
+  const config = getConfig({
+    FRIDAY_AGENT_REGISTRY_ENABLED: 'true',
+    FRIDAY_AGENT_LOCAL_GENERAL_URL: 'http://192.168.1.70:11434',
+    FRIDAY_AGENT_LOCAL_GENERAL_MODEL: 'qwen3:4b-instruct',
+    FRIDAY_AGENT_LOCAL_GENERAL_CONTEXT: '8192',
+    FRIDAY_AGENT_LOCAL_GENERAL_MAX_TOKENS: '768',
+  })
+
+  assert.equal(config.agents.enabled, true)
+  assert.deepEqual(config.agents.modelProfiles['local-general'], {
+    provider: 'ollama',
+    baseUrl: 'http://192.168.1.70:11434',
+    model: 'qwen3:4b-instruct',
+    context: 8192,
+    maxTokens: 768,
+    timeoutMs: 90000,
+  })
+  assert.equal('apiKey' in config.agents.modelProfiles['local-general'], false)
+})
+
+test('agent registry Supabase config is disabled by default and server-only', () => {
+  const defaults = getConfig({})
+  assert.deepEqual(defaults.agents.registry, {
+    enabled: false,
+    supabaseUrl: '',
+    supabaseServiceKey: '',
+  })
+
+  const config = getConfig({
+    FRIDAY_AGENT_REGISTRY_ENABLED: 'true',
+    FRIDAY_SUPABASE_URL: 'http://192.168.1.80:8000',
+    FRIDAY_SUPABASE_SERVICE_KEY: 'registry-secret',
+  })
+  assert.deepEqual(config.agents.registry, {
+    enabled: true,
+    supabaseUrl: 'http://192.168.1.80:8000',
+    supabaseServiceKey: 'registry-secret',
+  })
 })
 
 test('VM100 observer config is disabled by default and stays server-side', () => {

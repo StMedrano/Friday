@@ -46,6 +46,56 @@ test('observer failure degrades overview instead of failing it', async () => {
   assert.ok(result.alerts.some((alert) => alert.title === 'Integration degraded' && alert.detail.includes('observer offline')))
 })
 
+test('live overview exposes only observed services and never sample site or resource telemetry', async () => {
+  const observed = {
+    id: 'proxmox-qemu-102', name: 'friday-controller', category: 'virtualization',
+    host: 'home', site: 'Site A', status: 'online', detail: 'QEMU 102', updated: 'now',
+  }
+  const result = await buildOverview(liveConfig(), {
+    getDockerServices: async () => [],
+    getProxmoxServices: async () => [observed],
+    getVm100ObserverServices: async () => [],
+    getEndpointServices: async () => [],
+  })
+
+  assert.equal(result.mode, 'live')
+  assert.deepEqual(result.services, [observed])
+  assert.deepEqual(result.sites, [])
+  assert.deepEqual(result.resources, [])
+  assert.deepEqual(result.activities, [])
+})
+
+test('live adapter outage leaves inventory empty instead of claiming sample services are online', async () => {
+  const result = await buildOverview(liveConfig(), {
+    getDockerServices: async () => [],
+    getProxmoxServices: async () => { throw new Error('Proxmox unavailable') },
+    getVm100ObserverServices: async () => { throw new Error('observer unavailable') },
+    getEndpointServices: async () => [],
+  })
+
+  assert.equal(result.mode, 'live')
+  assert.deepEqual(result.services, [])
+  assert.deepEqual(result.sites, [])
+  assert.deepEqual(result.resources, [])
+  assert.deepEqual(result.activities, [])
+  assert.equal(result.alerts.length, 2)
+  assert.ok(result.alerts.every((alert) => alert.title === 'Integration degraded'))
+})
+
+test('mock mode preserves demo data without calling live adapters or requiring credentials', async () => {
+  const unexpected = async () => { throw new Error('Mock mode must not call live adapters') }
+  const result = await buildOverview({ mode: 'mock' }, {
+    getDockerServices: unexpected, getProxmoxServices: unexpected,
+    getVm100ObserverServices: unexpected, getEndpointServices: unexpected,
+  })
+
+  assert.equal(result.mode, 'mock')
+  assert.ok(result.services.length > 0)
+  assert.ok(result.sites.length > 0)
+  assert.ok(result.resources.length > 0)
+  assert.ok(result.alerts.some((alert) => alert.id === 'mock-alert'))
+})
+
 test('monitoring decoration preserves overview and appends incident alert without mutation', () => {
   const base = {
     mode: 'live',

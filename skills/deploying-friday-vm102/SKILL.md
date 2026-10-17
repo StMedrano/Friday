@@ -11,10 +11,12 @@ Treat VM102 as the authoritative Friday controller host. Inventory first, preser
 ## Host roles
 
 ```text
-VM102  friday-controller  192.168.1.64   authoritative Friday controller
-VM100  ubuntu-docker      192.168.1.124  managed infrastructure + read-only Docker observer
-CT108  friday-ollama      192.168.1.70   GPU local-AI fallback
+VM102  friday-controller  10.1.10.11/24  VLAN 10  authoritative Friday controller
+VM100  ubuntu-docker      10.1.10.10/24  VLAN 10  managed infrastructure + read-only Docker observer
+CT108  friday-ollama      10.1.10.12/24  VLAN 10  verified local Ollama endpoint
 ```
+
+VM102 legacy vmbr0 `192.168.1.64` and VM100 legacy vmbr0 `192.168.1.124` remain rollback paths. VM131 is absent from the live inventory recorded on 2026-09-21. Do not infer host numbers from VM IDs.
 
 Never deploy the Friday controller onto VM100 as part of the normal architecture.
 
@@ -33,7 +35,8 @@ Never deploy the Friday controller onto VM100 as part of the normal architecture
 - Provider credentials stay server-side and outside `VITE_*` variables.
 - Preferred provider order is `groq,gemini,ollama`.
 - Cloud timeout default is 15 seconds; local timeout default is 45 seconds.
-- CT108 Ollama is reached at `http://192.168.1.70:11434` and should be firewall-restricted to VM102.
+- CT108 nic1 is verified as `10.1.10.12/24`, and authoritative VM102 passes TCP/11434, `/api/tags`, and `/api/chat` over vmbr1. Friday's checked-in agent profile defaults use `http://10.1.10.12:11434`; `192.168.1.70` is a legacy rollback reference only.
+- CT108 Ollama should be firewall-restricted to VM102.
 - Default local model is `qwen3:4b-instruct`.
 - AI receives no Docker, Proxmox, shell, network, deployment, or remediation tools.
 

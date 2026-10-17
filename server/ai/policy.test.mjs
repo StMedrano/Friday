@@ -8,6 +8,7 @@ test('shared assistant policy is explicitly read-only and state-grounded', () =>
   assert.match(prompt, /normalized infrastructure state/i)
   assert.match(prompt, /do not claim.*executed/i)
   assert.match(prompt, /do not invent/i)
+  assert.match(prompt, /do not assume a fixed number of sites/i)
 })
 
 test('shared assistant policy preserves exact infrastructure identifiers and mappings', () => {

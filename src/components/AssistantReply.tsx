@@ -16,6 +16,7 @@ const provenanceLabels: Record<FridayAssistantMode, string> = {
   'cloud-ai': 'FRIDAY CLOUD AI',
   'local-ai': 'FRIDAY LOCAL AI',
   'local-analysis': 'LOCAL ANALYSIS · NO AI',
+  'local-agent': 'FRIDAY LOCAL AGENT',
 }
 
 function metadata(state: AssistantReplyState) {

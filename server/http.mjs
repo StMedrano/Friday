@@ -1,4 +1,5 @@
 import { createServer } from 'node:http'
+import { toPublicRepository } from './repositories/repository.mjs'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -6,10 +7,36 @@ import { previewCommand } from './core.mjs'
 import { buildOverview, decorateOverviewWithMonitoring } from './overview.mjs'
 import { answerAssistant } from './assistant.mjs'
 import { normalizeAssistantHistory, validateAssistantPrompt } from './assistant-input.mjs'
+import { validateAgentId, validateAgentPrompt, validateRegistrySyncBody } from './agents/input.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
 const SAFE_INCIDENT_ID = /^[A-Za-z0-9_.-]{1,256}$/
+const SAFE_REPOSITORY_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/
+const NO_AGENT_EXECUTION = { performed: false, reason: 'Phase 1 agents are advisory only.' }
+
+function matchedRoutingProvenance(route = {}) {
+  return {
+    matched: true,
+    method: route.routing || 'none',
+    confidence: Number.isFinite(route.confidence) ? route.confidence : 0,
+    reason: route.reason || 'Registered agent matched.',
+  }
+}
+
+function localAgentUnavailable(route = {}) {
+  return {
+    available: false,
+    mode: 'local-agent',
+    provider: 'ollama',
+    error: 'local-agent-unavailable',
+    ...(route.agentId ? { agentId: route.agentId } : {}),
+    ...(route.agentName ? { agentName: route.agentName } : {}),
+    reason: 'Local agent inference unavailable.',
+    routing: matchedRoutingProvenance(route),
+    execution: { ...NO_AGENT_EXECUTION },
+  }
+}
 
 const mime = {
   '.html': 'text/html; charset=utf-8',
@@ -82,6 +109,32 @@ function parseIncidentDiagnosticRerunRoute(pathname) {
   return { invalid: false, incidentId }
 }
 
+function parseAgentDetailRoute(pathname) {
+  const match = String(pathname || '').match(/^\/api\/agents\/([^/]+)$/)
+  if (!match) return null
+  let agentId
+  try { agentId = decodeURIComponent(match[1]) } catch { return { invalid: true } }
+  const validated = validateAgentId(agentId)
+  return validated.ok ? { invalid: false, agentId: validated.id } : { invalid: true }
+}
+
+function parseAgentAskRoute(pathname) {
+  const match = String(pathname || '').match(/^\/api\/agents\/([^/]+)\/ask$/)
+  if (!match) return null
+  let agentId
+  try { agentId = decodeURIComponent(match[1]) } catch { return { invalid: true } }
+  const validated = validateAgentId(agentId)
+  return validated.ok ? { invalid: false, agentId: validated.id } : { invalid: true }
+}
+
+function parseRepositoryToolRoute(pathname) {
+  const match = String(pathname || '').match(/^\/api\/repositories\/([^/]+)\/(status|files|file)$/)
+  if (!match) return null
+  let id
+  try { id = decodeURIComponent(match[1]) } catch { return { invalid: true } }
+  return SAFE_REPOSITORY_ID.test(id) ? { id, tool: match[2] } : { invalid: true }
+}
+
 async function currentOverview({ config, monitoringRuntime, buildOverviewImpl }) {
   const cached = monitoringRuntime?.getOverview?.()
   if (config.monitoring?.enabled && cached) {
@@ -97,6 +150,9 @@ async function currentOverview({ config, monitoringRuntime, buildOverviewImpl })
 export function createFridayServer({
   config,
   monitoringRuntime = null,
+  agentRegistryService = null,
+  agentService = null,
+  repositoryRegistry = null,
   buildOverviewImpl = buildOverview,
   answerAssistantImpl = answerAssistant,
 } = {}) {
@@ -127,6 +183,116 @@ export function createFridayServer({
 
     if (request.method === 'GET' && url.pathname === '/api/monitoring/history') {
       return json(response, 200, monitoringRuntime?.getHistory?.() || { events: [] })
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/agents') {
+      if (!agentRegistryService) return json(response, 503, { error: 'agent-registry-unavailable' })
+      try {
+        return json(response, 200, await agentRegistryService.list())
+      } catch {
+        return json(response, 503, { error: 'agent-registry-unavailable' })
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/repositories') {
+      if (!repositoryRegistry) return json(response, 503, { error: 'repository-registry-unavailable' })
+      try {
+        const repositories = await repositoryRegistry.list()
+        return json(response, 200, repositories.map(toPublicRepository))
+      } catch {
+        return json(response, 503, { error: 'repository-registry-unavailable' })
+      }
+    }
+
+    const repositoryToolRoute = parseRepositoryToolRoute(url.pathname)
+    if (request.method === 'GET' && repositoryToolRoute) {
+      if (repositoryToolRoute.invalid) return json(response, 400, { error: 'invalid-repository-id' })
+      if (!repositoryRegistry) return json(response, 503, { error: 'repository-registry-unavailable' })
+      try {
+        if (repositoryToolRoute.tool === 'status') return json(response, 200, await repositoryRegistry.status(repositoryToolRoute.id))
+        if (repositoryToolRoute.tool === 'files') {
+          const rawLimit = url.searchParams.get('limit')
+          if (rawLimit !== null && !/^\d+$/.test(rawLimit)) throw new Error('File list limit is invalid')
+          const limit = rawLimit === null ? 100 : Number(rawLimit)
+          return json(response, 200, await repositoryRegistry.listFiles(repositoryToolRoute.id, {
+            path: url.searchParams.get('path') || '.', limit,
+          }))
+        }
+        const path = url.searchParams.get('path')
+        if (!path) return json(response, 400, { error: 'repository-file-path-required' })
+        return json(response, 200, { path, content: await repositoryRegistry.readFile(repositoryToolRoute.id, path) })
+      } catch {
+        return json(response, 400, { error: 'repository-request-rejected' })
+      }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/agents/registry/status') {
+      if (!agentRegistryService) return json(response, 503, { error: 'agent-registry-unavailable' })
+      try {
+        return json(response, 200, await agentRegistryService.status())
+      } catch {
+        return json(response, 503, { error: 'agent-registry-unavailable' })
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/agents/registry/sync') {
+      if (!agentRegistryService) return json(response, 503, { error: 'agent-registry-unavailable' })
+      try {
+        const body = await readBody(request)
+        const validated = validateRegistrySyncBody(body)
+        if (!validated.ok) return json(response, 400, { error: validated.error })
+        return json(response, 200, await agentRegistryService.sync())
+      } catch {
+        return json(response, 503, { error: 'agent-registry-unavailable' })
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/agents/route') {
+      if (!agentService) return json(response, 503, { matched: false, error: 'agent-routing-unavailable', reason: 'Agent routing unavailable.' })
+      try {
+        const body = await readBody(request)
+        const promptResult = validateAgentPrompt(body.prompt)
+        if (!promptResult.ok) return json(response, 400, promptResult.result)
+        let requestedAgentId
+        if (body.agentId != null) {
+          const idResult = validateAgentId(body.agentId)
+          if (!idResult.ok) return json(response, 400, { error: idResult.error })
+          requestedAgentId = idResult.id
+        }
+        return json(response, 200, await agentService.route({ prompt: promptResult.prompt, requestedAgentId }))
+      } catch {
+        return json(response, 503, { matched: false, error: 'agent-routing-unavailable', reason: 'Agent routing unavailable.' })
+      }
+    }
+
+    const agentAskRoute = parseAgentAskRoute(url.pathname)
+    if (request.method === 'POST' && agentAskRoute) {
+      if (agentAskRoute.invalid) return json(response, 400, { error: 'invalid-agent-id' })
+      if (!agentService) return json(response, 503, { available: false, error: 'local-agent-unavailable', reason: 'Local agent inference unavailable.', execution: { ...NO_AGENT_EXECUTION } })
+      try {
+        const body = await readBody(request)
+        const promptResult = validateAgentPrompt(body.prompt)
+        if (!promptResult.ok) return json(response, 400, promptResult.result)
+        const overview = await currentOverview({ config, monitoringRuntime, buildOverviewImpl })
+        const result = await agentService.ask(agentAskRoute.agentId, { prompt: promptResult.prompt, overview })
+        if (result.available) return json(response, 200, result)
+        if (result.error === 'agent-unavailable') return json(response, 404, result)
+        return json(response, 503, result)
+      } catch {
+        return json(response, 503, { available: false, error: 'local-agent-unavailable', reason: 'Local agent inference unavailable.', execution: { ...NO_AGENT_EXECUTION } })
+      }
+    }
+
+    const agentDetailRoute = parseAgentDetailRoute(url.pathname)
+    if (request.method === 'GET' && agentDetailRoute) {
+      if (agentDetailRoute.invalid) return json(response, 400, { error: 'invalid-agent-id' })
+      if (!agentRegistryService) return json(response, 503, { error: 'agent-registry-unavailable' })
+      try {
+        const agent = await agentRegistryService.get(agentDetailRoute.agentId)
+        return agent ? json(response, 200, agent) : json(response, 404, { error: 'agent-not-found' })
+      } catch {
+        return json(response, 503, { error: 'agent-registry-unavailable' })
+      }
     }
 
     const diagnosticRerunRoute = parseIncidentDiagnosticRerunRoute(url.pathname)
@@ -174,6 +340,39 @@ export function createFridayServer({
 
         const history = normalizeAssistantHistory(body.history)
         const overview = await currentOverview({ config, monitoringRuntime, buildOverviewImpl })
+
+        let route = null
+        if (agentService) {
+          try {
+            route = await agentService.route({ prompt: promptResult.prompt })
+          } catch {
+            route = null
+          }
+        }
+
+        if (route?.matched === true) {
+          if (!route.agentId) return json(response, 503, localAgentUnavailable(route))
+          try {
+            const agentResult = await agentService.ask(route.agentId, {
+              prompt: promptResult.prompt,
+              overview,
+            })
+            const routedResult = {
+              ...agentResult,
+              mode: 'local-agent',
+              provider: 'ollama',
+              ...(!agentResult.agentId ? { agentId: route.agentId } : {}),
+              ...(!agentResult.agentName && route.agentName ? { agentName: route.agentName } : {}),
+              ...(!agentResult.available ? { error: 'local-agent-unavailable' } : {}),
+              routing: matchedRoutingProvenance(route),
+              execution: { ...NO_AGENT_EXECUTION },
+            }
+            return json(response, routedResult.available ? 200 : 503, routedResult)
+          } catch {
+            return json(response, 503, localAgentUnavailable(route))
+          }
+        }
+
         const result = await answerAssistantImpl({
           config,
           prompt: promptResult.prompt,
@@ -186,6 +385,10 @@ export function createFridayServer({
       } catch {
         return json(response, 502, { available: false, error: 'assistant-failed' })
       }
+    }
+
+    if ((request.method === 'GET' || request.method === 'HEAD') && url.pathname.startsWith('/api/')) {
+      return json(response, 404, { error: 'not-found' })
     }
 
     if (request.method === 'GET' || request.method === 'HEAD') {

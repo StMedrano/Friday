@@ -1,0 +1,5 @@
+{
+ "schemaVersion":"1","id":"github","capabilities":["github.repository.read"],
+ "risk":"low","connectionType":"api","enabled":false,
+ "description":"Descriptive read-only GitHub capability; not connected or executable"
+}

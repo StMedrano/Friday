@@ -104,6 +104,68 @@ jobs:
             exit 1
           fi
 
+      - name: Verify shared-work security boundary
+        run: |
+          if grep -RniE 'child_process|execFile\(|spawn\(|ssh ' server/work --exclude='*.test.mjs'; then
+            echo 'Shared-work execution interface detected' >&2
+            exit 1
+          fi
+          if grep -niE "url\.pathname.*(/api/(work|memory|decisions|handoffs))" server/http.mjs; then
+            echo 'Unreviewed shared-work public endpoint detected' >&2
+            exit 1
+          fi
+          if grep -RniE 'VITE_.*(SUPABASE|SERVICE_KEY|SECRET|MEMORY_TOKEN)' src .env.example compose.yaml; then
+            echo 'Browser-exposed work credential detected' >&2
+            exit 1
+          fi
+
+      - name: Verify read-only Supabase gateway preflight contract
+        run: node --test scripts/preflight-shared-work-target.test.mjs
+
+      - name: Validate Git fabric catalog and internal-only Phase 2C security
+        run: |
+          npm run validate:fabric-catalog
+          node --test server/fabric/*.test.mjs scripts/validate-fabric-catalog.test.mjs
+          if grep -RniE 'child_process|execFile\(|spawn\(|/containers/.*/(start|stop|restart|kill|exec)' server/fabric --exclude='*.test.mjs'; then
+            echo 'Phase 2C fabric added forbidden execution capability' >&2
+            exit 1
+          fi
+          if grep -niE "url\.pathname.*(/api/(policy|plugins|context|fabric|work|memory)|/mcp)" server/http.mjs; then
+            echo 'Unreviewed fabric public endpoint exposed' >&2
+            exit 1
+          fi
+          if grep -RniE 'VITE_.*(SUPABASE|SERVICE_KEY|SECRET|TOKEN)' src .env.example compose.yaml; then
+            echo 'Browser-exposed credential variable detected' >&2
+            exit 1
+          fi
+
+      - name: Verify dormant Phase 2C release boundary
+        run: npm run verify:fabric-dormant
+
+      - name: Validate shared-work schema
+        run: npm run validate:shared-work-schema
+
+      - name: Test shared-work Postgres transactions
+        run: npm run test:shared-work-db
+
+      - name: Validate agent registry schema
+        run: npm run validate:agent-registry-schema
+
+      - name: Verify local agent safety boundary
+        run: |
+          if grep -RniE --exclude-dir=superpowers 'VITE_.*SUPA[B]ASE|VITE_.*SERVICE_[K]EY' .env.example compose.yaml src server docs; then
+            echo 'Browser-visible Supabase credential detected.' >&2
+            exit 1
+          fi
+          if grep -RniE --exclude='*.test.mjs' --exclude='*.test.ts' --exclude='*.test.tsx' 'api/agents.*(execute|restart|shell)' server src; then
+            echo 'Agent execution route detected.' >&2
+            exit 1
+          fi
+          if grep -RniE 'child_process|execFile\(|spawn\(|ssh ' server/agents; then
+            echo 'Agent shell or SSH execution path detected.' >&2
+            exit 1
+          fi
+
       - name: Validate controller Compose
         run: docker compose config >/dev/null
 

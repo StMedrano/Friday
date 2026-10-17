@@ -8,11 +8,11 @@ Set `FRIDAY_MODE=live` and configure the dedicated read-only Proxmox token in VM
 
 ## VM100 Docker observer
 
-The deployed VM100 address is `192.168.1.124`. Configure the bearer-authenticated observer on port `3199` and configure the same token server-side on VM102:
+The verified VM100 nic1 address is `10.1.10.10/24` on VLAN 10. `192.168.1.124` is the legacy vmbr0 rollback address. Configure the bearer-authenticated observer on port `3199` and configure the same token server-side on VM102:
 
 ```env
 FRIDAY_VM100_OBSERVER_ENABLED=true
-FRIDAY_VM100_OBSERVER_URL=http://192.168.1.124:3199
+FRIDAY_VM100_OBSERVER_URL=http://10.1.10.10:3199
 FRIDAY_VM100_OBSERVER_TOKEN=
 FRIDAY_VM100_OBSERVER_HOST_NAME=VM 100
 ```
@@ -53,21 +53,21 @@ git pull --ff-only origin main
 cd observer
 docker compose config >/dev/null
 docker compose up -d --build --force-recreate
-curl -fsS http://192.168.1.124:3199/health | jq
+curl -fsS http://10.1.10.10:3199/health | jq
 ```
 
 Privately load the existing observer token into `$TOKEN`, then confirm inventory works and obtain the target container ID from sanitized inventory:
 
 ```bash
 CONTAINER_ID=$(curl -fsS -H "Authorization: Bearer $TOKEN" \
-  http://192.168.1.124:3199/api/v1/containers \
+  http://10.1.10.10:3199/api/v1/containers \
   | jq -r '.containers[] | select(.name=="nginx-proxy-manager") | .id')
 
 curl -fsS -H "Authorization: Bearer $TOKEN" \
-  "http://192.168.1.124:3199/api/v1/containers/$CONTAINER_ID/inspect" | jq
+  "http://10.1.10.10:3199/api/v1/containers/$CONTAINER_ID/inspect" | jq
 
 curl -fsS -H "Authorization: Bearer $TOKEN" \
-  "http://192.168.1.124:3199/api/v1/containers/$CONTAINER_ID/logs?tail=100" | jq
+  "http://10.1.10.10:3199/api/v1/containers/$CONTAINER_ID/logs?tail=100" | jq
 ```
 
 Do not manually construct arbitrary Docker paths. `$CONTAINER_ID` must come from observer inventory.
@@ -148,13 +148,15 @@ Groq -> Gemini -> CT108 GPU Ollama -> deterministic local analysis
 
 Relevant server-side configuration:
 
+The URL below uses CT108's verified nic1 endpoint. VM102 reaches TCP/11434, `/api/tags`, and `/api/chat` over vmbr1 with source `10.1.10.11`.
+
 ```env
 FRIDAY_AI_ENABLED=true
 FRIDAY_AI_PROVIDER_ORDER=groq,gemini,ollama
 FRIDAY_CLOUD_AI_TIMEOUT_MS=15000
 FRIDAY_LOCAL_AI_TIMEOUT_MS=45000
 FRIDAY_LOCAL_AI_ENABLED=true
-FRIDAY_LOCAL_AI_URL=http://192.168.1.70:11434
+FRIDAY_LOCAL_AI_URL=http://10.1.10.12:11434
 FRIDAY_LOCAL_AI_MODEL=qwen3:4b-instruct
 FRIDAY_LOCAL_AI_CONTEXT=8192
 FRIDAY_LOCAL_AI_MAX_TOKENS=512
