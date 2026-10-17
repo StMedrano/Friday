@@ -11,6 +11,15 @@ container="friday-phase2b-isolated-$$"
 cleanup() { docker rm -f "$container" >/dev/null 2>&1 || true; }
 trap cleanup EXIT HUP INT TERM
 docker run --rm -d --name "$container" --network none --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=128m -e POSTGRES_PASSWORD=temporary-test-only postgres:16-alpine >/dev/null
+# PostgreSQL's official entrypoint starts a TEMPORARY server during initdb,
+# shuts it down, then launches the final server. pg_isready can succeed during
+# that temporary window; wait for the explicit initialization-complete marker
+# before checking final server readiness. The container is always fresh.
+i=0
+until docker logs "$container" 2>&1 | grep -Fq 'PostgreSQL init process complete; ready for start up.'; do
+ i=$((i+1)); [ "$i" -lt 45 ] || { echo 'Temporary database initialization did not complete' >&2; exit 1; }
+ sleep 1
+done
 i=0
 until docker exec "$container" pg_isready -U postgres >/dev/null 2>&1; do
  i=$((i+1)); [ "$i" -lt 45 ] || { echo 'Temporary database did not start' >&2; exit 1; }

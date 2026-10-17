@@ -2,6 +2,29 @@
 
 This is the source-of-truth handoff ledger for coding agents. Update it when a major capability changes.
 
+## Current security release checkpoint — 2026-10-13
+
+### Authentication source policy — 2026-10-16
+
+- Friday's intended normal login is Authentik through Cloudflare Access Generic OIDC. Cloudflare One-time PIN is a manually activated break-glass method only during a confirmed Authentik outage; Cloudflare does not dynamically gate a second IdP on upstream availability.
+- Friday grants Operator status only when the signed Access JWT contains `custom.friday_auth_source="authentik"` and its signed email is in the operator allowlist. Fallback Access sessions without this claim remain Viewer-only.
+- The verifier and staging tests enforce this role boundary. Live Authentik OIDC configuration, custom-claim forwarding, outage/recovery acceptance, and production changes remain pending. See [authentication failover runbook](../friday-authentication-failover.md).
+
+This checkpoint takes precedence over the older rollout entries below. Those dated entries remain historical evidence, not instructions to repeat PR #19 deployment.
+
+- Continue existing **draft PR #29**, branch `feat/friday-operator-auth-20261011`. Verified implementation baseline: `511b9f70e237900fce24cbd0f0099c42c7bb3c97`; [Friday CI #437](https://github.com/StMedrano/Friday/actions/runs/38409074041) succeeded. Subsequent documentation-only revisions do not imply a new runtime deployment.
+- Candidate code now includes signed Cloudflare Access identity checks, operator-only mutations, same-origin/rate controls, pinned npm dependencies, non-root controller hardening and a restricted Docker observer broker. These are PR changes, not proof of production adoption or independent security acceptance.
+- Isolated VM100 staging is deployed. Token rotation and obsolete stopped-connector cleanup completed with specific approval; user reported successful login after rotation. Anonymous staging edge checks were repeated during continuation: all six routes returned trusted-team 302. Unlisted-identity denial and logout/expiry acceptance remain open.
+- **Staging restart policy applied and verified on VM100 after reconnection:** both existing services report `unless-stopped`. Only the app's Compose line and runtime restart policy changed; container IDs/start times are unchanged. No app/connector restart, recreation or VM/Docker reboot occurred. Stage health 200, protected origin 401 and six public trusted-team 302 checks passed. The connector reports four connections, zero restarts and zero error lines; NPM is running and observer healthy. This verifies policy configuration, not an actual host reboot rehearsal.
+- VM102 production container was rechecked read-only: `friday-release:0fba466`, running and healthy. No production checkout, state volume, integration or network change was made.
+- PR #29 remains draft/unmerged with zero submitted independent reviews. Remaining release gates: independent review, Access policy/negative-identity/session evidence, production Cloudflare/NPM acceptance, verified offline backup and separately approved copy-only UID10001 migration/cutover. Phase 2C remains disabled.
+
+- Continuation on 2026-10-13: CI #440 passed all 37 steps on `82c7746`. A subsequent test-first fix closes identity expiry during asynchronous signing-key retrieval; the final authorization decision now rechecks expiry. Full local verification and post-build Access 6/6 passed. This is candidate source work only; live Access/session and independent release review gates remain open.
+
+See [current finish queue](NEXT_STEPS.md#current-pr-29-release-queue-2026-10-13), [Access acceptance](../friday-cloudflare-acceptance-gates.md), and [VM100 staging runbook](../cloudflare-friday-staging-vm100.md).
+
+## Historical capability and rollout ledger
+
 ## Authoritative branch, hosts, and UI
 
 - `main` is the authoritative FRIDAY build after reviewed feature work is merged.

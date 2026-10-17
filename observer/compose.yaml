@@ -1,10 +1,42 @@
 services:
+  friday-docker-readonly:
+    build:
+      context: .
+      dockerfile: Dockerfile.proxy
+    container_name: friday-docker-readonly
+    restart: unless-stopped
+    user: "10001:10001"
+    # The host docker.sock owner/group is host-specific. Verify with stat.
+    # This group has Docker daemon authority: ONLY the minimal proxy gets it.
+    group_add:
+      - "${FRIDAY_DOCKER_SOCKET_GID:?Set from stat -c %g /var/run/docker.sock}"
+    network_mode: none
+    read_only: true
+    cap_drop:
+      - ALL
+    pids_limit: 64
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - friday_docker_proxy_socket:/proxy
+    security_opt:
+      - no-new-privileges:true
+
   friday-observer:
     build:
       context: .
       dockerfile: Dockerfile
     container_name: friday-observer
     restart: unless-stopped
+    depends_on:
+      friday-docker-readonly:
+        condition: service_healthy
+    user: "10001:10001"
+    read_only: true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,size=16m
     ports:
       - "${FRIDAY_OBSERVER_BIND_ADDRESS:-10.1.10.10}:${FRIDAY_OBSERVER_PORT:-3199}:3199"
     environment:
@@ -12,9 +44,14 @@ services:
       FRIDAY_OBSERVER_BIND_ADDRESS: 0.0.0.0
       FRIDAY_OBSERVER_TOKEN: ${FRIDAY_OBSERVER_TOKEN:?FRIDAY_OBSERVER_TOKEN is required}
       FRIDAY_OBSERVER_HOST_NAME: ${FRIDAY_OBSERVER_HOST_NAME:-VM 100}
-      FRIDAY_OBSERVER_DOCKER_SOCKET: /var/run/docker.sock
+      FRIDAY_OBSERVER_DOCKER_SOCKET: /proxy/docker.sock
       FRIDAY_OBSERVER_ALLOWED_LABEL_KEYS: ${FRIDAY_OBSERVER_ALLOWED_LABEL_KEYS:-com.docker.compose.project,com.docker.compose.service}
     volumes:
-      - /var/run/docker.sock:/var/run/docker.sock:ro
+      # Observer has only this restricted, rootless UNIX socket; NEVER docker.sock.
+      - friday_docker_proxy_socket:/proxy:ro
     security_opt:
       - no-new-privileges:true
+
+volumes:
+  friday_docker_proxy_socket:
+    name: friday_docker_proxy_socket

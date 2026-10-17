@@ -183,13 +183,6 @@ export async function fetchFridayAgentRegistryStatus(signal?: AbortSignal): Prom
   return body as FridayAgentRegistryStatus
 }
 
-export async function syncFridayAgentRegistry(signal?: AbortSignal): Promise<FridayAgentRegistryStatus> {
-  const response = await fetch('/api/agents/registry/sync', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({}), signal })
-  const body = await response.json() as FridayAgentRegistryStatus | { error?: string }
-  if (!response.ok) throw new Error('error' in body && body.error ? body.error : 'Agent registry sync unavailable')
-  return body as FridayAgentRegistryStatus
-}
-
 export async function routeFridayAgent(prompt: string, signal?: AbortSignal): Promise<FridayAgentRouteResponse> {
   const response = await fetch('/api/agents/route', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt }), signal })
   const body = await response.json() as FridayAgentRouteResponse

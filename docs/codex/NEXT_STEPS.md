@@ -1,6 +1,21 @@
 # Friday — Ordered Finish Queue
 
-Work from top to bottom. Do not skip safety prerequisites to reach action features sooner.
+Use the current PR #29 queue first. Older P0–P10 entries below are historical product planning and must not trigger a repeat of completed rollout work. Do not skip safety prerequisites to reach action features sooner.
+
+## Current PR #29 release queue — 2026-10-13
+
+1. Resume existing draft `feat/friday-operator-auth-20261011`, not a new security implementation. Implementation baseline `511b9f70e237900fce24cbd0f0099c42c7bb3c97` passed CI #437.
+2. **Completed on 2026-10-13 after VM100 reconnection:** inspected the existing staging app, changed only its Compose line and runtime policy to `unless-stopped`, and verified both service policies with unchanged container IDs/start times. Stage health, anonymous origin/edge denial and adjacent services passed. Do not repeat deployment, recreate the connector, or reboot Docker/VM100 for testing. Continue at step 3.
+3. Configure Authentik as the only normal Friday login method through Cloudflare Access Generic OIDC. Validate the signed `friday_auth_source` claim, exact operator identity and staging access. Test the outage-only One-time PIN break-glass path from [Friday authentication failover](../friday-authentication-failover.md); fallback identities must remain Viewer-only. Complete unlisted-identity denial, sanitized Access log/policy evidence, and logout/expiry acceptance with required session-impact approval. Never collect JWTs/cookies or broaden Allow policy to make a test pass.
+4. Obtain a genuine independent review of the final candidate. CI, self-review and user-reported login do not replace this gate.
+5. Complete production Cloudflare/NPM forwarding and origin-isolation acceptance, then a verified offline backup and copy-only non-root volume migration under separate authorization. Do not change the root-owned production volume or deploy this draft directly.
+6. Obtain separate explicit merge and production cutover decisions only after the concrete candidate and release evidence are reviewable. Keep Phase 2C disabled.
+
+Token rotation, obsolete stopped-connector cleanup and post-rotation user-reported login are **complete**. Do not repeat them. VM102 production remains on healthy `friday-release:0fba466`; no production rollout is authorized by this queue.
+
+See [build checkpoint](BUILD_STATUS.md#current-security-release-checkpoint-2026-10-13), [Access acceptance](../friday-cloudflare-acceptance-gates.md), and [staging reboot recovery](../cloudflare-friday-staging-vm100.md#staging-reboot-recovery-2026-10-13).
+
+## Historical product queue
 
 ## P0 — VM100 observer baseline — completed; nic1 example migrated
 
