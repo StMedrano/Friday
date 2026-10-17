@@ -61,3 +61,21 @@ test('repository explorer endpoints expose bounded status, paths, and file conte
     ])
   })
 })
+
+test('repository file limits require decimal digits before numeric conversion', async () => {
+  const limits = []
+  await withServer({ repositoryRegistry: {
+    async listFiles(id, { limit }) { limits.push(limit); return [] },
+  } }, async (base) => {
+    for (const limit of ['0x10', '0b10', '1e2', '1.0000000000000001', '1.5', '+1', ' 1 ', '', 'NaN', 'Infinity']) {
+      const response = await fetch(`${base}/api/repositories/friday/files?${new URLSearchParams({ limit })}`)
+      assert.equal(response.status, 400, `limit=${JSON.stringify(limit)}`)
+      assert.deepEqual(await response.json(), { error: 'repository-request-rejected' })
+    }
+    assert.deepEqual(limits, [], 'malformed limits must not reach repository traversal')
+    for (const query of ['', '?limit=1', '?limit=200']) {
+      assert.equal((await fetch(`${base}/api/repositories/friday/files${query}`)).status, 200)
+    }
+    assert.deepEqual(limits, [100, 1, 200])
+  })
+})
