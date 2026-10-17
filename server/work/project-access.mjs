@@ -1,6 +1,7 @@
 import {createOwnerWorkBindings,resolveTrustedWorkActor} from './actor-bindings.mjs'
 import {createWorkService} from './work-service.mjs'
 import {safeWorkError} from './validation.mjs'
+import {parseTaskCursor,encodeTaskCursor,validateTaskPage} from './task-pagination.mjs'
 const id=v=>typeof v==='string'&&/^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/.test(v)
 function projectCatalog(rows){
  if(!Array.isArray(rows)||rows.length>50)throw safeWorkError('storage-unavailable')
@@ -31,6 +32,16 @@ export function createProjectTaskAccess({repository,owner}){
  }
  return Object.freeze({
   projects:catalog,
+  async page(identity,projectId,cursor){
+   const scoped=await actor(identity,projectId)
+   const after=parseTaskCursor(cursor,projectId)
+   try{
+    const rows=validateTaskPage(await service.listPage({actor:scoped,projectId,cursor}),after)
+    // Validate the lookahead record too; never partially accept malformed storage.
+    const projected=rows.map(row=>task(row,projectId))
+    return {tasks:projected.slice(0,50),nextCursor:rows.length>50?encodeTaskCursor(projectId,rows[49]):null}
+   }catch(error){throw safeWorkError(error.kind==='invalid-input'?'invalid-input':'storage-unavailable')}
+  },
   async list(identity,projectId){
    const scoped=await actor(identity,projectId)
    try{

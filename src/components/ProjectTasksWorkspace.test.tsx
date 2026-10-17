@@ -3,6 +3,17 @@ import userEvent from '@testing-library/user-event'
 import {afterEach,expect,it,vi} from 'vitest'
 import ProjectTasksWorkspace from './ProjectTasksWorkspace'
 afterEach(()=>vi.unstubAllGlobals())
+it('browses older tasks and refreshes newest records without losing the draft',async()=>{
+ const row={id:'task-a',projectId:'project-a',title:'Newest task',objective:'Goal',acceptanceCriteria:[],status:'ready',version:1}
+ vi.stubGlobal('fetch',vi.fn(async(path:string)=>({ok:true,json:async()=>path==='/api/projects'?{projects:[{id:'project-a',name:'Fixture project'}]}:path.includes('?cursor=')?{tasks:[{...row,id:'task-b',title:'Older task'}],nextCursor:null}:{tasks:[row],nextCursor:'cursor-a'}})))
+ const user=userEvent.setup();render(<ProjectTasksWorkspace/>);await screen.findByRole('option',{name:'Fixture project'});await user.selectOptions(screen.getByLabelText('Project'),'project-a')
+ await screen.findByRole('heading',{name:'Newest task'});await user.type(screen.getByLabelText('Task title'),'Draft')
+ await user.click(screen.getByRole('button',{name:'Older tasks'}));await screen.findByRole('heading',{name:'Older task'})
+ expect(screen.queryByRole('heading',{name:'Newest task'})).toBeNull();expect(screen.queryByRole('button',{name:'Older tasks'})).toBeNull()
+ expect(screen.getByLabelText('Task title')).toHaveValue('Draft')
+ await user.click(screen.getByRole('button',{name:'Refresh tasks'}));await screen.findByRole('heading',{name:'Newest task'})
+ expect(screen.getByLabelText('Task title')).toHaveValue('Draft')
+})
 it('loads provisioned projects and saved tasks; failed writes retain draft without a false success',async()=>{
  let fail=false;let rows:unknown[]=[]
  vi.stubGlobal('fetch',vi.fn(async(path:string,options?:RequestInit)=>{
@@ -11,7 +22,7 @@ it('loads provisioned projects and saved tasks; failed writes retain draft witho
    if(fail)return {ok:false,status:503}
    const input=JSON.parse(options.body as string);const task={...input,id:'task-a',projectId:'project-a',status:'ready',version:1};rows=[task];return {ok:true,json:async()=>({task})}
   }
-  return {ok:true,json:async()=>({tasks:rows})}
+  return {ok:true,json:async()=>({tasks:rows,nextCursor:null})}
  }))
  const user=userEvent.setup();render(<ProjectTasksWorkspace/>);
  await screen.findByRole('option',{name:'Fixture project'})
@@ -35,7 +46,7 @@ it('unavailable and denied access do not masquerade as an empty project catalog'
 
 it('failed task reads disable creation until a successful explicit refresh',async()=>{
  let unavailable=true
- vi.stubGlobal('fetch',vi.fn(async(path:string)=>path==='/api/projects'?{ok:true,json:async()=>({projects:[{id:'project-a',name:'Fixture project'}]})}:unavailable?{ok:false,status:503}:{ok:true,json:async()=>({tasks:[]})}))
+ vi.stubGlobal('fetch',vi.fn(async(path:string)=>path==='/api/projects'?{ok:true,json:async()=>({projects:[{id:'project-a',name:'Fixture project'}]})}:unavailable?{ok:false,status:503}:{ok:true,json:async()=>({tasks:[],nextCursor:null})}))
  const user=userEvent.setup();render(<ProjectTasksWorkspace/>);
  await screen.findByRole('option',{name:'Fixture project'});await user.selectOptions(screen.getByLabelText('Project'),'project-a')
  await screen.findByRole('alert');await user.type(screen.getByLabelText('Task title'),'Draft');await user.type(screen.getByLabelText('Objective'),'Keep this draft')
@@ -58,7 +69,7 @@ it('an unchanged retry after a lost save response uses the same request ID',asyn
    if(requests.length===1)throw Error('Response lost')
    return {ok:true,json:async()=>({task:{...body,id:'task-a',projectId:'project-a',status:'ready',version:1}})}
   }
-  return {ok:true,json:async()=>({tasks:[]})}
+  return {ok:true,json:async()=>({tasks:[],nextCursor:null})}
  }))
  const user=userEvent.setup();render(<ProjectTasksWorkspace/>);
  await screen.findByRole('option',{name:'Fixture project'});await user.selectOptions(screen.getByLabelText('Project'),'project-a');await screen.findByText('No tasks recorded in this project.')

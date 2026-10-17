@@ -1,5 +1,14 @@
 # Friday Build Status
 
+## Task pagination continuation
+
+Continued from verifiedc0e8642 / successful CI480. Project task GET now returns up to50 normalized records and nextCursor, with one optional bounded cursor query. Pages use creation time plus UUID descending, preserving six PostgreSQL timestamp fractional digits; fixed project filters remain independent of position. Every page rechecks verified owner and the current provisioned catalog. Invalid/wrong-project/duplicate cursor parameters reject; malformed, unordered, duplicate or cursor-overlapping storage fails unavailable rather than empty. No new authority is encoded in the cursor.
+
+The Tasks view can browse older pages and return to newest through Refresh, preserving drafts, stale-read cancellation and failed-read creation blocking. Confirmed creation from an older/full page reloads newest, so the displaced boundary task is not skipped. Failing-first cursor, access/repository, HTTP, component and client regressions passed; scoped source review found no concrete defects. Full local Node22 WSL verification:174 frontend /486 Node tests, zero skips, and production build passed. Built Edge desktop/390px suite:5/5 passed, including61 synthetic records and a save-boundary check. Added a disposable SQL test for same-time UUID ordering, microsecond precision and insertion ahead of the cursor. No migration/dependency/private connection/runtime activation changed.
+
+Local make and Docker executable were rechecked and remain unavailable. Exact-head CI must establish real SQL/container/scanner gates and is recorded on draft PR33. Live PostgREST UTC serialization/query-plan performance, retention/backup and real Access/relogin remain activation requirements. Plan: docs/superpowers/plans/local-task-pagination.md.
+
+
 ## Task read and uncertain-save recovery
 
 Continued from verified4a9d54f / successful CI479. A failing component regression reproduced creation remaining enabled after a failed task list. Creation now requires a validated successful task read; failure keeps the draft and unavailable state until explicit successful refresh. The submit handler also rejects programmatic submission before records load. Empty-state text requires validated loaded records. Two new browser regressions exercise read failure/recovery and a committed synthetic storage write whose response is lost: unchanged retry recovers the same request and exactly one stored task. No new schema, dependency, API, identity grant, provider or bootstrap wiring. Source review found no further concrete defects.

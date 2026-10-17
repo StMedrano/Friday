@@ -18,3 +18,8 @@ export function tasksFrom(value:unknown,projectId:string):ProjectTask[]{
  if(!Array.isArray(rows)||rows.length>50||rows.some(x=>!x||x.projectId!==projectId||!validId(x.id)||!text(x.title,160)||!text(x.objective,4000)||!Array.isArray(x.acceptanceCriteria)||x.acceptanceCriteria.length>50||x.acceptanceCriteria.some((v:unknown)=>typeof v!=='string'||v.length>500)||!['ready','in_progress','blocked','review','completed','cancelled'].includes(x.status)||!Number.isSafeInteger(x.version)||x.version<1)||new Set(rows.map(x=>x.id)).size!==rows.length)throw Error('Task response invalid')
  return rows
 }
+export function taskPageFrom(value:unknown,projectId:string):{tasks:ProjectTask[];nextCursor:string|null}{
+ const cursor=(value as {nextCursor?:unknown})?.nextCursor
+ if(cursor!==null&&(typeof cursor!=='string'||!cursor||cursor.length>1024||!/^[A-Za-z0-9_-]+$/.test(cursor)))throw Error('Task page response invalid')
+ return {tasks:tasksFrom(value,projectId),nextCursor:cursor}
+}

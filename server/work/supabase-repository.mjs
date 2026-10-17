@@ -1,5 +1,6 @@
 import {createHash} from 'node:crypto'
 import {safeWorkError} from './validation.mjs'
+import {validateTaskAfter} from './task-pagination.mjs'
 
 function encode(value){return encodeURIComponent(String(value))}
 function normalized(row) {
@@ -56,6 +57,14 @@ export function createSupabaseWorkRepository({baseUrl,serviceKey,fetchImpl=globa
   get:(id)=>first('/rest/v1/friday_work_items?id=eq.'+encode(id)+'&select=*'),
   list:async({projectId,limit=20})=>{
    const rows=await request('/rest/v1/friday_work_items?project_id=eq.'+encode(projectId)+'&select=*&order=created_at.desc&limit='+Math.min(50,limit))
+   if(!Array.isArray(rows))throw safeWorkError('storage-unavailable')
+   return rows.map(normalized)
+  },
+  listPage:async({projectId,after})=>{
+   const boundary=validateTaskAfter(after)
+   const query=new URLSearchParams({project_id:'eq.'+projectId,select:'*',order:'created_at.desc,id.desc',limit:'51'})
+   if(boundary)query.set('or',`(created_at.lt.${boundary.createdAt},and(created_at.eq.${boundary.createdAt},id.lt.${boundary.id}))`)
+   const rows=await request('/rest/v1/friday_work_items?'+query)
    if(!Array.isArray(rows))throw safeWorkError('storage-unavailable')
    return rows.map(normalized)
   },

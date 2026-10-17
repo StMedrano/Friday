@@ -238,13 +238,13 @@ export function createFridayServer({
     if (url.pathname === '/api/projects' || projectTaskRoute) {
       // Explicit local-development injection only; bootstrap never creates this service.
       if (!authenticatedIdentity || config.mode !== 'live' || !projectTasks) return json(response,503,{error:'project-tasks-unavailable'})
-      if (url.search) return json(response,400,{error:'unexpected-query'})
+      if (url.search && (!projectTaskRoute || request.method!=='GET' || [...url.searchParams.keys()].some(key=>key!=='cursor') || url.searchParams.getAll('cursor').length!==1)) return json(response,400,{error:'unexpected-query'})
       if (request.method!=='GET' && !(projectTaskRoute && request.method==='POST')) return json(response,405,{error:'method-not-allowed'})
       if (request.method==='POST' && (request.headers.origin!==config.access.publicOrigin || !String(request.headers['content-type']||'').startsWith('application/json'))) return json(response,403,{error:'origin-or-content-type-denied'})
       try {
         if (!projectTaskRoute) return json(response,200,{projects:await projectTasks.projects(authenticatedIdentity)})
         const projectId=projectTaskRoute[1]
-        if (request.method==='GET') return json(response,200,{tasks:await projectTasks.list(authenticatedIdentity,projectId)})
+        if (request.method==='GET') return json(response,200,await projectTasks.page(authenticatedIdentity,projectId,url.searchParams.has('cursor')?url.searchParams.get('cursor'):undefined))
         let body
         try {body=await readBody(request)}catch{return json(response,400,{error:'invalid-input'})}
         return json(response,201,{task:await projectTasks.create(authenticatedIdentity,projectId,body)})

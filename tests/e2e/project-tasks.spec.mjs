@@ -1,4 +1,22 @@
 import {test,expect} from '@playwright/test'
+test('older task pages are reachable and refresh returns to newest without losing draft',async({page})=>{
+ await page.goto('/');await page.getByRole('button',{name:'Tasks',exact:true}).click();await page.getByLabel('Project',{exact:true}).selectOption('project-pages')
+ await expect(page.getByRole('heading',{name:'Paged fixture 0',exact:true})).toBeVisible()
+ await expect(page.getByRole('heading',{name:'Paged fixture 60',exact:true})).toHaveCount(0)
+ await page.getByLabel('Task title').fill('Keep page draft')
+ await page.getByRole('button',{name:'Older tasks',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'Paged fixture 60',exact:true})).toBeVisible()
+ await expect(page.getByRole('heading',{name:'Paged fixture 0',exact:true})).toHaveCount(0)
+ await expect(page.getByRole('button',{name:'Older tasks',exact:true})).toHaveCount(0)
+ await page.getByRole('button',{name:'Refresh tasks',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'Paged fixture 0',exact:true})).toBeVisible()
+ await expect(page.getByLabel('Task title')).toHaveValue('Keep page draft')
+ await page.getByLabel('Objective',{exact:true}).fill('Verify boundary after a new save')
+ await page.getByRole('button',{name:'Create task',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'Keep page draft',exact:true})).toBeVisible()
+ await page.getByRole('button',{name:'Older tasks',exact:true}).click()
+ await expect(page.getByRole('heading',{name:'Paged fixture 49',exact:true})).toBeVisible()
+})
 test('unconfirmed committed save retries without creating a duplicate',async({page})=>{
  await page.goto('/');await page.getByRole('button',{name:'Tasks',exact:true}).click()
  await page.getByLabel('Project',{exact:true}).selectOption('project-a')

@@ -1,5 +1,7 @@
 # Friday — Ordered Finish Queue
 
+Task pagination is implemented and browser-tested; preserve scoped keyset cursors, microsecond/UUID ordering, draft-preserving refresh and newest-page reset after saves. Do not recreate the first50-only view. Review docs/superpowers/plans/local-task-pagination.md and exact-head CI. Next safe source slice can extend read-only task detail/activity through the same trusted project binding; claims/execution and memory remain separately denied. Real runtime/storage activation still requires transport/configuration, UTC/query-plan, retention/backup and live Access/relogin review. No private connection, grants, worker, merge or deployment is authorized.
+
 Latest task reliability checkpoint: task creation waits for a validated list read; failed reads retain the draft until successful explicit refresh. Committed-but-unconfirmed save retry is browser-tested with exactly one stored synthetic task. Preserve unchanged request IDs across retries. Require exact-head CI; do not duplicate the completed project/task UI and recovery implementation or connect private runtime services incidentally.
 
 ## Project/task slice continuation
