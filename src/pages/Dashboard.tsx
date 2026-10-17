@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, Gauge, HardDrive, Home, MemoryStick, Network, PanelLeftClose, PanelLeftOpen, Search, Server, Settings, ShieldCheck, Sparkles, TerminalSquare, X } from 'lucide-react'
+import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, FolderGit2, Gauge, HardDrive, Home, MemoryStick, Network, PanelLeftClose, PanelLeftOpen, Search, Server, Settings, ShieldCheck, Sparkles, TerminalSquare, X } from 'lucide-react'
 import { fetchFridayAgentGroups, fetchMonitoringHistory, useFridayOverview, type GroupWorkspace, type FridayIncident, type MonitoringEvent } from '../lib/api'
 import { useFridaySession } from '../hooks/useFridaySession'
 import { usePhoneLayout } from '../hooks/usePhoneLayout'
@@ -14,14 +14,16 @@ import FridayWorkspace from '../components/FridayWorkspace'
 import IncidentsWorkspace from '../components/IncidentsWorkspace'
 import MobileHome from '../components/MobileHome'
 import MobileNavigation from '../components/MobileNavigation'
+import RepositoriesWorkspace from '../components/RepositoriesWorkspace'
 import '../monitoring.css'
 import '../mobile.css'
 import '../assistant.css'
 import '../agents.css'
+import '../repositories.css'
 
 const nav = [
   ['Overview', Home], ['FRIDAY', Sparkles], ['Infrastructure', Server], ['Applications', AppWindow],
-  ['Agents', Bot], ['Tasks', CheckCircle2], ['Approvals', ShieldCheck], ['Incidents', AlertTriangle],
+  ['Agents', Bot], ['Repositories', FolderGit2], ['Tasks', CheckCircle2], ['Approvals', ShieldCheck], ['Incidents', AlertTriangle],
   ['Memory', Database], ['Audit', Activity], ['Settings', Settings],
 ] as const
 
@@ -172,7 +174,7 @@ export default function Dashboard() {
             query={query}
             onQueryChange={setQuery}
             onSubmit={submitFriday}
-          /> : active === 'Agents' ? <AgentsWorkspace/> : active === 'Tasks' ? <ProjectTasksWorkspace/> : active === 'Incidents' ? <IncidentsWorkspace
+          /> : active === 'Agents' ? <AgentsWorkspace/> : active === 'Tasks' ? <ProjectTasksWorkspace/> : active === 'Repositories' ? <RepositoriesWorkspace/> : active === 'Incidents' ? <IncidentsWorkspace
             incidents={incidents}
             monitoring={overview.monitoring}
             history={history}
@@ -251,6 +253,7 @@ export default function Dashboard() {
           </> : active === 'FRIDAY' ? <FridayWorkspace session={friday} query={query} onQueryChange={setQuery} onSubmit={submitFriday}/>
             : active === 'Agents' ? <AgentsWorkspace/>
             : active === 'Tasks' ? <ProjectTasksWorkspace/>
+            : active === 'Repositories' ? <RepositoriesWorkspace/>
             : active === 'Incidents' ? <IncidentsWorkspace incidents={incidents} monitoring={overview.monitoring} history={history} historyError={historyError} historyLoading={historyLoading} onRefreshHistory={refreshHistory} selectedIncident={selectedIncident} onSelectIncident={viewDiagnosis} onClearSelection={() => setSelectedIncidentId(null)}/>
             : <DetailView active={active} overview={overview} />}
         </main>

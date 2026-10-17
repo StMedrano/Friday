@@ -14,7 +14,7 @@ const jwk={...publicKey.export({format:'jwk'}),kid:'staging-rsa-key',alg:'RS256'
 const encode=x=>Buffer.from(JSON.stringify(x)).toString('base64url')
 const baseClaims={
  iss:issuer,aud:[audience],iat:fixedTime-30,nbf:fixedTime-10,exp:fixedTime+600,
- sub:'synthetic-staging-user',type:'app',email:'operator@staging.test',
+ sub:'synthetic-staging-user',type:'app',email:'operator@staging.test',custom:{friday_auth_source:'authentik'},
 }
 function jwt(claims=baseClaims,header={alg:'RS256',kid:'staging-rsa-key',typ:'JWT'}){
  const content=encode(header)+'.'+encode(claims)
@@ -31,6 +31,9 @@ function forgeSignature(identity){
 }
 const token=jwt()
 const viewerToken=jwt({...baseClaims,email:'viewer@staging.test'})
+const fallbackClaims={...baseClaims}
+delete fallbackClaims.custom
+const fallbackToken=jwt(fallbackClaims)
 const headers=(identity,extra={})=>({
  ...(identity?{'cf-access-jwt-assertion':identity}:{}),
  ...extra,
@@ -133,6 +136,16 @@ test('staging: operator requires both signed identity and independent registry t
   })).status,200)
   assert.equal(calls.sync,1)
   assert.equal(calls.rerun,1)
+ })
+})
+test('staging: Cloudflare fallback keeps an allowlisted operator email in Viewer role',async()=>{
+ await withStaging(async(base,calls)=>{
+  assert.equal((await fetch(base+'/api/overview',{headers:headers(fallbackToken)})).status,200)
+  const sync=await fetch(base+'/api/agents/registry/sync',{
+   method:'POST',headers:headers(fallbackToken,{'content-type':'application/json',origin,authorization:'Bearer '+'a'.repeat(64)}),body:'{}',
+  })
+  assert.equal(sync.status,403)
+  assert.equal(calls.sync,0)
  })
 })
 test('staging: wrong issuer, audience, signature and expired JWT fail closed',async()=>{

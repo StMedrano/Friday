@@ -29,6 +29,7 @@ build:
 verify: test build
 	docker compose config >/dev/null
 	docker compose -f compose.yaml -f compose.live.yaml config >/dev/null
+	FRIDAY_REPOSITORY_REGISTRY_FILE=repositories.example.json FRIDAY_REPOSITORY_ROOT=. docker compose -f compose.yaml -f compose.repositories.yaml config >/dev/null
 	FRIDAY_OBSERVER_TOKEN=verify-token docker compose -f observer/compose.yaml config >/dev/null
 	@echo 'Friday verification passed.'
 

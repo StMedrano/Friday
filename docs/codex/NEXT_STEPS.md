@@ -1,5 +1,7 @@
 # Friday — Ordered Finish Queue
 
+Dependency checkpoint: security branch720b40a is reconciled into this development candidate. Compare actual remote branch refs, not only PR base-SHA snapshots; the older snapshot concealed the conflict that prevented paging CI. Retain signed Authentik-source Operator hardening and repository explorer alongside scoped task pages. No PR merge or runtime activation is implied. Private task write/role/source-claim acceptance, Access relogin and storage/retention/backup release gates remain unresolved.
+
 Task pagination is implemented and browser-tested; preserve scoped keyset cursors, microsecond/UUID ordering, draft-preserving refresh and newest-page reset after saves. Do not recreate the first50-only view. Review docs/superpowers/plans/local-task-pagination.md and exact-head CI. Next safe source slice can extend read-only task detail/activity through the same trusted project binding; claims/execution and memory remain separately denied. Real runtime/storage activation still requires transport/configuration, UTC/query-plan, retention/backup and live Access/relogin review. No private connection, grants, worker, merge or deployment is authorized.
 
 Latest task reliability checkpoint: task creation waits for a validated list read; failed reads retain the draft until successful explicit refresh. Committed-but-unconfirmed save retry is browser-tested with exactly one stored synthetic task. Preserve unchanged request IDs across retries. Require exact-head CI; do not duplicate the completed project/task UI and recovery implementation or connect private runtime services incidentally.
@@ -82,6 +84,7 @@ Use the current PR #29 queue first. Older P0–P10 entries below are historical 
 1. Resume existing draft `feat/friday-operator-auth-20261011`, not a new security implementation. Implementation baseline `511b9f70e237900fce24cbd0f0099c42c7bb3c97` passed CI #437.
 2. **Completed on 2026-10-13 after VM100 reconnection:** inspected the existing staging app, changed only its Compose line and runtime policy to `unless-stopped`, and verified both service policies with unchanged container IDs/start times. Stage health, anonymous origin/edge denial and adjacent services passed. Do not repeat deployment, recreate the connector, or reboot Docker/VM100 for testing. Continue at step 3.
 3. Investigate the unresolved production logout/relogin regression reported on 2026-10-14 through a separately approved, non-destructive diagnostic window. Capture sanitized timestamps, HTTP status and Access decision metadata only; compare protected-hostname, tunnel/origin health and authentication logs. Never collect JWTs/cookies, broaden Allow policy, add a bypass or weaken Friday authentication to make a test pass. Then complete unlisted-identity denial, allowed viewer/API/operator-denial and logout/expiry acceptance with the required session-impact approval.
+3. Configure Authentik as the only normal Friday login method through Cloudflare Access Generic OIDC. Validate the signed `friday_auth_source` claim, exact operator identity and staging access. Test the outage-only One-time PIN break-glass path from [Friday authentication failover](../friday-authentication-failover.md); fallback identities must remain Viewer-only. Complete unlisted-identity denial, sanitized Access log/policy evidence, and logout/expiry acceptance with required session-impact approval. Never collect JWTs/cookies or broaden Allow policy to make a test pass.
 4. Obtain a genuine independent review of the final candidate. CI, self-review and user-reported login do not replace this gate.
 5. Complete production Cloudflare/NPM forwarding and origin-isolation acceptance, then a verified offline backup and copy-only non-root volume migration under separate authorization. Do not change the root-owned production volume or deploy this draft directly.
 6. Obtain separate explicit merge and production cutover decisions only after the concrete candidate and release evidence are reviewable. Keep Phase 2C disabled.
@@ -167,6 +170,13 @@ Implemented source behavior:
 13. Complete desktop and phone Agents workspace acceptance and confirm no action controls appear. Obtain explicit owner approval before merge.
 
 Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execution, restart endpoints, or cloud fallback for matched agents as part of this rollout.
+
+## Repository-aware agent platform — in progress (issue #20)
+
+- Server-side registry and bounded GET-only repository tools are implemented in draft PR #35.
+- Repositories workspace supports desktop and mobile browsing, Git status, safe file listing, and bounded text preview.
+- Remaining: repository-scoped task flow and live acceptance after explicit checkout registration. No shell execution or repository writes.
+- Do not mount live roots, deploy, or merge without owner review.
 
 ## P6 — Complete real read-only visibility
 

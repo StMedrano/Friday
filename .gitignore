@@ -11,3 +11,4 @@ coverage/
 test-results/
 playwright-report/
 .superdesign/cache/
+repositories.json

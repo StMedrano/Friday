@@ -11,6 +11,7 @@ async function fixture(verifier, fn){
  let calls=0
  const spies={
   agentRegistryService:{list:async()=>{calls++;return []},get:async()=>null,status:async()=>({status:'ok'}),sync:async()=>{calls++;return {status:'ok'}}},
+  repositoryRegistry:{list:async()=>{calls++;return []},status:async()=>{calls++;return {}},listFiles:async()=>{calls++;return []},readFile:async()=>{calls++;return ''}},
   monitoringRuntime:{rerunDiagnostic:async()=>{calls++;return {statusCode:200,body:{ok:true}}},getIncidents:()=>({summary:{},incidents:[]})},
   answerAssistantImpl:async()=>{calls++;return {available:true,text:'test'}}
  }
@@ -21,7 +22,7 @@ async function fixture(verifier, fn){
 }
 test('when Access is enabled, anonymous API requests are rejected before any data fetch or provider usage',async()=>{
  await fixture(async()=>({ok:false,status:401,error:'access-identity-required'}),async(base,count)=>{
-  const paths=[['GET','/api/overview'],['GET','/api/incidents'],['GET','/api/agents'],['GET','/api/monitoring/history'],['POST','/api/assistant'],['POST','/api/agents/registry/sync'],['POST','/api/incidents/i1/diagnostics/rerun']]
+  const paths=[['GET','/api/overview'],['GET','/api/incidents'],['GET','/api/agents'],['GET','/api/monitoring/history'],['GET','/api/repositories'],['GET','/api/repositories/friday/status'],['GET','/api/repositories/friday/files'],['GET','/api/repositories/friday/file?path=README.md'],['POST','/api/assistant'],['POST','/api/agents/registry/sync'],['POST','/api/incidents/i1/diagnostics/rerun']]
   for(const [method,path] of paths){
    const res=await fetch(base+path,{method,headers:{'content-type':'application/json'},...(method==='POST'?{body:'{}'}:{})})
    assert.equal(res.status,401,path)

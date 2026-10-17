@@ -33,7 +33,7 @@ done
 docker exec "$name" node -e '
 const root="http://127.0.0.1:3010";
 async function run(){
- for(const path of ["/","/index.html","/api/overview","/api/agents"]){
+ for(const path of ["/","/index.html","/api/overview","/api/agents","/api/repositories","/api/repositories/friday/status"]){
   const result=await fetch(root+path);
   if(result.status!==503)throw Error(path+" expected 503; got "+result.status);
  }

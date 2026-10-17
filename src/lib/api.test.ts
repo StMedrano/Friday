@@ -4,6 +4,10 @@ import {
   askFridayAssistant,
   fetchFridayAgentRegistryStatus,
   fetchFridayAgents,
+  fetchFridayRepositories,
+  fetchFridayRepositoryFiles,
+  fetchFridayRepositoryFile,
+  fetchFridayRepositoryStatus,
   fetchIncidentDiagnostics,
   fetchIncidentLogs,
   routeFridayAgent,
@@ -108,6 +112,25 @@ describe('Friday local agent API', () => {
 
     expect(fetchMock).toHaveBeenNthCalledWith(1, '/api/agents/route', expect.objectContaining({ method: 'POST', body: JSON.stringify({ prompt: 'Check Proxmox' }) }))
     expect(fetchMock).toHaveBeenNthCalledWith(2, '/api/agents/agent%2Fone/ask', expect.objectContaining({ method: 'POST', body: JSON.stringify({ prompt: 'Check VM 100' }) }))
+  })
+})
+
+describe('Friday repository API', () => {
+  it('uses GET-only encoded routes for metadata, status, file lists, and file text', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _options?: RequestInit) => new Response(JSON.stringify([]), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+
+    await fetchFridayRepositories()
+    await fetchFridayRepositoryStatus('owner/repo')
+    await fetchFridayRepositoryFiles('owner/repo', 'src docs')
+    await fetchFridayRepositoryFile('owner/repo', 'src/a file.ts')
+
+    expect(fetchMock.mock.calls.map(([url, options]) => [url, options?.method || 'GET'])).toEqual([
+      ['/api/repositories', 'GET'],
+      ['/api/repositories/owner%2Frepo/status', 'GET'],
+      ['/api/repositories/owner%2Frepo/files?path=src+docs&limit=100', 'GET'],
+      ['/api/repositories/owner%2Frepo/file?path=src%2Fa+file.ts', 'GET'],
+    ])
   })
 })
 

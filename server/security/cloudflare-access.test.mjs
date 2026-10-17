@@ -9,7 +9,7 @@ const {privateKey,publicKey}=generateKeyPairSync('rsa',{modulusLength:2048})
 const jwk={...publicKey.export({format:'jwk'}),kid:'test-signing-key',use:'sig',alg:'RS256'}
 const b64=x=>Buffer.from(JSON.stringify(x)).toString('base64url')
 const now=1_780_000_000
-const claims={iss:issuer,aud:[audience],exp:now+600,nbf:now-20,iat:now-30,email:'operator@example.test',sub:'actor-1',type:'app'}
+const claims={iss:issuer,aud:[audience],exp:now+600,nbf:now-20,iat:now-30,email:'operator@example.test',sub:'actor-1',type:'app',custom:{friday_auth_source:'authentik'}}
 function token(payload=claims,header={alg:'RS256',kid:jwk.kid,typ:'JWT'}){
  const raw=b64(header)+'.'+b64(payload)
  return raw+'.'+sign('RSA-SHA256',Buffer.from(raw),privateKey).toString('base64url')
@@ -66,6 +66,17 @@ test('signed identity without operator email cannot perform privileged operation
  const v=createCloudflareAccessVerifier({fetchImpl:fetcher,now:()=>now*1000})
  const x=await v({headers:{'cf-access-jwt-assertion':token({...claims,email:'viewer@example.test'})}},config)
  assert.deepEqual(x,{ok:true,email:'viewer@example.test',operator:false})
+})
+
+test('Cloudflare fallback identity remains Viewer even when its email is on operator allowlist',async()=>{
+ const v=createCloudflareAccessVerifier({fetchImpl:fetcher,now:()=>now*1000})
+ for(const custom of [undefined,{}, {friday_auth_source:'cloudflare'}, {friday_auth_source:['authentik']}]){
+  const payload={...claims}
+  if(custom===undefined)delete payload.custom
+  else payload.custom=custom
+  const result=await v({headers:{'cf-access-jwt-assertion':token(payload)}},config)
+  assert.deepEqual(result,{ok:true,email:'operator@example.test',operator:false})
+ }
 })
 
 test('cached signing keys never extend an identity past its exact expiry',async()=>{

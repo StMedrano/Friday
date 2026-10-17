@@ -85,6 +85,37 @@ export type FridayAgentRegistryStatus = {
   errors?: string[]
 }
 
+export type FridayRepository = { id: string; name: string; remote?: string; defaultBranch: string; mode: string; enabled: boolean }
+export type FridayRepositoryStatus = { branch: string; dirty: boolean }
+
+async function repositoryGet<T>(path: string, signal?: AbortSignal): Promise<T> {
+  const response = await fetch(path, { method: 'GET', signal })
+  const body = await response.json() as T | { error?: string }
+  if (!response.ok) {
+    const error = body && typeof body === 'object' && 'error' in body ? body.error : undefined
+    throw new Error(error || 'Repository request failed')
+  }
+  return body as T
+}
+
+export function fetchFridayRepositories(signal?: AbortSignal) {
+  return repositoryGet<FridayRepository[]>('/api/repositories', signal)
+}
+
+export function fetchFridayRepositoryStatus(id: string, signal?: AbortSignal) {
+  return repositoryGet<FridayRepositoryStatus>(`/api/repositories/${encodeURIComponent(id)}/status`, signal)
+}
+
+export function fetchFridayRepositoryFiles(id: string, path = '.', signal?: AbortSignal) {
+  const query = new URLSearchParams({ path, limit: '100' })
+  return repositoryGet<string[]>(`/api/repositories/${encodeURIComponent(id)}/files?${query}`, signal)
+}
+
+export function fetchFridayRepositoryFile(id: string, path: string, signal?: AbortSignal) {
+  const query = new URLSearchParams({ path })
+  return repositoryGet<{ path: string; content: string }>(`/api/repositories/${encodeURIComponent(id)}/file?${query}`, signal)
+}
+
 export type FridayIncident = {
   id: string; fingerprint?: string; type: string; title: string; detail: string
   severity: 'high' | 'warning' | 'info'; status: 'open' | 'resolved'; source: string; host: string

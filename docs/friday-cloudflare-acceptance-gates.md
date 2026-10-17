@@ -1,5 +1,7 @@
 # Friday staging post-login security acceptance — 2026-10-13
 
+**Login policy:** Use [Authentik as primary and Cloudflare One-time PIN only as outage break-glass](friday-authentication-failover.md). Cloudflare does not automatically make secondary IdPs outage-only. Keep One-time PIN off Friday's allowed login methods until an operator confirms Authentik is down and activates the exact-email fallback policy. Fallback sessions remain Viewer-only because they lack the signed Authentik source claim.
+
 **Scope:** `https://friday-staging.mytechtactics.com`, Cloudflare team `mytechtactics.cloudflareaccess.com`, draft PR #29. The user reported the staging dashboard loads after a successful Access sign-in. The private staging controller runs separately from production Friday; **no production release is approved**.
 
 ## Automated checks completed

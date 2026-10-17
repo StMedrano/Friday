@@ -1,5 +1,12 @@
 # Friday Build Status
 
+## Current security dependency reconciliation
+
+Live remote security branch advanced to720b40aeac21a19e652de9d5bf57f90bc56cd5d8, while PR metadata still reported the priora4f11c3 base snapshot. PR33 was conflicting, so paging-only2f7f80f had no CI run; unrelated repository runs are not its proof. Reconciled that dependency into the development source only, retaining task/group/monitoring behavior and the imported repository explorer. The dependency's stricter signed Authentik-source requirement for Operator access is unchanged. The independently implemented scanner fixes were consolidated onto the dependency's disk-backed TMPDIR=/cache/tmp, retaining pinned scanner, no daemon, non-root/read-only/capability boundaries and HIGH/CRITICAL gate. The prior disk-storage regression now checks this equivalent cache-backed contract.
+
+Fresh combined verification:179 frontend /502 Node tests passed (zero skips), production build and5/5 built Edge desktop/390px browser tests passed. Scoped conflict review found no concrete integration defects. No PR was merged, no main write/deployment/live configuration/grant/private connection or HomeLab command occurred. Remote main was observed at2170d9d4a937d6b8154932745c60976414363281, reflecting other work; this continuation does not claim it stayed at historicalfa86ce4. Exact final-head CI is tracked on PR33. Local make/Docker limitations remain.
+
+
 ## Task pagination continuation
 
 Continued from verifiedc0e8642 / successful CI480. Project task GET now returns up to50 normalized records and nextCursor, with one optional bounded cursor query. Pages use creation time plus UUID descending, preserving six PostgreSQL timestamp fractional digits; fixed project filters remain independent of position. Every page rechecks verified owner and the current provisioned catalog. Invalid/wrong-project/duplicate cursor parameters reject; malformed, unordered, duplicate or cursor-overlapping storage fails unavailable rather than empty. No new authority is encoded in the cursor.
@@ -170,6 +177,12 @@ This is the source-of-truth handoff ledger for coding agents. Update it when a m
 
 ## Current security release checkpoint — 2026-10-13
 
+### Authentication source policy — 2026-10-16
+
+- Friday's intended normal login is Authentik through Cloudflare Access Generic OIDC. Cloudflare One-time PIN is a manually activated break-glass method only during a confirmed Authentik outage; Cloudflare does not dynamically gate a second IdP on upstream availability.
+- Friday grants Operator status only when the signed Access JWT contains `custom.friday_auth_source="authentik"` and its signed email is in the operator allowlist. Fallback Access sessions without this claim remain Viewer-only.
+- The verifier and staging tests enforce this role boundary. Live Authentik OIDC configuration, custom-claim forwarding, outage/recovery acceptance, and production changes remain pending. See [authentication failover runbook](../friday-authentication-failover.md).
+
 This checkpoint takes precedence over the older rollout entries below. Those dated entries remain historical evidence, not instructions to repeat PR #19 deployment.
 
 - Continue existing **draft PR #29**, branch `feat/friday-operator-auth-20261011`. Verified implementation baseline: `511b9f70e237900fce24cbd0f0099c42c7bb3c97`; [Friday CI #437](https://github.com/StMedrano/Friday/actions/runs/38409074041) succeeded. Subsequent documentation-only revisions do not imply a new runtime deployment.
@@ -248,6 +261,12 @@ The following capabilities are already part of `main`:
 - no infrastructure execution authority.
 
 PR #14 is merged; the old “finish the Friday Assistant experience” milestone is retired.
+
+## Repository-aware agent platform — in progress
+
+Issue #20 starts the repository-aware, read-only agent milestone. The local registry foundation accepts explicitly registered Git working trees from the server-only `FRIDAY_REPOSITORY_REGISTRY_PATH` JSON file. `GET /api/repositories` returns safe metadata without local paths, exclusion policy, or URL credentials. Path resolution rejects traversal, symlink escapes, secrets, and dependency/build trees. The registry file stays out of Git and the container build context.
+
+Read-only Explorer tools expose Git branch/dirty status, bounded file listings, and bounded text reads for registered roots. The responsive Repositories workspace browses those endpoints without write or execution controls. Paths remain canonicalized and exclusion-checked; reads cap at 64 KiB. Repository-scoped task flow remains unfinished. Source verification does not establish VM102 integration or live acceptance.
 
 ## Local Agent Platform Phase 1 — implemented in draft PR #19
 
