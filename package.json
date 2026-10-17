@@ -23,7 +23,7 @@
     "lucide-react": "0.468.0",
     "react": "18.3.1",
     "react-dom": "18.3.1",
-    "vite": "5.4.14"
+    "vite": "6.4.3"
   },
   "devDependencies": {
     "@testing-library/jest-dom": "6.6.3",
