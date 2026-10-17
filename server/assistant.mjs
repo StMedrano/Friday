@@ -32,6 +32,7 @@ export async function answerAssistant({
   providers = defaultProviders,
   previewImpl = previewCommand,
   signalFactory = timeoutSignal,
+  systemPrompt = fridaySystemPrompt(),
 } = {}) {
   const text = String(prompt || '').trim()
   if (!text) {
@@ -44,7 +45,6 @@ export async function answerAssistant({
   if (ai.enabled) {
     const order = Array.isArray(ai.providerOrder) ? ai.providerOrder : []
     const providerConfigs = ai.providers || {}
-    const systemPrompt = fridaySystemPrompt()
 
     for (const providerId of order) {
       const provider = providers?.[providerId]

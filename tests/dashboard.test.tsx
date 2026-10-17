@@ -83,6 +83,43 @@ afterEach(() => {
 })
 
 describe('Friday v3 command center', () => {
+  it.each([false,true])('recovers history with an explicit refresh and removes stale evidence on failure (phone=%s)',async phone=>{
+    installMatchMedia(phone)
+    const fallback=liveFetch()
+    let reads=0
+    vi.stubGlobal('fetch',vi.fn(async(input:RequestInfo|URL)=>{
+      if(String(input)!=='/api/monitoring/history')return fallback(input)
+      reads++
+      return reads===2?new Response(JSON.stringify({events:[{id:'recovered',type:'poll-recovered',at:'2026-10-15T00:00:00Z',source:'fixture',detail:'Fixture recovered history'}]}))
+        :new Response(JSON.stringify({error:'monitoring-history-unavailable'}),{status:503})
+    }))
+    const user=userEvent.setup()
+    render(<Dashboard/> )
+    await screen.findByText('Monitoring history unavailable')
+    await user.click(screen.getByRole('button',{name:'Refresh monitoring history'}))
+    expect(await screen.findByText('Fixture recovered history')).toBeInTheDocument()
+    if(phone)await user.click(screen.getByRole('button',{name:/^Incidents/}))
+    else await user.click(screen.getByTitle('Incidents'))
+    expect(screen.getByText('Fixture recovered history')).toBeInTheDocument()
+    expect(reads).toBe(2)
+    await user.click(screen.getByRole('button',{name:'Refresh monitoring history'}))
+    await screen.findByText('Monitoring history unavailable')
+    expect(screen.queryByText('Fixture recovered history')).not.toBeInTheDocument()
+    expect(screen.queryByText('0 recent events')).not.toBeInTheDocument()
+    expect(reads).toBe(3)
+  })
+  it.each([[false,'monitoring-disabled',503,'Monitoring disabled'],[true,'monitoring-history-invalid',502,'Monitoring history response invalid']] as const)('propagates monitoring state across Home and Incidents (phone=%s)',async(phone,error,status,message)=>{
+    installMatchMedia(phone)
+    const fallback=liveFetch()
+    vi.stubGlobal('fetch',vi.fn(async(input:RequestInfo|URL)=>String(input)==='/api/monitoring/history'?new Response(JSON.stringify({error}),{status}):fallback(input)))
+    const user=userEvent.setup()
+    render(<Dashboard/> )
+    expect(await screen.findByText(message)).toBeInTheDocument()
+    if(phone)await user.click(screen.getByRole('button',{name:/^Incidents/}))
+    else await user.click(screen.getByTitle('Incidents'))
+    expect(await screen.findByText(message)).toBeInTheDocument()
+    expect(screen.queryByText('0 recent events')).not.toBeInTheDocument()
+  })
   it('presents the authoritative Friday command surface and live infrastructure data', () => {
     installMatchMedia(false)
     render(<Dashboard />)

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { AlertTriangle, Home, Menu, Server, Sparkles } from 'lucide-react'
+import {useModalFocus} from '../hooks/useModalFocus'
 
 type MobileNavigationProps = {
   active: string
@@ -11,6 +12,7 @@ const secondary = ['Applications', 'Agents', 'Repositories', 'Tasks', 'Approvals
 
 export default function MobileNavigation({ active, activeIncidents, onNavigate }: MobileNavigationProps) {
   const [moreOpen, setMoreOpen] = useState(false)
+  const {dialogRef,rememberFocus}=useModalFocus(moreOpen,true,()=>setMoreOpen(false))
 
   useEffect(() => {
     if (!moreOpen) return
@@ -49,13 +51,13 @@ export default function MobileNavigation({ active, activeIncidents, onNavigate }
           <span>{label}</span>
         </button>
       })}
-      <button type="button" className={`v3-mobile-nav-button ${secondary.includes(active) ? 'active' : ''}`} aria-label="More" onClick={() => setMoreOpen(true)}>
+      <button type="button" className={`v3-mobile-nav-button ${secondary.includes(active) ? 'active' : ''}`} aria-label="More" onClick={() => {rememberFocus();setMoreOpen(true)}}>
         <span className="v3-mobile-nav-icon"><Menu size={18}/></span><span>More</span>
       </button>
     </nav>
 
     {moreOpen && <div className="v3-mobile-more-backdrop" onClick={() => setMoreOpen(false)}>
-      <section className="v3-mobile-more-sheet" role="dialog" aria-modal="true" aria-label="More FRIDAY views" onClick={(event) => event.stopPropagation()}>
+      <section ref={dialogRef} className="v3-mobile-more-sheet" role="dialog" aria-modal="true" aria-label="More FRIDAY views" onClick={(event) => event.stopPropagation()}>
         <div className="v3-mobile-more-handle" aria-hidden="true"/>
         <div className="v3-mobile-more-head"><span>MORE FRIDAY VIEWS</span><strong>Select a workspace</strong></div>
         <div className="v3-mobile-more-grid">{secondary.map((destination) => <button
