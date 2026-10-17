@@ -34,6 +34,8 @@ Friday's live adapters and AI surfaces are read-only/advisory. No restart/delete
 
 Infrastructure-changing actions remain blocked until authentication/RBAC, durable append-only action audit, explicit approval, and a global automation kill switch are implemented and tested.
 
+The local Repository Registry accepts only explicitly registered Git working trees. Its JSON file stays server-side and out of version control and container images. Lookup and path resolution remain read-only; canonical-path checks reject traversal, symlink escapes, and secret, build, or dependency paths. The Repositories workspace uses `GET /api/repositories` for safe metadata and `GET /api/repositories/:id/status`, `/files`, and `/file?path=...` for scoped Git status, bounded file lists, and text reads (64 KiB maximum). No shell or write operation is exposed. The opt-in `compose.repositories.yaml` overlay mounts both the registry and one approved checkout read-only. Enable it only after configuring `FRIDAY_REPOSITORY_REGISTRY_FILE` and `FRIDAY_REPOSITORY_ROOT` to reviewed host paths.
+
 # Local Agent Platform Phase 1
 
 Draft PR #19 implements the first local-only advisory agent platform. Source implementation is complete; **live VM102/Supabase/API/UI acceptance is still required before merge readiness**.

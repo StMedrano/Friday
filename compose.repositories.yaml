@@ -1,0 +1,17 @@
+services:
+  friday:
+    environment:
+      FRIDAY_REPOSITORY_REGISTRY_PATH: /etc/friday/repositories.json
+    volumes:
+      - type: bind
+        source: ${FRIDAY_REPOSITORY_REGISTRY_FILE:?Set FRIDAY_REPOSITORY_REGISTRY_FILE to an approved server-side registry file}
+        target: /etc/friday/repositories.json
+        read_only: true
+        bind:
+          create_host_path: false
+      - type: bind
+        source: ${FRIDAY_REPOSITORY_ROOT:?Set FRIDAY_REPOSITORY_ROOT to an approved checkout}
+        target: /repositories/friday
+        read_only: true
+        bind:
+          create_host_path: false

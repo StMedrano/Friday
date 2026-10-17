@@ -33,7 +33,7 @@ describe('MobileNavigation', () => {
     await user.click(screen.getByRole('button', { name: 'More' }))
     const dialog = screen.getByRole('dialog', { name: /more friday views/i })
     expect(dialog).toBeInTheDocument()
-    for (const name of ['Applications', 'Agents', 'Tasks', 'Approvals', 'Memory', 'Audit', 'Settings']) {
+    for (const name of ['Applications', 'Agents', 'Repositories', 'Tasks', 'Approvals', 'Memory', 'Audit', 'Settings']) {
       expect(screen.getByRole('button', { name })).toBeInTheDocument()
     }
 

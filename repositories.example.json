@@ -1,0 +1,11 @@
+[
+  {
+    "id": "example",
+    "name": "Example repository",
+    "path": "/path/to/git/checkout",
+    "defaultBranch": "main",
+    "mode": "read-only",
+    "enabled": false,
+    "exclude": ["data/**"]
+  }
+]
