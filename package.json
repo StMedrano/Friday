@@ -4,6 +4,7 @@
   "version": "0.2.0",
   "type": "module",
   "scripts": {
+    "test:e2e": "playwright test",
     "dev": "vite --host 0.0.0.0",
     "dev:server": "node --watch server/index.mjs",
     "build": "tsc -b && vite build",
@@ -16,7 +17,8 @@
     "validate:shared-work-schema": "node scripts/validate-shared-work-schema.mjs supabase/migrations/202610090001_friday_shared_work.sql",
     "test:shared-work-db": "sh scripts/test-shared-work-postgres.sh",
     "validate:fabric-catalog": "node scripts/validate-fabric-catalog.mjs",
-    "verify:fabric-dormant": "node scripts/verify-fabric-dormant.mjs"
+    "verify:fabric-dormant": "node scripts/verify-fabric-dormant.mjs",
+    "check:nvidia-catalog": "node scripts/check-nvidia-catalog.mjs --catalog"
   },
   "dependencies": {
     "@vitejs/plugin-react": "5.2.0",
@@ -26,6 +28,7 @@
     "vite": "8.3.4"
   },
   "devDependencies": {
+    "@playwright/test": "1.64.1",
     "@testing-library/jest-dom": "6.6.3",
     "@testing-library/react": "16.1.0",
     "@testing-library/user-event": "14.6.0",

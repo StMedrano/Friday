@@ -26,6 +26,8 @@ Returns FRIDAY-owned monitoring incidents. There is no incident mutation endpoin
 
 Returns bounded recent FRIDAY-owned monitoring events newest-first. History must not contain provider credentials, authorization headers, or raw application logs.
 
+Availability is explicit: HTTP 503 `monitoring-disabled` when configured off; 503 `monitoring-history-unavailable` if the reader is missing or throws; 502 `monitoring-history-invalid` if its result is malformed. Only a validated successful read may return HTTP 200 `{events: []}`. Reads are awaited, bounded to 5000 unique records and projected onto id/type/at/source/detail plus optional host/serviceId/serviceName. Failures never carry fabricated empty events or raw exception details. Existing signed Access and GET-only boundaries apply. History availability is not proof that incidents are absent or that current polling is healthy.
+
 ### `GET /api/incidents/:incidentId/diagnostics`
 
 Returns the persisted safe diagnostic report for one existing incident when diagnostics are supported/enabled.
@@ -270,3 +272,36 @@ separately before application to homelab production. This does not change
 the local-Ollama-only matched-agent contract or introduce an executor.
 
 See `docs/shared-work-phase2b.md`.
+## POST /api/group-advisory
+
+Authenticated non-executing Friday assistance for fixed public groups. This does not invoke a registered specialist or activate Phase 2C. Same-origin and the existing shared per-identity inference quota apply; live mode fails closed without verified Access identity.
+
+Request has exactly two fields:
+```json
+{"groupId":"app-builder","prompt":"Propose an implementation and QA plan for a booking app."}
+```
+Allowed group IDs are `techtactics`, `app-builder`, `homelab`; prompt is a nonempty string of at most 4000 characters. Actor, role, system-prompt, assignment, tool and history fields are rejected. Fixed server policy owns the group brief.
+
+TechTactics/App Builder receive no infrastructure snapshot or private business records. HomeLab receives fresh normalized overview evidence. The existing configured AI providers are tried sequentially; NVIDIA activation/provider configuration is unchanged. A deterministic infrastructure fallback is not a generated group plan and returns unavailable.
+
+Successful output includes `available:true`, the exact `groupId`, text, actual mode/provider/model and optional fallback provenance. `execution.performed` is always false. No shared work is created or stored, no private-data grant is inferred and no action is performed. Invalid brief returns 400, denied Access/origin/quota returns 401/403/429, unavailable AI returns 503, and internal failure returns a sanitized 502. Responses are no-store.
+
+## HomeLab workspace observation panel
+
+Consumes the existing protected GET /api/overview with a bounded timeout. The client projects mode/timestamp, validated service identity/status/detail and incident summaries. It retains exact source identifiers, labels mock data as demo, clears old evidence on refresh, and shows unavailable on HTTP/schema/timeouts instead of substituting mock success. Refresh is an explicit read; there is no mutation or restart control.
+
+## Private Web Growth projection
+
+GET `/api/web-growth` requires live mode, signed Access and an explicit exact email in `FRIDAY_WEB_GROWTH_READER_EMAILS`. Group/operator status alone grants nothing. Queries rejected400, writes405 (same-origin guard may deny earlier), ungranted actor403, invalid Access401/unconfigured503, disabled/unavailable/malformed reader503. No-store, no mock private records, no empty fallback. Defaults are disabled/empty grants.
+
+Reader URL is HTTPS origin-only with no embedded credentials/query/path. Server-only token, fixed GET `/v1/friday/web-growth`, no redirects, eight-second timeout, 1MiB streamed response bound. Canonical snapshot: schemaVersion1, projectId techtactics-web-growth, generatedAt, reported sourceRevision hex7–40, original-byte SHA256 sourceChecksum, max1000 unique leads. Lead projection contains id/businessName/stage, discoveredAt/updatedAt, recorded approval/send flags/timestamps, nullable0–100score/auditCheckedAt and proposal/demo availability. No contact/address/messages/notes/sales text/credentials. Invalid record rejects entire snapshot. Reported revision is not deployment attestation; read timestamp is not record freshness. Companion source/configuration prerequisites are documented in `integrations/web-growth-reader/README.md`.
+
+## Optional local project/task slice (not bootstrapped)
+
+GET /api/projects returns {projects:[{id,name}]} from the trusted provisioned catalog only. GET /api/projects/:id/tasks returns {tasks:[{id,projectId,title,objective,acceptanceCriteria,status,version}]}, latest50. POST on that task collection accepts exactly title, objective, acceptanceCriteria and requestId; project scope comes only from the URL intersected with the current trusted catalog/owner binding. Returns201 {task} after confirmed storage. An unchanged retry reuses requestId; changed input with a reused ID conflicts409. No claim/status/delete/memory/worker API exists in this slice.
+
+Requires live mode, signed Access owner identity and explicit trusted server service injection. Bootstrap has no wiring or credentials. Default503 unavailable; unknown identity/project403; invalid fields/query400; unsupported method405; request conflicts409; existing per-identity POST quota429; storage/malformed result503. Writes require exact configured Origin and JSON. All responses no-store. Denied access precedes private catalog reads; group/operator/model claims cannot grant access. Catalog >50, invalid/duplicate IDs and malformed task output fail closed. Catalog removal invalidates later operations. No production activation or grants implied.
+
+### Task keyset pages
+
+The task GET response now includes nextCursor:string|null alongside tasks (maximum50). Optional exactly-one cursor query continues older records. No other query keys, duplicate cursor or POST queries are accepted. Cursor is bounded base64url JSON position metadata tied to the selected project, not an authentication or grant token. Every request still resolves current identity/catalog scope. Invalid cursor400, denied project403, malformed/unordered/duplicate/overlapping store results503. Ordering is created_at DESC,id DESC with a51-record lookahead and exact UTC microsecond precision. A concurrent newer insert cannot shift the older boundary. Responses are not frozen database snapshots; Refresh discovers newest records. Client requires valid pagination metadata and never infers there are no older records from a malformed envelope. No runtime wiring or private grant is enabled.

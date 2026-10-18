@@ -1,4 +1,5 @@
 import {createHash} from 'node:crypto'
+import {parseTaskCursor} from './task-pagination.mjs'
 import {
  normalizeActor,safeWorkError,validateWorkCreate,validateClaim,
  validateCheckpoint,validateHandoff
@@ -46,6 +47,11 @@ export function createWorkService({repository,agentAuthorizer=()=>false}={}){
    if(!has(a.allowedProjectIds,workId(projectId)))throw safeWorkError('not-authorized')
    if(!Number.isSafeInteger(limit)||limit<1||limit>50)throw safeWorkError('invalid-input')
    return repository.list({projectId,limit})
+  },
+  async listPage({actor,projectId,cursor}={}){
+   const a=authorize(actor)
+   if(!has(a.allowedProjectIds,workId(projectId)))throw safeWorkError('not-authorized')
+   return repository.listPage({projectId,after:parseTaskCursor(cursor,projectId)})
   },
   async claim({actor,workItemId,agentId,runId,expectedVersion,leaseSeconds,requestId}={}){
    const a=authorize(actor)

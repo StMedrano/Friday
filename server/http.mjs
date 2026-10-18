@@ -1,3 +1,6 @@
+import { projectMonitoringHistory } from './monitoring/history.mjs'
+import { readWebGrowth } from './adapters/web-growth.mjs'
+import { validateWebGrowthSnapshot } from './adapters/web-growth-schema.mjs'
 import { createServer } from 'node:http'
 import { createHash, timingSafeEqual } from 'node:crypto'
 import { toPublicRepository } from './repositories/repository.mjs'
@@ -10,6 +13,8 @@ import { answerAssistant } from './assistant.mjs'
 import { normalizeAssistantHistory, validateAssistantPrompt } from './assistant-input.mjs'
 import { validateAgentId, validateAgentPrompt, validateRegistrySyncBody } from './agents/input.mjs'
 import {createCloudflareAccessVerifier} from './security/cloudflare-access.mjs'
+import { getGroupWorkspace } from './agents/group-workspace.mjs'
+import { groupAdvisoryPolicy } from './agents/group-advisory.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -168,9 +173,11 @@ export function createFridayServer({
   monitoringRuntime = null,
   agentRegistryService = null,
   agentService = null,
+  projectTasks = null,
   repositoryRegistry = null,
   buildOverviewImpl = buildOverview,
   answerAssistantImpl = answerAssistant,
+  readWebGrowthImpl = readWebGrowth,
   verifyAccessImpl = createCloudflareAccessVerifier(),
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
@@ -220,7 +227,8 @@ export function createFridayServer({
       // Small process-local resource guard; deployed ingress must also apply
       // distributed request quotas and abusive-client controls.
       const isExpensive=request.method==='POST'&&(
-        url.pathname==='/api/assistant'||url.pathname==='/api/agents/route'||
+        /^\/api\/projects\/[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\/tasks$/.test(url.pathname)||
+        url.pathname==='/api/assistant'||url.pathname==='/api/group-advisory'||url.pathname==='/api/agents/route'||
         /^\/api\/agents\/[^/]+\/ask$/.test(url.pathname)||isOperatorMutation)
       if (isExpensive) {
         const time=Date.now()
@@ -237,6 +245,50 @@ export function createFridayServer({
       }
     }
 
+    const projectTaskRoute=/^\/api\/projects\/([A-Za-z0-9][A-Za-z0-9_.-]{0,127})\/tasks$/.exec(url.pathname)
+    if (url.pathname === '/api/projects' || projectTaskRoute) {
+      // Explicit local-development injection only; bootstrap never creates this service.
+      if (!authenticatedIdentity || config.mode !== 'live' || !projectTasks) return json(response,503,{error:'project-tasks-unavailable'})
+      if (url.search && (!projectTaskRoute || request.method!=='GET' || [...url.searchParams.keys()].some(key=>key!=='cursor') || url.searchParams.getAll('cursor').length!==1)) return json(response,400,{error:'unexpected-query'})
+      if (request.method!=='GET' && !(projectTaskRoute && request.method==='POST')) return json(response,405,{error:'method-not-allowed'})
+      if (request.method==='POST' && (request.headers.origin!==config.access.publicOrigin || !String(request.headers['content-type']||'').startsWith('application/json'))) return json(response,403,{error:'origin-or-content-type-denied'})
+      try {
+        if (!projectTaskRoute) return json(response,200,{projects:await projectTasks.projects(authenticatedIdentity)})
+        const projectId=projectTaskRoute[1]
+        if (request.method==='GET') return json(response,200,await projectTasks.page(authenticatedIdentity,projectId,url.searchParams.has('cursor')?url.searchParams.get('cursor'):undefined))
+        let body
+        try {body=await readBody(request)}catch{return json(response,400,{error:'invalid-input'})}
+        return json(response,201,{task:await projectTasks.create(authenticatedIdentity,projectId,body)})
+      } catch(error) {
+        const status={ 'not-authorized':403,'invalid-input':400,'idempotency-conflict':409 }[error?.kind]||503
+        return json(response,status,{error:status===503?'project-tasks-unavailable':error.kind})
+      }
+    }
+
+    if (url.pathname === '/api/web-growth') {
+      // A fixed private project grant is separate from group membership/operator role.
+      // Never connect private business data in the unauthenticated demo mode.
+      if (!authenticatedIdentity || config.mode !== 'live') return json(response,503,{error:'web-growth-authentication-required'})
+      if (!config.webGrowth?.readerEmails?.includes(authenticatedIdentity.email)) return json(response,403,{error:'web-growth-reader-required'})
+      if (request.method !== 'GET') return json(response,405,{error:'read-only-endpoint'})
+      if (url.search) return json(response,400,{error:'unexpected-query'})
+      if (config.webGrowth.enabled !== true) return json(response,503,{error:'web-growth-unavailable'})
+      try {
+        return json(response,200,validateWebGrowthSnapshot(await readWebGrowthImpl(config.webGrowth)))
+      } catch { return json(response,503,{error:'web-growth-unavailable'}) }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/agent-groups') {
+      if (config.mode !== 'mock' && !authenticatedIdentity) {
+        return json(response, 503, { error: 'access-unconfigured' })
+      }
+      try {
+        return json(response, 200, await getGroupWorkspace({ registryService: agentRegistryService }))
+      } catch {
+        return json(response, 503, { error: 'group-workspace-unavailable' })
+      }
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/overview') {
       try {
         return json(response, 200, await currentOverview({ config, monitoringRuntime, buildOverviewImpl }))
@@ -250,7 +302,13 @@ export function createFridayServer({
     }
 
     if (request.method === 'GET' && url.pathname === '/api/monitoring/history') {
-      return json(response, 200, monitoringRuntime?.getHistory?.() || { events: [] })
+      if (config.monitoring?.enabled === false) return json(response,503,{error:'monitoring-disabled'})
+      if (typeof monitoringRuntime?.getHistory !== 'function') return json(response,503,{error:'monitoring-history-unavailable'})
+      let history
+      try { history=await monitoringRuntime.getHistory() }
+      catch { return json(response,503,{error:'monitoring-history-unavailable'}) }
+      try { return json(response,200,projectMonitoringHistory(history)) }
+      catch { return json(response,502,{error:'monitoring-history-invalid'}) }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/agents') {
@@ -398,6 +456,45 @@ export function createFridayServer({
         return json(response, result.accepted ? 200 : 400, result)
       } catch (error) {
         return json(response, 400, { accepted: false, mode: 'preview', reason: error.message })
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/group-advisory') {
+      const execution = { performed: false, reason: 'Friday group assistance is advisory only.' }
+      if (config.mode !== 'mock' && !authenticatedIdentity) {
+        return json(response, 503, { available: false, error: 'access-unconfigured', execution })
+      }
+      let body
+      try { body = await readBody(request) } catch {
+        return json(response, 400, { available: false, error: 'invalid-brief', execution })
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body) ||
+          Object.keys(body).length !== 2 || typeof body.groupId !== 'string' || typeof body.prompt !== 'string' ||
+          !Object.hasOwn(body, 'groupId') || !Object.hasOwn(body, 'prompt')) {
+        return json(response, 400, { available: false, error: 'invalid-brief', execution })
+      }
+      const systemPrompt = groupAdvisoryPolicy(body.groupId)
+      const validated = validateAssistantPrompt(body.prompt)
+      if (!systemPrompt || !validated.ok) {
+        return json(response, 400, { available: false, error: 'invalid-brief', execution })
+      }
+      try {
+        const overview = body.groupId === 'homelab'
+          ? await currentOverview({ config, monitoringRuntime, buildOverviewImpl }) : {}
+        const result = await answerAssistantImpl({ config, prompt: validated.prompt, overview, systemPrompt })
+        if (!result.available || result.mode === 'local-analysis') {
+          return json(response, 503, { available: false, groupId: body.groupId,
+            reason: 'Group advice requires an available AI provider. No plan was generated.', execution })
+        }
+        if (typeof result.text !== 'string' || !result.text.trim() ||
+            !['cloud-ai', 'local-ai'].includes(result.mode)) {
+          return json(response, 502, { available: false, error: 'group-advice-unavailable', execution })
+        }
+        return json(response, 200, { available: true, groupId: body.groupId,
+          text: result.text, mode: result.mode, provider: result.provider, model: result.model,
+          fallbackUsed: result.fallbackUsed, attempts: result.attempts, execution })
+      } catch {
+        return json(response, 502, { available: false, error: 'group-advice-unavailable', execution })
       }
     }
 

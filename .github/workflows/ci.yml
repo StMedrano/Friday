@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, build/friday-core-mvp]
   pull_request:
-    branches: [main]
+    branches: [main, feat/friday-operator-auth-20261011]
 
 permissions:
   contents: read
@@ -32,6 +32,12 @@ jobs:
 
       - name: Build
         run: npm run build
+
+      - name: Install isolated browser test runtime
+        run: npx playwright install --with-deps chromium
+
+      - name: Test trusted project tasks in synthetic local browser fixture
+        run: npm run test:e2e
 
       - name: Verify signed Access identity can load built UI
         run: node --test server/security/access-staging.test.mjs

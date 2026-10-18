@@ -1,0 +1,11 @@
+.project-tasks{padding:24px;max-width:960px;margin:auto;color:var(--text-primary,#e7edf6)}
+.project-tasks header p,.project-tasks article span{color:#a4b2c5;font-size:14px}
+.project-tasks label{display:grid;gap:8px;margin:16px 0;min-width:0}
+.project-tasks input,.project-tasks textarea,.project-tasks select{box-sizing:border-box;width:100%;min-height:44px;border:1px solid #35465e;background:#101a29;color:#e7edf6;border-radius:8px;padding:12px;font:inherit}
+.project-tasks textarea{min-height:88px;resize:vertical}
+.project-tasks button{min-height:44px;padding:10px 16px;background:#172d43;color:#d9f5ff;border:1px solid #386177;border-radius:8px;cursor:pointer}
+.project-tasks button:disabled{opacity:.5;cursor:default}
+.project-tasks :is(button,input,textarea,select):focus-visible{outline:2px solid #75d9fa;outline-offset:3px}
+.project-tasks article{padding:18px 0;border-bottom:1px solid #26384b;overflow-wrap:anywhere}
+.project-tasks [role=alert]{padding:12px;border-left:3px solid #efa582;color:#ffd4be}
+@media(max-width:600px){.project-tasks{padding:16px}}

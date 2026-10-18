@@ -22,3 +22,13 @@ test('CI scans exact built image through a tar with no scanner Docker daemon soc
  assert.match(script,/--exit-code 1/)
  assert.doesNotMatch(script,/docker\.sock/)
 })
+
+test('scanner downloads use isolated disk-backed temporary storage rather than bounded tmpfs',async()=>{
+ const script=await readFile(resolve(root,'scripts/scan-controller-image.sh'),'utf8')
+ assert.match(script,/mkdir -p "\$dir\/input" "\$dir\/cache\/tmp"/)
+ assert.match(script,/--env TMPDIR=\/cache\/tmp/)
+ assert.match(script,/--mount "type=bind,src=\$dir\/cache,dst=\/cache"/)
+ assert.doesNotMatch(script,/--tmpfs \/tmp/)
+ assert.match(script,/--read-only/)
+ assert.match(script,/--cap-drop ALL/)
+})

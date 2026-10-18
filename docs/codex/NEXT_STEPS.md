@@ -1,11 +1,89 @@
 # Friday — Ordered Finish Queue
 
+Dependency checkpoint: security branch720b40a is reconciled into this development candidate. Compare actual remote branch refs, not only PR base-SHA snapshots; the older snapshot concealed the conflict that prevented paging CI. Retain signed Authentik-source Operator hardening and repository explorer alongside scoped task pages. No PR merge or runtime activation is implied. Private task write/role/source-claim acceptance, Access relogin and storage/retention/backup release gates remain unresolved.
+
+Task pagination is implemented and browser-tested; preserve scoped keyset cursors, microsecond/UUID ordering, draft-preserving refresh and newest-page reset after saves. Do not recreate the first50-only view. Review docs/superpowers/plans/local-task-pagination.md and exact-head CI. Next safe source slice can extend read-only task detail/activity through the same trusted project binding; claims/execution and memory remain separately denied. Real runtime/storage activation still requires transport/configuration, UTC/query-plan, retention/backup and live Access/relogin review. No private connection, grants, worker, merge or deployment is authorized.
+
+Latest task reliability checkpoint: task creation waits for a validated list read; failed reads retain the draft until successful explicit refresh. Committed-but-unconfirmed save retry is browser-tested with exactly one stored synthetic task. Preserve unchanged request IDs across retries. Require exact-head CI; do not duplicate the completed project/task UI and recovery implementation or connect private runtime services incidentally.
+
+## Project/task slice continuation
+
+Project list/task list/create UI and the optional identity/catalog-bound HTTP adapter are implemented locally; do not rebuild them or add another framework. Review docs/superpowers/plans/local-project-task-slice.md and exact-head CI. Runtime bootstrap remains disconnected. Before real private records: review server-only configuration/transport, catalog ownership, retention/erasure, backup and real Access session/relogin acceptance. All-project owner intent is supplied; no agent/memory/tool grants follow. Keep PR33 draft; no private-service connections, worker activation, grant changes or deployments are authorized. No migration added. Local make/Docker are unavailable, so real disposable SQL and container proof must come from CI, independently of local synthetic browser persistence.
+
+
+## Latest local verification follow-up
+
+Scanner fix63bd95a passed CI476, including scans and isolated container/database checks. Owner project snapshot compilera1ded9c passed 167 frontend /471 Node tests and build locally; require successful exact-head CI. Owner identity/all-project intent are supplied; do not ask again or commit the identity. Next: review the private project/work HTTP and storage boundary, using the trusted provisioned catalog and no agent/memory/tool grants. No runtime access is configured yet.
+
+
+## Local PC continuation queue
+
+Use local `C:/Users/medra/Documents/Codex/Friday` on `feat/friday-group-workspace-20261013`, not the historical remote controller checkout. Monitoring-history missing-runtime/disabled/malformed handling is now fixed in source with failing-first regressions. Local WSL Node22 tests/build passed with the documented prebuild skip. Make and Docker are unavailable locally; require exact-head CI and do not claim those local gates passed.
+
+1. Publish and verify this monitoring checkpoint on PR33 without force-push; preserve PR29 security dependency and PR31 design record.
+2. Keyboard focus containment/restoration and explicit bounded monitoring-history refresh/recovery are implemented with regressions. Preserve shared Home/Incidents state, stale clearing and distinct unavailable/demo states; check exact final-head CI rather than repeating completed UI work.
+3. Pure internal identity/project-to-ActorContext mapping is now implemented and tested; do not duplicate it. Use the supplied owner designation and trusted project-ID snapshot compiler, then review the separate HTTP/storage boundary and retention/access design before exposing private work/conversation/memory records. No runtime wiring or real grants exist yet. Group/model output grants no authority. Reuse existing Phase2B services; keep Phase2C dormant.
+4. Complete remaining provider/model compatibility and feature UI work with source/fixture versus live evidence recorded separately. Do not read configured remote servers or activate inference during this local-only task.
+5. Before production review, record incomplete live Access relogin/role/origin acceptance, deployment transport/grants for Web Growth, backup/rollback and migration gates. No merge/deploy or HomeLab commands are authorized. Docker/make/database gates need a working local isolated runtime or exact-head CI; do not install/reconfigure system services incidentally.
+
+CI474 at recovery640b4e9 failed because its hosted runner ran out of disk while downloading the Trivy vulnerability database. Tests/build and preceding gates passed, but the scan is unverified. Keep the unchanged vulnerability gate and require a successful fresh exact-head run; never label the failed scan a clean vulnerability result.
+
+## Web Growth private connection checkpoint — 2026-10-14
+
+The protected read-only reader/Friday adapter/UI is implemented in PR #33 source, disabled by default. The identified VM100 service currently has anonymous reads and write routes; do not connect Friday to its raw API. VM100 remains inaccessible for verified deployment inspection. Next activation work must verify actual lead-file path/schema/revision and writer replacement strategy, establish reviewed private TLS reader transport and private token, approve named reader emails, then verify signed Access allowed/denied reads and no writes on a separately approved candidate. Do not treat public source or fixture tests as deployed security evidence. The original anonymous service needs its own authentication/write permission fix.
+
+Continue trusted work/project bindings before task/artifact persistence; no model or group membership may grant private access. Preserve Access relogin tracking, NVIDIA inference checks and authenticated allowlisted durable approval/audit prerequisites for Umbrel. No deployment/merge is included in this source continuation.
+
+
+## Connected feature checkpoint — 2026-10-14
+
+Group-level Friday proposals and HomeLab read/refresh evidence are implemented in PR #33. A public App Builder brief succeeded through the configured Groq provider; browser fixture flow and isolated Access/invalid-body/quota tests verify the new route. These are advisory features, not autonomous specialists or deployment evidence.
+
+1. Check exact published-head CI and keep draft until release gates are met.
+2. Obtain authenticated live UI/read acceptance on an approved deployed candidate; do not infer deployment from source or provider smoke.
+3. Next business slice: authenticate and project the existing Web Growth read backend before exposing leads/approval/send state. Backend address/auth/read contract must be verified; no fabricated customer data or unsafe proxy.
+4. Next work slice: trusted actor/project/group bindings and reviewed private work APIs before durable tasks/artifacts/memory. Proposals currently remain browser-only.
+5. Preserve unresolved Access relogin, NVIDIA inference, worker activation and audited Umbrel action prerequisites. No incidental production/staging change or security bypass is authorized.
+
+
+## UI continuation checkpoint — 2026-10-14
+
+The group workspace visual/search slice is implemented on the existing PR #33 branch. Local role filtering, readable state/metadata, responsive controls, keyboard focus and reduced-motion-aware interactions are complete in source. Focused UI review findings were fixed with regression tests; 121 frontend / 434 Node tests, build/Compose and Access/dormant fixture checks passed. Check the latest published-head CI before any readiness claim.
+
+Continue with the feature-first queue below. Private integrations and real worker acceptance are still separate. A later shell refinement can address legacy dashboard typography/navigation, but must preserve truthful operation and existing workflows. UI polish does not waive the unresolved Access relogin defect or release/approval requirements.
+
+
+## Feature-first continuation queue — 2026-10-14
+
+This queue reflects the latest operator direction and takes precedence over older release-first ordering below. Keep using PR #33's `feat/friday-group-workspace-20261013`; PR #31 is its design record. Continue source development and tests without changing production or staging.
+
+1. Require passing CI on the latest PR #33 head and retain the operational ledger in BUILD_STATUS. Group display is implemented; private business/work data and new workers remain disconnected.
+2. NVIDIA: use the new read-only catalog check to verify an operator-selected currently advertised model. The first selected model returned `model-unavailable`. Catalog acceptance is not inference or billing verification. Keep hosted inference disabled until account terms and a selected model are verified; the existing one-request inference probe has separate opt-in/free-tier guards.
+3. Plan and implement the next private Web Growth read or trusted group-work slice with explicit actor/project/group bindings before exposing customer/task/memory records. Do not invent backend addresses, credentials, grants or customer state.
+4. HomeLab activation stays read-only and individually scoped. Umbrel container restart is blocked until the actual target and authenticated, allowlisted, durably audited approval workflow are verified. No VM/host/Docker-daemon restart authority is implied.
+5. Track Cloudflare Access logout/relogin as an unresolved functionality defect. Troubleshooting must preserve Access policy and avoid changing live sessions or collecting JWT/cookie values incidentally.
+6. Perform deferred broad independent security review when feature implementation is complete. Before any merge/deployment, satisfy PR #29's remaining identity/session, origin-isolation, backup/migration and explicit cutover gates. Deferral never waives them.
+
+No merge, deployment, live worker activation, private data integration or Umbrel action was performed by this continuation.
+
+
+## Group workspace release queue — 2026-10-13
+
+1. Obtain independent Task 4 and whole-branch reviews, then publish the separate feature PR stacked on the verified PR #29 candidate. Require passing CI for its exact final head; local checks do not replace CI.
+2. Finish and release PR #29's security boundary independently before deploying this group slice. Its Access negative-identity/session, production origin-isolation, offline backup and copy-only non-root migration gates remain authoritative.
+3. Preview the built mock UI on desktop and phone when browser access is available. Verify unavailable state, keyboard group selection, navigation, advisory assistant preservation and cancellation. Browser visual acceptance was not performed in development.
+4. After separate access authorization, perform authenticated live read-only group/registry acceptance. Display configured definitions as configured, never as running workers; verify registry outage does not erase declared groups.
+5. Obtain separate merge/deployment decisions with an immutable reviewed candidate, verified offline backup and rollback target `0fba466e7e142105b3048af0c38d3fb3960ebd07` (recorded production image `friday-release:0fba466`). Do not infer production state from local test evidence.
+
+This slice has no automation policy control. Actions remain not enabled. Role implementation/registry registration, HomeLab telemetry activation, Web Growth integration, trusted actor bindings for work/customer/memory and controlled actions each require their own approved plan. Preserve local-only advisory Phase 1 and dormant Phase 2C.
+
 Use the current PR #29 queue first. Older P0–P10 entries below are historical product planning and must not trigger a repeat of completed rollout work. Do not skip safety prerequisites to reach action features sooner.
 
 ## Current PR #29 release queue — 2026-10-13
 
 1. Resume existing draft `feat/friday-operator-auth-20261011`, not a new security implementation. Implementation baseline `511b9f70e237900fce24cbd0f0099c42c7bb3c97` passed CI #437.
 2. **Completed on 2026-10-13 after VM100 reconnection:** inspected the existing staging app, changed only its Compose line and runtime policy to `unless-stopped`, and verified both service policies with unchanged container IDs/start times. Stage health, anonymous origin/edge denial and adjacent services passed. Do not repeat deployment, recreate the connector, or reboot Docker/VM100 for testing. Continue at step 3.
+3. Investigate the unresolved production logout/relogin regression reported on 2026-10-14 through a separately approved, non-destructive diagnostic window. Capture sanitized timestamps, HTTP status and Access decision metadata only; compare protected-hostname, tunnel/origin health and authentication logs. Never collect JWTs/cookies, broaden Allow policy, add a bypass or weaken Friday authentication to make a test pass. Then complete unlisted-identity denial, allowed viewer/API/operator-denial and logout/expiry acceptance with the required session-impact approval.
 3. Configure Authentik as the only normal Friday login method through Cloudflare Access Generic OIDC. Validate the signed `friday_auth_source` claim, exact operator identity and staging access. Test the outage-only One-time PIN break-glass path from [Friday authentication failover](../friday-authentication-failover.md); fallback identities must remain Viewer-only. Complete unlisted-identity denial, sanitized Access log/policy evidence, and logout/expiry acceptance with required session-impact approval. Never collect JWTs/cookies or broaden Allow policy to make a test pass.
 4. Obtain a genuine independent review of the final candidate. CI, self-review and user-reported login do not replace this gate.
 5. Complete production Cloudflare/NPM forwarding and origin-isolation acceptance, then a verified offline backup and copy-only non-root volume migration under separate authorization. Do not change the root-owned production volume or deploy this draft directly.

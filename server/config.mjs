@@ -78,6 +78,12 @@ export function getConfig(env = process.env) {
       tokenSecret: env.FRIDAY_PROXMOX_TOKEN_SECRET || '',
       rejectUnauthorized: !enabled(env.FRIDAY_PROXMOX_INSECURE),
     },
+    webGrowth: {
+      enabled: enabled(env.FRIDAY_WEB_GROWTH_ENABLED),
+      baseUrl: env.FRIDAY_WEB_GROWTH_READER_URL || '',
+      token: env.FRIDAY_WEB_GROWTH_READER_TOKEN || '',
+      readerEmails: [...new Set(String(env.FRIDAY_WEB_GROWTH_READER_EMAILS || '').split(',').map(x=>x.trim().toLowerCase()).filter(Boolean))],
+    },
     vm100Observer: {
       enabled: enabled(env.FRIDAY_VM100_OBSERVER_ENABLED),
       baseUrl: env.FRIDAY_VM100_OBSERVER_URL || '',
