@@ -8,6 +8,7 @@ import { buildOverview, decorateOverviewWithMonitoring } from './overview.mjs'
 import { answerAssistant } from './assistant.mjs'
 import { normalizeAssistantHistory, validateAssistantPrompt } from './assistant-input.mjs'
 import { validateAgentId, validateAgentPrompt, validateRegistrySyncBody } from './agents/input.mjs'
+import { createAccessGate } from './security/access.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -155,8 +156,12 @@ export function createFridayServer({
   repositoryRegistry = null,
   buildOverviewImpl = buildOverview,
   answerAssistantImpl = answerAssistant,
+  accessGateImpl = null,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
+  const securityRequired = config.access?.enabled === true ||
+    (config.mode === 'live' && config.access?.enabled !== false)
+  const accessGate = securityRequired ? (accessGateImpl || createAccessGate(config.access)) : null
 
   return createServer(async (request, response) => {
     const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
@@ -167,6 +172,25 @@ export function createFridayServer({
 
     if (request.method === 'GET' && url.pathname === '/api/health') {
       return json(response, 200, { status: 'ok', mode: config.mode, ai: config.ai.enabled, time: new Date().toISOString() })
+    }
+
+    // Protect every operational API before any service method is reached.
+    // Health probes alone are public; browser UI assets are static.
+    if (accessGate && url.pathname.startsWith('/api/')) {
+      const operatorOnly = request.method === 'POST' && url.pathname === '/api/agents/registry/sync'
+      let identity
+      try { identity = await accessGate(request, operatorOnly) }
+      catch { identity = {status:503,error:'access-verification-unavailable'} }
+      if (identity?.status !== 200) {
+        const denied = identity?.status === 503
+        return json(response, denied ? 503 : 403, {error:denied?'access-verification-unavailable':'access-denied'})
+      }
+      // Do not allow browser-origin cross-site requests to use a verified session
+      // for operational POST handlers. The registry sync additionally requires JSON.
+      if (request.method === 'POST' && request.headers['sec-fetch-site'] === 'cross-site')
+        return json(response, 403, {error:'access-denied'})
+      if (operatorOnly && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
+        return json(response, 415, {error:'json-required'})
     }
 
     if (request.method === 'GET' && url.pathname === '/api/overview') {

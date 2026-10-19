@@ -6,6 +6,7 @@ import { createFridayServer } from './http.mjs'
 function config() {
   return {
     mode: 'live',
+    access: {enabled:false}, // in-process historical route fixtures
     port: 3010,
     monitoring: { enabled: false, statePath: '/tmp/unused.json' },
     diagnostics: { enabled: false },
