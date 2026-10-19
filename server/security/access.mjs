@@ -15,8 +15,7 @@ export function createAccessGate(config,{fetchImpl=fetch}={}){
  const audience=String(config?.audience||'').trim()
  const operators=config?.operatorEmails
  const isConfigured=domain.test(teamDomain)&&audience.length>=3&&audience.length<=256&&
-  Array.isArray(operators)&&operators.every(s=>typeof s==='string'&&email.test(s.trim()))&&
-  operators.length>0
+  Array.isArray(operators)&&operators.every(s=>typeof s==='string'&&email.test(s.trim()))
  const allowedOperators=new Set(isConfigured?operators.map(x=>x.toLowerCase().trim()):[])
  let cachedKeys=null
  let cacheDeadline=0

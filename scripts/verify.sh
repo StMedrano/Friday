@@ -16,9 +16,12 @@ if command -v docker >/dev/null 2>&1; then
 fi
 
 check_http_endpoints() {
-  curl -fsS "http://127.0.0.1:${PORT}/healthz" >/dev/null 2>&1 &&
-    curl -fsS "http://127.0.0.1:${PORT}/api/health" >/dev/null 2>&1 &&
-    curl -fsS "http://127.0.0.1:${PORT}/api/overview" >/dev/null 2>&1
+  HEALTH_STATUS=$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:${PORT}/healthz" 2>/dev/null) || return 1
+  API_HEALTH_STATUS=$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:${PORT}/api/health" 2>/dev/null) || return 1
+  OVERVIEW_STATUS=$(curl -sS -o /dev/null -w '%{http_code}' "http://127.0.0.1:${PORT}/api/overview" 2>/dev/null) || return 1
+  [ "$HEALTH_STATUS" = '200' ] &&
+    [ "$API_HEALTH_STATUS" = '200' ] &&
+    { [ "$OVERVIEW_STATUS" = '200' ] || [ "$OVERVIEW_STATUS" = '401' ] || [ "$OVERVIEW_STATUS" = '403' ]; }
 }
 
 if command -v curl >/dev/null 2>&1; then
@@ -34,7 +37,7 @@ if command -v curl >/dev/null 2>&1; then
     sleep "$RETRY_DELAY_SECONDS"
     attempt=$((attempt + 1))
   done
-  echo "Friday health and overview endpoints: ok"
+  echo "Friday health endpoints are ok; overview is available or Access-protected"
 else
   echo "curl not installed; skipped HTTP health checks"
 fi

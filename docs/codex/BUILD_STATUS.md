@@ -1,5 +1,11 @@
 # Friday Build Status
 
+## Production Access rollout correction — 2026-10-19
+
+The first VM102 deployment attempt for security release `d92c632` built successfully but returned `503 access-not-configured` for protected APIs because base Compose did not pass the server-only Access settings. Production was restored to the preserved last-known-good image while the checkout remained on current `main`.
+
+The rollout correction passes `FRIDAY_ACCESS_TEAM_DOMAIN`, `FRIDAY_ACCESS_AUD`, and `FRIDAY_ACCESS_OPERATOR_EMAILS` through base Compose. An empty operator allowlist now provides signed viewer access while denying all operator-only actions. Deployment health requires 200 from both health endpoints and accepts only 200, 401, or 403 from `/api/overview`; a 503 remains a failed deployment.
+
 This is the source-of-truth handoff ledger for coding agents. Update it when a major capability changes.
 
 ## Authoritative branch, hosts, and UI
