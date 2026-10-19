@@ -36,6 +36,28 @@ Performs explicit read-only bounded log inspection. Raw log text is response-onl
 
 There is no diagnostic remediation endpoint.
 
+## Local repository metadata
+
+### `GET /api/repositories`
+
+Returns enabled repositories from the server-side local registry. Response metadata includes ID, display name, remote without URL credentials or query parameters, default branch, and access mode. It never includes local filesystem paths or per-repository exclusions. Missing or invalid registry data returns a generic `503`; the route has no mutation methods.
+
+The file named by `FRIDAY_REPOSITORY_REGISTRY_PATH` is excluded from Git and the container build context. Enabled entries require string IDs; numbers, booleans, arrays, and objects are rejected rather than coerced. Registry path resolution accepts only explicitly registered Git working trees, rejects traversal and symlink escapes, and refuses secret, dependency, and build paths.
+
+The optional `enabled` field must be a JSON boolean: omission defaults to enabled, and `false` excludes the entry. Other values, including the string `"false"` and `null`, invalidate the registry rather than enabling a checkout unintentionally.
+
+Registry `exclude` patterns support `*` within a path segment, `?` for exactly one non-separator character, and `**` across segments, including paths containing line terminators. A `**/` prefix matches zero or more directories, so `**/inventory.json` excludes both root-level and nested files named `inventory.json`. Excluded directories also exclude their descendants. The same exclusions apply to file listings and text reads.
+
+### Read-only repository tools
+
+- `GET /api/repositories/:id/status` returns the branch and a dirty flag, without file names. Repositories with no commits report their actual branch name. The dirty flag includes staged changes but ignores untracked files.
+- `GET /api/repositories/:id/files?path=.&limit=100` returns at most 200 in-root file paths. The optional limit defaults to 100 and must contain only decimal digits representing an integer from 1 to 200; malformed or out-of-range values return HTTP 400 (`repository-request-rejected`). Directory traversal is depth- and entry-bounded.
+- `GET /api/repositories/:id/file?path=README.md` returns UTF-8 text for a regular file no larger than 64 KiB. Files containing NUL bytes or invalid UTF-8 are rejected with HTTP 400 (`repository-request-rejected`).
+
+All paths resolve under an enabled registered Git root and repeat exclusion checks after symlink resolution. Failures return a generic rejection; arbitrary shell, Git arguments, write methods, and repository mutation are not exposed.
+
+The Repositories workspace uses these GET routes only. It displays registered metadata, branch/dirty status, file paths, and selected text; it does not perform repository writes or execute code.
+
 ## `POST /api/commands/preview`
 
 Deterministic safety classifier. It never executes infrastructure work.

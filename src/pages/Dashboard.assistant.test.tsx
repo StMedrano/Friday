@@ -20,6 +20,10 @@ vi.mock('../lib/api', () => ({
   }),
   fetchMonitoringHistory: vi.fn(async () => []),
   askFridayAssistant: (...args: unknown[]) => askFridayAssistant(...args),
+  fetchFridayRepositories: vi.fn(async () => [{ id: 'friday', name: 'Friday Controller', defaultBranch: 'main', mode: 'read-only', enabled: true }]),
+  fetchFridayRepositoryStatus: vi.fn(async () => ({ branch: 'main', dirty: false })),
+  fetchFridayRepositoryFiles: vi.fn(async () => ['README.md']),
+  fetchFridayRepositoryFile: vi.fn(async () => ({ path: 'README.md', content: 'Friday source' })),
 }))
 
 vi.mock('../hooks/usePhoneLayout', () => ({
@@ -107,5 +111,13 @@ describe('Dashboard assistant integration', () => {
     expect(await screen.findByText('FRIDAY is analyzing…')).toBeInTheDocument()
     expect(input).toBeDisabled()
     expect(send).toBeDisabled()
+  })
+
+  it('opens the repository workspace from the desktop navigation', async () => {
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    await user.click(screen.getByRole('button', { name: 'Repositories' }))
+    expect(await screen.findByText('Friday Controller')).toBeInTheDocument()
+    expect(screen.getByText(/Working tree clean/)).toBeInTheDocument()
   })
 })

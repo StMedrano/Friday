@@ -2,6 +2,13 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getConfig } from './config.mjs'
 
+test('repository registry defaults to a server-side path and accepts explicit configuration', () => {
+  assert.deepEqual(getConfig({}).repositories, { registryPath: './repositories.json' })
+  assert.deepEqual(getConfig({ FRIDAY_REPOSITORY_REGISTRY_PATH: '/data/repositories.json' }).repositories, {
+    registryPath: '/data/repositories.json',
+  })
+})
+
 test('AI config exposes the Groq Gemini Ollama chain and keeps credentials server-side', () => {
   const config = getConfig({
     FRIDAY_AI_ENABLED: 'true',
