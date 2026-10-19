@@ -2,33 +2,51 @@ function deriveName(url) {
   try { return new URL(url).hostname } catch { return url }
 }
 
-export async function getEndpointServices(config) {
-  if (!config.enabled || config.urls.length === 0) return []
-  return Promise.all(config.urls.map(async (url, index) => {
+function legacyChecks(urls = []) {
+  return urls.map((url,index)=>({
+    id:`legacy-${index}`,name:deriveName(url),site:'Site A',url,expectedStatuses:null,
+  }))
+}
+
+export async function getEndpointServices(config,{fetchImpl=fetch,now=Date.now}={}) {
+  if (!config?.enabled) return []
+  if (config.configurationError) throw Error('Invalid endpoint configuration')
+  const checks=Array.isArray(config.checks)&&config.checks.length?config.checks:legacyChecks(config.urls)
+  if (!checks.length) return []
+  return Promise.all(checks.map(async (check) => {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 4000)
+    const started=now()
     try {
-      const response = await fetch(url, { method: 'GET', signal: controller.signal })
+      const response = await fetchImpl(check.url, {
+        method: 'GET',redirect:'manual',credentials:'omit',cache:'no-store',signal:controller.signal,
+      })
+      const latencyMs=Math.max(0,Math.round(now()-started))
+      const accepted=check.expectedStatuses===null
+        ? response.status>=200&&response.status<300
+        : check.expectedStatuses.includes(response.status)
       return {
-        id: `endpoint-${index}`,
-        name: deriveName(url),
+        id: `endpoint-${check.id}`,
+        name: check.name,
         category: 'monitoring',
-        host: deriveName(url),
-        site: 'Site A',
-        status: response.ok ? 'online' : 'degraded',
-        detail: `HTTP ${response.status}`,
-        updated: 'live',
+        host: deriveName(check.url),
+        site: check.site,
+        status: accepted ? 'online' : 'degraded',
+        detail: `HTTP ${response.status} · ${latencyMs} ms`,
+        updated: new Date().toISOString(),
+        latencyMs,
       }
     } catch (error) {
       return {
-        id: `endpoint-${index}`,
-        name: deriveName(url),
+        id: `endpoint-${check.id}`,
+        name: check.name,
         category: 'monitoring',
-        host: deriveName(url),
-        site: 'Site A',
+        host: deriveName(check.url),
+        site: check.site,
         status: 'offline',
-        detail: error.name === 'AbortError' ? 'Timeout' : 'Unreachable',
-        updated: 'live',
+        detail: ['AbortError','TimeoutError'].includes(error?.name) ? 'Timeout' : 'Unreachable',
+        updated: new Date().toISOString(),
+        latencyMs: Math.max(0,Math.round(now()-started)),
       }
     } finally {
       clearTimeout(timer)

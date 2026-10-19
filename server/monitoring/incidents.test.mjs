@@ -67,6 +67,22 @@ test('degraded service opens warning after grace and resolves online', () => {
   assert.equal(state.incidents.find((item) => item.id === incident.id).status, 'resolved')
 })
 
+test('failed Site B endpoint check opens a stable read-only monitoring incident',()=>{
+ const endpoint={
+  id:'endpoint-site-b-edge',name:'Remote edge',category:'monitoring',host:'remote.example.test',site:'Site B',
+  status:'offline',detail:'Timeout',updated:'2026-10-19T00:00:00.000Z',latencyMs:4000,
+ }
+ let state=createEmptyMonitoringState()
+ state=evaluate(state,[endpoint],'2026-10-19T00:00:00.000Z',[],{offlineGraceSeconds:30})
+ state=evaluate(state,[endpoint],'2026-10-19T00:00:31.000Z',[],{offlineGraceSeconds:30})
+ const incident=state.incidents.find(item=>item.status==='open')
+ assert.equal(incident.type,'service-offline')
+ assert.equal(incident.serviceId,'endpoint-site-b-edge')
+ assert.equal(incident.serviceName,'Remote edge')
+ assert.equal(incident.host,'remote.example.test')
+ assert.match(incident.recommendedAction,/approval/i)
+})
+
 test('three service transitions in fifteen minutes opens one flapping warning', () => {
   let state = createEmptyMonitoringState()
   state = evaluate(state, [online], '2026-08-19T02:00:00.000Z', [], { offlineGraceSeconds: 9999 })

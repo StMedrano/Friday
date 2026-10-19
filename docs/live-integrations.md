@@ -136,7 +136,7 @@ Then use the explicit live override. Keep this disabled for normal Proxmox + VM1
 
 ## HTTP endpoint checks
 
-`FRIDAY_ENDPOINTS_ENABLED=true` enables approved read-only health URLs. Do not embed credentials in URLs.
+`FRIDAY_ENDPOINTS_ENABLED=true` enables approved read-only health URLs. Configure structured Site A and Site B checks through the server-only `FRIDAY_ENDPOINT_CHECKS_JSON` value documented in `.env.example`. Check IDs must be stable because monitoring incidents use them as service identity. Friday sends bounded credential-free GET requests, does not read response bodies, and does not follow redirects. URLs with embedded credentials, query strings, or fragments fail closed. Keep the legacy `FRIDAY_ENDPOINT_URLS` list only for existing Site A configurations; do not set both formats.
 
 ## Advisory AI on VM102
 

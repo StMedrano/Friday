@@ -1,5 +1,7 @@
 const DEFAULT_AI_PROVIDER_ORDER = ['groq', 'gemini', 'ollama']
 const AI_PROVIDER_IDS = new Set(['groq', 'gemini', 'ollama', 'openai', 'anthropic'])
+const ENDPOINT_ID = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/
+const ENDPOINT_FIELDS = new Set(['id', 'name', 'site', 'url', 'expectedStatuses'])
 
 function enabled(value) {
   return String(value ?? '').toLowerCase() === 'true'
@@ -24,6 +26,54 @@ function providerOrder(value) {
   return parsed.length ? parsed : [...DEFAULT_AI_PROVIDER_ORDER]
 }
 
+function endpointUrl(value) {
+  if (typeof value !== 'string' || value.length > 2048) return null
+  try {
+    const parsed = new URL(value)
+    if (!['http:', 'https:'].includes(parsed.protocol) || parsed.username || parsed.password || parsed.search || parsed.hash) return null
+    return parsed.toString()
+  } catch { return null }
+}
+
+function endpointText(value) {
+  if (typeof value !== 'string') return null
+  const text = value.trim()
+  return text && text.length <= 80 && !/[\u0000-\u001f\u007f]/.test(text) ? text : null
+}
+
+function endpointConfiguration(env) {
+  const raw = String(env.FRIDAY_ENDPOINT_CHECKS_JSON || '').trim()
+  const legacyRaw = String(env.FRIDAY_ENDPOINT_URLS || '').trim()
+  const invalid = () => ({ checks: [], urls: [], configurationError: 'invalid-endpoint-configuration' })
+  if (raw && legacyRaw) return invalid()
+  if (!raw) {
+    const urls = legacyRaw ? legacyRaw.split(',').map(item => item.trim()).filter(Boolean) : []
+    if (urls.length > 16 || urls.some(value => !endpointUrl(value))) return invalid()
+    return { checks: [], urls, configurationError: null }
+  }
+  if (raw.length > 16384) return invalid()
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed) || parsed.length > 16) return invalid()
+    const ids = new Set()
+    const checks = parsed.map(item => {
+      if (!item || typeof item !== 'object' || Array.isArray(item) || Object.keys(item).some(key => !ENDPOINT_FIELDS.has(key))) throw Error('invalid')
+      const id = typeof item.id === 'string' ? item.id.trim() : ''
+      const name = endpointText(item.name)
+      const site = endpointText(item.site)
+      const url = endpointUrl(item.url)
+      const expectedStatuses = item.expectedStatuses === undefined ? [200] : item.expectedStatuses
+      if (!ENDPOINT_ID.test(id) || ids.has(id) || !name || !site || !url || !Array.isArray(expectedStatuses) ||
+        expectedStatuses.length < 1 || expectedStatuses.length > 10 ||
+        expectedStatuses.some(status => !Number.isInteger(status) || status < 100 || status > 599) ||
+        new Set(expectedStatuses).size !== expectedStatuses.length) throw Error('invalid')
+      ids.add(id)
+      return { id, name, site, url, expectedStatuses: [...expectedStatuses] }
+    })
+    return { checks, urls: [], configurationError: null }
+  } catch { return invalid() }
+}
+
 function localAgentProfile(env, prefix, fallbackModel = 'qwen3:4b-instruct') {
   return {
     provider: 'ollama',
@@ -42,6 +92,7 @@ export function getConfig(env = process.env) {
   const cloudTimeoutFallback = legacyAiTimeoutProvided ? legacyAiTimeoutMs : 15000
   const localTimeoutFallback = legacyAiTimeoutProvided ? legacyAiTimeoutMs : 45000
   const agentRegistryEnabled = enabled(env.FRIDAY_AGENT_REGISTRY_ENABLED)
+  const endpoints = endpointConfiguration(env)
 
   return {
     access: {
@@ -73,10 +124,7 @@ export function getConfig(env = process.env) {
     },
     endpoints: {
       enabled: enabled(env.FRIDAY_ENDPOINTS_ENABLED),
-      urls: String(env.FRIDAY_ENDPOINT_URLS || '')
-        .split(',')
-        .map((item) => item.trim())
-        .filter(Boolean),
+      ...endpoints,
     },
     monitoring: {
       enabled: enabled(env.FRIDAY_MONITORING_ENABLED),
