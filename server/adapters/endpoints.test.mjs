@@ -1,5 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
+import http from 'node:http'
 import {getEndpointServices} from './endpoints.mjs'
 
 const checks=[
@@ -52,7 +53,24 @@ test('disabled checks are inert and malformed enabled configuration fails as one
 
 test('legacy URL list remains supported as Site A checks',async()=>{
  const services=await getEndpointServices({enabled:true,urls:['https://legacy.example.test/health']},{fetchImpl:async()=>({status:204}),now:()=>0})
- assert.equal(services[0].id,'endpoint-legacy-0')
+ assert.equal(services[0].id,'endpoint-0')
  assert.equal(services[0].site,'Site A')
  assert.equal(services[0].status,'online')
+})
+
+test('endpoint checks cancel streaming response bodies after receiving headers',async(t)=>{
+ let closed=false
+ const server=http.createServer((_request,response)=>{
+  response.writeHead(200,{'content-type':'text/plain'})
+  response.flushHeaders()
+  const timer=setInterval(()=>response.write('still-open\n'),25)
+  response.on('close',()=>{clearInterval(timer);closed=true})
+ })
+ await new Promise(resolve=>server.listen(0,'127.0.0.1',resolve))
+ t.after(()=>new Promise(resolve=>{server.closeAllConnections();server.close(resolve)}))
+ const url=`http://127.0.0.1:${server.address().port}/healthz`
+ const [service]=await getEndpointServices({enabled:true,checks:[{...checks[0],url}]})
+ assert.equal(service.status,'online')
+ await new Promise(resolve=>setTimeout(resolve,50))
+ assert.equal(closed,true)
 })

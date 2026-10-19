@@ -83,6 +83,17 @@ test('failed Site B endpoint check opens a stable read-only monitoring incident'
  assert.match(incident.recommendedAction,/approval/i)
 })
 
+test('legacy endpoint recovery resolves a persisted pre-upgrade incident',()=>{
+ const legacyOffline={...offline,id:'endpoint-0',name:'Legacy health URL',host:'legacy.example.test',category:'monitoring'}
+ let state=createEmptyMonitoringState()
+ state=evaluate(state,[legacyOffline],'2026-10-19T01:00:00.000Z',[],{offlineGraceSeconds:30})
+ state=evaluate(state,[legacyOffline],'2026-10-19T01:00:31.000Z',[],{offlineGraceSeconds:30})
+ const incident=state.incidents.find(item=>item.status==='open')
+ assert.equal(incident.serviceId,'endpoint-0')
+ state=evaluate(state,[{...legacyOffline,status:'online',detail:'HTTP 200'}],'2026-10-19T01:01:00.000Z',[],{offlineGraceSeconds:30})
+ assert.equal(state.incidents.find(item=>item.id===incident.id).status,'resolved')
+})
+
 test('three service transitions in fifteen minutes opens one flapping warning', () => {
   let state = createEmptyMonitoringState()
   state = evaluate(state, [online], '2026-08-19T02:00:00.000Z', [], { offlineGraceSeconds: 9999 })

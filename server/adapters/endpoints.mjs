@@ -4,7 +4,7 @@ function deriveName(url) {
 
 function legacyChecks(urls = []) {
   return urls.map((url,index)=>({
-    id:`legacy-${index}`,name:deriveName(url),site:'Site A',url,expectedStatuses:null,
+    id:String(index),name:deriveName(url),site:'Site A',url,expectedStatuses:null,
   }))
 }
 
@@ -21,10 +21,13 @@ export async function getEndpointServices(config,{fetchImpl=fetch,now=Date.now}=
       const response = await fetchImpl(check.url, {
         method: 'GET',redirect:'manual',credentials:'omit',cache:'no-store',signal:controller.signal,
       })
+      const status=response.status
+      try { await response.body?.cancel() } catch {}
+      controller.abort()
       const latencyMs=Math.max(0,Math.round(now()-started))
       const accepted=check.expectedStatuses===null
-        ? response.status>=200&&response.status<300
-        : check.expectedStatuses.includes(response.status)
+        ? status>=200&&status<300
+        : check.expectedStatuses.includes(status)
       return {
         id: `endpoint-${check.id}`,
         name: check.name,
@@ -32,7 +35,7 @@ export async function getEndpointServices(config,{fetchImpl=fetch,now=Date.now}=
         host: deriveName(check.url),
         site: check.site,
         status: accepted ? 'online' : 'degraded',
-        detail: `HTTP ${response.status} · ${latencyMs} ms`,
+        detail: `HTTP ${status} · ${latencyMs} ms`,
         updated: new Date().toISOString(),
         latencyMs,
       }
@@ -49,6 +52,7 @@ export async function getEndpointServices(config,{fetchImpl=fetch,now=Date.now}=
         latencyMs: Math.max(0,Math.round(now()-started)),
       }
     } finally {
+      controller.abort()
       clearTimeout(timer)
     }
   }))
