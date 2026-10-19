@@ -53,7 +53,12 @@ test('empty operator allowlist keeps signed viewers available while denying ever
  assert.equal((await guard({headers},true)).status,403)
 })
 test('missing or malformed configuration fails closed with 503',async()=>{
- for(const conf of [{audience:''},{teamDomain:'http://team.cloudflareaccess.com'},{teamDomain:'https://attacker.example'},{operatorEmails:['not-an-email']}]) {
+ for(const conf of [
+  {audience:''},{audience:'aud with spaces'},{audience:'aud\nvalue'},
+  {teamDomain:'http://team.cloudflareaccess.com'},{teamDomain:'https://attacker.example'},
+  {teamDomain:'https://-.cloudflareaccess.com'},{teamDomain:'https://team-.cloudflareaccess.com'},
+  {operatorEmails:['not-an-email']},
+ ]) {
   const {guard}=gate(conf)
   assert.equal((await guard({headers:{'cf-access-jwt-assertion':token()}},false)).status,503)
  }
