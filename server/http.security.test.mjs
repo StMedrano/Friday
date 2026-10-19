@@ -24,6 +24,17 @@ test('real live configuration requires signed identity, otherwise never calls da
   assert.equal(calls,0)
  })
 })
+test('malformed Access settings remain unavailable at the HTTP boundary',async()=>{
+ for(const env of [
+  {FRIDAY_ACCESS_TEAM_DOMAIN:'https://-.cloudflareaccess.com',FRIDAY_ACCESS_AUD:'aud-123'},
+  {FRIDAY_ACCESS_TEAM_DOMAIN:'https://team.cloudflareaccess.com',FRIDAY_ACCESS_AUD:'aud with spaces'},
+ ]) {
+  const config=getConfig({FRIDAY_MODE:'live',FRIDAY_ACCESS_OPERATOR_EMAILS:'',...env})
+  await request({config},async base=>{
+   assert.equal((await fetch(base+'/api/overview')).status,503)
+  })
+ }
+})
 test('verified identity is required for all APIs and operator identity for registry sync',async()=>{
  const config=getConfig({FRIDAY_MODE:'live'})
  let calls=0

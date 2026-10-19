@@ -46,8 +46,19 @@ test('valid nonoperator token never authorizes registry mutation',async()=>{
  assert.equal((await guard({headers},false)).status,200)
  assert.equal((await guard({headers},true)).status,403)
 })
+test('empty operator allowlist keeps signed viewers available while denying every operator action',async()=>{
+ const {guard}=gate({operatorEmails:[]})
+ const headers={'cf-access-jwt-assertion':token({email:'viewer@example.test'})}
+ assert.equal((await guard({headers},false)).status,200)
+ assert.equal((await guard({headers},true)).status,403)
+})
 test('missing or malformed configuration fails closed with 503',async()=>{
- for(const conf of [{audience:''},{teamDomain:'http://team.cloudflareaccess.com'},{teamDomain:'https://attacker.example'},{operatorEmails:['']}]) {
+ for(const conf of [
+  {audience:''},{audience:'aud with spaces'},{audience:'aud\nvalue'},
+  {teamDomain:'http://team.cloudflareaccess.com'},{teamDomain:'https://attacker.example'},
+  {teamDomain:'https://-.cloudflareaccess.com'},{teamDomain:'https://team-.cloudflareaccess.com'},
+  {operatorEmails:['not-an-email']},
+ ]) {
   const {guard}=gate(conf)
   assert.equal((await guard({headers:{'cf-access-jwt-assertion':token()}},false)).status,503)
  }

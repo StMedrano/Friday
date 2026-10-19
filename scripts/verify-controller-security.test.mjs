@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import {readFile} from 'node:fs/promises'
 import {resolve} from 'node:path'
+import {spawnSync} from 'node:child_process'
 
 const fromRepo=x=>readFile(resolve(import.meta.dirname,'..',x),'utf8')
 test('live controller Compose never exposes raw Docker socket or enables Docker inventory',async()=>{
@@ -21,4 +22,21 @@ test('client application never contains server-side Access credentials',async()=
  const env=await fromRepo('.env.example')
  for(const name of ['FRIDAY_ACCESS_TEAM_DOMAIN','FRIDAY_ACCESS_AUD','FRIDAY_ACCESS_OPERATOR_EMAILS'])
   assert.match(env,new RegExp('^'+name+'=','m'))
+})
+test('base Compose passes server-only Access configuration into the controller',()=>{
+ const result=spawnSync('docker',['compose','config','--format','json'],{
+  cwd:resolve(import.meta.dirname,'..'),
+  env:{
+   ...process.env,
+   FRIDAY_ACCESS_TEAM_DOMAIN:'https://team.cloudflareaccess.com',
+   FRIDAY_ACCESS_AUD:'aud-123',
+   FRIDAY_ACCESS_OPERATOR_EMAILS:'',
+  },
+  encoding:'utf8',
+ })
+ assert.equal(result.status,0,result.stderr)
+ const config=JSON.parse(result.stdout)
+ assert.equal(config.services.friday.environment.FRIDAY_ACCESS_TEAM_DOMAIN,'https://team.cloudflareaccess.com')
+ assert.equal(config.services.friday.environment.FRIDAY_ACCESS_AUD,'aud-123')
+ assert.equal(config.services.friday.environment.FRIDAY_ACCESS_OPERATOR_EMAILS,'')
 })
