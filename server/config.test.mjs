@@ -119,6 +119,44 @@ test('VM100 observer config is disabled by default and stays server-side', () =>
   assert.equal(config.vm100Observer.hostName, 'VM 100')
 })
 
+test('endpoint checks parse bounded structured server-only definitions',()=>{
+ const checks=[
+  {id:'site-a-friday',name:'Friday',site:'Site A',url:'https://friday.example.test/healthz',expectedStatuses:[200]},
+  {id:'site-b-edge',name:'Remote edge',site:'Site B',url:'https://remote.example.test/status',expectedStatuses:[204,302]},
+ ]
+ const config=getConfig({FRIDAY_ENDPOINTS_ENABLED:'true',FRIDAY_ENDPOINT_CHECKS_JSON:JSON.stringify(checks)})
+ assert.deepEqual(config.endpoints,{enabled:true,checks,urls:[],configurationError:null})
+})
+
+test('endpoint checks reject duplicate ids, credentials, queries, fragments, invalid protocols and malformed JSON',()=>{
+ const valid={id:'site-a',name:'Site A',site:'Site A',url:'https://site-a.example.test/healthz',expectedStatuses:[200]}
+ const invalidValues=[
+  '{not-json',
+  JSON.stringify([valid,{...valid,url:'https://site-b.example.test/healthz'}]),
+  JSON.stringify([{...valid,url:'https://user:pass@site-a.example.test/healthz'}]),
+  JSON.stringify([{...valid,url:'https://site-a.example.test/healthz?token=value'}]),
+  JSON.stringify([{...valid,url:'https://site-a.example.test/healthz#fragment'}]),
+  JSON.stringify([{...valid,url:'file:///etc/passwd'}]),
+  JSON.stringify([{...valid,expectedStatuses:[99]}]),
+ ]
+ for(const value of invalidValues){
+  const endpoints=getConfig({FRIDAY_ENDPOINTS_ENABLED:'true',FRIDAY_ENDPOINT_CHECKS_JSON:value}).endpoints
+  assert.deepEqual(endpoints.checks,[])
+  assert.equal(endpoints.configurationError,'invalid-endpoint-configuration')
+ }
+})
+
+test('endpoint checks cap definitions at sixteen and preserve legacy URL configuration',()=>{
+ const checks=Array.from({length:17},(_,index)=>({
+  id:`check-${index}`,name:`Check ${index}`,site:index%2?'Site B':'Site A',
+  url:`https://service-${index}.example.test/healthz`,expectedStatuses:[200],
+ }))
+ assert.equal(getConfig({FRIDAY_ENDPOINT_CHECKS_JSON:JSON.stringify(checks)}).endpoints.configurationError,'invalid-endpoint-configuration')
+ assert.deepEqual(getConfig({FRIDAY_ENDPOINT_URLS:'https://one.example.test/health, https://two.example.test/status'}).endpoints,{
+  enabled:false,checks:[],urls:['https://one.example.test/health','https://two.example.test/status'],configurationError:null,
+ })
+})
+
 test('diagnostics are disabled by default and require explicit opt-in', () => {
   assert.deepEqual(getConfig({}).diagnostics, { enabled: false })
   assert.deepEqual(getConfig({ FRIDAY_DIAGNOSTICS_ENABLED: 'true' }).diagnostics, { enabled: true })

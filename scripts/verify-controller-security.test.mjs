@@ -40,3 +40,14 @@ test('base Compose passes server-only Access configuration into the controller',
  assert.equal(config.services.friday.environment.FRIDAY_ACCESS_AUD,'aud-123')
  assert.equal(config.services.friday.environment.FRIDAY_ACCESS_OPERATOR_EMAILS,'')
 })
+test('base Compose passes structured endpoint checks only to the controller',()=>{
+ const checks='[{"id":"site-a","name":"Site A","site":"Site A","url":"https://site-a.example.test/healthz","expectedStatuses":[200]}]'
+ const result=spawnSync('docker',['compose','config','--format','json'],{
+  cwd:resolve(import.meta.dirname,'..'),
+  env:{...process.env,FRIDAY_ENDPOINT_CHECKS_JSON:checks},
+  encoding:'utf8',
+ })
+ assert.equal(result.status,0,result.stderr)
+ const config=JSON.parse(result.stdout)
+ assert.equal(config.services.friday.environment.FRIDAY_ENDPOINT_CHECKS_JSON,checks)
+})

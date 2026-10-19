@@ -128,7 +128,10 @@ Every successful Phase 1 agent reply remains advisory and reports `execution.per
 
 - Adapter: `server/adapters/endpoints.mjs`
 - Purpose: read-only availability checks of approved HTTP/HTTPS services.
-- Do not place credentials in endpoint URL query strings.
+- Preferred configuration: `FRIDAY_ENDPOINT_CHECKS_JSON`, a server-only JSON array of at most 16 checks with stable `id`, `name`, `site`, `url`, and `expectedStatuses` fields.
+- Friday performs bounded GET requests without credentials, response-body reads, or redirect following. The URL cannot contain credentials, a query string, or a fragment.
+- Each check becomes a stable monitoring service. Unexpected HTTP responses are degraded; timeouts and network failures are offline and enter the existing incident grace-period flow.
+- `FRIDAY_ENDPOINT_URLS` remains available for legacy comma-separated Site A checks. Do not configure both formats.
 
 ## General advisory AI providers
 

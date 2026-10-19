@@ -89,7 +89,7 @@ Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execut
 
 1. Keep Proxmox on its dedicated read-only token.
 2. Keep the VM100 observer authoritative for VM100 Docker visibility.
-3. Add approved HTTP endpoint checks for both sites.
+3. Structured, bounded HTTP endpoint checks for both sites are implemented; production activation waits for approved Site A and Site B health URLs.
 4. Compare FRIDAY output to actual infrastructure and fix normalization errors before adding more providers.
 5. Prefer existing trustworthy monitoring data over duplicate probes where practical.
 

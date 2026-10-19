@@ -22,6 +22,7 @@ export type Service = {
   status: InfrastructureStatus
   detail: string
   updated: string
+  latencyMs?: number
 }
 
 export type ActivityItem = {
