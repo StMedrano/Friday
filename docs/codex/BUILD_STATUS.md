@@ -6,6 +6,8 @@ The first VM102 deployment attempt for security release `d92c632` built successf
 
 The rollout correction passes `FRIDAY_ACCESS_TEAM_DOMAIN`, `FRIDAY_ACCESS_AUD`, and `FRIDAY_ACCESS_OPERATOR_EMAILS` through base Compose. An empty operator allowlist now provides signed viewer access while denying all operator-only actions. Deployment health requires 200 from both health endpoints and accepts only 200, 401, or 403 from `/api/overview`; a 503 remains a failed deployment.
 
+PR #41 merged and deployed to VM102 as `5cfeae3` on 2026-10-19. Exact-head GitHub CI and VM102 `make verify` passed with 90 frontend tests and 372 server/script tests. The rebuilt controller is healthy without a Docker socket mount: direct `/healthz` and `/api/health` return 200, direct `/api/overview` returns the intended 403, the container can fetch the Access JWKS, and the public Cloudflare route redirects to Access with the configured application audience. The production operator list remains deliberately empty, so signed viewers can read while every operator-only action remains denied. An authenticated browser session was not available for the final signed-viewer request. LAN split DNS still resolves the public hostname directly to the origin proxy, where the origin verifier correctly denies requests without an Access JWT; LAN clients must use a route that traverses Cloudflare Access.
+
 This is the source-of-truth handoff ledger for coding agents. Update it when a major capability changes.
 
 ## Authoritative branch, hosts, and UI
