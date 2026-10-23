@@ -37,6 +37,14 @@ disabled-by-default prerequisite contract, not a deployed executor or completed 
   deployment, production action or merge. NVIDIA code is absent from this main
   baseline; restoration is separate. No live capability is established.
 
+Published source checkpoint: commit `2c53de339dd6688a00bbfcc606f372c8e3537ecc`
+passed exact-head Node22 CI515 (run 40003318110), including tests, build,
+isolated Postgres, security/dormant gates, Compose and container builds.
+Continuation CI now invokes the required `make verify` entry point in place
+of separate npm test/build steps, adding the repository Compose overlay check;
+all later security gates remain. Fresh final-head CI is required after this
+workflow/documentation follow-up. Local verification limits above remain.
+
 Scope, durability/trust limitations and next gates:
 `docs/superpowers/plans/2026-10-23-restricted-homelab-foundation.md`.
 

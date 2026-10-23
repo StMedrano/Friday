@@ -27,11 +27,8 @@ jobs:
       - name: Audit locked dependencies
         run: npm audit --audit-level=moderate
 
-      - name: Test
-        run: npm test
-
-      - name: Build
-        run: npm run build
+      - name: Verify repository
+        run: make verify
 
       - name: Validate shell scripts
         run: |
