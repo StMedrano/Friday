@@ -2,6 +2,25 @@
 
 Work from top to bottom. Do not skip safety prerequisites to reach action features sooner.
 
+## 2026-10-23 continuation scope — internal safety foundation
+
+The owner authorized a new continuation branch after PR33 merged and PR29
+closed as superseded. `server/homelab-control.mjs` and `server/homelab-audit.mjs`
+now provide disabled internal fixture diagnostics/advisory, private durable audit,
+required automation gating, and expiring explicit staging-canary restart request/
+approval records. Production bootstrap and HTTP APIs do not construct/expose it.
+Approval is recorded but execution is unavailable. This does not finish P8 or
+activate P9, and does not change the observer's read-only boundary.
+
+Next for this continuation: obtain full Node22 CI verification and review; then
+provision a persistent global automation policy/lifecycle and separately review
+a single staging target's least-privilege action transport, one-use execution
+claims, crash/timeout recovery, and mandatory pre/post health verification.
+Do not add an actual restart or enable NVIDIA/HomeLab access from these records
+alone. No live credentials, hosts, container identity or readiness is inferred.
+See `../superpowers/plans/2026-10-23-restricted-homelab-foundation.md` and the
+current BUILD_STATUS verification limits. Existing ordered safety gates remain.
+
 ## P0 — VM100 observer baseline — completed; nic1 example migrated
 
 - VM100's verified nic1 address is `10.1.10.10/24` on VLAN 10; observer port `3199` remains the read-only Docker boundary.
