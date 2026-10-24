@@ -157,6 +157,42 @@ test('endpoint checks cap definitions at sixteen and preserve legacy URL configu
  })
 })
 
+test('AdGuard Home adapter is disabled by default and keeps credentials server-side',()=>{
+ assert.deepEqual(getConfig({}).adguard,{enabled:false,baseUrl:'',username:'',password:'',site:'Site A',configurationError:null})
+ const config=getConfig({
+  FRIDAY_ADGUARD_ENABLED:'true',FRIDAY_ADGUARD_URL:'https://dns.example.test/adguard',
+  FRIDAY_ADGUARD_USERNAME:'friday-reader',FRIDAY_ADGUARD_PASSWORD:'pass:with:colons',FRIDAY_ADGUARD_SITE:'Site B',
+ })
+ assert.deepEqual(config.adguard,{
+  enabled:true,baseUrl:'https://dns.example.test/adguard/',username:'friday-reader',password:'pass:with:colons',
+  site:'Site B',configurationError:null,
+ })
+})
+
+test('enabled AdGuard Home configuration fails closed on unsafe URLs, missing credentials or invalid site',()=>{
+ const valid={FRIDAY_ADGUARD_ENABLED:'true',FRIDAY_ADGUARD_URL:'http://10.1.10.10:3000',FRIDAY_ADGUARD_USERNAME:'friday',FRIDAY_ADGUARD_PASSWORD:'synthetic'}
+ assert.equal(getConfig(valid).adguard.configurationError,null)
+ assert.equal(getConfig(valid).adguard.baseUrl,'http://10.1.10.10:3000/')
+ assert.equal(getConfig({...valid,FRIDAY_ADGUARD_SITE:''}).adguard.site,'Site A')
+ for(const override of [
+  {FRIDAY_ADGUARD_URL:''},
+  {FRIDAY_ADGUARD_URL:'https://user:pass@dns.example.test/'},
+  {FRIDAY_ADGUARD_URL:'https://dns.example.test/?token=value'},
+  {FRIDAY_ADGUARD_URL:'https://dns.example.test/#fragment'},
+  {FRIDAY_ADGUARD_URL:'file:///etc/passwd'},
+  {FRIDAY_ADGUARD_USERNAME:''},
+  {FRIDAY_ADGUARD_USERNAME:'has:colon'},
+  {FRIDAY_ADGUARD_USERNAME:'line\nbreak'},
+  {FRIDAY_ADGUARD_PASSWORD:''},
+  {FRIDAY_ADGUARD_SITE:'x'.repeat(81)},
+ ]){
+  const adguard=getConfig({...valid,...override}).adguard
+  assert.equal(adguard.configurationError,'invalid-adguard-configuration',JSON.stringify(override))
+  assert.equal(adguard.baseUrl,'')
+  assert.equal(adguard.password,'')
+ }
+})
+
 test('diagnostics are disabled by default and require explicit opt-in', () => {
   assert.deepEqual(getConfig({}).diagnostics, { enabled: false })
   assert.deepEqual(getConfig({ FRIDAY_DIAGNOSTICS_ENABLED: 'true' }).diagnostics, { enabled: true })

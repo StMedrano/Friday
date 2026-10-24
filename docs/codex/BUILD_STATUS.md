@@ -171,10 +171,21 @@ Do not represent those live rollout checks as complete until they are actually p
 
 Docker's native TCP API must never be exposed. Inventory/diagnostic IDs come from sanitized current inventory. The observer must never gain restart, stop, kill, exec, remove, image creation, volume mutation, network mutation, archive write, or arbitrary Docker-path proxy behavior.
 
+## AdGuard Home read-only adapter — 2026-10-24 (source only)
+
+P7 item 2 is implemented in source and disabled by default (`FRIDAY_ADGUARD_ENABLED=false`).
+
+- `server/adapters/adguard.mjs` sends exactly `GET /control/status` and `GET /control/stats` with server-side Basic credentials, a four-second deadline, a 256 KiB response cap, and no redirect following. There is no write path.
+- Output is one stable `adguard-home` `dns` service: online when running with protection on, degraded when protection is disabled or the API rejects credentials/returns malformed data, offline when the DNS server is stopped or the API is unreachable. Invalid enabled configuration fails closed as one `adguard` integration alert.
+- Only aggregate counts, protection/running flags, and a strictly validated version string are forwarded. Top clients, client addresses, queried/blocked domains, and upstream names never reach the UI, monitoring history, or AI providers.
+- AdGuard Home has no read-only role; the documented minimum is a dedicated Friday user kept only in the controller `.env`.
+- Test-first: config, adapter, overview, integration-summary, monitoring, and Compose tests failed before implementation. `make verify` passed in this environment on Node 22.22.0: 90/90 frontend tests, 399/399 server/observer/script tests, production build, and all four Compose validations. An end-to-end check through real config, overview, and monitoring evaluation against a local fake AdGuard server confirmed subpath resolution, authenticated GET-only requests, no client/domain leakage, and a `service-degraded` incident when protection is disabled.
+- Not live-validated: the AdGuard Home address, version, and a dedicated Friday user have not been verified on the homelab. No AdGuard, DNS, DHCP, or network configuration was inspected or changed.
+
 ## Not implemented yet
 
 - Omada authenticated read-only site/device/health adapter.
-- AdGuard authenticated read-only API/statistics adapter.
+- AdGuard live activation (adapter implemented in source; needs a verified address and dedicated Friday user).
 - Uptime Kuma/Prometheus/Grafana native adapters.
 - Application authentication and RBAC.
 - Durable action audit/action request store.

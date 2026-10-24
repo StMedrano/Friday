@@ -237,6 +237,8 @@ FRIDAY_VM100_OBSERVER_TOKEN=
 FRIDAY_VM100_OBSERVER_HOST_NAME=VM 100
 ```
 
+Optional read-only AdGuard Home status and aggregate DNS statistics use a dedicated AdGuard user and stay disabled until configured; see `docs/integrations.md`.
+
 The general Friday Assistant remains separately configurable with its preferred chain:
 
 ```text

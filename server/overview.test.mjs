@@ -82,11 +82,44 @@ test('live adapter outage leaves inventory empty instead of claiming sample serv
   assert.ok(result.alerts.every((alert) => alert.title === 'Integration degraded'))
 })
 
+test('live overview merges AdGuard Home DNS service and reports the integration', async () => {
+  const dns = {
+    id: 'adguard-home', name: 'AdGuard Home', category: 'dns', host: '10.1.10.10', site: 'Site A',
+    status: 'online', detail: 'Protection on · 10 queries/24h · 0.0% blocked · 1 ms avg', updated: '2026-10-24T00:00:00.000Z',
+  }
+  let received
+  const result = await buildOverview({ ...liveConfig(), vm100Observer: { enabled: false }, adguard: { enabled: true } }, {
+    getDockerServices: async () => [],
+    getProxmoxServices: async () => [],
+    getVm100ObserverServices: async () => [],
+    getEndpointServices: async () => [],
+    getAdGuardServices: async (config) => { received = config; return [dns] },
+  })
+
+  assert.deepEqual(received, { enabled: true })
+  assert.deepEqual(result.services, [dns])
+  assert.equal(result.integrations.find((item) => item.id === 'adguard').enabled, true)
+  assert.equal(result.integrations.find((item) => item.id === 'adguard').mode, 'live')
+})
+
+test('AdGuard configuration failure degrades overview as one integration alert', async () => {
+  const result = await buildOverview({ ...liveConfig(), adguard: { enabled: true } }, {
+    getDockerServices: async () => [],
+    getProxmoxServices: async () => [],
+    getVm100ObserverServices: async () => [],
+    getEndpointServices: async () => [],
+    getAdGuardServices: async () => { throw new Error('Invalid AdGuard configuration') },
+  })
+
+  assert.deepEqual(result.services, [])
+  assert.deepEqual(result.alerts.map((alert) => alert.detail), ['adguard: Invalid AdGuard configuration'])
+})
+
 test('mock mode preserves demo data without calling live adapters or requiring credentials', async () => {
   const unexpected = async () => { throw new Error('Mock mode must not call live adapters') }
   const result = await buildOverview({ mode: 'mock' }, {
     getDockerServices: unexpected, getProxmoxServices: unexpected,
-    getVm100ObserverServices: unexpected, getEndpointServices: unexpected,
+    getVm100ObserverServices: unexpected, getEndpointServices: unexpected, getAdGuardServices: unexpected,
   })
 
   assert.equal(result.mode, 'mock')

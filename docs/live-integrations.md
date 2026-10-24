@@ -138,6 +138,10 @@ Then use the explicit live override. Keep this disabled for normal Proxmox + VM1
 
 `FRIDAY_ENDPOINTS_ENABLED=true` enables approved read-only health URLs. Configure structured Site A and Site B checks through the server-only `FRIDAY_ENDPOINT_CHECKS_JSON` value documented in `.env.example`. Check IDs must be stable because monitoring incidents use them as service identity. Friday sends bounded credential-free GET requests, does not read response bodies, and does not follow redirects. URLs with embedded credentials, query strings, or fragments fail closed. Keep the legacy `FRIDAY_ENDPOINT_URLS` list only for existing Site A configurations; do not set both formats.
 
+## AdGuard Home
+
+`FRIDAY_ADGUARD_ENABLED=true` enables the read-only AdGuard Home adapter. Set `FRIDAY_ADGUARD_URL` to the AdGuard web/API base URL (a reverse-proxy subpath is allowed), `FRIDAY_ADGUARD_USERNAME`/`FRIDAY_ADGUARD_PASSWORD` to a dedicated Friday user, and `FRIDAY_ADGUARD_SITE` to the site that hosts the instance. Friday sends only `GET /control/status` and `GET /control/stats`, shows one `adguard-home` DNS service, and forwards no client addresses or queried domains. The AdGuard address is not yet verified in live inventory; confirm it read-only before enabling, and do not change AdGuard, DNS, or DHCP configuration to make Friday work.
+
 ## Advisory AI on VM102
 
 The validated production provider order is:

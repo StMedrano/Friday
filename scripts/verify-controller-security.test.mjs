@@ -51,3 +51,31 @@ test('base Compose passes structured endpoint checks only to the controller',()=
  const config=JSON.parse(result.stdout)
  assert.equal(config.services.friday.environment.FRIDAY_ENDPOINT_CHECKS_JSON,checks)
 })
+test('base Compose passes AdGuard Home settings only as server-side controller variables',async()=>{
+ const result=spawnSync('docker',['compose','config','--format','json'],{
+  cwd:resolve(import.meta.dirname,'..'),
+  env:{
+   ...process.env,
+   FRIDAY_ADGUARD_ENABLED:'true',
+   FRIDAY_ADGUARD_URL:'https://dns.example.test/',
+   FRIDAY_ADGUARD_USERNAME:'friday',
+   FRIDAY_ADGUARD_PASSWORD:'synthetic-password',
+   FRIDAY_ADGUARD_SITE:'Site B',
+  },
+  encoding:'utf8',
+ })
+ assert.equal(result.status,0,result.stderr)
+ const environment=JSON.parse(result.stdout).services.friday.environment
+ assert.equal(environment.FRIDAY_ADGUARD_ENABLED,'true')
+ assert.equal(environment.FRIDAY_ADGUARD_URL,'https://dns.example.test/')
+ assert.equal(environment.FRIDAY_ADGUARD_USERNAME,'friday')
+ assert.equal(environment.FRIDAY_ADGUARD_PASSWORD,'synthetic-password')
+ assert.equal(environment.FRIDAY_ADGUARD_SITE,'Site B')
+ const yaml=await fromRepo('compose.yaml')
+ assert.match(yaml,/FRIDAY_ADGUARD_ENABLED: \$\{FRIDAY_ADGUARD_ENABLED:-false\}/)
+ assert.match(yaml,/FRIDAY_ADGUARD_PASSWORD: \$\{FRIDAY_ADGUARD_PASSWORD:-\}/)
+ const env=await fromRepo('.env.example')
+ assert.match(env,/^FRIDAY_ADGUARD_ENABLED=false$/m)
+ assert.match(env,/^FRIDAY_ADGUARD_PASSWORD=$/m)
+ for(const source of [yaml,env])assert.doesNotMatch(source,/VITE_[A-Z_]*ADGUARD/)
+})

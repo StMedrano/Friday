@@ -96,7 +96,7 @@ Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execut
 ## P7 — Complete network/service read adapters
 
 1. Omada read-only site/device/health adapter.
-2. AdGuard Home status and DNS statistics adapter.
+2. AdGuard Home status and DNS statistics adapter — implemented in source (`server/adapters/adguard.mjs`), disabled by default. Live activation waits for a read-only verified AdGuard address and a dedicated Friday user; do not change AdGuard/DNS/DHCP configuration to enable it.
 3. Prefer existing Prometheus/Uptime Kuma/Grafana data over duplicate probes where practical.
 4. Keep provider failure non-fatal to `/api/overview` and visible to monitoring.
 

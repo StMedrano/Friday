@@ -133,6 +133,17 @@ Every successful Phase 1 agent reply remains advisory and reports `execution.per
 - Each check becomes a stable monitoring service. Unexpected HTTP responses are degraded; timeouts and network failures are offline and enter the existing incident grace-period flow.
 - `FRIDAY_ENDPOINT_URLS` remains available for legacy comma-separated Site A checks. Do not configure both formats.
 
+## AdGuard Home
+
+- Adapter: `server/adapters/adguard.mjs`
+- Purpose: read-only DNS filtering status and aggregate query statistics for one AdGuard Home instance.
+- Configuration: `FRIDAY_ADGUARD_ENABLED`, `FRIDAY_ADGUARD_URL`, `FRIDAY_ADGUARD_USERNAME`, `FRIDAY_ADGUARD_PASSWORD`, and `FRIDAY_ADGUARD_SITE`, all server-side only. An enabled configuration with a missing or unsafe URL (embedded credentials, query string, fragment, non-HTTP scheme) or missing credentials fails closed as one `adguard` integration alert.
+- Requests: exactly `GET /control/status` and `GET /control/stats` with HTTP Basic authentication, a four-second deadline, a 256 KiB response cap, and no redirect following. The adapter has no write path; protection, filtering, DHCP, rewrite, client, and statistics-reset APIs are never called.
+- Normalized output: one stable `adguard-home` service in the `dns` category. Running with protection on is online, protection disabled is degraded, and a stopped DNS server is offline. Authentication failures, unexpected HTTP status, and malformed or oversized payloads are degraded; timeouts and network failures are offline, so the existing monitoring grace period applies.
+- Privacy: only aggregate counts (queries, blocked-by-filter share, average processing time), the protection/running flags, and a strictly validated version string leave the adapter. Top clients, client addresses, queried or blocked domains, and upstream names are never forwarded to the UI, monitoring history, or AI providers.
+
+Minimum permissions: AdGuard Home has no read-only role; every configured user can change settings. Create a dedicated user for Friday in `AdGuardHome.yaml` (`users:` with a bcrypt password), never reuse the owner login, rotate it independently, and keep it only in the controller `.env`. Prefer HTTPS so the Basic credential is not sent in clear text; if plain HTTP is used, restrict it to the trusted controller VLAN. Repeated authentication failures may trigger AdGuard's login rate limiting for the controller address, so disable the integration rather than leaving a wrong credential polling.
+
 ## General advisory AI providers
 
 Friday's general assistant remains separate from matched local agents. Preferred sequential assistant chain:

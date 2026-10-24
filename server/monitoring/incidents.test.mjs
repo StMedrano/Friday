@@ -83,6 +83,23 @@ test('failed Site B endpoint check opens a stable read-only monitoring incident'
  assert.match(incident.recommendedAction,/approval/i)
 })
 
+test('disabled AdGuard protection opens a degraded DNS incident that resolves when protection returns',()=>{
+ const dns={
+  id:'adguard-home',name:'AdGuard Home',category:'dns',host:'10.1.10.10',site:'Site A',status:'degraded',
+  detail:'Protection disabled · 10 queries/24h · 0.0% blocked · 1 ms avg',updated:'2026-10-24T00:00:00.000Z',
+ }
+ let state=createEmptyMonitoringState()
+ state=evaluate(state,[dns],'2026-10-24T00:00:00.000Z',[],{offlineGraceSeconds:30})
+ state=evaluate(state,[dns],'2026-10-24T00:00:31.000Z',[],{offlineGraceSeconds:30})
+ const incident=state.incidents.find(item=>item.status==='open')
+ assert.equal(incident.type,'service-degraded')
+ assert.equal(incident.serviceId,'adguard-home')
+ assert.equal(incident.severity,'warning')
+ assert.ok(incident.evidence.includes(dns.detail))
+ state=evaluate(state,[{...dns,status:'online',detail:'Protection on · 12 queries/24h · 0.0% blocked · 1 ms avg'}],'2026-10-24T00:01:00.000Z',[],{offlineGraceSeconds:30})
+ assert.equal(state.incidents.find(item=>item.id===incident.id).status,'resolved')
+})
+
 test('legacy endpoint recovery resolves a persisted pre-upgrade incident',()=>{
  const legacyOffline={...offline,id:'endpoint-0',name:'Legacy health URL',host:'legacy.example.test',category:'monitoring'}
  let state=createEmptyMonitoringState()

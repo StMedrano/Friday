@@ -74,6 +74,23 @@ function endpointConfiguration(env) {
   } catch { return invalid() }
 }
 
+function adguardConfiguration(env) {
+  const disabled = { enabled: false, baseUrl: '', username: '', password: '', site: 'Site A', configurationError: null }
+  if (!enabled(env.FRIDAY_ADGUARD_ENABLED)) return disabled
+  const url = endpointUrl(env.FRIDAY_ADGUARD_URL)
+  const username = String(env.FRIDAY_ADGUARD_USERNAME || '')
+  const password = String(env.FRIDAY_ADGUARD_PASSWORD || '')
+  const site = String(env.FRIDAY_ADGUARD_SITE ?? '').trim() ? endpointText(env.FRIDAY_ADGUARD_SITE) : 'Site A'
+  // Basic auth: the username cannot contain a colon; neither value may carry control characters.
+  if (!url || !site || !username || username.length > 128 || /[:\u0000-\u001f\u007f]/.test(username) ||
+    !password || password.length > 256 || /[\u0000-\u001f\u007f]/.test(password)) {
+    return { ...disabled, enabled: true, configurationError: 'invalid-adguard-configuration' }
+  }
+  // Keep a trailing slash so a reverse-proxy subpath survives relative API path resolution.
+  const baseUrl = url.endsWith('/') ? url : `${url}/`
+  return { enabled: true, baseUrl, username, password, site, configurationError: null }
+}
+
 function localAgentProfile(env, prefix, fallbackModel = 'qwen3:4b-instruct') {
   return {
     provider: 'ollama',
@@ -126,6 +143,7 @@ export function getConfig(env = process.env) {
       enabled: enabled(env.FRIDAY_ENDPOINTS_ENABLED),
       ...endpoints,
     },
+    adguard: adguardConfiguration(env),
     monitoring: {
       enabled: enabled(env.FRIDAY_MONITORING_ENABLED),
       pollSeconds: positiveNumber(env.FRIDAY_MONITORING_POLL_SECONDS, 30),
