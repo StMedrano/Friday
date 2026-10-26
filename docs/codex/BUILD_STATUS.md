@@ -1,5 +1,30 @@
 # Friday Build Status
 
+## Two-site operations views — draft PR #47, source only
+
+`feat/site-aware-infrastructure-20261026` implements a real read-only
+Infrastructure workspace replacing the generic placeholder on desktop and
+mobile. It derives site membership only from normalized service.site and
+declared site identifiers/names, groups services by observed host, offers
+site filters, highlights degraded/offline/maintenance services, and labels
+mock and missing inventory accurately. `Both Sites` and missing membership
+are separate Shared/Unassigned buckets; the view is explicitly an inventory
+grouping, **not** proof of site-to-site VPN links or physical topology.
+
+The Incidents workspace now supports read-only site and severity filters
+with exact incident.serviceId-to-service.id attribution. Unmatched incidents
+remain Unassigned regardless of host text; resolution lists follow filters
+and health history is explicitly unfiltered. Selection hides stale incident
+details when an active filter excludes their record. Existing diagnostics
+are unchanged and do not acquire execution authority.
+
+Test-first cases cover exact service grouping, ambiguous shared membership,
+fallback/unavailable states, filtered incidents and desktop/phone navigation.
+Full exact-head GitHub CI and source review must pass before the draft can
+be considered ready. No merge, deployment, private services, access/role
+policy, network configuration or HomeLab command was changed.
+
+
 ## Cloud automation API — deployed and live-validated, 2026-10-26
 
 Prepared the user-selected `friday-api.mytechtactics.com` connection: an optional separate port 3011 listener accepts only signed, explicitly allowlisted Cloudflare Access service identities for a dedicated application audience. It exposes authenticated health plus cached overview, incidents and monitoring history. All writes, query strings, repository/AI/diagnostic endpoints and other routes are denied. The existing UI's human/operator authentication remains separate. No infrastructure calls are triggered by cloud reads.
