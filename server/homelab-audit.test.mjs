@@ -51,3 +51,54 @@ test('symbolic-link event and directory cannot redirect audit reads or writes',a
  await assert.rejects(store.append(record))
  await assert.rejects(store.read(record.requestId,record.event))
 })
+
+test('pending queue survives reload, omits approved and expired, and orders by expiry',async t=>{
+ const {directory,store,record}=await fixture(t)
+ const first={...record,requestId:randomUUID(),expiresAt:3000}
+ const next={...record,requestId:randomUUID(),expiresAt:5000}
+ const expired={...record,requestId:randomUUID(),expiresAt:1200}
+ for(const row of [next,expired,first])await store.append(row)
+ const reloaded=await createHomeLabAudit({directory})
+ const available=await reloaded.listPending({at:1500,limit:20})
+ assert.deepEqual(available.map(r=>r.requestId),[first.requestId,next.requestId])
+ assert.equal(available[0].actor,record.actor)
+ await store.append({...first,event:'restart-approved',actor:'b'.repeat(64),at:1600})
+ assert.deepEqual((await reloaded.listPending({at:1500,limit:20})).map(r=>r.requestId),[next.requestId])
+ assert.deepEqual(await reloaded.listPending({at:6000,limit:20}),[])
+})
+
+test('pending queue enforces bounded input and no partial results on corrupt records or symlinks',async t=>{
+ const {directory,store,record}=await fixture(t)
+ await store.append(record)
+ for(const bad of [{at:-1,limit:20},{at:1500,limit:0},{at:1500,limit:51},{at:NaN,limit:20}]){
+  await assert.rejects(store.listPending(bad),/homelab-denied/)
+ }
+ assert.equal((await store.listPending({at:1500,limit:1})).length,1)
+ const path=join(directory,record.requestId+'.restart-requested.json')
+ await writeFile(path,'{bad')
+ await assert.rejects(store.listPending({at:1500,limit:20}),/homelab-denied/)
+ await writeFile(path,JSON.stringify(record))
+ await chmod(path,0o644)
+ await assert.rejects(store.listPending({at:1500,limit:20}),/homelab-denied/)
+ await chmod(path,0o600)
+ await writeFile(join(directory,'junk.restart-requested.json'),'not safe')
+ await assert.rejects(store.listPending({at:1500,limit:20}),/homelab-denied/)
+})
+
+test('pending queue cannot follow symlinked event or produce partial results on invalid approval',async t=>{
+ const {directory,store,record}=await fixture(t)
+ const second={...record,requestId:randomUUID()}
+ await store.append(record)
+ await store.append(second)
+ const approval=join(directory,record.requestId+'.restart-approved.json')
+ await symlink(join(directory,second.requestId+'.restart-requested.json'),approval)
+ await assert.rejects(store.listPending({at:1500,limit:20}),/homelab-denied/)
+})
+
+test('pending queue fails closed when private audit directory exceeds bounded scan',async t=>{
+ const {directory,store}=await fixture(t)
+ for(let i=0;i<515;i++){
+  await writeFile(join(directory,randomUUID()+'.denied.json'),'{}',{mode:0o600})
+ }
+ await assert.rejects(store.listPending({at:1500,limit:1}),/homelab-denied/)
+})
