@@ -94,11 +94,13 @@ test('wrong encryption key and corrupted ciphertext deny permanently, including 
  const value=tx()
  await f.make().reserve(value)
  await assert.rejects(f.make({key:randomBytes(32)}).consume(value.state),/sso-denied/)
+ // A wrong key must not consume another key's authorization transaction.
+ assert.deepEqual(await f.make().consume(value.state),value)
  await assert.rejects(f.make().consume(value.state),/sso-denied/)
+ const beforeNames=new Set(await readdir(f.dir))
  const next=tx()
  await f.make().reserve(next)
- const file=(await readdir(f.dir)).find(x=>x.endsWith('.pending')&&!x.startsWith('.'))
- // a distinct 2nd transaction remains pending; never modify consumed marker
+ const file=(await readdir(f.dir)).find(x=>x.endsWith('.pending')&&!beforeNames.has(x))
  assert.equal(typeof file,'string')
  const path=join(f.dir,file)
  await writeFile(path,'{"schemaVersion":1,"bad":true}')
