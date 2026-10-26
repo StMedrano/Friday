@@ -205,3 +205,51 @@ test('administrator cannot self approve a staging proposal even with the correct
  }),/homelab-denied/)
  assert.equal(await f.store.read(p.requestId,'restart-approved'),null)
 })
+
+test('only signed administrators can see pending approvals without actor hashes or confirmation tokens',async t=>{
+ const f=await fixture(t)
+ const proposal=await f.service.requestRestart(request('operator@example.test'),{target:'staging-canary'})
+ for(const who of ['operator@example.test','viewer@example.test','agent@example.test','unknown@example.test']){
+  await assert.rejects(f.service.listPendingApprovals(request(who),{limit:20}),/homelab-denied/)
+ }
+ await assert.rejects(f.service.listPendingApprovals({headers:{}},{limit:20}),/homelab-denied/)
+ const view=await f.service.listPendingApprovals(request('admin@example.test'),{limit:20})
+ assert.equal(view.execution.performed,false)
+ assert.deepEqual(view.items.map(item=>item.requestId),[proposal.requestId])
+ assert.equal(view.items[0].target,'staging-canary')
+ assert.equal(view.items[0].canApprove,true)
+ assert.equal(JSON.stringify(view).includes('operator@example.test'),false)
+ assert.equal(JSON.stringify(view).includes('actor'),false)
+ assert.equal(JSON.stringify(view).includes('confirmation'),false)
+ await f.service.approveRestart(request('admin@example.test'),{
+  requestId:proposal.requestId,confirmation:proposal.confirmation,
+ })
+ const after=await f.service.listPendingApprovals(request('admin@example.test'),{limit:20})
+ assert.deepEqual(after.items,[])
+ assert.equal(f.service.execute,undefined)
+})
+
+test('pending queue respects proposer/admin separation, expiry, bounds and kill revocation',async t=>{
+ let current=Date.now()
+ const f=await fixture(t,{now:()=>current})
+ const own=await f.service.requestRestart(request('admin@example.test'),{target:'staging-canary'})
+ const view=await f.service.listPendingApprovals(request('admin@example.test'),{limit:20})
+ assert.deepEqual(view.items.map(i=>i.canApprove),[false])
+ await assert.rejects(f.service.listPendingApprovals(request('admin@example.test'),{limit:100}),/homelab-denied/)
+ current+=300001
+ assert.deepEqual((await f.service.listPendingApprovals(request('admin@example.test'),{limit:20})).items,[])
+ f.kill()
+ await assert.rejects(f.service.listPendingApprovals(request('admin@example.test'),{limit:20}),/homelab-denied/)
+ assert.equal((await f.store.read(own.requestId,'restart-approved')),null)
+})
+
+test('unavailable approval queue storage cannot return success or leak internal record data',async t=>{
+ const f=await fixture(t,{store:{
+  append:async()=>{},
+  read:async()=>null,
+  listPending:async()=>{throw Error('private audit disk unavailable')},
+ }})
+ await assert.rejects(f.service.listPendingApprovals(request('admin@example.test'),{limit:20}),/homelab-denied/)
+ const missing=await fixture(t,{store:{append:async()=>{},read:async()=>null}})
+ await assert.rejects(missing.service.listPendingApprovals(request('admin@example.test'),{limit:20}),/homelab-denied/)
+})
