@@ -50,7 +50,10 @@ export function checkConnection(request) {
     throw Error('Expected a live, timestamped overview snapshot')
   check('/api/incidents', {}, 200)
   check('/api/monitoring/history', {}, 200)
-  check('/api/health', { auth: false }, 403)
+  const unauthenticated = request('/api/health', { auth: false })
+  if (![401, 403].includes(unauthenticated.status))
+    throw Error(`Acceptance failed: GET /api/health expected 401 or 403, received ${unauthenticated.status}`)
+  outcomes.push({ path: '/api/health', method: 'GET', authenticated: false, status: unauthenticated.status })
   check('/api/overview', { method: 'POST' }, 405)
   check('/api/repositories', {}, 404)
   return outcomes

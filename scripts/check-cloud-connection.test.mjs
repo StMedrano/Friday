@@ -36,3 +36,12 @@ test('acceptance checks enforce live identity, missing-auth denial and restricte
  assert.throws(()=>checkConnection(()=>({status:200,body:{service:'friday-automation',mode:'mock'}})))
  assert.throws(()=>checkConnection((path,options)=>options?.auth===false?{status:200}:request(path,options)))
 })
+test('acceptance checks allow Cloudflare 401 for a missing service token',()=>{
+ const request=(path,options={})=>{
+  if(options.auth===false)return {status:401}
+  if(options.method==='POST')return {status:405}
+  if(path==='/api/repositories')return {status:404}
+  return {status:200,body:path==='/api/health'?{service:'friday-automation',mode:'live'}:path==='/api/overview'?{mode:'live',generatedAt:'2026-10-25T00:00:00Z',services:[]}:{}}
+ }
+ assert.equal(checkConnection(request)[4].status,401)
+})
