@@ -1,5 +1,35 @@
 # Friday Build Status
 
+## P8 dormant safety-boundary composition — draft PR #53 (source only)
+
+The standalone internal `createDormantHomeLabRuntime` composes Friday's
+already-tested signed Cloudflare Access human identity, exact role/target
+policy, owner-private short-lived revocable **file-based role bindings**,
+durable private action audit, and **owner-private five-minute kill switch**.
+The kill gate and its five regression tests are copied byte-for-byte from
+unmerged PR #48 to enable exact-head integration testing in the stacked PR
+chain; this is a deliberate temporary overlap, not a competing rewrite.
+
+Absent explicit `enabled:true`, the factory creates no audit directory,
+reads no role/kill files, makes no infrastructure connections, and returns
+a disabled control. An opted-in *internal fixture* still needs valid private
+files, signed human JWT, role permission and kill arm **at every authorization
+boundary**. All actions remain symbolic `staging-canary` proposals or
+durable, non-executable two-person approval records. No HomeLab Docker,
+Proxmox, shell, SSH, container restart, public API, UI, AI executor, real
+target mapping, secret or production deployment is introduced.
+
+Tests exercise default-disable, missing/invalid private files, signed
+operator/administrator/viewer flows, disarm and expiry, role downgrade, and
+disarming during read-only diagnostics, plus PR #48's original kill tests.
+PR #53 stacks on draft #52 -> #51 -> #50 -> #49. PR #48 remains separate
+until a reviewed integration/merge decision resolves the duplicate file
+diffs. Exact-head CI and owner/security review required. P8 remains
+**incomplete**: trusted live identity lifecycle, production kill control,
+full approval state machine, multi-instance revocation and action-boundary
+audit/verification need independent work.
+
+
 ## P8 async reauthorization — draft PR #52, source only
 
 The dormant HomeLab control now rechecks the verified Access JWT subject's current
