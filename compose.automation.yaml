@@ -1,0 +1,11 @@
+# Opt-in host-local listener for cloudflared running on VM102.
+# This adds a loopback mapping; it never publishes automation to the LAN.
+services:
+  friday:
+    ports:
+      - "127.0.0.1:3011:3011"
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"

@@ -2,6 +2,12 @@
 
 Base URL is same-origin with the UI. Browser clients call relative `/api/...` paths. Provider and registry credentials stay server-side.
 
+## Optional cloud automation listener
+
+The separate, disabled-by-default port 3011 listener serves only exact `GET /api/health`, `GET /api/overview`, `GET /api/incidents`, and `GET /api/monitoring/history`. Every route, including health, requires a signed Access service-token JWT for its independent configured application audience and allowlisted Client ID. Browser identities are rejected. Other methods return 405; other paths and all query strings return 404 after authentication. Missing credentials return 403; missing authentication configuration, disabled monitoring, missing snapshots, oversized responses and collection-access failures return 503.
+
+Overview/incidents/history read the existing monitoring cache and never trigger collection, diagnostics, repository reads, AI, or writes. Overview is the cached normalized snapshot, not a new collection or a freshly decorated monitoring response; clients must inspect its timestamps. Replies have `Cache-Control: no-store`, a generated `X-Request-Id`, and a 2 MiB maximum. The UI server's health and operational API behavior remain separate. See [cloud-connection.md](../cloud-connection.md) for deployment, request logging, identity configuration and cloud acceptance checks.
+
 ## Core health/state
 
 ### `GET /healthz`
@@ -15,6 +21,14 @@ Runtime health and feature flags.
 ### `GET /api/overview`
 
 Returns normalized FRIDAY state. Fresh normalized state is the authoritative infrastructure boundary for assistant and local-agent reasoning.
+
+When explicitly enabled, the server-only Omada adapter adds `network` services for observed site summaries and devices, plus an `omada` entry in `integrations`. Adapter errors become sanitized integration-degraded alerts without failing other adapters. No Omada-specific browser route, raw upstream response, credential, or mutation operation is exposed. These services describe device connectivity, not unobserved WAN/VPN/topology health.
+
+The optional AdGuard Home adapter adds an `adguard` integration entry and a `dns` service with stable ID `adguard`. Its detail contains process/protection state and aggregate query/filtering counts and average processing time for the configured statistics window. Raw domain/client statistics, credentials, and configuration are excluded. Failures degrade the integration independently; no AdGuard-specific route or mutation operation exists. Online reflects reported process/protection state, not a DNS resolution probe.
+
+The optional Prometheus adapter adds a `prometheus` integration entry and `monitoring` services for active scrape targets. IDs hash the scrape pool and sorted final labels; names identify the Prometheus job and the host field contains only the instance host/port. Site comes from the target's nonempty `site` label or the required configured fallback. Status describes the last reported scrape outcome, with its timestamp in `updated`; it does not establish application health. Raw label maps, scrape URLs, discovery data, errors, and credentials are excluded. No Prometheus-specific browser route, query execution, or mutation operation exists.
+
+The optional Uptime Kuma adapter adds an `uptime-kuma` integration entry and `monitoring` services with stable IDs `uptime-kuma-{monitor_id}`. It exposes monitor name/type and last reported status (including pending and maintenance), with the configured site and collector hostname. `updated` is the collection time, not a fresh heartbeat timestamp. Monitored URLs, tags, raw metrics, and API keys are excluded. No Kuma-specific browser route, live probe, or control operation exists.
 
 ## Monitoring and diagnostics
 

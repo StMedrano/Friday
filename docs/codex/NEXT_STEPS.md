@@ -2,6 +2,10 @@
 
 Work from top to bottom. Do not skip safety prerequisites to reach action features sooner.
 
+## User-requested cloud access — activation pending
+
+The read-only automation API for `friday-api.mytechtactics.com` is implemented locally and disabled by default. Cloudflare staging is complete: the dedicated Access application, exact Service Auth identity, DNS record, and inactive dedicated tunnel targeting `http://friday:3011` exist. Next: deliver the reviewed source revision to VM102; configure the origin issuer/audience/client-ID allowlist and protected tunnel-token file; start Friday plus its dedicated connector; verify the tunnel becomes healthy; add the exact cloud destination and service-token secret bindings; run authenticated and denial checks; remove temporary rollout credential copies. Host health alone is insufficient: validate live snapshots and timestamps. Do not expose the UI port as the automation origin or grant deployment/execution tools through this API.
+
 ## P0 — VM100 observer baseline — completed; nic1 example migrated
 
 - VM100's verified nic1 address is `10.1.10.10/24` on VLAN 10; observer port `3199` remains the read-only Docker boundary.
@@ -95,9 +99,9 @@ Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execut
 
 ## P7 — Complete network/service read adapters
 
-1. Omada read-only site/device/health adapter.
-2. AdGuard Home status and DNS statistics adapter.
-3. Prefer existing Prometheus/Uptime Kuma/Grafana data over duplicate probes where practical.
+1. Omada Open API v1 read-only site/device inventory is implemented and disabled by default. Live acceptance still requires a reachable controller, trusted TLS certificate, controller API/version confirmation, and a dedicated read-only application scoped to approved sites; compare IDs/counts/status to Omada before activation. WAN/VPN/routing health remains outside this inventory slice. See `docs/integrations.md`.
+2. AdGuard Home status and aggregate DNS statistics are implemented for one explicitly configured instance and disabled by default. Live acceptance requires a trusted HTTPS endpoint, suitable server-only credentials/access restrictions, and the correct site label; compare running/protection state and counters with AdGuard. Secondary DNS instances remain future work. See `docs/integrations.md`.
+3. Prometheus active-target scrape health and Uptime Kuma monitor metrics are implemented and disabled by default, using existing monitoring data without duplicate probes. Prometheus acceptance requires restricted Basic credentials and accurate site labels. Kuma acceptance requires a metrics-only key, exported `monitor_id` labels, and an explicit site label. Both require trusted HTTPS and comparison against their source inventories. Grafana remains future work. See `docs/integrations.md`.
 4. Keep provider failure non-fatal to `/api/overview` and visible to monitoring.
 
 ## P8 — Authentication, roles, approval, and durable action audit

@@ -4,6 +4,10 @@ import { getDockerServices as defaultGetDockerServices } from './adapters/docker
 import { getProxmoxServices as defaultGetProxmoxServices } from './adapters/proxmox.mjs'
 import { getVm100ObserverServices as defaultGetVm100ObserverServices } from './adapters/vm100-observer.mjs'
 import { getEndpointServices as defaultGetEndpointServices } from './adapters/endpoints.mjs'
+import { getOmadaServices as defaultGetOmadaServices } from './adapters/omada.mjs'
+import { getAdguardServices as defaultGetAdguardServices } from './adapters/adguard.mjs'
+import { getPrometheusServices as defaultGetPrometheusServices } from './adapters/prometheus.mjs'
+import { getUptimeKumaServices as defaultGetUptimeKumaServices } from './adapters/uptime-kuma.mjs'
 
 async function safe(label, fn) {
   try {
@@ -37,6 +41,10 @@ export async function buildOverview(config, adapters = {}) {
   const getProxmoxServices = adapters.getProxmoxServices || defaultGetProxmoxServices
   const getVm100ObserverServices = adapters.getVm100ObserverServices || defaultGetVm100ObserverServices
   const getEndpointServices = adapters.getEndpointServices || defaultGetEndpointServices
+  const getOmadaServices = adapters.getOmadaServices || defaultGetOmadaServices
+  const getAdguardServices = adapters.getAdguardServices || defaultGetAdguardServices
+  const getPrometheusServices = adapters.getPrometheusServices || defaultGetPrometheusServices
+  const getUptimeKumaServices = adapters.getUptimeKumaServices || defaultGetUptimeKumaServices
 
   if (config.mode !== 'live') {
     return { ...normalizeOverview(getMockOverview()), integrations: integrationSummary({}) }
@@ -46,8 +54,12 @@ export async function buildOverview(config, adapters = {}) {
   const proxmox = await safe('proxmox', () => getProxmoxServices(config.proxmox))
   const vm100Observer = await safe('vm100-observer', () => getVm100ObserverServices(config.vm100Observer))
   const endpoints = await safe('endpoints', () => getEndpointServices(config.endpoints))
-  const liveServices = [...docker.items, ...proxmox.items, ...vm100Observer.items, ...endpoints.items]
-  const errors = [docker.error, proxmox.error, vm100Observer.error, endpoints.error].filter(Boolean)
+  const omada = await safe('omada', () => getOmadaServices(config.omada))
+  const adguard = await safe('adguard', () => getAdguardServices(config.adguard))
+  const prometheus = await safe('prometheus', () => getPrometheusServices(config.prometheus))
+  const uptimeKuma = await safe('uptime-kuma', () => getUptimeKumaServices(config.uptimeKuma))
+  const liveServices = [...docker.items, ...proxmox.items, ...vm100Observer.items, ...endpoints.items, ...omada.items, ...adguard.items, ...prometheus.items, ...uptimeKuma.items]
+  const errors = [docker.error, proxmox.error, vm100Observer.error, endpoints.error, omada.error, adguard.error, prometheus.error, uptimeKuma.error].filter(Boolean)
 
   return {
     ...normalizeOverview({
@@ -61,6 +73,10 @@ export async function buildOverview(config, adapters = {}) {
       proxmox: config.proxmox.enabled,
       vm100Observer: config.vm100Observer.enabled,
       endpoints: config.endpoints.enabled,
+      omada: config.omada?.enabled,
+      adguard: config.adguard?.enabled,
+      prometheus: config.prometheus?.enabled,
+      uptimeKuma: config.uptimeKuma?.enabled,
     }),
   }
 }

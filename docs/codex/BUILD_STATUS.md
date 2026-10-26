@@ -1,5 +1,57 @@
 # Friday Build Status
 
+## Cloud automation API — local implementation, 2026-10-25
+
+Prepared the user-selected `friday-api.mytechtactics.com` connection: an optional separate port 3011 listener accepts only signed, explicitly allowlisted Cloudflare Access service identities for a dedicated application audience. It exposes authenticated health plus cached overview, incidents and monitoring history. All writes, query strings, repository/AI/diagnostic endpoints and other routes are denied. The existing UI's human/operator authentication remains separate. No infrastructure calls are triggered by cloud reads.
+
+The listener defaults off, fails closed without authentication settings, bounds responses, and emits sanitized structured request logs. `compose.automation.yaml` publishes only VM102 loopback for a host-local connector and rotates controller logs. A dedicated container tunnel overlay (`compose.cloud-tunnel.yaml`) publishes no host port and mounts its token from a protected file; a host-local tunnel ingress template and proxy-aware, secret-safe acceptance checker accompany the [activation runbook](../cloud-connection.md). The default test commands now include the previously omitted `server/security/*.test.mjs` suite.
+
+Validation: Node 22 `make verify` passed **90 frontend and 453 server/observer/script tests**, production build and five Compose configurations; the subsequently added dedicated-tunnel overlay also passed Compose validation. Signed-token integration tests verify permitted reads and denial of browser identities, other service identities, missing credentials, writes, queries and unsupported routes; audit sanitization, unavailable caches and response bounds also pass.
+
+**Cloudflare staged; application deployment still pending.** On 2026-10-26, account inspection verified the active `mytechtactics.com` zone, `mytechtactics.cloudflareaccess.com` organization, strict service-token authentication, and the existing healthy website/staging tunnels. The API hostname previously shared the website Access application and routed to port 3010. It now has a dedicated `Friday Cloud API` self-hosted application with one exact service-token `non_identity` policy, a 30-day `friday-cloud-reader` identity, and a dedicated remotely managed `friday-cloud-api` tunnel configured for `http://friday:3011`. DNS points at that dedicated tunnel. The tunnel remains inactive, so the hostname is not connected to an origin while deployment is pending. The website application now covers only `friday.mytechtactics.com`; its existing administrator policy was preserved. Service and tunnel credentials are stored as mode-0600 files outside the VM102 checkout for rollout and must be moved into their final secret bindings, then removed when no longer needed.
+
+The authorized VM102 connection shows a clean production checkout at `d4b06ec`; existing `make preflight` and `make health` pass. The cloud environment still lacks the hostname allowlist and service-token secret bindings. No production `.env`, running container, Twingate, website route, staging route, VLAN, firewall, DNS service, or upstream provider configuration was changed. The verified implementation and four new read adapters are committed locally on `codex/friday-cloud-api-read-adapters`; publishing and deployment remain pending.
+
+## Uptime Kuma monitor health — local implementation, 2026-10-25
+
+Friday now reads Uptime Kuma's existing `monitor_status` metrics through fixed `GET /metrics` access using a dedicated metrics API key. Monitor IDs stay stable across renames, label ordering, target URL changes, and health transitions. Down/up/pending/maintenance map to offline/online/degraded/maintenance, preserving existing incident grace and recovery behavior. No monitor controls, administrator login, Socket.IO access, or duplicate probes were added.
+
+`FRIDAY_UPTIME_KUMA_ENABLED` defaults to false. HTTPS origin, metrics key, and explicit site label remain empty in examples and are passed only to the controller. Collection is bounded to five seconds, 512 KiB, and 200 monitors; status samples require `monitor_id`, `monitor_name`, and `monitor_type`. Monitored URLs, raw metric labels, and unrelated metric families are excluded from normalized state. Invalid, duplicate, oversized, or failed upstream data degrades only this integration. The observation timestamp is collection time, not proof of a fresh heartbeat. Setup and compatibility limits are in [integrations.md](../integrations.md#uptime-kuma-monitor-health).
+
+Verification on Node 22.23.4: `make verify` passed with **90 frontend tests and 435 server/observer/script tests**, production build, and all four Compose configurations. New tests cover metrics-key authentication, fixed read routes, status/maintenance mapping, stable IDs, Prometheus escapes/numeric notation, privacy filtering, malformed/duplicate/bounded responses, deadlines, disabled/mock behavior, overview isolation, and incident grace/recovery. Mock smoke checks passed for `/healthz`, `/api/health`, `/api/overview`, and `/`, with all four new adapters disabled; resolved Compose settings confirmed server-only key forwarding.
+
+**Not deployed or live-validated.** Activation requires a trusted HTTPS endpoint, enabled metrics API, dedicated key, explicit site label, and output containing `monitor_id`, followed by comparison with the user's Kuma instance. Creating a first Kuma metrics key changes existing metrics authentication, so that configuration remains an operator rollout task. No live keys, monitors, deployments, or production settings were changed. Grafana integration and Phase 1 live acceptance remain pending.
+
+## Prometheus target scrape health — local implementation, 2026-10-25
+
+Friday now consumes existing Prometheus active-target health through the fixed read-only `/api/v1/targets?state=active` endpoint. Each target becomes a monitoring service with job name, sanitized instance host/port, explicit target/fallback site, last scrape time, and scrape outcome. Stable IDs use the scrape pool and sorted final labels, preserving incident identity across health and ordering changes. Details distinguish scrape success/failure from application health; no duplicate probes or query execution were added.
+
+`FRIDAY_PROMETHEUS_ENABLED` defaults to false. HTTPS origin, Basic credentials, and fallback site label remain empty in examples and are passed only to the controller. The adapter bounds requests to five seconds, responses to 512 KiB, and inventory to 200 active targets. Raw label maps, discovery data, upstream URLs/errors, and credentials are excluded from normalized state. Malformed/oversized inventory or upstream failures degrade only this integration. Setup, credential restrictions, bounds, and live checks are documented in [integrations.md](../integrations.md#prometheus-target-scrape-health).
+
+Verification on Node 22.23.4: `make verify` passed with **90 frontend tests and 420 server/observer/script tests**, production build, and all four Compose configurations. New tests cover fixed authenticated GET access, stable identities, site assignment, conservative health mapping, URL/credential redaction, malformed/duplicate/oversized data, timeouts, disabled/mock behavior, overview failure isolation, and incident grace/recovery. Mock smoke checks passed for `/healthz`, `/api/health`, `/api/overview`, and `/`, with all three new adapters disabled; a resolved Compose check confirmed server-only configuration forwarding.
+
+**Not deployed or live-validated.** This cloud workspace has no homelab credentials. Activation requires the intended Prometheus HTTPS endpoint/trusted certificate, suitably restricted Basic-auth access, accurate site labels, and comparison of target inventory and last-scrape health with Prometheus. See the newer Uptime Kuma checkpoint above; Grafana integration and the existing Phase 1 live acceptance remain pending. Production and monitoring configuration were not changed.
+
+## AdGuard Home status and statistics — local implementation, 2026-10-25
+
+The new server-side AdGuard Home adapter reads only `/control/status` and `/control/stats`. It adds one normalized DNS service with running/protection state, aggregate query/filtering counts, and average processing time for AdGuard's configured statistics window. Domain/client breakdowns are discarded before entering Friday's API, assistant context, or monitoring store. No query-log request, DNS probe, configuration write, reset, or protection toggle was added.
+
+`FRIDAY_ADGUARD_ENABLED` defaults to false. HTTPS origin, credentials, and an explicit site label are required for activation; examples remain empty and base Compose passes configuration only to the controller. Collection has a five-second total deadline, bounded bodies, strict field validation, and sanitized integration errors. Stopped DNS maps to offline, disabled protection to degraded, and existing incident grace/recovery behavior applies. Native AdGuard Basic-auth credentials are not inherently read-only; prefer a dedicated proxy identity restricted to the two GET routes. See [integrations.md](../integrations.md#adguard-home-status-and-dns-statistics).
+
+Verification on Node 22.23.4: `make verify` passed with **90 frontend tests and 407 server/observer/script tests**, production build, and all four Compose configurations. New regressions cover fixed read routes/authentication, privacy normalization, status mapping, seconds-to-milliseconds conversion, invalid/missing data, HTTP/network failures, response/deadline bounds, disabled/mock behavior, overview isolation, and incident opening/recovery. Mock HTTP smoke checks returned 200 for `/healthz`, `/api/health`, `/api/overview`, and `/`; both Omada and AdGuard remained disabled. A resolved Compose check confirmed server-only configuration forwarding.
+
+**Not deployed or live-validated.** No homelab credentials are configured in this cloud workspace. Acceptance needs the intended instance's reachable HTTPS origin/trusted certificate, appropriate credential restrictions, site label, and comparison of real status/counters against AdGuard. One instance is supported; secondary DNS visibility remains future work. Production, DNS, proxy configuration, and the earlier Phase 1 live-acceptance gates remain unchanged.
+
+## Omada read-only inventory — local implementation, 2026-10-25
+
+The Open API v1 adapter now adds observed site summaries and device connectivity to Friday's existing network service inventory. It uses server-only Client Credentials authentication and fixed GET inventory routes; the sole POST obtains an OAuth token. Tokens stay in memory, responses and pagination are bounded, errors are sanitized, and failed inventory collection leaves the other integrations available. No device or network configuration action was added.
+
+`FRIDAY_OMADA_ENABLED` defaults to false. The HTTPS origin, controller ID, client ID, and client secret remain empty in examples and are passed through base Compose only to the controller. Mock mode still needs zero credentials. Site summaries do not invent WAN, VPN, gateway, or routing health. Setup, bounds, status mapping, and acceptance requirements are in [integrations.md](../integrations.md#omada-site-and-device-inventory).
+
+Verification on Node 22.23.4: `make verify` passed with **90 frontend tests and 396 server/observer/script tests**, production build, and all four Compose configurations. New regressions cover multi-site normalization, complete pagination, ID uniqueness, token expiry/rotation, strict configuration, oversized/malformed responses, total deadlines, credential redaction, disabled/mock behavior, and non-fatal integration failure. A temporary mock server returned 200 for `/healthz`, `/api/health`, `/api/overview`, and `/`; the overview reported Omada disabled.
+
+**Not deployed or live-validated.** This cloud workspace has no homelab VPN or Omada credentials. Activation requires the target controller's API/version confirmation, reachable HTTPS address and trusted certificate, a dedicated read-only application scoped to the intended sites, and comparison of actual names/IDs/counts/status to Omada. Phase 1's existing live acceptance requirements remain pending; no production configuration, registry, deployment, or network was changed.
+
 ## Production Access rollout correction — 2026-10-19
 
 The first VM102 deployment attempt for security release `d92c632` built successfully but returned `503 access-not-configured` for protected APIs because base Compose did not pass the server-only Access settings. Production was restored to the preserved last-known-good image while the checkout remained on current `main`.
@@ -173,9 +225,9 @@ Docker's native TCP API must never be exposed. Inventory/diagnostic IDs come fro
 
 ## Not implemented yet
 
-- Omada authenticated read-only site/device/health adapter.
-- AdGuard authenticated read-only API/statistics adapter.
-- Uptime Kuma/Prometheus/Grafana native adapters.
+- Omada WAN/VPN/routing health (site/device inventory is implemented above; live acceptance remains pending).
+- AdGuard live acceptance and secondary DNS visibility (single-instance status/statistics adapter is implemented above).
+- Grafana native adapter (Prometheus target scrape health and Uptime Kuma monitor metrics are implemented above; live acceptance remains pending).
 - Application authentication and RBAC.
 - Durable action audit/action request store.
 - Human approval queue and global automation kill switch.

@@ -68,3 +68,28 @@ test('Access JWT audience may be a single RFC 7519 string',async()=>{
  const {guard}=gate()
  assert.equal((await guard({headers:{'cf-access-jwt-assertion':token({aud:cfg.audience})}},false)).status,200)
 })
+
+test('service-only gate requires signed application token and exact client ID; never permits operator work', async () => {
+ const {guard}=gate({identityMode:'service',serviceTokenIds:['reader.access']})
+ const headers={'cf-access-jwt-assertion':token({type:'app',sub:'',email:undefined,common_name:'reader.access'})}
+ assert.equal((await guard({headers})).status,200)
+ assert.equal((await guard({headers},true)).status,403)
+ for(const claims of [
+  {common_name:'other.access'}, {type:'org'}, {sub:'human'}, {common_name:undefined},
+  {aud:'different-audience'}, {exp:0}, {iss:'https://other.cloudflareaccess.com'},
+ ]) {
+  const raw=token({type:'app',sub:'',email:undefined,common_name:'reader.access',...claims})
+  assert.equal((await guard({headers:{'cf-access-jwt-assertion':raw}})).status,403)
+ }
+ assert.equal((await guard({headers:{'cf-access-jwt-assertion':token()}})).status,403)
+ assert.equal((await gate().guard({headers})).status,403)
+})
+
+test('service identity configuration fails closed and raw identity headers grant nothing', async () => {
+ for(const serviceTokenIds of [undefined,[],['*'],['bad\n.access']]) {
+  const {guard}=gate({identityMode:'service',serviceTokenIds})
+  assert.equal((await guard({headers:{}})).status,503)
+ }
+ const {guard}=gate({identityMode:'service',serviceTokenIds:['reader.access']})
+ assert.equal((await guard({headers:{'cf-access-client-id':'reader.access','cf-access-client-secret':'secret'}})).status,403)
+})
