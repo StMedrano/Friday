@@ -9,7 +9,8 @@ const NO_EXECUTION=Object.freeze({performed:false,reason:'Safety foundation only
 const denied=()=>{throw Error('homelab-denied')}
 const exact=(value,keys)=>value&&typeof value==='object'&&!Array.isArray(value)&&
  Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key))
-const confirmation=id=>`approve:${id}:${TARGET}:restart`
+const confirmation=(id,outcome='approved')=>
+ `${{approved:'approve',rejected:'reject',withdrawn:'withdraw'}[outcome]}:${id}:${TARGET}:restart`
 
 // Internal dependency-injection seam only. Not constructed by server/index.mjs,
 // not an AI tool, and not an HTTP route. Never receives authority from model text.
@@ -50,6 +51,25 @@ export function createHomeLabControl({enabled=false,access,store,automationAllow
    if(ready)try {await store.append(record(randomUUID(),'denied',actor))}catch{}
    denied()
   }
+ }
+ async function decideRestart(request,input,outcome,capability) {
+  return guarded(request,capability,async (actor,reauthorize)=>{
+   if(!exact(input,['requestId','confirmation'])||!validRequestId(input.requestId)||
+      input.confirmation!==confirmation(input.requestId,outcome))denied()
+   const proposal=await store.read(input.requestId,'restart-requested')
+   reauthorize()
+   const at=now()
+   if(!proposal||proposal.target!==TARGET||proposal.at>at||proposal.expiresAt<=at||
+      (outcome==='withdrawn'?proposal.actor!==actor:proposal.actor===actor))denied()
+   reauthorize()
+   // All three outcomes race on one O_EXCL create-only pathname. There is
+   // no separate approve/reject/withdraw marker that could conflict.
+   await store.append({...record(input.requestId,'restart-decided',actor,at,proposal.expiresAt),outcome})
+   reauthorize()
+   const state={approved:'approved-execution-unavailable',
+    rejected:'rejected',withdrawn:'withdrawn'}[outcome]
+   return {requestId:input.requestId,target:TARGET,state,execution:{...NO_EXECUTION}}
+  })
  }
  return Object.freeze({
   enabled:ready,
@@ -116,24 +136,19 @@ export function createHomeLabControl({enabled=false,access,store,automationAllow
     reauthorize()
     await store.append(record(requestId,'restart-requested',actor,at,at+300000))
     reauthorize()
-    return {requestId,target:TARGET,state:'pending-approval',confirmation:confirmation(requestId),execution:{...NO_EXECUTION}}
+    return {requestId,target:TARGET,state:'pending-approval',
+     confirmation:confirmation(requestId),withdrawalConfirmation:confirmation(requestId,'withdrawn'),
+     execution:{...NO_EXECUTION}}
    })
   },
   async approveRestart(request,input) {
-   return guarded(request,'action.approve',async (actor,reauthorize)=>{
-    if(!exact(input,['requestId','confirmation'])||!validRequestId(input.requestId)||input.confirmation!==confirmation(input.requestId))denied()
-    const requested=await store.read(input.requestId,'restart-requested')
-    reauthorize()
-    const at=now()
-    if(!requested||requested.target!==TARGET||requested.at>at||requested.expiresAt<=at||
-      requested.actor===actor)denied()
-    reauthorize()
-    // Exclusive create in the durable store makes approval single-use across
-    // service instances. Approval is a record, never execution authority.
-    await store.append(record(input.requestId,'restart-approved',actor,at,requested.expiresAt))
-    reauthorize()
-    return {requestId:input.requestId,target:TARGET,state:'approved-execution-unavailable',execution:{...NO_EXECUTION}}
-   })
+   return decideRestart(request,input,'approved','action.approve')
+  },
+  async rejectRestart(request,input) {
+   return decideRestart(request,input,'rejected','action.approve')
+  },
+  async withdrawRestart(request,input) {
+   return decideRestart(request,input,'withdrawn','action.propose')
   },
  })
 }
