@@ -13,23 +13,26 @@ const confirmation=id=>`approve:${id}:${TARGET}:restart`
 
 // Internal dependency-injection seam only. Not constructed by server/index.mjs,
 // not an AI tool, and not an HTTP route. Never receives authority from model text.
-export function createHomeLabControl({enabled=false,access,store,automationAllowed,
+export function createHomeLabControl({enabled=false,access,store,automationAllowed,rolePolicy,
  diagnostics,config={},assistant=answerAssistant,fetchKeys,now=Date.now,diagnosticTimeoutMs=5000}={}) {
  const ready=enabled===true&&typeof store?.append==='function'&&typeof store?.read==='function'&&
-  typeof automationAllowed==='function'&&Number.isInteger(diagnosticTimeoutMs)&&diagnosticTimeoutMs>=1&&diagnosticTimeoutMs<=5000
+  typeof automationAllowed==='function'&&typeof rolePolicy?.permits==='function'&&Number.isInteger(diagnosticTimeoutMs)&&diagnosticTimeoutMs>=1&&diagnosticTimeoutMs<=5000
  const authorize=createAccessGate(access,fetchKeys?{fetchImpl:fetchKeys}:{})
  const active=()=>{if(!ready||automationAllowed()!==true)denied()}
  const record=(requestId,event,actor,at=now(),expiresAt=at)=>({requestId,event,actor,target:TARGET,at,expiresAt})
- async function actorFor(request) {
+ async function actorFor(request,capability) {
   active()
-  const result=await authorize(request,true)
-  if(result?.status!==200||!result.identity?.subject)denied()
+  // A verified Access JWT supplies identity; never trust role/target headers or model text.
+  // The server-owned role snapshot provides an independent exact capability grant.
+  const result=await authorize(request,false)
+  if(result?.status!==200||!result.identity?.subject||
+    !rolePolicy.permits(result.identity,capability,TARGET))denied()
   active()
   return createHash('sha256').update(result.identity.subject).digest('hex')
  }
- async function guarded(request,operation) {
+ async function guarded(request,capability,operation) {
   let actor='0'.repeat(64)
-  try {actor=await actorFor(request);return await operation(actor)}
+  try {actor=await actorFor(request,capability);return await operation(actor)}
   catch {
    // Failure to durably record a denial still denies the operation. Never record
    // raw tokens, prompts, endpoints, provider exceptions or untrusted targets.
@@ -40,7 +43,7 @@ export function createHomeLabControl({enabled=false,access,store,automationAllow
  return Object.freeze({
   enabled:ready,
   async inspect(request,input) {
-   return guarded(request,async actor=>{
+   return guarded(request,'diagnostics.read',async actor=>{
     if(!exact(input,['target','prompt'])||input.target!==TARGET||typeof diagnostics?.read!=='function')denied()
     const prompt=validateAssistantPrompt(input.prompt)
     if(!prompt.ok)denied()
@@ -74,7 +77,7 @@ export function createHomeLabControl({enabled=false,access,store,automationAllow
    })
   },
   async requestRestart(request,input) {
-   return guarded(request,async actor=>{
+   return guarded(request,'action.propose',async actor=>{
     if(!exact(input,['target'])||input.target!==TARGET)denied()
     const requestId=randomUUID(),at=now()
     await store.append(record(requestId,'restart-requested',actor,at,at+300000))
@@ -82,11 +85,12 @@ export function createHomeLabControl({enabled=false,access,store,automationAllow
    })
   },
   async approveRestart(request,input) {
-   return guarded(request,async actor=>{
+   return guarded(request,'action.approve',async actor=>{
     if(!exact(input,['requestId','confirmation'])||!validRequestId(input.requestId)||input.confirmation!==confirmation(input.requestId))denied()
     const requested=await store.read(input.requestId,'restart-requested')
     const at=now()
-    if(!requested||requested.target!==TARGET||requested.at>at||requested.expiresAt<=at)denied()
+    if(!requested||requested.target!==TARGET||requested.at>at||requested.expiresAt<=at||
+      requested.actor===actor)denied()
     active()
     // Exclusive create in the durable store makes approval single-use across
     // service instances. Approval is a record, never execution authority.
