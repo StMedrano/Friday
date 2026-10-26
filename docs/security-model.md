@@ -336,6 +336,26 @@ satisfy; use targeted protections and preserve stricter barriers for
 privileged Friday/HomeLab functionality.
 See `docs/authentik-public-sso.md`.
 
+## Public OIDC encrypted single-host login-state prototype — PR #62
+
+The optional private file-backed login-state store is source-only and
+**disabled by default**. It encrypts each reserved PKCE verifier/nonce/
+client binding using AES-256-GCM and a server-provided key, and names
+files with keyed HMAC rather than exposing the state. Its local POSIX
+O_EXCL reservation and atomic hard-link terminal claim prevent two
+cooperating processes from accepting the same authorization state.
+Owner-only modes, symlink safety, strict TTL and authenticated encryption
+are required. A bad key, corrupted state, expired token, unsafe path or
+duplicate/replayed callback denies without revealing secrets.
+
+This design is intentionally **not a cross-machine transactional
+database**, distributed cluster store, web cookie, HTTP callback or
+privilege token. It has no automatic retention sweep; a production
+distributed identity service requires owner-reviewed atomic database
+consume+expiry/cleanup, browser-bound login state, secure cookie/session
+rotation, CSRF protection, MFA, rate limiting and revocation. Normal
+public login remains entirely separate from HomeLab tool authorization.
+
 ## Future write-action rule
 
 A future action engine must require all of the following before any infrastructure mutation:
