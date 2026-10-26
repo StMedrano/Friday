@@ -83,6 +83,7 @@ test('expired login state and clock rollback burn state but never return transac
  await assert.rejects(f.make().consume(value.state),/sso-denied/)
  f.setTime(TIME+1000)
  await assert.rejects(store.consume(value.state),/sso-denied/)
+ f.setTime(TIME)
  const later=tx()
  await store.reserve(later)
  f.setTime(TIME-1)
@@ -124,7 +125,12 @@ test('insecure file or directory permission and symlinked path deny before consu
  await symlink(f.dir,alias)
  const bad=createFileOidcTransactions({enabled:true,directory:alias,key:f.key,now:()=>TIME})
  await assert.rejects(bad.consume(value.state),/sso-denied/)
- assert.deepEqual(await f.make().consume(value.state),value)
+ // Once any callback attempts to claim an insecure record, even a
+ // subsequent chmod repair must not resurrect that login state.
+ await assert.rejects(f.make().consume(value.state),/sso-denied/)
+ const fresh=tx()
+ await f.make().reserve(fresh)
+ assert.deepEqual(await f.make().consume(fresh.state),fresh)
 })
 
 test('invalid, replayed or extended transaction records fail closed',async t=>{
