@@ -81,6 +81,38 @@ Incident Diagnostics can automatically capture one metadata-only report for supp
 
 Diagnostics expose no remediation endpoint.
 
+## Operator role policy — internal foundation (draft PR #49)
+
+`server/security/operator-policy.mjs` supplies a strictly validated,
+**server-owned** role and target binding snapshot for the existing dormant
+HomeLab controller. The policy uses the `sub` of a **cryptographically verified
+Cloudflare Access JWT**, never role, permission, email or target assertions
+from untrusted browser headers, agent prompts, or AI output. Missing, malformed,
+duplicate, wildcard, unsupported or extra-field bindings deny all grants.
+
+| Role | Fixture diagnostics | Request restart proposal | Approve another principal's proposal |
+| --- | --- | --- | --- |
+| Viewer | Yes | No | No |
+| Operator | Yes | Yes | No |
+| Administrator | Yes | Yes | Yes |
+| Friday Agent | Yes (read-only) | No | No |
+
+Roles apply only to exact configured target identifiers (currently the
+unbound symbolic `staging-canary`). No role, including Administrator, grants
+execution authority. The internal HomeLab controller now requires this
+independent policy alongside Access authentication, the separate
+`automationAllowed` kill gate, and durable audit. A proposer cannot approve
+their own request, even when also an Administrator. Approval remains an
+immutable *record*, not execution. Service tokens cannot become human roles.
+
+This module is not configured, mounted, or served by production
+`server/index.mjs`, and it does not modify the read-only cloud automation
+listener. Before production use, trusted provisioning/rotation of subject
+bindings, user lifecycle and revocation, audit completeness, role governance,
+multi-instance kill-switch semantics, threat review, and live identity tests
+still need separate approval. **Do not treat this as completed product RBAC or
+a license to enable infrastructure writes.**
+
 ## Future write-action rule
 
 A future action engine must require all of the following before any infrastructure mutation:
