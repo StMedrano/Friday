@@ -172,3 +172,64 @@ test('terminal decisions are globally single-use even under concurrent append ra
  assert.equal(rows.some(row=>JSON.stringify(row)===JSON.stringify(winner)),true)
  assert.deepEqual(await store.listPending({at:1600,limit:20}),[])
 })
+
+test('readLifecycle returns only validated request state across reload, expiry and each terminal outcome',async t=>{
+ const {directory,store,record}=await fixture(t)
+ await store.append(record)
+ const second={...record,requestId:randomUUID()}
+ const third={...record,requestId:randomUUID()}
+ await store.append(second)
+ await store.append(third)
+ const reloaded=await createHomeLabAudit({directory})
+ const pending=await reloaded.readLifecycle({requestId:record.requestId,at:1500})
+ assert.equal(pending.state,'pending-approval')
+ assert.equal(pending.actor,record.actor)
+ assert.equal(pending.decidedBy,null)
+ assert.equal(pending.decidedAt,null)
+ assert.equal((await reloaded.readLifecycle({requestId:record.requestId,at:2000})).state,'expired')
+ await store.append({...record,event:'restart-decided',actor:'b'.repeat(64),at:1600,outcome:'approved'})
+ await store.append({...second,event:'restart-decided',actor:'b'.repeat(64),at:1700,outcome:'rejected'})
+ await store.append({...third,event:'restart-decided',at:1800,outcome:'withdrawn'})
+ for(const [id,state] of [[record.requestId,'approved-execution-unavailable'],
+  [second.requestId,'rejected'],[third.requestId,'withdrawn']]){
+  const found=await reloaded.readLifecycle({requestId:id,at:1900})
+  assert.equal(found.state,state)
+  assert.equal(found.target,'staging-canary')
+  assert.equal(found.decidedAt>=1600,true)
+ }
+ assert.equal((await reloaded.readLifecycle({requestId:record.requestId,at:999999})).state,'approved-execution-unavailable')
+})
+
+test('readLifecycle fails closed for absent, malformed, orphan, forged or inconsistent records',async t=>{
+ const {directory,store,record}=await fixture(t)
+ await assert.rejects(store.readLifecycle({requestId:randomUUID(),at:1000}),/homelab-denied/)
+ for(const input of [{requestId:'../escape',at:1500},{requestId:record.requestId,at:-1},
+  {requestId:record.requestId,at:'1500'},{requestId:record.requestId,at:NaN}]){
+  await assert.rejects(store.readLifecycle(input),/homelab-denied/)
+ }
+ await store.append({...record,event:'restart-decided',actor:'b'.repeat(64),at:1600,outcome:'approved'})
+ await assert.rejects(store.readLifecycle({requestId:record.requestId,at:1700}),/homelab-denied/)
+ await store.append(record)
+ const path=join(directory,record.requestId+'.restart-decided.json')
+ await writeFile(path,JSON.stringify({...record,event:'restart-decided',actor:record.actor,
+  at:1600,outcome:'approved'})+'\n')
+ await assert.rejects(store.readLifecycle({requestId:record.requestId,at:1700}),/homelab-denied/)
+ await writeFile(path,JSON.stringify({...record,event:'restart-decided',actor:'b'.repeat(64),
+  at:1600,outcome:'approved',expiresAt:3000})+'\n')
+ await assert.rejects(store.readLifecycle({requestId:record.requestId,at:1700}),/homelab-denied/)
+})
+
+test('readLifecycle rejects unsafe event file modes, symlinks and policy clock rollback',async t=>{
+ const {directory,store,record}=await fixture(t)
+ await store.append(record)
+ await assert.rejects(store.readLifecycle({requestId:record.requestId,at:999}),/homelab-denied/)
+ const path=join(directory,record.requestId+'.restart-requested.json')
+ await chmod(path,0o644)
+ await assert.rejects(store.readLifecycle({requestId:record.requestId,at:1500}),/homelab-denied/)
+ await chmod(path,0o600)
+ const replacement=join(directory,randomUUID()+'.restart-requested.json')
+ await store.append({...record,requestId:replacement.split('/').pop().split('.')[0]})
+ await rm(path)
+ await symlink(replacement,path)
+ await assert.rejects(store.readLifecycle({requestId:record.requestId,at:1500}),/homelab-denied/)
+})
