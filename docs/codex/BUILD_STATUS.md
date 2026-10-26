@@ -1,5 +1,27 @@
 # Friday Build Status
 
+## P8 operator RBAC foundation — draft PR #49, source only
+
+Internal operator policy now defines explicit server-injected, verified Cloudflare
+Access JWT subject grants for the four intended roles: Viewer, Operator,
+Administrator and Friday Agent. The dormant `createHomeLabControl` interface
+requires a trusted exact-role/target policy on top of the signed human identity,
+its existing durable audit, and its independently injected automation kill gate.
+Missing/malformed bindings deny all. Proposal requires Operator/Admin;
+approval requires Administrator and a **different verified subject** than the
+original requester. Viewers and agent roles are read-only. The symbolic
+`staging-canary` remains unbound and **no execution path exists**.
+
+Test-first Node regressions exercise denied/invalid bindings, role matrix,
+identity/target spoof attempts, snapshot mutation, missing policy, viewer and
+agent restrictions, separation of duties, concurrent single-use approval, and
+existing safety invariants. PR #49 is source-only. Its exact-head CI and
+review status must be checked separately; no deployment, merge, or HomeLab
+access was performed. It does not implement user-account provisioning,
+session management, production policy binding, real target controls, or
+global control-plane RBAC. P8 remains incomplete.
+
+
 ## Two-site operations views — draft PR #47, source only
 
 `feat/site-aware-infrastructure-20261026` implements a real read-only
