@@ -8,5 +8,6 @@ dist/
 .vscode/
 .idea/
 coverage/
+*.tsbuildinfo
 .superdesign/cache/
 repositories.json
