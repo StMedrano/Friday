@@ -1,4 +1,14 @@
-# Authentik identity integration — source-only P8 foundation
+# Authentik identity integration — internal control and future public SSO
+
+**Public website SSO is now in scope.** See `docs/authentik-public-sso.md`
+for the central internet-reachable Authentik identity architecture,
+separate OIDC clients for Friday and future websites, exact callback
+registration, and the non-production public authorization-code/PKCE
+foundation built in draft PR #60.
+
+The P8 approval identity below remains **internal, opt-in and non-executing**.
+Normal public website authentication must not grant HomeLab privileges.
+
 
 **Not a production login or deployment guide.** Draft PR #58 implements a
 strict, default-disabled **server-owned**, internally injected Authentik
