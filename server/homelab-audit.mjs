@@ -78,6 +78,9 @@ export async function createHomeLabAudit({directory}={}) {
     for(const id of proposed) {
      const row=await readRecord(id,'restart-requested')
      if(!row)denied() // Never emit partial results during concurrent deletion.
+     // Proposals in the dormant fixture may live for at most five minutes.
+     // Corrupt or forged long-lived requests invalidate the entire snapshot.
+     if(row.expiresAt<=row.at||row.expiresAt-row.at>300000)denied()
      if(approved.has(id)) {
       const action=await readRecord(id,'restart-approved')
       if(!action||action.target!==row.target||action.at<row.at||action.at>row.expiresAt||
