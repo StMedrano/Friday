@@ -109,6 +109,7 @@ Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execut
 Implement before any infrastructure write operation:
 
 - authentication or a documented trusted reverse-proxy identity boundary;
+- **internal owner-private revocable role binding adapter in stacked draft PR #51**: exact, short-lived (24-hour maximum) file-backed subject bindings revalidated on every request, tested with signed operator flows. No operator account provisioning, production transport, or standalone authorization—live RBAC/identity rollout is still pending.
 - **internal role policy foundation in draft PR #49**: exact JWT subject-to-role-and-target bindings for Viewer, Operator, Administrator and Friday Agent; enforced in the dormant HomeLab fixture service with proposer/approver separation. No production configuration, UI/RBAC endpoints, real target rights, or execution authority; full product RBAC remains pending.
 - durable append-only action audit events separate from monitoring history;
 - action request IDs/lifecycle states;

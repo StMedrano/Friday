@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {mkdtemp, readFile, readdir, rm, writeFile} from 'node:fs/promises'
+import {mkdir, mkdtemp, readFile, readdir, rm, writeFile} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {generateKeyPairSync, sign} from 'node:crypto'
@@ -8,6 +8,7 @@ import * as control from './homelab-control.mjs'
 import * as audit from './homelab-audit.mjs'
 import {answerAssistant} from './assistant.mjs'
 import {createOperatorRolePolicy} from './security/operator-policy.mjs'
+import {createFileOperatorRolePolicy} from './security/file-operator-policy.mjs'
 
 const {publicKey,privateKey}=generateKeyPairSync('rsa',{modulusLength:2048})
 const access={teamDomain:'https://fixture.cloudflareaccess.com',audience:'fixture-aud',operatorEmails:['operator@example.test']}
@@ -252,4 +253,38 @@ test('unavailable approval queue storage cannot return success or leak internal 
  await assert.rejects(f.service.listPendingApprovals(request('admin@example.test'),{limit:20}),/homelab-denied/)
  const missing=await fixture(t,{store:{append:async()=>{},read:async()=>null}})
  await assert.rejects(missing.service.listPendingApprovals(request('admin@example.test'),{limit:20}),/homelab-denied/)
+})
+
+test('owner-private live role policy revokes HomeLab proposal and approval capabilities immediately',async t=>{
+ const root=await mkdtemp(join(tmpdir(),'friday-role-integration-'))
+ t.after(()=>rm(root,{recursive:true,force:true}))
+ const directory=join(root,'policy')
+ await mkdir(directory,{mode:0o700})
+ const filePath=join(directory,'roles.json')
+ const write=async bindings=>writeFile(filePath,JSON.stringify({
+  schemaVersion:1,expiresAt:Date.now()+60_000,bindings,
+ })+'\n',{mode:0o600})
+ const oneRole=(role,subject)=>({subject,role,targets:['staging-canary']})
+ const base=[oneRole('Operator','operator@example.test'),oneRole('Administrator','admin@example.test')]
+ await write(base)
+ const rolePolicy=createFileOperatorRolePolicy({filePath})
+ const f=await fixture(t,{rolePolicy})
+ const proposal=await f.service.requestRestart(request(),{target:'staging-canary'})
+ assert.equal(proposal.state,'pending-approval')
+ await write([oneRole('Viewer','operator@example.test'),base[1]])
+ await assert.rejects(f.service.requestRestart(request(),{target:'staging-canary'}),/homelab-denied/)
+ assert.equal((await f.service.inspect(request(),{target:'staging-canary',prompt:'Health'})).execution.performed,false)
+ await write([oneRole('Viewer','operator@example.test'),oneRole('Viewer','admin@example.test')])
+ await assert.rejects(f.service.listPendingApprovals(request('admin@example.test'),{limit:20}),/homelab-denied/)
+ await assert.rejects(f.service.approveRestart(request('admin@example.test'),{
+  requestId:proposal.requestId,confirmation:proposal.confirmation,
+ }),/homelab-denied/)
+ await write(base)
+ const approved=await f.service.approveRestart(request('admin@example.test'),{
+  requestId:proposal.requestId,confirmation:proposal.confirmation,
+ })
+ assert.equal(approved.execution.performed,false)
+ assert.equal(f.service.execute,undefined)
+ await rm(filePath)
+ await assert.rejects(f.service.listPendingApprovals(request('admin@example.test'),{limit:20}),/homelab-denied/)
 })
