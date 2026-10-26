@@ -14,12 +14,26 @@ const confirmation=(id,outcome='approved')=>
 
 // Internal dependency-injection seam only. Not constructed by server/index.mjs,
 // not an AI tool, and not an HTTP route. Never receives authority from model text.
-export function createHomeLabControl({enabled=false,access,store,automationAllowed,rolePolicy,
+export function createHomeLabControl({enabled=false,access,identityGate,store,automationAllowed,rolePolicy,
  diagnostics,config={},assistant=answerAssistant,fetchKeys,now=Date.now,diagnosticTimeoutMs=5000}={}) {
  const ready=enabled===true&&typeof store?.append==='function'&&typeof store?.read==='function'&&
   typeof automationAllowed==='function'&&typeof rolePolicy?.permits==='function'&&Number.isInteger(diagnosticTimeoutMs)&&diagnosticTimeoutMs>=1&&diagnosticTimeoutMs<=5000
- const authorize=createAccessGate(access,fetchKeys?{fetchImpl:fetchKeys}:{})
+ // A non-default gate is injected ONLY by the dormant Authentik factory.
+ // No header-based autodetection, no Cloudflare fallback when it is selected.
+ const authorize=identityGate===undefined?
+  createAccessGate(access,fetchKeys?{fetchImpl:fetchKeys}:{}):
+  typeof identityGate==='function'?identityGate:
+   async()=>({status:503,error:'identity-gate-invalid'})
  const active=()=>{if(!ready||automationAllowed()!==true)denied()}
+ const liveIdentity=identity=>{
+  // Authentik's verified token expiration is an upper bound on the identity
+  // for *the entire async operation*, not merely its entry point. Do not
+  // trust expiry fields supplied by browser/LLM; only gate-issued identity.
+  if(identity?.expiresAtMs===undefined)return
+  const at=now()
+  if(!Number.isSafeInteger(at)||!Number.isSafeInteger(identity.expiresAtMs)||
+     identity.expiresAtMs<=at)denied()
+ }
  const record=(requestId,event,actor,at=now(),expiresAt=at)=>({requestId,event,actor,target:TARGET,at,expiresAt})
  async function actorFor(request,capability) {
   active()
@@ -28,6 +42,7 @@ export function createHomeLabControl({enabled=false,access,store,automationAllow
   const result=await authorize(request,false)
   if(result?.status!==200||!result.identity?.subject||
     !rolePolicy.permits(result.identity,capability,TARGET))denied()
+  liveIdentity(result.identity)
   active()
   return {actor:createHash('sha256').update(result.identity.subject).digest('hex'),identity:result.identity}
  }
@@ -41,6 +56,7 @@ export function createHomeLabControl({enabled=false,access,store,automationAllow
     // Re-evaluate revocable server-owned policy after every asynchronous
     // trust boundary. The JWT identity was verified by actorFor, not a header.
     if(rolePolicy.permits(verified.identity,capability,TARGET)!==true)denied()
+    liveIdentity(verified.identity)
     active()
    }
    return await operation(actor,reauthorize,verified.identity)
