@@ -1,5 +1,35 @@
 # Friday Build Status
 
+## Public Authentik restart-durable encrypted login state — draft PR #62
+
+Added `server/security/file-oidc-transactions.mjs` as an **explicitly
+enabled, single-host POSIX** storage prototype for public Authentik
+authorization-code + PKCE login transactions. It implements the
+`reserve(record)` / `consume(state)` seam required by
+`createPublicOidcFlow`. Authentication state, nonce, per-login PKCE
+verifier, client identity and timestamps are encrypted at rest using
+AES-256-GCM with a server-only supplied 256-bit key; raw login state is
+never included in filenames. A verified private 0700 directory and
+create-only 0600 files are required. HMAC-derived filenames,
+O_EXCL create, fsync, no-follow reads and atomic POSIX hard-link
+`.used` marker prevent concurrent same-state consumption by independent
+processes sharing the *same local directory*. Replay denies even
+when an earlier callback failed or the process restarted.
+Corrupt, insecure, expired, tampered or forged state denies.
+
+The store has **no production bootstrap, HTTP route, cookie, credential,
+login UI, site registration, migration, cleanup job or cloud deployment**.
+It is not a cross-host/durable distributed session solution: network
+filesystem atomic semantics are not trusted, and old `.pending`/`.used`
+records accumulate pending an audited retention/cleanup design.
+Before multi-replica production SSO, replace with transactional database
+state and a supported secure session store, add browser-bound CSRF/state
+cookie, logout, rate limiting and owner review. This is a source-only
+step stacked on PR #60; no HomeLab actions. Tests cover encryption,
+replay/races, restart, expiry, file ownership, corruption, app
+separation and complete synthetic OIDC roundtrip.
+
+
 ## Public multi-site Authentik OIDC foundation — draft PR #60 (source-only)
 
 Friday's Authentik design now explicitly includes **public internet sign-in**
