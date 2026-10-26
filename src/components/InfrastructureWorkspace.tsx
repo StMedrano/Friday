@@ -95,7 +95,7 @@ export default function InfrastructureWorkspace({ overview, connected }: {
       </div>
       {visible.length === 0 ? <div className="v3-incident-empty">
         <Server size={18} aria-hidden="true"/>
-        <span>{names.length ? 'No services were observed for this site.' : 'No site or service inventory available.'}</span>
+        <span>{names.length ? 'No services were observed for this site.' : 'No services are available in the current inventory.'}</span>
       </div> : <div className="v3-topology-hosts">
         {hostGroups.map(([host, services]) => <article className="v3-panel v3-topology-host" key={host}>
           <div className="v3-topology-host-heading">
