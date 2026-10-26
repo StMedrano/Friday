@@ -2,20 +2,8 @@ import { useMemo, useState } from 'react'
 import { Network, Server, ShieldCheck } from 'lucide-react'
 import type { FridayOverview } from '../lib/api'
 import type { Service } from '../lib/infrastructure'
-
-const SHARED = 'Shared / multi-site'
-const UNASSIGNED = 'Unassigned'
+import { observedServiceSite, SHARED_SITE, UNASSIGNED_SITE } from '../lib/site-membership'
 const statusPriority = { offline: 0, degraded: 1, maintenance: 2, online: 3 } as const
-
-// Site labels are evidence from normalized state, not inferred host/IP topology.
-// A "Both Sites" label is not proof of a particular service-to-site link.
-function serviceSite(service: Service, overview: FridayOverview) {
-  const value = typeof service.site === 'string' ? service.site.trim() : ''
-  if (!value) return UNASSIGNED
-  if (value.toLowerCase() === 'both sites') return SHARED
-  const explicit = overview.sites.find(site => site.id === value || site.name === value)
-  return explicit?.name || value
-}
 
 function hostLabel(host: string) {
   return typeof host === 'string' && host.trim() ? host.trim() : 'Unknown host'
@@ -33,12 +21,12 @@ export default function InfrastructureWorkspace({ overview, connected }: {
       if (typeof site.name === 'string' && site.name.trim()) names.add(site.name.trim())
     }
     for (const service of overview.services) {
-      const name = serviceSite(service, overview)
+      const name = observedServiceSite(service, overview.sites)
       names.add(name)
       buckets.set(name, [...(buckets.get(name) ?? []), service])
     }
     const ordered = [...names].sort((a, b) => {
-      const last = (value: string) => value === SHARED ? 1 : value === UNASSIGNED ? 2 : 0
+      const last = (value: string) => value === SHARED_SITE ? 1 : value === UNASSIGNED_SITE ? 2 : 0
       return last(a) - last(b) || a.localeCompare(b)
     })
     return { names: ordered, buckets, counts: new Map(ordered.map(name => [name, buckets.get(name)?.length ?? 0])) }
@@ -106,7 +94,7 @@ export default function InfrastructureWorkspace({ overview, connected }: {
             {[...services].sort((a, b) => statusPriority[a.status] - statusPriority[b.status] || a.name.localeCompare(b.name))
               .map(service => <div key={service.id} className="v3-topology-service">
                 <i className={service.status} aria-hidden="true"/>
-                <div><b>{service.name}</b><small>{service.category} · {serviceSite(service, overview)} · {service.detail}</small></div>
+                <div><b>{service.name}</b><small>{service.category} · {observedServiceSite(service, overview.sites)} · {service.detail}</small></div>
                 <strong className={service.status}>{service.status}</strong>
               </div>)}
           </div>
