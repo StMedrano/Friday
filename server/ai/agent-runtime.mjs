@@ -3,6 +3,41 @@ import { fridaySystemPrompt } from './policy.mjs'
 
 const VALID_PERMISSION_MODES = new Set(['auto', 'approval', 'forbidden'])
 const DEPLOYMENT_MODEL_FIELDS = ['provider', 'model', 'baseUrl', 'context', 'maxTokens']
+const NON_ONLINE_HEALTH_CLAIMS = [
+  /\bfully healthy\b/i,
+  /\bfully operational\b/i,
+  /\ball services (?:are )?(?:online|running|healthy)\b/i,
+  /\bno active issues\b/i,
+]
+
+function groundingViolations(text, overview) {
+  const state = overview && typeof overview === 'object' && !Array.isArray(overview) ? overview : {}
+  const output = String(text || '')
+  const violations = []
+  const sites = Array.isArray(state.sites) ? state.sites : []
+  const services = Array.isArray(state.services) ? state.services : []
+  const incidents = Array.isArray(state.incidents) ? state.incidents : null
+  const alerts = Array.isArray(state.alerts) ? state.alerts : []
+
+  if (!sites.length && /\bSite\s+[A-Z0-9][\w-]*/.test(output)) {
+    violations.push('unsupported site label')
+  }
+  if (services.some((service) => service?.status !== 'online') &&
+    NON_ONLINE_HEALTH_CLAIMS.some((pattern) => pattern.test(output))) {
+    violations.push('overall-health claim contradicts non-online services')
+  }
+  if (!incidents && /\b(?:no|zero)\s+(?:(?:active|open)\s+)?incidents?\b/i.test(output)) {
+    violations.push('incident absence was asserted without incident data')
+  }
+  const declaredSeverities = new Set([
+    ...alerts.map((alert) => String(alert?.severity || '').toLowerCase()),
+    ...(incidents || []).map((incident) => String(incident?.severity || '').toLowerCase()),
+  ].filter(Boolean))
+  if (/\bcritical\b/i.test(output) && !declaredSeverities.has('critical')) {
+    violations.push('unsupported severity')
+  }
+  return violations
+}
 
 export function validateAgentSpec(agent = {}) {
   const errors = []
@@ -97,12 +132,27 @@ export async function runLocalAgent({
   }
   const deadline = AbortSignal.timeout(modelProfile.timeoutMs ?? 90000)
 
-  return askOllama({
+  const ask = (currentPrompt) => askOllama({
     providerConfig,
-    prompt,
+    prompt: currentPrompt,
     overview,
     systemPrompt: buildAgentSystemPrompt(agent),
     fetchImpl,
     signal: signal ? AbortSignal.any([signal, deadline]) : deadline,
   })
+  let result = await ask(prompt)
+  let violations = groundingViolations(result.text, overview)
+  if (!violations.length) return result
+
+  result = await ask([
+    prompt,
+    `The prior draft was rejected for: ${violations.join('; ')}.`,
+    'Rewrite from the authoritative state and machine-derived constraints only. Do not repeat an unsupported claim.',
+  ].join('\n\n'))
+  violations = groundingViolations(result.text, overview)
+  if (!violations.length) return result
+
+  const error = new Error('Local agent response contradicted authoritative state')
+  error.code = 'FRIDAY_AGENT_GROUNDING_INVALID'
+  throw error
 }

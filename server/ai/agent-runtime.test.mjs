@@ -89,3 +89,48 @@ test('runs through the resolved Ollama model profile', async () => {
   assert.match(body.messages[1].content, /"id":"proxmox-qemu-100"/)
   assert.equal(body.model, 'qwen3:4b-instruct')
 })
+
+test('retries one ungrounded local draft with exact machine-state feedback', async () => {
+  const requests = []
+  const drafts = [
+    'Site A is fully healthy. All services are running and there are no incidents. Two critical services are offline.',
+    'One service is online and stopped-db is offline. Site and incident data are absent, so no site label or incident count is asserted.',
+  ]
+  const fetchImpl = async (_url, options) => {
+    requests.push(JSON.parse(options.body))
+    return new Response(JSON.stringify({ message: { content: drafts[requests.length - 1] } }), { status: 200 })
+  }
+  const overview = {
+    mode: 'live', sites: [], alerts: [],
+    services: [
+      { id: 'proxmox-qemu-100', name: 'ubuntu-docker', status: 'online', updated: 'live' },
+      { id: 'vm100-observer-deadbeef', name: 'stopped-db', status: 'offline', updated: 'Exited (0) 3 days ago' },
+    ],
+  }
+
+  const result = await runLocalAgent({ agent, modelProfile, prompt: 'Summarize health.', overview, fetchImpl })
+
+  assert.equal(result.text, drafts[1])
+  assert.equal(requests.length, 2)
+  assert.match(requests[1].messages[1].content, /prior draft was rejected/i)
+  assert.match(requests[1].messages[1].content, /unsupported site label/i)
+  assert.match(requests[1].messages[1].content, /unsupported severity/i)
+})
+
+test('fails closed after two ungrounded local drafts', async () => {
+  let calls = 0
+  const fetchImpl = async () => {
+    calls += 1
+    return new Response(JSON.stringify({ message: { content: 'Site A is fully healthy with no incidents.' } }), { status: 200 })
+  }
+  const overview = {
+    mode: 'live', sites: [], alerts: [],
+    services: [{ id: 'proxmox-qemu-100', name: 'ubuntu-docker', status: 'offline', updated: 'stopped' }],
+  }
+
+  await assert.rejects(
+    runLocalAgent({ agent, modelProfile, prompt: 'Summarize health.', overview, fetchImpl }),
+    (error) => error?.code === 'FRIDAY_AGENT_GROUNDING_INVALID',
+  )
+  assert.equal(calls, 2)
+})
