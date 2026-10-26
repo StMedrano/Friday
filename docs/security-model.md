@@ -257,6 +257,33 @@ socket, network mutation, arbitrary shell tool, deployment or merge
 is introduced. Live identity provisioning, security acceptance and
 an independently reauthorizing P9 executor remain separate prerequisites.
 
+## Authenticated, private lifecycle status lookup — draft PR #56
+
+`createHomeLabAudit.readLifecycle` reads the exact proposal and at most one
+exclusive terminal decision from the owner-private audit store. It
+validates the five-minute staging TTL, terminal timestamps, actor
+separation/withdrawal ownership, event pairing and file safety before
+classifying the request as pending, expired, approved, rejected or
+withdrawn. Missing, corrupted and inconsistent audit events deny. The
+read is a **snapshot**, not an execution authorization or a global
+transaction: an independent decision can arrive immediately afterward.
+
+The internal dormant `createHomeLabControl.getRequestStatus` requires a
+signed Cloudflare Access JWT, a valid server-side policy and the
+independent automation gate. The verified original proposer must retain
+action proposal permission, or an Administrator must retain approval
+permission for the exact unbound staging target. Viewers, agents,
+unrelated Operators and spoofed role headers are denied. These checks
+are repeated after each asynchronous storage wait so mid-read
+revocations fail closed. The output is a minimal projection with
+request ID, state, target, event times and `execution.performed:false`,
+**not** identity hashes, confirmations, tokens or raw audit records.
+
+There is no user-facing API, approval dashboard, infrastructure target
+mapping, execution endpoint, container restart, merge or deployment
+in this change. A future executor must independently enforce its own
+current identity, role, kill-switch, approval, resource and audit checks.
+
 ## Future write-action rule
 
 A future action engine must require all of the following before any infrastructure mutation:

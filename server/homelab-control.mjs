@@ -43,7 +43,7 @@ export function createHomeLabControl({enabled=false,access,store,automationAllow
     if(rolePolicy.permits(verified.identity,capability,TARGET)!==true)denied()
     active()
    }
-   return await operation(actor,reauthorize)
+   return await operation(actor,reauthorize,verified.identity)
   }
   catch {
    // Failure to durably record a denial still denies the operation. Never record
@@ -107,6 +107,45 @@ export function createHomeLabControl({enabled=false,access,store,automationAllow
     const result=await assistant({config,prompt:prompt.prompt,overview})
     reauthorize()
     return {...result,requestId,evidenceMode:'fixture',execution:{...NO_EXECUTION}}
+   })
+  },
+  async getRequestStatus(request,input) {
+   return guarded(request,'diagnostics.read',async (actor,reauthorize,identity)=>{
+    if(!exact(input,['requestId'])||!validRequestId(input.requestId)||
+       typeof store.readLifecycle!=='function')denied()
+    const scope=()=>{
+     reauthorize()
+     const administrator=rolePolicy.permits(identity,'action.approve',TARGET)===true
+     const proposer=rolePolicy.permits(identity,'action.propose',TARGET)===true
+     if(!administrator&&!proposer)denied()
+     reauthorize()
+     return {administrator,proposer}
+    }
+    // Deny Viewer/Agent before reading private audit metadata.
+    scope()
+    const row=await store.readLifecycle({requestId:input.requestId,at:now()})
+    const rights=scope()
+    const terminal=['approved-execution-unavailable','rejected','withdrawn'].includes(row?.state)
+    const current=now()
+    if(row?.requestId!==input.requestId||row.target!==TARGET||
+       !/^[a-f0-9]{64}$/.test(row.actor)||!Number.isSafeInteger(row.at)||
+       !Number.isSafeInteger(row.expiresAt)||row.expiresAt<=row.at||
+       row.expiresAt-row.at>300000||!Number.isSafeInteger(current)||row.at>current||
+       !['pending-approval','expired','approved-execution-unavailable','rejected','withdrawn'].includes(row.state)||
+       (row.state==='pending-approval'&&row.expiresAt<=current)||
+       (row.state==='expired'&&row.expiresAt>current)||
+       (terminal?(!Number.isSafeInteger(row.decidedAt)||row.decidedAt<row.at||
+         row.decidedAt>row.expiresAt||!/^[a-f0-9]{64}$/.test(row.decidedBy)||
+         (row.state==='withdrawn'?row.decidedBy!==row.actor:
+           row.decidedBy===row.actor)):
+         row.decidedAt!==null||row.decidedBy!==null)||
+       (!rights.administrator&&(!rights.proposer||row.actor!==actor)))denied()
+    // Never return actor hashes, raw durable records, JWT metadata or
+    // confirmation strings. Historical approval is NOT authority to execute.
+    reauthorize()
+    return {requestId:row.requestId,target:TARGET,state:row.state,
+      requestedAt:row.at,expiresAt:row.expiresAt,
+      decidedAt:row.decidedAt,execution:{...NO_EXECUTION}}
    })
   },
   async listPendingApprovals(request,input) {

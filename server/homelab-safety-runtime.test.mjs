@@ -198,3 +198,41 @@ test('file-backed kill revocation denies finalizing pending requests even with s
  }),/homelab-denied/)
  assert.equal(service.execute,undefined)
 })
+
+test('dormant wired private files support proposer and admin status, not viewer or executor',async t=>{
+ const f=await fixture(t)
+ await f.role()
+ await f.arm()
+ const service=await createDormantHomeLabRuntime(f.options)
+ const p=await service.requestRestart(operator,{target:'staging-canary'})
+ const pending=await service.getRequestStatus(operator,{requestId:p.requestId})
+ assert.equal(pending.state,'pending-approval')
+ assert.equal(pending.execution.performed,false)
+ assert.deepEqual(await service.getRequestStatus(admin,{requestId:p.requestId}),pending)
+ await assert.rejects(service.getRequestStatus(viewer,{requestId:p.requestId}),/homelab-denied/)
+ await service.rejectRestart(admin,{requestId:p.requestId,
+  confirmation:'reject:'+p.requestId+':staging-canary:restart'})
+ const status=await service.getRequestStatus(operator,{requestId:p.requestId})
+ assert.equal(status.state,'rejected')
+ assert.equal(status.execution.performed,false)
+ assert.equal(service.execute,undefined)
+ for(const token of ['operator-sub','admin-sub','confirmation','decidedBy','actor']){
+  assert.equal(JSON.stringify(status).includes(token),false)
+ }
+})
+
+test('dormant wired status denies role downgrade and disarmed kill file without returning old result',async t=>{
+ const f=await fixture(t)
+ await f.role()
+ await f.arm()
+ const service=await createDormantHomeLabRuntime(f.options)
+ const p=await service.requestRestart(operator,{target:'staging-canary'})
+ await f.role([
+  {subject:'operator-sub',role:'Viewer',targets:['staging-canary']},
+  ...policies.slice(1),
+ ])
+ await assert.rejects(service.getRequestStatus(operator,{requestId:p.requestId}),/homelab-denied/)
+ assert.equal((await service.getRequestStatus(admin,{requestId:p.requestId})).state,'pending-approval')
+ await f.arm('stopped')
+ await assert.rejects(service.getRequestStatus(admin,{requestId:p.requestId}),/homelab-denied/)
+})

@@ -1,5 +1,35 @@
 # Friday Build Status
 
+## P8 private read-only proposal lifecycle lookup — draft PR #56 (source only)
+
+A bounded `readLifecycle({requestId,at})` projection in the owner-private
+append-only audit store validates the original symbolic staging proposal
+against its sole terminal decision event, expiration, actor attribution,
+action target, event timestamps and strict five-minute lifetime.
+It denies missing, orphaned, corrupt, symlinked, forged, incomplete or
+inconsistent records instead of returning partial results. Historical
+approval is a non-executable audit state, never authority to restart.
+
+The dormant `getRequestStatus` control requires a verified Cloudflare
+Access human identity and currently effective server-owned rights.
+Only the original proposer, while retaining `action.propose`, or an
+Administrator with `action.approve` may inspect a request.
+Viewer/Agent and unrelated Operators are denied. It repeats both policy
+and kill-switch checks before and after asynchronous storage reads,
+returns pending/expired/approved/rejected/withdrawn statuses, and never
+returns actor hashes, raw audit data, emails, JWTs or confirmations.
+Every result explicitly states `execution.performed:false`.
+
+Test-first coverage includes private-store reload, terminal outcomes,
+clock rollback/expiry, tampered files and symlinks, role scope, privacy,
+unexpected audit failure, mid-read revocation, and the real dormant
+file-backed kill/role composition using synthetic identities. No live
+HTTP route, UI, HomeLab connection, executor, deployment or new secret
+is added. PR #56 is stacked on draft PR #54. CI and owner review are
+required; production identity, request status UI, multi-process
+consistency, log retention and P9 independent action gates remain open.
+
+
 ## P8 terminal proposal decisions — draft PR #54, source only
 
 The internal dormant HomeLab approval workflow now supports **exactly one**
