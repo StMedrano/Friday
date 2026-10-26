@@ -3,13 +3,12 @@ import {createHmac,randomBytes,timingSafeEqual} from 'node:crypto'
 const ID=/^[a-z][a-z0-9-]{1,62}$/
 const TOKEN=/^[A-Za-z0-9_-]{43}$/
 const SUBJECT=/^authentik:[a-f0-9]{16}:[A-Za-z0-9][A-Za-z0-9._:@/-]{0,190}$/
-const SUBJECT_FIXTURE=/^authentik:issuer:[A-Za-z0-9][A-Za-z0-9._:@/-]{0,190}$/
 const TTL=3600000
 const STATE_TTL=300000
 const denied=()=>{throw Error('sso-denied')}
 const exact=(value,keys)=>value!==null&&typeof value==='object'&&!Array.isArray(value)&&
  Object.keys(value).length===keys.length&&keys.every(key=>Object.hasOwn(value,key))
-const isSubject=value=>typeof value==='string'&&(SUBJECT.test(value)||SUBJECT_FIXTURE.test(value))
+const isSubject=value=>typeof value==='string'&&SUBJECT.test(value)
 const timeValid=value=>Number.isSafeInteger(value)&&value>=0
 
 function validOrigin(value) {
