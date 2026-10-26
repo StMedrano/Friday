@@ -179,6 +179,24 @@ identity lifecycle, secure operator distribution procedure or
 production-ready RBAC system. Approval review and runtime multi-node
 testing are still necessary.
 
+## Async revocation boundary — stacked draft PR #52
+
+The internal HomeLab fixture controller keeps the signed, server-verified
+Cloudflare Access subject as a request-local value and re-evaluates the
+server-owned role/target grant and independent kill gate after every
+asynchronous trust boundary. It checks again before and after proposal
+and approval audit appends, denying stale responses from revoked roles.
+Tests revoke Administrator privileges during pending-queue and approval
+storage reads, and Viewer privileges during diagnostics and inference.
+Untrusted headers or model text cannot grant or renew a permission.
+
+**Immutable-audit race:** Once an append is fsynced, a change of policy
+during that append cannot undo the historical event. Rechecking after it
+prevents returning success but is not a transaction or an authority for
+actual infrastructure actions. A future executor must independently
+validate fresh identity, grants, approval state and kill switch at the
+action boundary. No executor, route, runtime binding or deployment exists.
+
 ## Future write-action rule
 
 A future action engine must require all of the following before any infrastructure mutation:

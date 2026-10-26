@@ -113,6 +113,7 @@ Implement before any infrastructure write operation:
 - **internal role policy foundation in draft PR #49**: exact JWT subject-to-role-and-target bindings for Viewer, Operator, Administrator and Friday Agent; enforced in the dormant HomeLab fixture service with proposer/approver separation. No production configuration, UI/RBAC endpoints, real target rights, or execution authority; full product RBAC remains pending.
 - durable append-only action audit events separate from monitoring history;
 - action request IDs/lifecycle states;
+- **async role and kill rechecks in stacked draft PR #52:** fresh permissions at audit/diagnostic/assistant wait boundaries, including after fsynced writes, without granting execution. Multi-node atomicity and full approval state machine still pending.
 - **internal read-only pending-approval queue in stacked draft PR #50 (depends on #49)**: private bounded audit scan for unexpired, unapproved symbolic staging requests; signed Administrator-only projection with proposer/approver separation. No public UI/API, production operator identity provisioning or executor; full human approval workflow remains outstanding.
 - global automation kill switch.
 

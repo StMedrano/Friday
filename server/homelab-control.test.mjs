@@ -288,3 +288,101 @@ test('owner-private live role policy revokes HomeLab proposal and approval capab
  await rm(filePath)
  await assert.rejects(f.service.listPendingApprovals(request('admin@example.test'),{limit:20}),/homelab-denied/)
 })
+
+test('admin role revocation during durable request read denies approval before append',async t=>{
+ const first=await fixture(t)
+ const pending=await first.service.requestRestart(request(),{target:'staging-canary'})
+ let allowed=true
+ const rolePolicy={permits:(identity,capability,target)=>
+  target==='staging-canary'&&capability==='action.approve'&&
+  identity.subject==='admin@example.test'&&allowed}
+ const g=await fixture(t,{
+  rolePolicy,
+  store:{
+   ...first.store,
+   read:async(...args)=>{
+    const row=await first.store.read(...args)
+    allowed=false
+    return row
+   },
+  },
+ })
+ await assert.rejects(g.service.approveRestart(request('admin@example.test'),{
+  requestId:pending.requestId,confirmation:pending.confirmation,
+ }),/homelab-denied/)
+ assert.equal(await first.store.read(pending.requestId,'restart-approved'),null)
+})
+
+test('admin role revocation during queue I/O denies full result despite valid earlier JWT',async t=>{
+ const first=await fixture(t)
+ await first.service.requestRestart(request(),{target:'staging-canary'})
+ let granted=true
+ const g=await fixture(t,{
+  rolePolicy:{permits:(identity,capability,target)=>
+   granted&&identity.subject==='admin@example.test'&&
+   capability==='action.approve'&&target==='staging-canary'},
+  store:{
+   ...first.store,
+   listPending:async(...args)=>{
+    const pending=await first.store.listPending(...args)
+    granted=false
+    return pending
+   },
+  },
+ })
+ await assert.rejects(g.service.listPendingApprovals(request('admin@example.test'),{limit:20}),/homelab-denied/)
+})
+
+test('revoked viewer diagnostic privilege during asynchronous inference never returns result',async t=>{
+ let granted=true
+ const f=await fixture(t,{
+  rolePolicy:{permits:(identity,capability,target)=>
+   granted&&identity.subject==='viewer@example.test'&&
+   capability==='diagnostics.read'&&target==='staging-canary'},
+  assistant:async()=>{
+   granted=false
+   return {provider:'fixture',text:'Should not return'}
+  },
+ })
+ await assert.rejects(f.service.inspect(request('viewer@example.test'),{
+  target:'staging-canary',prompt:'Analyze'
+ }),/homelab-denied/)
+ assert.deepEqual(f.calls,['staging-canary'])
+})
+
+test('switch disabled during async request audit write never reports accepted proposal',async t=>{
+ let armed=true
+ const seed=await fixture(t)
+ const f=await fixture(t,{
+  automationAllowed:()=>armed,
+  store:{
+   ...seed.store,
+   append:async record=>{
+    await seed.store.append(record)
+    if(record.event==='restart-requested')armed=false
+   },
+  },
+ })
+ await assert.rejects(f.service.requestRestart(request(),{target:'staging-canary'}),/homelab-denied/)
+ assert.equal(f.service.execute,undefined)
+})
+
+test('role revoked by diagnostic adapter denies before model inference',async t=>{
+ let allowed=true
+ let inference=0
+ const f=await fixture(t,{
+  rolePolicy:{permits:(identity,permission,target)=>
+   allowed&&identity.subject==='viewer@example.test'&&
+   permission==='diagnostics.read'&&target==='staging-canary'},
+  diagnostics:{read:async()=>{
+   allowed=false
+   return {status:'healthy'}
+  }},
+  assistant:async()=>{inference++;return {text:'must not run'}},
+ })
+ await assert.rejects(f.service.inspect(request('viewer@example.test'),{
+  target:'staging-canary',prompt:'Health',
+ }),/homelab-denied/)
+ assert.equal(inference,0)
+ assert.equal(f.service.execute,undefined)
+})
