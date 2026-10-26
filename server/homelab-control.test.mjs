@@ -204,7 +204,7 @@ test('administrator cannot self approve a staging proposal even with the correct
  await assert.rejects(f.service.approveRestart(request('admin@example.test'),{
   requestId:p.requestId,confirmation:p.confirmation,
  }),/homelab-denied/)
- assert.equal(await f.store.read(p.requestId,'restart-approved'),null)
+ assert.equal(await f.store.read(p.requestId,'restart-decided'),null)
 })
 
 test('only signed administrators can see pending approvals without actor hashes or confirmation tokens',async t=>{
@@ -241,7 +241,7 @@ test('pending queue respects proposer/admin separation, expiry, bounds and kill 
  assert.deepEqual((await f.service.listPendingApprovals(request('admin@example.test'),{limit:20})).items,[])
  f.kill()
  await assert.rejects(f.service.listPendingApprovals(request('admin@example.test'),{limit:20}),/homelab-denied/)
- assert.equal((await f.store.read(own.requestId,'restart-approved')),null)
+ assert.equal((await f.store.read(own.requestId,'restart-decided')),null)
 })
 
 test('unavailable approval queue storage cannot return success or leak internal record data',async t=>{
@@ -310,7 +310,7 @@ test('admin role revocation during durable request read denies approval before a
  await assert.rejects(g.service.approveRestart(request('admin@example.test'),{
   requestId:pending.requestId,confirmation:pending.confirmation,
  }),/homelab-denied/)
- assert.equal(await first.store.read(pending.requestId,'restart-approved'),null)
+ assert.equal(await first.store.read(pending.requestId,'restart-decided'),null)
 })
 
 test('admin role revocation during queue I/O denies full result despite valid earlier JWT',async t=>{
@@ -385,4 +385,92 @@ test('role revoked by diagnostic adapter denies before model inference',async t=
  }),/homelab-denied/)
  assert.equal(inference,0)
  assert.equal(f.service.execute,undefined)
+})
+
+test('signed administrator can reject a pending staging proposal with durable terminal outcome',async t=>{
+ const f=await fixture(t)
+ const proposal=await f.service.requestRestart(request(),{target:'staging-canary'})
+ const rejection={requestId:proposal.requestId,
+  confirmation:'reject:'+proposal.requestId+':staging-canary:restart'}
+ await assert.rejects(f.service.rejectRestart(request('viewer@example.test'),rejection),/homelab-denied/)
+ await assert.rejects(f.service.rejectRestart(request(),rejection),/homelab-denied/)
+ const denied=await f.service.rejectRestart(request('admin@example.test'),rejection)
+ assert.equal(denied.state,'rejected')
+ assert.equal(denied.execution.performed,false)
+ assert.equal((await f.store.read(proposal.requestId,'restart-decided')).outcome,'rejected')
+ assert.deepEqual((await f.service.listPendingApprovals(request('admin@example.test'),{limit:20})).items,[])
+ await assert.rejects(f.service.approveRestart(request('admin@example.test'),{
+  requestId:proposal.requestId,confirmation:proposal.confirmation,
+ }),/homelab-denied/)
+ await assert.rejects(f.service.rejectRestart(request('admin@example.test'),rejection),/homelab-denied/)
+ assert.equal(f.service.execute,undefined)
+})
+
+test('signed proposer can withdraw only their own request, never another proposal',async t=>{
+ const f=await fixture(t)
+ const p=await f.service.requestRestart(request(),{target:'staging-canary'})
+ assert.equal(p.withdrawalConfirmation,'withdraw:'+p.requestId+':staging-canary:restart')
+ const input={requestId:p.requestId,confirmation:p.withdrawalConfirmation}
+ await assert.rejects(f.service.withdrawRestart(request('admin@example.test'),input),/homelab-denied/)
+ await assert.rejects(f.service.withdrawRestart(request('viewer@example.test'),input),/homelab-denied/)
+ await assert.rejects(f.service.withdrawRestart(request(),{...input,confirmation:'yes'}),/homelab-denied/)
+ const result=await f.service.withdrawRestart(request(),input)
+ assert.equal(result.state,'withdrawn')
+ assert.equal(result.execution.performed,false)
+ assert.equal((await f.store.read(p.requestId,'restart-decided')).outcome,'withdrawn')
+ await assert.rejects(f.service.withdrawRestart(request(),input),/homelab-denied/)
+ await assert.rejects(f.service.approveRestart(request('admin@example.test'),{
+  requestId:p.requestId,confirmation:p.confirmation,
+ }),/homelab-denied/)
+ assert.deepEqual((await f.service.listPendingApprovals(request('admin@example.test'),{limit:20})).items,[])
+})
+
+test('competing approve, reject and proposer-withdraw requests yield exactly one terminal outcome',async t=>{
+ const f=await fixture(t)
+ const p=await f.service.requestRestart(request(),{target:'staging-canary'})
+ const attempts=await Promise.allSettled([
+  f.service.approveRestart(request('admin@example.test'),{requestId:p.requestId,confirmation:p.confirmation}),
+  f.service.rejectRestart(request('admin@example.test'),{
+   requestId:p.requestId,confirmation:'reject:'+p.requestId+':staging-canary:restart'}),
+  f.service.withdrawRestart(request(),{requestId:p.requestId,confirmation:p.withdrawalConfirmation}),
+ ])
+ assert.equal(attempts.filter(x=>x.status==='fulfilled').length,1)
+ const final=await f.store.read(p.requestId,'restart-decided')
+ assert.equal(['approved','rejected','withdrawn'].includes(final.outcome),true)
+ assert.deepEqual((await f.service.listPendingApprovals(request('admin@example.test'),{limit:20})).items,[])
+ assert.equal(f.service.execute,undefined)
+})
+
+test('rejection and withdrawal honor expiry, role, kill and exact confirmation',async t=>{
+ let clock=Date.now()
+ const f=await fixture(t,{now:()=>clock})
+ const p=await f.service.requestRestart(request(),{target:'staging-canary'})
+ const reject={requestId:p.requestId,confirmation:'reject:'+p.requestId+':staging-canary:restart'}
+ const withdraw={requestId:p.requestId,confirmation:p.withdrawalConfirmation}
+ await assert.rejects(f.service.rejectRestart(request('admin@example.test'),{
+  ...reject,command:'restart',
+ }),/homelab-denied/)
+ clock+=300001
+ await assert.rejects(f.service.rejectRestart(request('admin@example.test'),reject),/homelab-denied/)
+ await assert.rejects(f.service.withdrawRestart(request(),withdraw),/homelab-denied/)
+ assert.equal(await f.store.read(p.requestId,'restart-decided'),null)
+ clock=Date.now()
+ const next=await f.service.requestRestart(request(),{target:'staging-canary'})
+ f.kill()
+ await assert.rejects(f.service.rejectRestart(request('admin@example.test'),{
+  requestId:next.requestId,confirmation:'reject:'+next.requestId+':staging-canary:restart',
+ }),/homelab-denied/)
+ await assert.rejects(f.service.withdrawRestart(request(),{
+  requestId:next.requestId,confirmation:next.withdrawalConfirmation,
+ }),/homelab-denied/)
+ assert.equal(await f.store.read(next.requestId,'restart-decided'),null)
+})
+
+test('administrator cannot reject their own proposal to bypass two-person workflow',async t=>{
+ const f=await fixture(t)
+ const p=await f.service.requestRestart(request('admin@example.test'),{target:'staging-canary'})
+ await assert.rejects(f.service.rejectRestart(request('admin@example.test'),{
+  requestId:p.requestId,confirmation:'reject:'+p.requestId+':staging-canary:restart',
+ }),/homelab-denied/)
+ assert.equal(await f.store.read(p.requestId,'restart-decided'),null)
 })
