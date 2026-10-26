@@ -2,9 +2,9 @@
 
 Work from top to bottom. Do not skip safety prerequisites to reach action features sooner.
 
-## User-requested cloud access — activation pending
+## User-requested cloud access — homelab endpoint live; cloud binding pending
 
-The read-only automation API for `friday-api.mytechtactics.com` is implemented locally and disabled by default. Cloudflare staging is complete: the dedicated Access application, exact Service Auth identity, DNS record, and inactive dedicated tunnel targeting `http://friday:3011` exist. Next: deliver the reviewed source revision to VM102; configure the origin issuer/audience/client-ID allowlist and protected tunnel-token file; start Friday plus its dedicated connector; verify the tunnel becomes healthy; add the exact cloud destination and service-token secret bindings; run authenticated and denial checks; remove temporary rollout credential copies. Host health alone is insufficient: validate live snapshots and timestamps. Do not expose the UI port as the automation origin or grant deployment/execution tools through this API.
+The read-only automation API at `friday-api.mytechtactics.com` is deployed on VM102 behind its dedicated Cloudflare Access application and tunnel. The tunnel is healthy and authenticated live-data, denial, write-rejection, and excluded-route acceptance checks pass. Next: allow exactly this hostname in the managed cloud runtime, bind `FRIDAY_CLOUD_URL`, `FRIDAY_CLOUD_CLIENT_ID`, and `FRIDAY_CLOUD_CLIENT_SECRET` through its secret settings, rerun `scripts/check-cloud-connection.mjs` from that runtime, then remove the temporary owner-only service-token copy from VM102. Do not expose the UI port as the automation origin or grant deployment/execution tools through this API.
 
 ## P0 — VM100 observer baseline — completed; nic1 example migrated
 
