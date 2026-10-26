@@ -109,7 +109,14 @@ place the token in command arguments or committed environment files. Configure:
 ```dotenv
 FRIDAY_CLOUDFLARED_IMAGE=cloudflare/cloudflared:2026.10.3
 FRIDAY_TUNNEL_TOKEN_FILE=/srv/infrastructure/secrets/friday-cloud-tunnel.token
+FRIDAY_CLOUDFLARED_UID=1000
+FRIDAY_CLOUDFLARED_GID=1000
 ```
+
+Set the UID/GID to the actual owner of the protected token file (`id -u` and
+`id -g` on VM102); the checked-in defaults match the verified VM102 account.
+The connector runs as that unprivileged identity so Docker's file-backed secret
+remains readable without broadening the host file beyond mode 0600.
 
 The default pins official release `2026.10.3`; its Git tag and Docker registry
 manifest were verified during preparation. Future replacements must support

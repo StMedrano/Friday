@@ -3,6 +3,8 @@
 services:
   friday-cloud-tunnel:
     image: ${FRIDAY_CLOUDFLARED_IMAGE:-cloudflare/cloudflared:2026.10.3}
+    # Match the owner of the mode-0600 host token file. VM102 uses 1000:1000.
+    user: "${FRIDAY_CLOUDFLARED_UID:-1000}:${FRIDAY_CLOUDFLARED_GID:-1000}"
     restart: unless-stopped
     command: ["tunnel", "--no-autoupdate", "run", "--token-file", "/run/secrets/friday_tunnel_token"]
     secrets:
