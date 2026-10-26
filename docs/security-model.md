@@ -284,6 +284,34 @@ mapping, execution endpoint, container restart, merge or deployment
 in this change. A future executor must independently enforce its own
 current identity, role, kill-switch, approval, resource and audit checks.
 
+## Authentik OIDC identity boundary — stacked draft PR #58
+
+A new internal `server/security/authentik.mjs` verifies a configured
+Authentik OAuth2/OIDC provider's short-lived RS256-signed human *access*
+JWT, never a raw trusted header. The expected HTTPS issuer is
+provider-specific (`/application/o/<slug>/`), OIDC discovery and JWKS
+URLs are pinned, and signed `iss`, audience, `sub`, scope, issuance and
+expiration are checked. The required `friday_control` scope limits token
+purpose but does **not grant roles**. Role policy continues to rely on
+Friday's independent owner-private exact subject/target bindings.
+Issuer-hashed Authentik subject namespace prevents same-email/same-sub
+reuse across Cloudflare and Authentik. HS256, service tokens, wrong
+discovery/signing keys, missing credentials and spoofed alternate
+identity headers fail closed.
+
+The dormant HomeLab safety factory's `identityProvider:'authentik'`
+option is **mutually exclusive** with Cloudflare Access, opted in through
+trusted server-only test configuration, and never selected from requests.
+An expiring Authentik identity is rechecked after async waits, alongside
+the separate role policy and global kill switch. All control APIs remain
+internal, unbound to real infrastructure and non-executing; Authentik
+identity cannot trigger HomeLab actions itself.
+
+No browser SSO, callback/cookie/session, OIDC authorization-code/PKCE
+exchange, logout, enrollment, production Authentik integration or
+deployment is included. Those require independent implementation and
+security acceptance. See `docs/authentik.md`.
+
 ## Future write-action rule
 
 A future action engine must require all of the following before any infrastructure mutation:

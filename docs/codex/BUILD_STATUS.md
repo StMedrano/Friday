@@ -1,5 +1,38 @@
 # Friday Build Status
 
+## P8 Authentik human identity adapter — draft PR #58, source only
+
+Friday now has an **opt-in internal Authentik OIDC access-token verifier**,
+complementing (not replacing) the signed Cloudflare Access boundary.
+The source-only `createAuthentikAccessGate` pins an HTTPS provider-specific
+issuer, exact OIDC discovery/JWKS endpoints, client audience, RS256 signing
+keys and a dedicated signed `friday_control` access-token scope.
+It fails closed on unsupported global issuer, HS256, wrong issuer/audience,
+unsigned/expired/unscoped/malformed/service tokens, malicious discovery,
+invalid keys, and missing config. There is no secret or source of roles in
+claims. Authentik subjects are qualified by an issuer-specific hash to
+prevent Cloudflare subject/role collisions.
+
+The disabled-by-default HomeLab safety-runtime can *explicitly* select
+the Authentik verifier for isolated tests, with no request-based provider
+choice or fallthrough to Cloudflare. It still needs server-owned exact
+subject/role bindings, owner-private append-only audit and five-minute
+revocable kill switch. Verified identity expiration is rechecked after
+async diagnostics/approval boundaries; roles and kill gates continue to
+be revalidated. All allowed fixture actions remain non-executable.
+
+Test-first Authentik JWT, discovery/JWKS, boundary and synthetic signed
+Operator/Administrator/Viewer integration cases cover two-person approval,
+authorization failures, no cross-provider fallback, session expiry,
+and emergency kill. No live Authentik/Cloudflare/HomeLab connection
+was made; there is **no OIDC browser login/callback**, cookie/session,
+HTTP endpoint, real role provisioning, executor or production deployment.
+Full confidential code+PKCE login, MFA/account-lifecycle acceptance,
+trusted reverse-proxy boundary and live OIDC interoperability remain
+future tasks. See `docs/authentik.md`. This draft stacks on PR #56.
+Independent review and CI evidence are needed before production integration.
+
+
 ## P8 private read-only proposal lifecycle lookup — draft PR #56 (source only)
 
 A bounded `readLifecycle({requestId,at})` projection in the owner-private
