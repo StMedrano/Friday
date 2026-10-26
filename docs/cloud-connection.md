@@ -195,11 +195,13 @@ Run from the cloud checkout with Node 22 and curl:
 node scripts/check-cloud-connection.mjs
 ```
 
-The script requires a live Friday automation response and a timestamped overview;
-checks all four reads; expects 401 or 403 without credentials, 405 for POST overview,
-and 404 for repository access. It uses curl's proxy/CA support, does not follow
-redirects, bounds responses/timeouts, and passes credentials on stdin rather
-than argv. Output contains only check results, never response bodies or secrets.
+The script requires a live Friday automation response and an overview generated
+no more than five minutes ago and no more than one minute in the future. It
+checks all four reads; expects 401 or 403 without credentials, 405 for POST
+overview, and 404 for both repository access and a query-suffixed overview
+request. It uses curl's proxy/CA support, does not follow redirects, bounds
+responses/timeouts, and passes credentials on stdin rather than argv. Output
+contains only check results, never response bodies or secrets.
 If the environment injects credentials into **every** request to this hostname,
 perform the unauthenticated denial check from a separate caller without that binding;
 the script deliberately fails rather than misreporting that negative check.
@@ -213,6 +215,10 @@ authorized VM102 session removed only the temporary service-token copy from
 `/home/stalin/.config/friday-cloud-api/client.json`. The separate mode-600
 tunnel-token runtime file was preserved. VM102 `make health` and the complete
 managed-runtime acceptance checker passed again after cleanup.
+
+Post-merge acceptance hardening also verified that
+`/api/overview?probe=1` returns 404 and that the live snapshot falls within the
+documented age/skew window. The resulting checker reports eight passing gates.
 
 Also verify a different service token and an ordinary browser-session JWT fail,
 direct unauthenticated access to the local origin fails, the UI still works,

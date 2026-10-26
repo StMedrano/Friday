@@ -1,7 +1,9 @@
 import { spawnSync } from 'node:child_process'
 import { pathToFileURL } from 'node:url'
 
-const paths = new Set(['/api/health', '/api/overview', '/api/incidents', '/api/monitoring/history', '/api/repositories'])
+const paths = new Set(['/api/health', '/api/overview', '/api/incidents', '/api/monitoring/history', '/api/repositories', '/api/overview?probe=1'])
+const MAX_OVERVIEW_AGE_MS = 5 * 60 * 1000
+const MAX_FUTURE_SKEW_MS = 60 * 1000
 const quote = value => '"' + value.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"'
 
 export function cloudSettings(env = process.env) {
@@ -35,7 +37,7 @@ export function cloudRequest(settings, path, { method = 'GET', auth = true, exec
   return { status, body }
 }
 
-export function checkConnection(request) {
+export function checkConnection(request, { now = Date.now } = {}) {
   const outcomes = []
   function check(path, options, expected) {
     const result = request(path, options)
@@ -46,8 +48,11 @@ export function checkConnection(request) {
   const health = check('/api/health', {}, 200)
   if (health?.service !== 'friday-automation' || health.mode !== 'live') throw Error('Expected the live Friday automation listener')
   const overview = check('/api/overview', {}, 200)
-  if (overview?.mode !== 'live' || !Array.isArray(overview.services) || !Number.isFinite(Date.parse(overview.generatedAt)))
-    throw Error('Expected a live, timestamped overview snapshot')
+  const generatedAt = Date.parse(overview?.generatedAt)
+  const snapshotAge = now() - generatedAt
+  if (overview?.mode !== 'live' || !Array.isArray(overview.services) || !Number.isFinite(generatedAt) ||
+    snapshotAge > MAX_OVERVIEW_AGE_MS || snapshotAge < -MAX_FUTURE_SKEW_MS)
+    throw Error('Expected a fresh overview snapshot from the live listener')
   check('/api/incidents', {}, 200)
   check('/api/monitoring/history', {}, 200)
   const unauthenticated = request('/api/health', { auth: false })
@@ -56,6 +61,7 @@ export function checkConnection(request) {
   outcomes.push({ path: '/api/health', method: 'GET', authenticated: false, status: unauthenticated.status })
   check('/api/overview', { method: 'POST' }, 405)
   check('/api/repositories', {}, 404)
+  check('/api/overview?probe=1', {}, 404)
   return outcomes
 }
 
