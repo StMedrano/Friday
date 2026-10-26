@@ -1,23 +1,177 @@
 # Friday Build Status
 
-## P8 global automation gate foundation — draft PR #48, source only
+## P8 private read-only proposal lifecycle lookup — draft PR #56 (source only)
 
-A fail-closed file-backed `createFileAutomationGate` is implemented under
-`server/security/automation-kill-switch.mjs`. A missing, corrupt, symlinked,
-group/world-accessible, expired or overly permissive gate file denies. Only an
-exact owner-private schema with `state:allow-approved-actions` and at most a
-five-minute expiration passes; the file is reopened on every check so owner
-revocation is effective without a server restart. The gate is tested with the
-existing dormant HomeLab control callback and does not create a file or an HTTP
-route. It does not enable infrastructure execution, authenticate operators,
-or confer independent RBAC/approval/audit permissions.
+A bounded `readLifecycle({requestId,at})` projection in the owner-private
+append-only audit store validates the original symbolic staging proposal
+against its sole terminal decision event, expiration, actor attribution,
+action target, event timestamps and strict five-minute lifetime.
+It denies missing, orphaned, corrupt, symlinked, forged, incomplete or
+inconsistent records instead of returning partial results. Historical
+approval is a non-executable audit state, never authority to restart.
 
-PR #48 is for source review only, with no production wiring or HomeLab access.
-CI and a separate production/security design review must be completed before
-future action development. P8 is **not complete**: authenticated role policy,
-a durable approval queue, cross-instance audit/deny semantics, and a reviewed
-runtime kill-switch integration remain pending. The read-only cloud automation
-endpoint remains unrelated and unchanged.
+The dormant `getRequestStatus` control requires a verified Cloudflare
+Access human identity and currently effective server-owned rights.
+Only the original proposer, while retaining `action.propose`, or an
+Administrator with `action.approve` may inspect a request.
+Viewer/Agent and unrelated Operators are denied. It repeats both policy
+and kill-switch checks before and after asynchronous storage reads,
+returns pending/expired/approved/rejected/withdrawn statuses, and never
+returns actor hashes, raw audit data, emails, JWTs or confirmations.
+Every result explicitly states `execution.performed:false`.
+
+Test-first coverage includes private-store reload, terminal outcomes,
+clock rollback/expiry, tampered files and symlinks, role scope, privacy,
+unexpected audit failure, mid-read revocation, and the real dormant
+file-backed kill/role composition using synthetic identities. No live
+HTTP route, UI, HomeLab connection, executor, deployment or new secret
+is added. PR #56 is stacked on draft PR #54. CI and owner review are
+required; production identity, request status UI, multi-process
+consistency, log retention and P9 independent action gates remain open.
+
+
+## P8 terminal proposal decisions — draft PR #54, source only
+
+The internal dormant HomeLab approval workflow now supports **exactly one**
+durable terminal outcome for a symbolic staging restart proposal:
+- Approved by a *different* signed Administrator.
+- Rejected by a *different* signed Administrator.
+- Withdrawn by the verified original proposer.
+
+All three decisions use the *same* create-only,
+fsynced `<requestId>.restart-decided.json` audit file, with an explicit
+validated `outcome` field. Competing decisions cannot each persist their
+own separate terminal file. Pending-approval scans exclude every terminal
+outcome and fail closed on orphan, corrupt, missing, misattributed or
+inconsistent events. An expired request has no accepted final decision.
+A successful result always states `execution.performed:false`.
+
+New test-first audit, controller and wired dormant-runtime tests cover
+signed role scopes, same-person denial, wrong-owner denial, confirmation,
+expiry, replay prevention, simultaneous approve/reject/withdraw races,
+audit reload and immutable storage, revocation/kill-gate denial,
+and corrupted decision records. This is not connected to production
+server/index.mjs and creates no real HomeLab executor.
+
+**Dependency:** draft PR #54 is stacked above the approved source
+branch from prior PR #53. PR #48 is merged on main and PRs #50-53
+were merged into their parent development branches; PR #49 remains
+awaiting main merge. Do not deploy or infer live approval availability
+from these source changes. CI/review gates remain mandatory.
+
+
+## P8 dormant safety-boundary composition — draft PR #53 (source only)
+
+The standalone internal `createDormantHomeLabRuntime` composes Friday's
+already-tested signed Cloudflare Access human identity, exact role/target
+policy, owner-private short-lived revocable **file-based role bindings**,
+durable private action audit, and **owner-private five-minute kill switch**.
+The kill gate and its five regression tests are copied byte-for-byte from
+unmerged PR #48 to enable exact-head integration testing in the stacked PR
+chain; this is a deliberate temporary overlap, not a competing rewrite.
+
+Absent explicit `enabled:true`, the factory creates no audit directory,
+reads no role/kill files, makes no infrastructure connections, and returns
+a disabled control. An opted-in *internal fixture* still needs valid private
+files, signed human JWT, role permission and kill arm **at every authorization
+boundary**. All actions remain symbolic `staging-canary` proposals or
+durable, non-executable two-person approval records. No HomeLab Docker,
+Proxmox, shell, SSH, container restart, public API, UI, AI executor, real
+target mapping, secret or production deployment is introduced.
+
+Tests exercise default-disable, missing/invalid private files, signed
+operator/administrator/viewer flows, disarm and expiry, role downgrade, and
+disarming during read-only diagnostics, plus PR #48's original kill tests.
+PR #53 stacks on draft #52 -> #51 -> #50 -> #49. PR #48 remains separate
+until a reviewed integration/merge decision resolves the duplicate file
+diffs. Exact-head CI and owner/security review required. P8 remains
+**incomplete**: trusted live identity lifecycle, production kill control,
+full approval state machine, multi-instance revocation and action-boundary
+audit/verification need independent work.
+
+
+## P8 async reauthorization — draft PR #52, source only
+
+The dormant HomeLab control now rechecks the verified Access JWT subject's current
+server-owned role and target policy, plus the independent automation gate,
+after asynchronous audit reads, queue scans, diagnostics, assistant inference,
+and before/after durable audit appends. This closes a stale-permission response
+gap during role changes or kill-gate revocation. Tests cover role downgrade
+during the approval read, pending queue scan, diagnostic read and assistant
+inference, and disarming during a proposal audit append.
+
+A successfully fsynced append cannot be rolled back if revocation occurs
+mid-write; the post-write recheck denies a stale success response but the
+historical event can exist. No executor exists and any future action must
+independently revalidate identity, policy, approval and kill status at execution.
+This draft depends on PR #51 -> #50 -> #49; the separate PR #48 is unmerged.
+P8 is incomplete, with no merge, deployment, runtime binding, new credentials
+or HomeLab contact.
+
+
+## P8 private operator role provisioning — draft PR #51, source only
+
+A small internal adapter reloads an owner-private canonical JSON role
+policy on every permission check, expires each trust snapshot within
+24 hours, rejects symlinked/insecure/malformed/duplicate-key records,
+and delegates actual Viewer/Operator/Administrator/Agent capability
+intersections to PR #49's exact role policy. Source integration tests
+on PR #50's dormant HomeLab controller exercise immediate downgrades,
+administrator revocation, and fail-closed missing policy while retaining
+durable audit and non-execution semantics.
+
+This is a stacked **draft PR #51**, based on draft #50 which depends on
+draft #49; PR #48 is a separate kill-switch foundation. It is not
+deployed or configured, does not create UI/API mutation or an executor,
+and makes no HomeLab connections. CI evidence and separate owner/security
+review are required; P8 is **not yet complete**. Real trusted identity
+provisioning and rotation, multi-node revocation semantics, full
+approval lifecycle, and global production control policies remain
+pending.
+
+
+## P8 pending approval queue — stacked draft PR #50, source only
+
+An internal, read-only approval queue now derives from the owner-private,
+append-only HomeLab audit store. Pending proposals are limited to the symbolic
+unbound `staging-canary`, exclude approved/expired entries, and sort by expiry.
+The bounded 512-event scan validates each record, ownership, file mode, symlink
+safety and pairing; corruption or overflow fails closed rather than returning
+partial results. The service verifies an Administrator's signed Access subject,
+exact target role policy and independent automation gate before revealing only
+safe request metadata and self-approval eligibility. No requester hash or
+confirmation string is emitted. All results include `execution.performed:false`.
+
+Test-first Node cases cover store reload, approval/expiry transitions, scan
+limits, malformed/symlinked/permissive records, denial for other roles, absent
+JWT/policy/store, kill revocation, and unavailable storage. PR #50 **depends on
+unmerged draft PR #49** and must be reviewed with its exact-head verification.
+PR #48 is a separate kill-switch foundation; no production integration or
+executor is authorized. Live UI, durable event pagination/retention, production
+role provisioning, a full human approval workflow, and all HomeLab action
+control-plane security gates remain incomplete.
+
+
+## P8 operator RBAC foundation — draft PR #49, source only
+
+Internal operator policy now defines explicit server-injected, verified Cloudflare
+Access JWT subject grants for the four intended roles: Viewer, Operator,
+Administrator and Friday Agent. The dormant `createHomeLabControl` interface
+requires a trusted exact-role/target policy on top of the signed human identity,
+its existing durable audit, and its independently injected automation kill gate.
+Missing/malformed bindings deny all. Proposal requires Operator/Admin;
+approval requires Administrator and a **different verified subject** than the
+original requester. Viewers and agent roles are read-only. The symbolic
+`staging-canary` remains unbound and **no execution path exists**.
+
+Test-first Node regressions exercise denied/invalid bindings, role matrix,
+identity/target spoof attempts, snapshot mutation, missing policy, viewer and
+agent restrictions, separation of duties, concurrent single-use approval, and
+existing safety invariants. PR #49 is source-only. Its exact-head CI and
+review status must be checked separately; no deployment, merge, or HomeLab
+access was performed. It does not implement user-account provisioning,
+session management, production policy binding, real target controls, or
+global control-plane RBAC. P8 remains incomplete.
 
 
 ## Two-site operations views — draft PR #47, source only

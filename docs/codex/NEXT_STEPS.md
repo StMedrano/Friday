@@ -109,11 +109,16 @@ Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execut
 Implement before any infrastructure write operation:
 
 - authentication or a documented trusted reverse-proxy identity boundary;
-- roles: Viewer, Operator, Administrator, Friday Agent;
+- **internal owner-private revocable role binding adapter in stacked draft PR #51**: exact, short-lived (24-hour maximum) file-backed subject bindings revalidated on every request, tested with signed operator flows. No operator account provisioning, production transport, or standalone authorization—live RBAC/identity rollout is still pending.
+- **internal role policy foundation in draft PR #49**: exact JWT subject-to-role-and-target bindings for Viewer, Operator, Administrator and Friday Agent; enforced in the dormant HomeLab fixture service with proposer/approver separation. No production configuration, UI/RBAC endpoints, real target rights, or execution authority; full product RBAC remains pending.
 - durable append-only action audit events separate from monitoring history;
 - action request IDs/lifecycle states;
-- explicit approval workflow;
-- a default-off, owner-file-backed **global automation gate foundation** is implemented in draft PR #48 and tested against the existing internal HomeLab approval seam. It is not wired into production, grants no action permission and has no user-facing toggle. Production-safe kill-switch activation, cross-instance reviews and the remaining authorization/audit/approval controls are still pending.
+- **dormant read-only request status in stacked draft PR #56**: verified original proposer or separately authorized Administrator can inspect pending, expired or terminal staging request state without disclosing actor hashes. No public endpoint/UI, action executor, production identity or deployed audit service; concurrent snapshots may be stale.
+- **terminal outcome lifecycle in draft PR #54:** approved / rejected by another signed Administrator or withdrawn by the verified proposer, exclusively appended to one durable event path to prevent conflicting final decisions. Still internal, symbolic and non-executing; full production identity, decision review UI, retention/multi-instance transactional design pending.
+- **async role and kill rechecks in stacked draft PR #52:** fresh permissions at audit/diagnostic/assistant wait boundaries, including after fsynced writes, without granting execution. Multi-node atomicity and full approval state machine still pending.
+- **internal read-only pending-approval queue in stacked draft PR #50 (depends on #49)**: private bounded audit scan for unexpired, unapproved symbolic staging requests; signed Administrator-only projection with proposer/approver separation. No public UI/API, production operator identity provisioning or executor; full human approval workflow remains outstanding.
+- **dormant safety composition in stacked draft PR #53**: signed human JWT + strict role binding + private durable audit + file-backed kill gate; disabled by default, symbolic staging-only and non-executing. The gate module and tests match separate draft PR #48; resolve overlap in review before merge.
+- global automation kill switch **as a deployed, independently revocable operational capability** still pending; complete live identity and multi-instance security review before any action path.
 
 ## P9 — Controlled actions
 
