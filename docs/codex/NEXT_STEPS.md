@@ -106,14 +106,25 @@ Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execut
 
 ## P8 — Authentication, roles, approval, and durable action audit
 
+- **Public browser login/session boundary in draft PR #64:** per-site HttpOnly/Secure/Lax OAuth state binding and opaque session cookies, exact-origin/cross-site denial, server-side state digest, CSRF-signed logout and revocation via injected session-store interfaces. Standalone source only; next build a reviewed distributed transactional session backend and actual HTTP callback/login/logout routes with verified reverse proxy TLS, rate limiting and CSRF protections.
+- **Encrypted public OIDC login state in draft PR #62:** default-disabled owner-private AES-GCM encrypted state, single-host restart persistence and one-winner atomic local consumption using the existing `createPublicOidcFlow` seam. **Not** a shared multi-host production store. Next: Postgres/Redis transactional cross-instance store with TTL cleanup, browser state-cookie binding, CSRF protection, secure site sessions and logout, only after staging OIDC end-to-end acceptance.
+- **Public Authentik login across Friday/future sites:** draft PR #60 adds a source-only isolated multi-client authorization-code+PKCE/OIDC ID-token contract, distinct from privileged HomeLab JWT verification. Next: public HTTPS identity service (VM120 review), Authentik per-site applications, shared atomic short-lived login-state storage, server-backed HttpOnly sessions and callback/logout HTTP routes, exact redirect registrations, MFA policies and live remote-network acceptance. Do not expose Authentik network services or remove Cloudflare Access without a reviewed migration. See `docs/authentik-public-sso.md`.
+
+- **Authentik human OIDC gate in stacked draft PR #58**: server-only RS256 access JWT validation pinned to per-app issuer/discovery/JWKS, dedicated scope, client audience, issuer-scoped subject, no Cloudflare fallback; optional only in dormant staging fixtures. Separate user-facing authorization code + PKCE login, MFA, account lifecycle, production session/cookie and revocation controls remain to build. See `docs/authentik.md`.
+
 Implement before any infrastructure write operation:
 
 - authentication or a documented trusted reverse-proxy identity boundary;
-- roles: Viewer, Operator, Administrator, Friday Agent;
+- **internal owner-private revocable role binding adapter in stacked draft PR #51**: exact, short-lived (24-hour maximum) file-backed subject bindings revalidated on every request, tested with signed operator flows. No operator account provisioning, production transport, or standalone authorization—live RBAC/identity rollout is still pending.
+- **internal role policy foundation in draft PR #49**: exact JWT subject-to-role-and-target bindings for Viewer, Operator, Administrator and Friday Agent; enforced in the dormant HomeLab fixture service with proposer/approver separation. No production configuration, UI/RBAC endpoints, real target rights, or execution authority; full product RBAC remains pending.
 - durable append-only action audit events separate from monitoring history;
 - action request IDs/lifecycle states;
-- explicit approval workflow;
-- a default-off, owner-file-backed **global automation gate foundation** is implemented in draft PR #48 and tested against the existing internal HomeLab approval seam. It is not wired into production, grants no action permission and has no user-facing toggle. Production-safe kill-switch activation, cross-instance reviews and the remaining authorization/audit/approval controls are still pending.
+- **dormant read-only request status in stacked draft PR #56**: verified original proposer or separately authorized Administrator can inspect pending, expired or terminal staging request state without disclosing actor hashes. No public endpoint/UI, action executor, production identity or deployed audit service; concurrent snapshots may be stale.
+- **terminal outcome lifecycle in draft PR #54:** approved / rejected by another signed Administrator or withdrawn by the verified proposer, exclusively appended to one durable event path to prevent conflicting final decisions. Still internal, symbolic and non-executing; full production identity, decision review UI, retention/multi-instance transactional design pending.
+- **async role and kill rechecks in stacked draft PR #52:** fresh permissions at audit/diagnostic/assistant wait boundaries, including after fsynced writes, without granting execution. Multi-node atomicity and full approval state machine still pending.
+- **internal read-only pending-approval queue in stacked draft PR #50 (depends on #49)**: private bounded audit scan for unexpired, unapproved symbolic staging requests; signed Administrator-only projection with proposer/approver separation. No public UI/API, production operator identity provisioning or executor; full human approval workflow remains outstanding.
+- **dormant safety composition in stacked draft PR #53**: signed human JWT + strict role binding + private durable audit + file-backed kill gate; disabled by default, symbolic staging-only and non-executing. The gate module and tests match separate draft PR #48; resolve overlap in review before merge.
+- global automation kill switch **as a deployed, independently revocable operational capability** still pending; complete live identity and multi-instance security review before any action path.
 
 ## P9 — Controlled actions
 
