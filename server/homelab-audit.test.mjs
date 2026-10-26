@@ -102,3 +102,17 @@ test('pending queue fails closed when private audit directory exceeds bounded sc
  }
  await assert.rejects(store.listPending({at:1500,limit:1}),/homelab-denied/)
 })
+
+test('queue fails closed on orphan approvals and forged overlong proposal TTL',async t=>{
+ const {store,record}=await fixture(t)
+ await store.append({...record,event:'restart-approved',actor:'b'.repeat(64)})
+ await assert.rejects(store.listPending({at:1500,limit:20}),/homelab-denied/)
+})
+
+test('queue never returns a partial slice when a later proposal has an unsafe TTL',async t=>{
+ const {store,record}=await fixture(t)
+ await store.append(record)
+ const forged={...record,requestId:randomUUID(),expiresAt:record.at+86400000}
+ await store.append(forged)
+ await assert.rejects(store.listPending({at:1500,limit:1}),/homelab-denied/)
+})
