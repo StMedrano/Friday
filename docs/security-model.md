@@ -197,6 +197,38 @@ actual infrastructure actions. A future executor must independently
 validate fresh identity, grants, approval state and kill switch at the
 action boundary. No executor, route, runtime binding or deployment exists.
 
+## Dormant P8 safety gate composition — stacked draft PR #53
+
+`server/homelab-safety-runtime.mjs` connects the **internal-only** HomeLab
+fixture control to the existing signed Cloudflare Access identity,
+`createFileOperatorRolePolicy`, owner-private durable audit store and
+`createFileAutomationGate`. The last module and its original regression
+suite are copied unchanged from draft PR #48 solely because that PR is not
+merged. Reconcile/resolve the duplicate PR #48 files during owner review.
+
+The factory is **disabled by default**. Without an explicit server-side
+`enabled:true`, it does not create storage or initialize infrastructure
+capabilities. An opted-in isolated test fixture must provide separate
+absolute paths for the audit directory, role-policy file and kill-switch
+file. The role file uses short-lived exact subject/target grants; the
+kill file permits only a short time window, re-read at each check. An absent,
+expired, malformed, symlinked, or insecure file denies operations. All
+actor identity is verified against signed Access JWT, never spoofable
+headers or model instructions.
+
+Even when explicitly enabled in tests, Friday can only inspect the
+synthetic, unbound `staging-canary`, persist a symbolic restart *request*
+and append a **non-executing**, separate human approval. The control has
+**no execute method**, no HomeLab resource binding, no public HTTP/API
+route and no bootstrap in `server/index.mjs`. The user-facing Friday
+dashboard and read-only cloud automation API remain unchanged.
+
+Do not activate this source as a production control plane. Reviewer
+acceptance, secure owner provisioning, global cross-instance
+revocation semantics, audit repair/retention policies, request lifecycle
+state transitions, and independent P9 action authorization remain
+prerequisites to any real command.
+
 ## Future write-action rule
 
 A future action engine must require all of the following before any infrastructure mutation:
