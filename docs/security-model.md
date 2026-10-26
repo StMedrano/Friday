@@ -229,6 +229,34 @@ revocation semantics, audit repair/retention policies, request lifecycle
 state transitions, and independent P9 action authorization remain
 prerequisites to any real command.
 
+## Single terminal decision lifecycle — draft PR #54
+
+The dormant internal HomeLab proposal workflow may end in one of three
+exclusive states: **approved**, **rejected** or **withdrawn**.
+The original proposer can withdraw their own valid unexpired proposal,
+whereas a distinct Administrator may approve or reject with an explicit
+action-specific confirmation. Viewer and Friday Agent roles cannot
+finalize requests. Every operation verifies the signed Cloudflare Access
+principal and repeats the live server-owned role and kill-gate checks
+across asynchronous audit boundaries.
+
+All final states occupy one create-only, owner-private, fsynced
+`restart-decided` audit event filename per request. The exact audit
+schema includes a bounded outcome, actor hash, target and time fields.
+Concurrent competing decisions cannot both succeed, even when coming
+from different service instances using the same audit directory.
+The pending queue treats any correctly validated terminal outcome
+as completed and fails closed if it encounters forged actors,
+corrupt state, orphaned events, or missing files. The history is
+non-executable: an approval is **not** an infrastructure authorization.
+
+The queue is read-only; these methods are internal to the
+default-disabled symbolic staging fixture, not HTTP routes or a
+published user-facing approval service. No real restart target, Docker
+socket, network mutation, arbitrary shell tool, deployment or merge
+is introduced. Live identity provisioning, security acceptance and
+an independently reauthorizing P9 executor remain separate prerequisites.
+
 ## Future write-action rule
 
 A future action engine must require all of the following before any infrastructure mutation:

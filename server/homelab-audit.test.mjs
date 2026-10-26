@@ -62,7 +62,7 @@ test('pending queue survives reload, omits approved and expired, and orders by e
  const available=await reloaded.listPending({at:1500,limit:20})
  assert.deepEqual(available.map(r=>r.requestId),[first.requestId,next.requestId])
  assert.equal(available[0].actor,record.actor)
- await store.append({...first,event:'restart-approved',actor:'b'.repeat(64),at:1600})
+ await store.append({...first,event:'restart-decided',actor:'b'.repeat(64),at:1600,outcome:'approved'})
  assert.deepEqual((await reloaded.listPending({at:1500,limit:20})).map(r=>r.requestId),[next.requestId])
  assert.deepEqual(await reloaded.listPending({at:6000,limit:20}),[])
 })
@@ -90,7 +90,7 @@ test('pending queue cannot follow symlinked event or produce partial results on 
  const second={...record,requestId:randomUUID()}
  await store.append(record)
  await store.append(second)
- const approval=join(directory,record.requestId+'.restart-approved.json')
+ const approval=join(directory,record.requestId+'.restart-decided.json')
  await symlink(join(directory,second.requestId+'.restart-requested.json'),approval)
  await assert.rejects(store.listPending({at:1500,limit:20}),/homelab-denied/)
 })
@@ -105,7 +105,7 @@ test('pending queue fails closed when private audit directory exceeds bounded sc
 
 test('queue fails closed on orphan approvals and forged overlong proposal TTL',async t=>{
  const {store,record}=await fixture(t)
- await store.append({...record,event:'restart-approved',actor:'b'.repeat(64)})
+ await store.append({...record,event:'restart-decided',actor:'b'.repeat(64),outcome:'approved'})
  await assert.rejects(store.listPending({at:1500,limit:20}),/homelab-denied/)
 })
 
@@ -115,4 +115,60 @@ test('queue never returns a partial slice when a later proposal has an unsafe TT
  const forged={...record,requestId:randomUUID(),expiresAt:record.at+86400000}
  await store.append(forged)
  await assert.rejects(store.listPending({at:1500,limit:1}),/homelab-denied/)
+})
+
+test('terminal decision is a single immutable audited outcome, never a second event per outcome',async t=>{
+ const {directory,store,record}=await fixture(t)
+ await store.append(record)
+ const approve={...record,event:'restart-decided',actor:'b'.repeat(64),at:1500,outcome:'approved'}
+ assert.equal((await store.read(record.requestId,'restart-decided')),null)
+ await store.append(approve)
+ assert.deepEqual(await store.read(record.requestId,'restart-decided'),approve)
+ await assert.rejects(store.append({...approve,outcome:'rejected'}))
+ await assert.rejects(store.append({...approve,outcome:'withdrawn'}))
+ assert.equal((await stat(join(directory,record.requestId+'.restart-decided.json'))).mode&0o777,0o600)
+})
+
+test('terminal outcomes enforce strict schema and queue omits rejected and withdrawn proposals',async t=>{
+ const {directory,store,record}=await fixture(t)
+ const rejected={...record,requestId:randomUUID()}
+ const withdrawn={...record,requestId:randomUUID()}
+ const pending={...record,requestId:randomUUID()}
+ for(const p of [rejected,withdrawn,pending])await store.append(p)
+ const decide=(p,outcome,actor)=>({...p,event:'restart-decided',at:1500,outcome,actor})
+ await store.append(decide(rejected,'rejected','b'.repeat(64)))
+ await store.append(decide(withdrawn,'withdrawn',record.actor))
+ const reload=await createHomeLabAudit({directory})
+ assert.deepEqual((await reload.listPending({at:1600,limit:20})).map(x=>x.requestId),[pending.requestId])
+ for(const invalid of [
+  {...record,event:'restart-decided'}, {...record,event:'restart-decided',outcome:'execute'},
+  {...record,event:'restart-requested',outcome:'approved'},
+  {...record,event:'restart-decided',outcome:'approved',raw:'token'},
+ ]){
+  await assert.rejects(store.append({...invalid,requestId:randomUUID()}),/homelab-denied/)
+ }
+})
+
+test('terminal scan rejects forged self-approval and third-party withdrawal without partial results',async t=>{
+ const {store,record}=await fixture(t)
+ await store.append(record)
+ await store.append({...record,event:'restart-decided',at:1500,outcome:'approved'})
+ await assert.rejects(store.listPending({at:1600,limit:20}),/homelab-denied/)
+ const {store:other,record:second}=await fixture(t)
+ await other.append(second)
+ await other.append({...second,event:'restart-decided',actor:'b'.repeat(64),at:1500,outcome:'withdrawn'})
+ await assert.rejects(other.listPending({at:1600,limit:20}),/homelab-denied/)
+})
+
+test('terminal decisions are globally single-use even under concurrent append races',async t=>{
+ const {store,record}=await fixture(t)
+ await store.append(record)
+ const rows=['approved','rejected','withdrawn'].map(outcome=>({
+  ...record,event:'restart-decided',outcome,actor:outcome==='withdrawn'?record.actor:'b'.repeat(64),at:1500,
+ }))
+ const results=await Promise.allSettled(rows.map(row=>store.append(row)))
+ assert.equal(results.filter(x=>x.status==='fulfilled').length,1)
+ const winner=await store.read(record.requestId,'restart-decided')
+ assert.equal(rows.some(row=>JSON.stringify(row)===JSON.stringify(winner)),true)
+ assert.deepEqual(await store.listPending({at:1600,limit:20}),[])
 })
