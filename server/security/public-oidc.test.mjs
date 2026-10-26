@@ -111,10 +111,10 @@ test('Friday callback exchanges code through fixed token endpoint, validates sig
  assert.equal(JSON.stringify(result).includes('id_token'),false)
  assert.deepEqual(f.fetches.map(x=>x.url),[
   origin+'/application/o/friday/.well-known/openid-configuration',
-  origin+'/application/o/friday/jwks/',
   origin+'/application/o/token/',
+  origin+'/application/o/friday/jwks/',
  ])
- const call=f.fetches[2]
+ const call=f.fetches[1]
  const body=new URLSearchParams(call.options.body)
  assert.equal(body.get('grant_type'),'authorization_code')
  assert.equal(body.get('client_id'),'friday-web')
@@ -132,10 +132,10 @@ test('future site returns separate app-scoped identity and exact confidential cl
  const result=await f.flow.complete({applicationId:'site',state,code:'other-code'})
  assert.equal(result.applicationId,'site')
  assert.equal(result.identity.subject.endsWith(':user-123'),true)
- const body=new URLSearchParams(f.fetches.at(-1).options.body)
+ const body=new URLSearchParams(f.fetches[1].options.body)
  assert.equal(body.get('client_id'),'future-web')
  assert.equal(body.get('redirect_uri'),clients[1].redirectUri)
- assert.equal(f.fetches.at(-1).options.headers.Authorization,'Basic '+Buffer.from('future-web:server-only-secret-b').toString('base64'))
+ assert.equal(f.fetches[1].options.headers.Authorization,'Basic '+Buffer.from('future-web:server-only-secret-b').toString('base64'))
 })
 
 test('callback state is single-use, app-bound, expires after five minutes and never accepts arbitrary redirects',async()=>{
