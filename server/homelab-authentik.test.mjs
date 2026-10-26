@@ -110,10 +110,11 @@ test('Authentik session expires during asynchronous diagnostic read and prevents
  await f.arm()
  let calls=0
  const service=await createDormantHomeLabRuntime({...f.options,
-  diagnostics:{read:async()=>{f.setTime(TIME+301000);return {status:'healthy'}}},
+  diagnostics:{read:async()=>{f.setTime(TIME+61000);return {status:'healthy'}}},
   assistant:async()=>{calls++;return {text:'do not infer'}},
  })
- await assert.rejects(service.inspect(actor('viewer'),{target:'staging-canary',prompt:'Health'}),/homelab-denied/)
+ await assert.rejects(service.inspect(actor('viewer',{exp:Math.floor(TIME/1000)+60}),
+  {target:'staging-canary',prompt:'Health'}),/homelab-denied/)
  assert.equal(calls,0)
  assert.equal(service.execute,undefined)
 })
