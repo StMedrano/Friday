@@ -125,8 +125,7 @@ test('nested symlink ancestor and escaped duplicate authorization key deny atomi
   filePath:join(alias,'nested','roles.json'),now:()=>NOW,
  })
  assert.equal(nestedAlias.permits(operator,'action.propose','staging-canary'),false)
- const escapedKey=String.raw`{"schemaVersion":1,"expiresAt":1793034001000,"bindings":[],
- "\u0062indings":`+JSON.stringify(bindings)+'}\n'
+ const escapedKey=String.raw`{"schemaVersion":1,"expiresAt":1793034001000,"bindings":[],"\u0062indings":`+JSON.stringify(bindings)+'}\n'
  await writeFile(f.filePath,escapedKey,{mode:0o600})
  assert.equal(f.policy.permits(operator,'action.propose','staging-canary'),false)
 })
