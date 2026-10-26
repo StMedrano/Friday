@@ -106,6 +106,8 @@ Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execut
 
 ## P8 — Authentication, roles, approval, and durable action audit
 
+- **Authentik human OIDC gate in stacked draft PR #58**: server-only RS256 access JWT validation pinned to per-app issuer/discovery/JWKS, dedicated scope, client audience, issuer-scoped subject, no Cloudflare fallback; optional only in dormant staging fixtures. Separate user-facing authorization code + PKCE login, MFA, account lifecycle, production session/cookie and revocation controls remain to build. See `docs/authentik.md`.
+
 Implement before any infrastructure write operation:
 
 - authentication or a documented trusted reverse-proxy identity boundary;
