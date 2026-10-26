@@ -106,6 +106,8 @@ Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execut
 
 ## P8 — Authentication, roles, approval, and durable action audit
 
+- **Public Authentik login across Friday/future sites:** draft PR #60 adds a source-only isolated multi-client authorization-code+PKCE/OIDC ID-token contract, distinct from privileged HomeLab JWT verification. Next: public HTTPS identity service (VM120 review), Authentik per-site applications, shared atomic short-lived login-state storage, server-backed HttpOnly sessions and callback/logout HTTP routes, exact redirect registrations, MFA policies and live remote-network acceptance. Do not expose Authentik network services or remove Cloudflare Access without a reviewed migration. See `docs/authentik-public-sso.md`.
+
 - **Authentik human OIDC gate in stacked draft PR #58**: server-only RS256 access JWT validation pinned to per-app issuer/discovery/JWKS, dedicated scope, client audience, issuer-scoped subject, no Cloudflare fallback; optional only in dormant staging fixtures. Separate user-facing authorization code + PKCE login, MFA, account lifecycle, production session/cookie and revocation controls remain to build. See `docs/authentik.md`.
 
 Implement before any infrastructure write operation:
