@@ -76,6 +76,25 @@ export function createHomeLabControl({enabled=false,access,store,automationAllow
     return {...result,requestId,evidenceMode:'fixture',execution:{...NO_EXECUTION}}
    })
   },
+  async listPendingApprovals(request,input) {
+   return guarded(request,'action.approve',async actor=>{
+    if(!exact(input,['limit'])||!Number.isSafeInteger(input.limit)||
+      input.limit<1||input.limit>50||typeof store.listPending!=='function')denied()
+    const pending=await store.listPending({at:now(),limit:input.limit})
+    if(!Array.isArray(pending)||pending.length>input.limit)denied()
+    // Storage metadata is never returned raw. No actor hash or token in the
+    // administrative projection, and the approver cannot approve self-proposals.
+    const items=pending.map(item=>{
+     if(!validRequestId(item?.requestId)||item.target!==TARGET||
+      !/^[a-f0-9]{64}$/.test(item.actor)||!Number.isSafeInteger(item.at)||
+      !Number.isSafeInteger(item.expiresAt)||item.expiresAt<=item.at)denied()
+     return {requestId:item.requestId,target:TARGET,state:'pending-approval',
+       requestedAt:item.at,expiresAt:item.expiresAt,canApprove:item.actor!==actor}
+    })
+    active()
+    return {items,execution:{...NO_EXECUTION}}
+   })
+  },
   async requestRestart(request,input) {
    return guarded(request,'action.propose',async actor=>{
     if(!exact(input,['target'])||input.target!==TARGET)denied()
