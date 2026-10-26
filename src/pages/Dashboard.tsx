@@ -100,6 +100,8 @@ export default function Dashboard() {
             onSubmit={submitFriday}
           /> : active === 'Agents' ? <AgentsWorkspace/> : active === 'Repositories' ? <RepositoriesWorkspace/> : active === 'Infrastructure' ? <InfrastructureWorkspace overview={overview} connected={connected}/> : active === 'Incidents' ? <IncidentsWorkspace
             incidents={incidents}
+            services={overview.services}
+            sites={overview.sites}
             monitoring={overview.monitoring}
             history={history}
             historyError={historyError}
@@ -171,7 +173,7 @@ export default function Dashboard() {
             : active === 'Agents' ? <AgentsWorkspace/>
             : active === 'Repositories' ? <RepositoriesWorkspace/>
             : active === 'Infrastructure' ? <InfrastructureWorkspace overview={overview} connected={connected}/>
-            : active === 'Incidents' ? <IncidentsWorkspace incidents={incidents} monitoring={overview.monitoring} history={history} historyError={historyError} selectedIncident={selectedIncident} onSelectIncident={viewDiagnosis} onClearSelection={() => setSelectedIncidentId(null)}/>
+            : active === 'Incidents' ? <IncidentsWorkspace incidents={incidents} services={overview.services} sites={overview.sites} monitoring={overview.monitoring} history={history} historyError={historyError} selectedIncident={selectedIncident} onSelectIncident={viewDiagnosis} onClearSelection={() => setSelectedIncidentId(null)}/>
             : <DetailView active={active} overview={overview} />}
         </main>
       </div>
