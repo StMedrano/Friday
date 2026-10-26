@@ -1,5 +1,43 @@
 # Friday Build Status
 
+## P8 public Authentik browser-cookie / server-session boundary — draft PR #64 (source only)
+
+Added `server/security/public-oidc-browser.mjs` as a **disabled-by-default
+browser-bound coordinator** over the existing per-app public Authentik
+authorization-code+PKCE flow. On login start it issues a host-only
+`__Host-friday-oidc-<app>` Secure, HttpOnly, SameSite=Lax, Path=/
+short-lived cookie containing a key-HMAC state binding, **not the raw
+OAuth state**. Callback requires the matching browser cookie and
+exact trusted application origin BEFORE touching the one-use OAuth
+transaction or redeeming the authorization code. A different website
+or attacker-supplied login state cannot consume the same browser's
+transaction.
+
+The successful verified OIDC callback creates a fresh random opaque
+`__Host-friday-session-<app>` cookie, whose bearer is never stored
+in the app's session store: only an app+origin HMAC digest and verified
+issuer-scoped subject with a bounded lifetime. A **separately supplied,
+revocable server-side session backend** must implement
+create/read/revoke and expire sessions on each read. The source provides
+a minimal current-session projection (human subject and a synchronizer
+CSRF token) and exact-origin, CSRF-protected logout, clearing both
+cookies and invalidating the server-side session. Same-site users
+retain *independent* per-application sessions and roles, even when
+Authentik itself shares a central identity login.
+
+Test-first cases cover default-disabled behavior, host/origin isolation,
+HttpOnly/secure flags, browser binding, duplicate/forged cookies,
+cross-site callback mixups, expiry, persistent revocation, CSRF logout,
+malformed sessions and absent backend. Browser login is **not** wired
+into `server/http.mjs` or `server/index.mjs`: no live HTTP endpoint,
+cookie, Authentik credentials, external ingress, session DB, signup
+or privileged HomeLab action exists. Production prerequisites:
+transactional multi-host login-state and session stores with TTL
+cleanup, browser route handling, CSRF preflight, strict reverse proxy,
+actual Authentik provider acceptance, MFA and explicit owner review.
+This PR stacks on draft PR #62; source CI pending.
+
+
 ## Public Authentik restart-durable encrypted login state — draft PR #62
 
 Added `server/security/file-oidc-transactions.mjs` as an **explicitly
