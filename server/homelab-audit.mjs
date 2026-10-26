@@ -3,14 +3,19 @@ import {mkdir, lstat, open, opendir} from 'node:fs/promises'
 import {isAbsolute, join} from 'node:path'
 
 const UUID=/^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/
-const EVENTS=new Set(['diagnostic-started','diagnostic-completed','diagnostic-failed','restart-requested','restart-approved','denied'])
+const EVENTS=new Set(['diagnostic-started','diagnostic-completed','diagnostic-failed','restart-requested','restart-decided','denied'])
 const FIELDS=['requestId','event','actor','target','at','expiresAt']
+const OUTCOMES=new Set(['approved','rejected','withdrawn'])
 const MAX_QUEUE_FILES=512
 const AUDIT_FILE=/^([a-f0-9-]{36})\.([a-z-]+)\.json$/
 const denied=()=>{throw Error('homelab-denied')}
 export function validRequestId(value){return typeof value==='string'&&UUID.test(value)}
 function valid(record) {
- return record&&Object.keys(record).length===FIELDS.length&&FIELDS.every(key=>Object.hasOwn(record,key))&&
+ const decision=record?.event==='restart-decided'
+ return record&&typeof record==='object'&&!Array.isArray(record)&&
+  Object.keys(record).length===FIELDS.length+(decision?1:0)&&
+  FIELDS.every(key=>Object.hasOwn(record,key))&&
+  (!decision||Object.hasOwn(record,'outcome')&&OUTCOMES.has(record.outcome))&&
   validRequestId(record.requestId)&&EVENTS.has(record.event)&&/^[a-f0-9]{64}$/.test(record.actor)&&
   record.target==='staging-canary'&&Number.isSafeInteger(record.at)&&record.at>=0&&
   Number.isSafeInteger(record.expiresAt)&&record.expiresAt>=record.at
@@ -57,12 +62,13 @@ export async function createHomeLabAudit({directory}={}) {
    return readRecord(requestId,event)
   },
   // Internal, bounded, read-only approval projection. No HTTP method exposes it.
-  // A concurrent approval can make this snapshot stale; approveRestart always
-  // re-reads the request and atomically appends the single-use approval.
+  // A concurrent terminal decision can make this snapshot stale. Each
+  // approve/reject/withdraw action validates the proposal and exclusively
+  // appends the SAME immutable decision event filename.
   async listPending({at,limit=20}={}) {
    if(!Number.isSafeInteger(at)||at<0||!Number.isSafeInteger(limit)||limit<1||limit>50)denied()
    await checkDirectory()
-   const proposed=new Set(),approved=new Set()
+   const proposed=new Set(),decided=new Set()
    let scanned=0
    try {
     const cursor=await opendir(directory)
@@ -71,9 +77,9 @@ export async function createHomeLabAudit({directory}={}) {
      const match=AUDIT_FILE.exec(entry.name)
      if(!match||!validRequestId(match[1])||!EVENTS.has(match[2])||!entry.isFile())denied()
      if(match[2]==='restart-requested')proposed.add(match[1])
-     if(match[2]==='restart-approved')approved.add(match[1])
+     if(match[2]==='restart-decided')decided.add(match[1])
     }
-    for(const id of approved)if(!proposed.has(id))denied()
+    for(const id of decided)if(!proposed.has(id))denied()
     const items=[]
     for(const id of proposed) {
      const row=await readRecord(id,'restart-requested')
@@ -81,10 +87,11 @@ export async function createHomeLabAudit({directory}={}) {
      // Proposals in the dormant fixture may live for at most five minutes.
      // Corrupt or forged long-lived requests invalidate the entire snapshot.
      if(row.expiresAt<=row.at||row.expiresAt-row.at>300000)denied()
-     if(approved.has(id)) {
-      const action=await readRecord(id,'restart-approved')
+     if(decided.has(id)) {
+      const action=await readRecord(id,'restart-decided')
       if(!action||action.target!==row.target||action.at<row.at||action.at>row.expiresAt||
-         action.actor===row.actor)denied()
+         action.expiresAt!==row.expiresAt||
+         (action.outcome==='withdrawn'?action.actor!==row.actor:action.actor===row.actor))denied()
       continue
      }
      if(row.expiresAt<=at||row.at>at)continue
