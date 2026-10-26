@@ -115,7 +115,8 @@ Implement before any infrastructure write operation:
 - action request IDs/lifecycle states;
 - **async role and kill rechecks in stacked draft PR #52:** fresh permissions at audit/diagnostic/assistant wait boundaries, including after fsynced writes, without granting execution. Multi-node atomicity and full approval state machine still pending.
 - **internal read-only pending-approval queue in stacked draft PR #50 (depends on #49)**: private bounded audit scan for unexpired, unapproved symbolic staging requests; signed Administrator-only projection with proposer/approver separation. No public UI/API, production operator identity provisioning or executor; full human approval workflow remains outstanding.
-- global automation kill switch.
+- **dormant safety composition in stacked draft PR #53**: signed human JWT + strict role binding + private durable audit + file-backed kill gate; disabled by default, symbolic staging-only and non-executing. The gate module and tests match separate draft PR #48; resolve overlap in review before merge.
+- global automation kill switch **as a deployed, independently revocable operational capability** still pending; complete live identity and multi-instance security review before any action path.
 
 ## P9 — Controlled actions
 
