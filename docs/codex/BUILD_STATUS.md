@@ -1,5 +1,35 @@
 # Friday Build Status
 
+## P8 terminal proposal decisions — draft PR #54, source only
+
+The internal dormant HomeLab approval workflow now supports **exactly one**
+durable terminal outcome for a symbolic staging restart proposal:
+- Approved by a *different* signed Administrator.
+- Rejected by a *different* signed Administrator.
+- Withdrawn by the verified original proposer.
+
+All three decisions use the *same* create-only,
+fsynced `<requestId>.restart-decided.json` audit file, with an explicit
+validated `outcome` field. Competing decisions cannot each persist their
+own separate terminal file. Pending-approval scans exclude every terminal
+outcome and fail closed on orphan, corrupt, missing, misattributed or
+inconsistent events. An expired request has no accepted final decision.
+A successful result always states `execution.performed:false`.
+
+New test-first audit, controller and wired dormant-runtime tests cover
+signed role scopes, same-person denial, wrong-owner denial, confirmation,
+expiry, replay prevention, simultaneous approve/reject/withdraw races,
+audit reload and immutable storage, revocation/kill-gate denial,
+and corrupted decision records. This is not connected to production
+server/index.mjs and creates no real HomeLab executor.
+
+**Dependency:** draft PR #54 is stacked above the approved source
+branch from prior PR #53. PR #48 is merged on main and PRs #50-53
+were merged into their parent development branches; PR #49 remains
+awaiting main merge. Do not deploy or infer live approval availability
+from these source changes. CI/review gates remain mandatory.
+
+
 ## P8 dormant safety-boundary composition — draft PR #53 (source only)
 
 The standalone internal `createDormantHomeLabRuntime` composes Friday's
