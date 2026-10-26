@@ -160,3 +160,27 @@ describe('Friday v3 command center', () => {
     expect(screen.queryByRole('navigation', { name: /mobile command bar/i })).not.toBeInTheDocument()
   })
 })
+
+
+describe('Site topology navigation', () => {
+  it('replaces the desktop Infrastructure placeholder with site filters and host inventory', async () => {
+    installMatchMedia(false)
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    await user.click(screen.getByRole('button', { name: 'Infrastructure' }))
+    expect(screen.getByRole('region', { name: 'Infrastructure workspace' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: /site a/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /all observed services/i })).toBeInTheDocument()
+    expect(screen.getByText(/not a verified network path/i)).toBeInTheDocument()
+  })
+
+  it('opens the same read-only topology from the phone command bar', async () => {
+    installMatchMedia(true)
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    await user.click(screen.getByRole('button', { name: 'Infrastructure' }))
+    expect(screen.getByRole('region', { name: 'Infrastructure workspace' })).toBeInTheDocument()
+    expect(screen.getByText(/preview data.*not live/i)).toBeInTheDocument()
+    expect(document.querySelector('.v3-rail')).toBeNull()
+  })
+})
