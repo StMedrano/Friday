@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {mkdir, mkdtemp, readFile, readdir, rm, writeFile} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
-import {generateKeyPairSync, sign} from 'node:crypto'
+import {generateKeyPairSync, sign, randomUUID} from 'node:crypto'
 import * as control from './homelab-control.mjs'
 import * as audit from './homelab-audit.mjs'
 import {answerAssistant} from './assistant.mjs'
@@ -473,4 +473,125 @@ test('administrator cannot reject their own proposal to bypass two-person workfl
   requestId:p.requestId,confirmation:'reject:'+p.requestId+':staging-canary:restart',
  }),/homelab-denied/)
  assert.equal(await f.store.read(p.requestId,'restart-decided'),null)
+})
+
+test('signed proposer and Administrator can inspect a request status without leaking actor hashes or confirmations',async t=>{
+ const f=await fixture(t)
+ const p=await f.service.requestRestart(request(),{target:'staging-canary'})
+ const status=await f.service.getRequestStatus(request(),{requestId:p.requestId})
+ assert.equal(status.state,'pending-approval')
+ assert.equal(status.requestId,p.requestId)
+ assert.equal(status.target,'staging-canary')
+ assert.equal(status.execution.performed,false)
+ assert.equal(Number.isSafeInteger(status.requestedAt),true)
+ assert.equal(status.expiresAt>status.requestedAt,true)
+ for(const value of ['actor','decidedBy','confirmation','withdrawalConfirmation',
+  'operator@example.test','admin@example.test']){
+  assert.equal(JSON.stringify(status).includes(value),false)
+ }
+ const admin=await f.service.getRequestStatus(request('admin@example.test'),{requestId:p.requestId})
+ assert.equal(admin.state,'pending-approval')
+ assert.deepEqual(admin,status)
+ assert.equal(f.service.execute,undefined)
+})
+
+test('status remains visible for rejected, withdrawn and approved requests without becoming execution authority',async t=>{
+ const f=await fixture(t)
+ const operator=request()
+ const admin=request('admin@example.test')
+ const actions=[
+  ['approveRestart','approved-execution-unavailable'],
+  ['rejectRestart','rejected'],
+  ['withdrawRestart','withdrawn'],
+ ]
+ for(const [action,expected] of actions){
+  const p=await f.service.requestRestart(operator,{target:'staging-canary'})
+  const confirmation=action==='approveRestart'?p.confirmation:
+   action==='withdrawRestart'?p.withdrawalConfirmation:
+   'reject:'+p.requestId+':staging-canary:restart'
+  const actor=action==='withdrawRestart'?operator:admin
+  await f.service[action](actor,{requestId:p.requestId,confirmation})
+  const status=await f.service.getRequestStatus(operator,{requestId:p.requestId})
+  assert.equal(status.state,expected)
+  assert.equal(status.execution.performed,false)
+  assert.equal(Number.isSafeInteger(status.decidedAt),true)
+  assert.equal(JSON.stringify(status).includes('actor'),false)
+  assert.equal(JSON.stringify(status).includes('confirmation'),false)
+  assert.deepEqual(await f.service.getRequestStatus(admin,{requestId:p.requestId}),status)
+ }
+ assert.equal(f.service.execute,undefined)
+})
+
+test('request status denies unprivileged identities, invalid IDs, missing storage and spoofed roles',async t=>{
+ const f=await fixture(t)
+ const p=await f.service.requestRestart(request(),{target:'staging-canary'})
+ for(const who of ['viewer@example.test','agent@example.test','stranger@example.test']){
+  await assert.rejects(f.service.getRequestStatus(request(who),{requestId:p.requestId}),/homelab-denied/)
+ }
+ for(const input of [{requestId:'not-a-uuid'}, {requestId:p.requestId,role:'Administrator'},
+  {requestId:p.requestId+'-x'}, {}, {requestId:123}]){
+  await assert.rejects(f.service.getRequestStatus(request(),input),/homelab-denied/)
+ }
+ await assert.rejects(f.service.getRequestStatus(request(),{requestId:randomUUID()}),/homelab-denied/)
+ await assert.rejects(f.service.getRequestStatus({headers:{'x-friday-role':'Administrator'}},
+  {requestId:p.requestId}),/homelab-denied/)
+ const unavailable=await fixture(t,{store:{
+  append:async()=>{},read:async()=>null,
+  readLifecycle:async()=>{throw Error('private file contents')},
+ }})
+ await assert.rejects(unavailable.service.getRequestStatus(request(),{requestId:p.requestId}),/homelab-denied/)
+ const missing=await fixture(t,{store:{append:async()=>{},read:async()=>null}})
+ await assert.rejects(missing.service.getRequestStatus(request(),{requestId:p.requestId}),/homelab-denied/)
+})
+
+test('status of another proposer is hidden from Operators while Administrators retain oversight',async t=>{
+ const f=await fixture(t)
+ const p=await f.service.requestRestart(request('admin@example.test'),{target:'staging-canary'})
+ await assert.rejects(f.service.getRequestStatus(request(),{requestId:p.requestId}),/homelab-denied/)
+ const view=await f.service.getRequestStatus(request('admin@example.test'),{requestId:p.requestId})
+ assert.equal(view.state,'pending-approval')
+ assert.equal(view.execution.performed,false)
+})
+
+test('role and kill changes during status read revoke even a previously signed authorized request',async t=>{
+ const f=await fixture(t)
+ const p=await f.service.requestRestart(request(),{target:'staging-canary'})
+ let canView=true
+ const revocation=await fixture(t,{
+  rolePolicy:{permits:(id,permission,target)=>
+   canView&&id.subject==='operator@example.test'&&
+   ['diagnostics.read','action.propose'].includes(permission)&&target==='staging-canary'},
+  store:{
+   ...f.store,readLifecycle:async input=>{
+    const result=await f.store.readLifecycle(input)
+    canView=false
+    return result
+   },
+  },
+ })
+ await assert.rejects(revocation.service.getRequestStatus(request(),{requestId:p.requestId}),/homelab-denied/)
+ let enabled=true
+ const disarmed=await fixture(t,{
+  automationAllowed:()=>enabled,
+  store:{
+   ...f.store,readLifecycle:async input=>{
+    const row=await f.store.readLifecycle(input)
+    enabled=false
+    return row
+   },
+  },
+ })
+ await assert.rejects(disarmed.service.getRequestStatus(request('admin@example.test'),
+  {requestId:p.requestId}),/homelab-denied/)
+})
+
+test('request status expires correctly and stays non-executable',async t=>{
+ let at=Date.now()
+ const f=await fixture(t,{now:()=>at})
+ const p=await f.service.requestRestart(request(),{target:'staging-canary'})
+ at+=300001
+ const status=await f.service.getRequestStatus(request(),{requestId:p.requestId})
+ assert.equal(status.state,'expired')
+ assert.equal(status.execution.performed,false)
+ assert.equal(status.decidedAt,null)
 })
