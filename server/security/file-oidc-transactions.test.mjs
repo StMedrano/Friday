@@ -75,6 +75,14 @@ test('different registered applications never consume each other state or collid
  assert.equal((await readdir(f.dir)).length,4)
 })
 
+test('small async delay between authorize-start and durable reservation is tolerated',async t=>{
+ const f=await fixture(t)
+ const original=tx()
+ f.setTime(TIME+50)
+ await f.make().reserve(original)
+ assert.deepEqual(await f.make().consume(original.state),original)
+})
+
 test('expired login state and clock rollback burn state but never return transaction',async t=>{
  const f=await fixture(t)
  const store=f.make(),value=tx()
