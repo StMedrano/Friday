@@ -1,11 +1,12 @@
 # Friday cloud connection
 
-Status: implemented locally and disabled by default. Cloudflare staging was
-completed on 2026-10-26: a dedicated Access application, exact Service Auth
-policy/identity, DNS record, and inactive dedicated tunnel exist. The tunnel
-targets `http://friday:3011` but has no running connector yet, so the API is not
-live. Production Friday has not been changed. This is an HTTPS API, not an MCP
-server or a deployment channel.
+Status: deployed and cloud-runtime validated on 2026-10-26. The dedicated
+Access application, exact Service Auth policy/identity, DNS record, and tunnel
+are live. The healthy connector routes only the automation hostname to the
+unpublished `http://friday:3011` listener on VM102. The managed cloud runtime's
+hostname policy is enforced and its bound service identity passed the complete
+acceptance checker. This is an HTTPS API, not an MCP server or a deployment
+channel.
 
 ## Connection and permissions
 
@@ -55,15 +56,13 @@ application audience/client identity recorded in Cloudflare and the protected
 VM102 rollout settings. Never copy the Client Secret or tunnel token into this
 document, Git, chat, logs, or command arguments.
 
-No Cloudflare administrative credentials or cloud caller secrets are configured
-in this workspace. Its environment tools can inspect readiness but cannot edit
-configuration. Desktop Commander provides an authorized VM102 connection:
-read-only checks found a clean checkout at `d4b06ec` and passing `make preflight`
-and `make health`. No cloudflared binary or active systemd service was found on
-VM102; its running container list contains no cloudflared. The VM100 observer
-reports Cloudflare connector containers, including a staging connector; their
-association with the website tunnel has not been verified. Do not alter that
-staging setup or PR #9. These observations do not establish cloud API readiness.
+The managed cloud runtime now has an enforced hostname allowlist, the non-secret
+API URL, and ready hostname-scoped service credential bindings. The values must
+remain in environment settings and must not be printed or copied into the
+checkout. VM102 is checked out at deployment-record commit `5021012`; the
+running Friday image contains application commit `608d85b`. `make preflight`,
+`make health`, the dedicated connector health check, and public acceptance all
+passed during deployment. Do not alter the separate website tunnel or PR #9.
 
 ## 2. Configure Cloudflare Access before routing traffic
 
@@ -197,13 +196,22 @@ node scripts/check-cloud-connection.mjs
 ```
 
 The script requires a live Friday automation response and a timestamped overview;
-checks all four reads; expects 403 without credentials, 405 for POST overview,
+checks all four reads; expects 401 or 403 without credentials, 405 for POST overview,
 and 404 for repository access. It uses curl's proxy/CA support, does not follow
 redirects, bounds responses/timeouts, and passes credentials on stdin rather
 than argv. Output contains only check results, never response bodies or secrets.
 If the environment injects credentials into **every** request to this hostname,
-perform the unauthenticated 403 check from a separate caller without that binding;
+perform the unauthenticated denial check from a separate caller without that binding;
 the script deliberately fails rather than misreporting that negative check.
+
+Managed-runtime acceptance passed on 2026-10-26: authenticated health,
+overview, incidents, and monitoring history returned 200; unauthenticated health
+returned 401; POST overview returned 405; and the excluded repositories route
+returned 404. The health response identified the live `friday-automation`
+listener, and the overview contained a valid generated timestamp. The remaining
+credential hygiene step is to remove the temporary owner-only service-token copy
+from VM102 through an authorized administrative session. Do not remove the
+separate tunnel-token runtime file.
 
 Also verify a different service token and an ordinary browser-session JWT fail,
 direct unauthenticated access to the local origin fails, the UI still works,

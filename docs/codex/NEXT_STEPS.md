@@ -2,9 +2,9 @@
 
 Work from top to bottom. Do not skip safety prerequisites to reach action features sooner.
 
-## User-requested cloud access — homelab endpoint live; cloud binding pending
+## User-requested cloud access — cloud acceptance complete; VM102 cleanup pending
 
-The read-only automation API at `friday-api.mytechtactics.com` is deployed on VM102 behind its dedicated Cloudflare Access application and tunnel. The tunnel is healthy and authenticated live-data, denial, write-rejection, and excluded-route acceptance checks pass. Next: allow exactly this hostname in the managed cloud runtime, bind `FRIDAY_CLOUD_URL`, `FRIDAY_CLOUD_CLIENT_ID`, and `FRIDAY_CLOUD_CLIENT_SECRET` through its secret settings, rerun `scripts/check-cloud-connection.mjs` from that runtime, then remove the temporary owner-only service-token copy from VM102. Do not expose the UI port as the automation origin or grant deployment/execution tools through this API.
+The read-only automation API at `friday-api.mytechtactics.com` is deployed on VM102 behind its dedicated Cloudflare Access application and tunnel. The tunnel is healthy. The managed cloud runtime now has an enforced exact-host policy and ready URL/service-credential bindings; `scripts/check-cloud-connection.mjs` passed all authenticated reads, denial, write-rejection, and excluded-route checks on 2026-10-26. Next: use an authorized VM102 administrative session to delete only the temporary owner-only service-token copy, preserve the tunnel-token runtime file, and recheck API health before final PR #45 review. Do not expose the UI port as the automation origin or grant deployment/execution tools through this API.
 
 ## P0 — VM100 observer baseline — completed; nic1 example migrated
 
