@@ -1,5 +1,53 @@
 # Friday Build Status
 
+## Restricted HomeLab safety foundation — 2026-10-23 (source only)
+
+Continuation from freshly verified `main` `d4b06ec7bc233defa908549af295bd936c5578d5`;
+PR33/31 are merged and PR29 is closed as superseded. This is an internal,
+disabled-by-default prerequisite contract, not a deployed executor or completed P8.
+
+- Reuses signed Access operator authorization and existing sequential assistant
+  orchestration. Synthetic allowlisted diagnostics are audited before reads and
+  projected to normalized fixture evidence before advisory inference.
+- Private create-only/fsynced structured audit records; no raw identity, token,
+  prompt, provider error or diagnostic payload. Required automation gate denies
+  by default; bounded diagnostics, exact target/input validation, expiry and
+  atomic single-use approval have regression coverage.
+- Only symbolic `staging-canary` restart request/explicit approval is supported.
+  Approval returns `approved-execution-unavailable`; there is no restart/execute
+  method, Docker transport, production wiring, HTTP route or real host binding.
+  Post-action verification is deferred together with execution. The existing
+  observer stays read-only and no mutation tools are supplied to AI providers.
+- Test-first missing-contract failure observed; disabled signing-key-fetch and
+  ignored-cancellation timeout regressions separately failed before fixes.
+  Focused **39/39** tests passed using fake diagnostics/provider, synthetic signed
+  JWTs and real temporary local filesystem records, including audit reload,
+  concurrent duplicate approvals, expiry/corruption, symlinks and storage failure.
+- Local runtime is Node **24.19.0**, not required Node22 (not installed).
+  `make verify` attempted and stopped at `vitest: not found`; `npm run build`
+  stopped at `tsc: not found`. Offline `npm ci` failed ENOTCACHED (xmlchars);
+  external shell network is blocked. Docker/Compose is absent. Full Node test
+  sweep: **395 passed / 2 failed / 397 total, no skips**. Both failures are the
+  existing `base Compose passes server-only Access configuration into the
+  controller` and `base Compose passes structured endpoint checks only to the
+  controller` tests in `scripts/verify-controller-security.test.mjs`, because
+  Docker is absent. No test or gate was weakened. Full local verification is
+  incomplete; draft PR Node22 CI must provide independent full-build evidence.
+- No credentials inspected, NVIDIA request, live HomeLab/VPN/Docker-host access,
+  deployment, production action or merge. NVIDIA code is absent from this main
+  baseline; restoration is separate. No live capability is established.
+
+Published source checkpoint: commit `2c53de339dd6688a00bbfcc606f372c8e3537ecc`
+passed exact-head Node22 CI515 (run 40003318110), including tests, build,
+isolated Postgres, security/dormant gates, Compose and container builds.
+Continuation CI now invokes the required `make verify` entry point in place
+of separate npm test/build steps, adding the repository Compose overlay check;
+all later security gates remain. Fresh final-head CI is required after this
+workflow/documentation follow-up. Local verification limits above remain.
+
+Scope, durability/trust limitations and next gates:
+`docs/superpowers/plans/2026-10-23-restricted-homelab-foundation.md`.
+
 ## Production Access rollout correction — 2026-10-19
 
 The first VM102 deployment attempt for security release `d92c632` built successfully but returned `503 access-not-configured` for protected APIs because base Compose did not pass the server-only Access settings. Production was restored to the preserved last-known-good image while the checkout remained on current `main`.
