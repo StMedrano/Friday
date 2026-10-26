@@ -1,5 +1,24 @@
 # Friday Build Status
 
+## P8 async reauthorization — draft PR #52, source only
+
+The dormant HomeLab control now rechecks the verified Access JWT subject's current
+server-owned role and target policy, plus the independent automation gate,
+after asynchronous audit reads, queue scans, diagnostics, assistant inference,
+and before/after durable audit appends. This closes a stale-permission response
+gap during role changes or kill-gate revocation. Tests cover role downgrade
+during the approval read, pending queue scan, diagnostic read and assistant
+inference, and disarming during a proposal audit append.
+
+A successfully fsynced append cannot be rolled back if revocation occurs
+mid-write; the post-write recheck denies a stale success response but the
+historical event can exist. No executor exists and any future action must
+independently revalidate identity, policy, approval and kill status at execution.
+This draft depends on PR #51 -> #50 -> #49; the separate PR #48 is unmerged.
+P8 is incomplete, with no merge, deployment, runtime binding, new credentials
+or HomeLab contact.
+
+
 ## P8 private operator role provisioning — draft PR #51, source only
 
 A small internal adapter reloads an owner-private canonical JSON role
