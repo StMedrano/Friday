@@ -1,0 +1,32 @@
+# Dedicated remotely managed tunnel, colocated with Friday on VM102.
+# No host port mapping: configure the tunnel origin as http://friday:3011.
+services:
+  friday-cloud-tunnel:
+    image: ${FRIDAY_CLOUDFLARED_IMAGE:-cloudflare/cloudflared:2026.10.3}
+    # Match the owner of the mode-0600 host token file. VM102 uses 1000:1000.
+    user: "${FRIDAY_CLOUDFLARED_UID:-1000}:${FRIDAY_CLOUDFLARED_GID:-1000}"
+    restart: unless-stopped
+    command: ["tunnel", "--no-autoupdate", "run", "--token-file", "/run/secrets/friday_tunnel_token"]
+    secrets:
+      - friday_tunnel_token
+    networks:
+      - friday_frontend
+    read_only: true
+    cap_drop: ["ALL"]
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+  friday:
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+secrets:
+  friday_tunnel_token:
+    file: ${FRIDAY_TUNNEL_TOKEN_FILE:?Set path to the protected dedicated tunnel token file}

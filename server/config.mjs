@@ -95,6 +95,17 @@ export function getConfig(env = process.env) {
   const endpoints = endpointConfiguration(env)
 
   return {
+    automation: {
+      enabled: enabled(env.FRIDAY_AUTOMATION_ENABLED),
+      port: Number(env.FRIDAY_AUTOMATION_PORT || 3011),
+      access: {
+        identityMode: 'service',
+        teamDomain: env.FRIDAY_AUTOMATION_ACCESS_TEAM_DOMAIN || '',
+        audience: env.FRIDAY_AUTOMATION_ACCESS_AUD || '',
+        serviceTokenIds: String(env.FRIDAY_AUTOMATION_SERVICE_TOKEN_IDS || '').split(',').map(x => x.trim()).filter(Boolean),
+        operatorEmails: [],
+      },
+    },
     access: {
       // Live deployments MUST validate an Access JWT at the origin.
       enabled: env.FRIDAY_MODE === 'live',
@@ -125,6 +136,33 @@ export function getConfig(env = process.env) {
     endpoints: {
       enabled: enabled(env.FRIDAY_ENDPOINTS_ENABLED),
       ...endpoints,
+    },
+    omada: {
+      enabled: enabled(env.FRIDAY_OMADA_ENABLED),
+      baseUrl: env.FRIDAY_OMADA_URL || '',
+      controllerId: env.FRIDAY_OMADA_CONTROLLER_ID || '',
+      clientId: env.FRIDAY_OMADA_CLIENT_ID || '',
+      clientSecret: env.FRIDAY_OMADA_CLIENT_SECRET || '',
+    },
+    adguard: {
+      enabled: enabled(env.FRIDAY_ADGUARD_ENABLED),
+      baseUrl: env.FRIDAY_ADGUARD_URL || '',
+      username: env.FRIDAY_ADGUARD_USERNAME || '',
+      password: env.FRIDAY_ADGUARD_PASSWORD || '',
+      site: env.FRIDAY_ADGUARD_SITE || '',
+    },
+    prometheus: {
+      enabled: enabled(env.FRIDAY_PROMETHEUS_ENABLED),
+      baseUrl: env.FRIDAY_PROMETHEUS_URL || '',
+      username: env.FRIDAY_PROMETHEUS_USERNAME || '',
+      password: env.FRIDAY_PROMETHEUS_PASSWORD || '',
+      site: env.FRIDAY_PROMETHEUS_SITE || '',
+    },
+    uptimeKuma: {
+      enabled: enabled(env.FRIDAY_UPTIME_KUMA_ENABLED),
+      baseUrl: env.FRIDAY_UPTIME_KUMA_URL || '',
+      apiKey: env.FRIDAY_UPTIME_KUMA_API_KEY || '',
+      site: env.FRIDAY_UPTIME_KUMA_SITE || '',
     },
     monitoring: {
       enabled: enabled(env.FRIDAY_MONITORING_ENABLED),

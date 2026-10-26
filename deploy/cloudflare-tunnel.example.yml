@@ -1,0 +1,9 @@
+# TEMPLATE ONLY for host-installed cloudflared on VM102.
+# Use a dedicated tunnel or add the ingress rule to an existing reviewed config.
+# Never replace an existing tunnel configuration with this example.
+tunnel: YOUR-TUNNEL-ID
+credentials-file: /etc/cloudflared/YOUR-TUNNEL-ID.json
+ingress:
+  - hostname: friday-api.mytechtactics.com
+    service: http://127.0.0.1:3011
+  - service: http_status:404

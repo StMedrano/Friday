@@ -1,6 +1,64 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { buildOverview, decorateOverviewWithMonitoring } from './overview.mjs'
+import { getConfig } from './config.mjs'
+
+test('Uptime Kuma joins the overview and failures leave other adapters available', async () => {
+  const config = getConfig({ FRIDAY_MODE: 'live', FRIDAY_UPTIME_KUMA_ENABLED: 'true' })
+  const service = { id: 'uptime-kuma-7', name: 'Uptime Kuma · Edge', category: 'monitoring', host: 'kuma.test', site: 'Site B', status: 'maintenance', detail: 'Maintenance · http', updated: 'now' }
+  const result = await buildOverview(config, { getUptimeKumaServices: async () => [service] })
+  assert.deepEqual(result.services, [service])
+  assert.equal(result.integrations.find(item => item.id === 'uptime-kuma').enabled, true)
+  const degraded = await buildOverview(config, {
+    getUptimeKumaServices: async () => { throw Error('Uptime Kuma authentication failed') },
+    getEndpointServices: async () => [{ ...service, id: 'endpoint' }],
+  })
+  assert.equal(degraded.services[0].id, 'endpoint')
+  assert.equal(degraded.alerts[0].detail, 'uptime-kuma: Uptime Kuma authentication failed')
+})
+
+test('Prometheus target services join live overview and failures preserve other adapters', async () => {
+  const config = getConfig({ FRIDAY_MODE: 'live', FRIDAY_PROMETHEUS_ENABLED: 'true' })
+  const service = { id: 'prometheus-target', name: 'Prometheus · node', category: 'monitoring', host: 'node.test:9100', site: 'Site B', status: 'offline', detail: 'Scrape failed', updated: 'now' }
+  const result = await buildOverview(config, { getPrometheusServices: async () => [service] })
+  assert.deepEqual(result.services, [service])
+  assert.equal(result.integrations.find(item => item.id === 'prometheus').enabled, true)
+  const degraded = await buildOverview(config, {
+    getPrometheusServices: async () => { throw Error('Prometheus authentication failed') },
+    getEndpointServices: async () => [{ ...service, id: 'endpoint' }],
+  })
+  assert.equal(degraded.services[0].id, 'endpoint')
+  assert.equal(degraded.alerts[0].detail, 'prometheus: Prometheus authentication failed')
+})
+
+test('AdGuard health and statistics join live services while adapter failures remain non-fatal', async () => {
+  const config = getConfig({ FRIDAY_MODE: 'live', FRIDAY_ADGUARD_ENABLED: 'true' })
+  const service = { id: 'adguard', name: 'AdGuard Home', category: 'dns', host: 'dns.test', site: 'Site B', status: 'online', detail: 'Protection enabled · 120 queries · 30 filtered', updated: 'now' }
+  const result = await buildOverview(config, { getAdguardServices: async () => [service] })
+  assert.deepEqual(result.services, [service])
+  assert.equal(result.integrations.find(i => i.id === 'adguard').enabled, true)
+  const degraded = await buildOverview(config, {
+    getAdguardServices: async () => { throw Error('AdGuard authentication failed') },
+    getEndpointServices: async () => [{ ...service, id: 'endpoint' }],
+  })
+  assert.equal(degraded.services[0].id, 'endpoint')
+  assert.equal(degraded.alerts[0].detail, 'adguard: AdGuard authentication failed')
+})
+
+test('Omada inventory joins live overview and failures leave other integrations available', async () => {
+  const config = getConfig({ FRIDAY_MODE: 'live', FRIDAY_OMADA_ENABLED: 'true' })
+  const service = { id: 'omada-site-a-device', name: 'Gateway', category: 'network', host: 'controller', site: 'Site A', status: 'online', detail: 'Connected', updated: 'now' }
+  const result = await buildOverview(config, { getOmadaServices: async () => [service] })
+  assert.deepEqual(result.services, [service])
+  assert.equal(result.integrations.find(i => i.id === 'omada').enabled, true)
+  assert.deepEqual(result.sites, []) // No invented VPN, gateway, or network telemetry.
+  const degraded = await buildOverview(config, {
+    getOmadaServices: async () => { throw Error('Omada authentication failed') },
+    getEndpointServices: async () => [{ ...service, id: 'endpoint' }],
+  })
+  assert.equal(degraded.services[0].id, 'endpoint')
+  assert.equal(degraded.alerts[0].detail, 'omada: Omada authentication failed')
+})
 
 function liveConfig() {
   return {
@@ -86,7 +144,7 @@ test('mock mode preserves demo data without calling live adapters or requiring c
   const unexpected = async () => { throw new Error('Mock mode must not call live adapters') }
   const result = await buildOverview({ mode: 'mock' }, {
     getDockerServices: unexpected, getProxmoxServices: unexpected,
-    getVm100ObserverServices: unexpected, getEndpointServices: unexpected,
+    getVm100ObserverServices: unexpected, getEndpointServices: unexpected, getOmadaServices: unexpected, getAdguardServices: unexpected, getPrometheusServices: unexpected, getUptimeKumaServices: unexpected,
   })
 
   assert.equal(result.mode, 'mock')

@@ -2,24 +2,9 @@
 
 Work from top to bottom. Do not skip safety prerequisites to reach action features sooner.
 
-## 2026-10-23 continuation scope — internal safety foundation
+## User-requested cloud access — completed
 
-The owner authorized a new continuation branch after PR33 merged and PR29
-closed as superseded. `server/homelab-control.mjs` and `server/homelab-audit.mjs`
-now provide disabled internal fixture diagnostics/advisory, private durable audit,
-required automation gating, and expiring explicit staging-canary restart request/
-approval records. Production bootstrap and HTTP APIs do not construct/expose it.
-Approval is recorded but execution is unavailable. This does not finish P8 or
-activate P9, and does not change the observer's read-only boundary.
-
-Next for this continuation: obtain full Node22 CI verification and review; then
-provision a persistent global automation policy/lifecycle and separately review
-a single staging target's least-privilege action transport, one-use execution
-claims, crash/timeout recovery, and mandatory pre/post health verification.
-Do not add an actual restart or enable NVIDIA/HomeLab access from these records
-alone. No live credentials, hosts, container identity or readiness is inferred.
-See `../superpowers/plans/2026-10-23-restricted-homelab-foundation.md` and the
-current BUILD_STATUS verification limits. Existing ordered safety gates remain.
+The read-only automation API at `friday-api.mytechtactics.com` is deployed on VM102 behind its dedicated Cloudflare Access application and tunnel. The tunnel is healthy. The managed cloud runtime has an enforced exact-host policy and ready URL/service-credential bindings; `scripts/check-cloud-connection.mjs` passed all authenticated reads, denial, write-rejection, and excluded-route checks on 2026-10-26. The temporary VM102 service-token copy was removed, the tunnel-token file was preserved, and both VM102 health and cloud acceptance passed afterward. PR #45 now needs final owner review before any merge decision. Do not expose the UI port as the automation origin or grant deployment/execution tools through this API.
 
 ## P0 — VM100 observer baseline — completed; nic1 example migrated
 
@@ -114,9 +99,9 @@ Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execut
 
 ## P7 — Complete network/service read adapters
 
-1. Omada read-only site/device/health adapter.
-2. AdGuard Home status and DNS statistics adapter.
-3. Prefer existing Prometheus/Uptime Kuma/Grafana data over duplicate probes where practical.
+1. Omada Open API v1 read-only site/device inventory is implemented and disabled by default. Live acceptance still requires a reachable controller, trusted TLS certificate, controller API/version confirmation, and a dedicated read-only application scoped to approved sites; compare IDs/counts/status to Omada before activation. WAN/VPN/routing health remains outside this inventory slice. See `docs/integrations.md`.
+2. AdGuard Home status and aggregate DNS statistics are implemented for one explicitly configured instance and disabled by default. Live acceptance requires a trusted HTTPS endpoint, suitable server-only credentials/access restrictions, and the correct site label; compare running/protection state and counters with AdGuard. Secondary DNS instances remain future work. See `docs/integrations.md`.
+3. Prometheus active-target scrape health and Uptime Kuma monitor metrics are implemented and disabled by default, using existing monitoring data without duplicate probes. Prometheus acceptance requires restricted Basic credentials and accurate site labels. Kuma acceptance requires a metrics-only key, exported `monitor_id` labels, and an explicit site label. Both require trusted HTTPS and comparison against their source inventories. Grafana remains future work. See `docs/integrations.md`.
 4. Keep provider failure non-fatal to `/api/overview` and visible to monitoring.
 
 ## P8 — Authentication, roles, approval, and durable action audit

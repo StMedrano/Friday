@@ -15,8 +15,12 @@ export function createAccessGate(config,{fetchImpl=fetch}={}){
  const teamDomain=String(config?.teamDomain||'').trim().replace(/\/$/,'')
  const audience=String(config?.audience||'').trim()
  const operators=config?.operatorEmails
+ const serviceOnly=config?.identityMode==='service'
+ const serviceIds=config?.serviceTokenIds
  const isConfigured=domain.test(teamDomain)&&audienceTag.test(audience)&&
-  Array.isArray(operators)&&operators.every(s=>typeof s==='string'&&email.test(s.trim()))
+  Array.isArray(operators)&&operators.every(s=>typeof s==='string'&&email.test(s.trim()))&&
+  (!serviceOnly||(Array.isArray(serviceIds)&&serviceIds.length>0&&serviceIds.length<=16&&
+   serviceIds.every(s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}\.access$/.test(s))))
  const allowedOperators=new Set(isConfigured?operators.map(x=>x.toLowerCase().trim()):[])
  let cachedKeys=null
  let cacheDeadline=0
@@ -51,8 +55,15 @@ export function createAccessGate(config,{fetchImpl=fetch}={}){
    const claims=decode(parts[1]),current=now()
    if(claims?.iss!==teamDomain||!(claims.aud===audience||(Array.isArray(claims.aud)&&claims.aud.includes(audience)))||
       !Number.isSafeInteger(claims.exp)||claims.exp<=current-30||
-      (claims.nbf!==undefined&&(!Number.isSafeInteger(claims.nbf)||claims.nbf>current+30))||
-      typeof claims.sub!=='string'||!claims.sub)return {status:403,error:'access-denied'}
+      (claims.nbf!==undefined&&(!Number.isSafeInteger(claims.nbf)||claims.nbf>current+30)))return {status:403,error:'access-denied'}
+   if(serviceOnly){
+    // Service-token JWTs have an empty sub and identify the client in common_name.
+    // This path is opt-in and cannot authorize the existing human/operator API.
+    if(operatorOnly||claims.type!=='app'||claims.sub!==''||!serviceIds.includes(claims.common_name))
+     return {status:403,error:'access-denied'}
+    return {status:200,identity:{subject:claims.common_name,kind:'service'}}
+   }
+   if(typeof claims.sub!=='string'||!claims.sub)return {status:403,error:'access-denied'}
    const userEmail=typeof claims.email==='string'?claims.email.toLowerCase().trim():''
    if(operatorOnly&&!allowedOperators.has(userEmail))return {status:403,error:'access-denied'}
    return {status:200,identity:{subject:claims.sub,email:userEmail}}

@@ -56,5 +56,9 @@ export function integrationSummary(config = {}) {
     { id: 'proxmox', enabled: config.proxmox === true, mode: config.proxmox ? 'live' : 'mock' },
     { id: 'vm100-observer', enabled: config.vm100Observer === true, mode: config.vm100Observer ? 'live' : 'mock' },
     { id: 'endpoints', enabled: config.endpoints === true, mode: config.endpoints ? 'live' : 'mock' },
+    { id: 'omada', enabled: config.omada === true, mode: config.omada ? 'live' : 'mock' },
+    { id: 'adguard', enabled: config.adguard === true, mode: config.adguard ? 'live' : 'mock' },
+    { id: 'prometheus', enabled: config.prometheus === true, mode: config.prometheus ? 'live' : 'mock' },
+    { id: 'uptime-kuma', enabled: config.uptimeKuma === true, mode: config.uptimeKuma ? 'live' : 'mock' },
   ]
 }

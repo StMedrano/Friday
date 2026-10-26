@@ -2,6 +2,30 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { getConfig } from './config.mjs'
 
+test('Uptime Kuma defaults off with a server-only metrics key and explicit site', () => {
+  assert.deepEqual(getConfig({}).uptimeKuma, { enabled: false, baseUrl: '', apiKey: '', site: '' })
+  assert.deepEqual(getConfig({ FRIDAY_UPTIME_KUMA_ENABLED: 'true', FRIDAY_UPTIME_KUMA_URL: 'https://kuma.test', FRIDAY_UPTIME_KUMA_API_KEY: 'key', FRIDAY_UPTIME_KUMA_SITE: 'Site B' }).uptimeKuma,
+    { enabled: true, baseUrl: 'https://kuma.test', apiKey: 'key', site: 'Site B' })
+})
+
+test('Prometheus defaults off with empty server-only settings and explicit fallback site', () => {
+  assert.deepEqual(getConfig({}).prometheus, { enabled: false, baseUrl: '', username: '', password: '', site: '' })
+  assert.deepEqual(getConfig({ FRIDAY_PROMETHEUS_ENABLED: 'true', FRIDAY_PROMETHEUS_URL: 'https://prom.test', FRIDAY_PROMETHEUS_USERNAME: 'reader', FRIDAY_PROMETHEUS_PASSWORD: 'secret', FRIDAY_PROMETHEUS_SITE: 'Site A' }).prometheus,
+    { enabled: true, baseUrl: 'https://prom.test', username: 'reader', password: 'secret', site: 'Site A' })
+})
+
+test('AdGuard defaults off with empty server-only configuration and explicit site assignment', () => {
+  assert.deepEqual(getConfig({}).adguard, { enabled: false, baseUrl: '', username: '', password: '', site: '' })
+  assert.deepEqual(getConfig({ FRIDAY_ADGUARD_ENABLED: 'true', FRIDAY_ADGUARD_URL: 'https://dns.test', FRIDAY_ADGUARD_USERNAME: 'reader', FRIDAY_ADGUARD_PASSWORD: 'secret', FRIDAY_ADGUARD_SITE: 'Site B' }).adguard,
+    { enabled: true, baseUrl: 'https://dns.test', username: 'reader', password: 'secret', site: 'Site B' })
+})
+
+test('Omada defaults off with server-only client credentials', () => {
+  assert.deepEqual(getConfig({}).omada, { enabled: false, baseUrl: '', controllerId: '', clientId: '', clientSecret: '' })
+  assert.deepEqual(getConfig({ FRIDAY_OMADA_ENABLED: 'true', FRIDAY_OMADA_URL: 'https://omada.test', FRIDAY_OMADA_CONTROLLER_ID: 'controller', FRIDAY_OMADA_CLIENT_ID: 'client', FRIDAY_OMADA_CLIENT_SECRET: 'secret' }).omada,
+    { enabled: true, baseUrl: 'https://omada.test', controllerId: 'controller', clientId: 'client', clientSecret: 'secret' })
+})
+
 test('repository registry defaults to a server-side path and accepts explicit configuration', () => {
   assert.deepEqual(getConfig({}).repositories, { registryPath: './repositories.json' })
   assert.deepEqual(getConfig({ FRIDAY_REPOSITORY_REGISTRY_PATH: '/data/repositories.json' }).repositories, {
