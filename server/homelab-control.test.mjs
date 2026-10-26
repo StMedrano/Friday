@@ -595,3 +595,25 @@ test('request status expires correctly and stays non-executable',async t=>{
  assert.equal(status.execution.performed,false)
  assert.equal(status.decidedAt,null)
 })
+
+test('forged storage lifecycle metadata cannot become an authorized status response',async t=>{
+ const proposalId=randomUUID(),at=Date.now(),actor='a'.repeat(64)
+ const valid={requestId:proposalId,target:'staging-canary',at,expiresAt:at+60000,
+  actor,decidedAt:null,decidedBy:null,state:'pending-approval'}
+ const bad=[
+  {...valid,state:'approved-execution-unavailable',decidedAt:at+1000,decidedBy:actor},
+  {...valid,state:'rejected',decidedAt:at+1000,decidedBy:actor},
+  {...valid,state:'withdrawn',decidedAt:at+1000,decidedBy:'b'.repeat(64)},
+  {...valid,state:'pending-approval',expiresAt:at-1},
+  {...valid,state:'expired'},
+  {...valid,actor:'raw email'},
+  {...valid,target:'real-server'},
+  {...valid,requestId:randomUUID()},
+ ]
+ for(const snapshot of bad){
+  const f=await fixture(t,{store:{append:async()=>{},read:async()=>null,
+   readLifecycle:async()=>snapshot}})
+  await assert.rejects(f.service.getRequestStatus(request('admin@example.test'),
+   {requestId:proposalId}),/homelab-denied/)
+ }
+})
