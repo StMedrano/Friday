@@ -109,7 +109,7 @@ Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execut
 Implement before any infrastructure write operation:
 
 - authentication or a documented trusted reverse-proxy identity boundary;
-- roles: Viewer, Operator, Administrator, Friday Agent;
+- **internal role policy foundation in draft PR #49**: exact JWT subject-to-role-and-target bindings for Viewer, Operator, Administrator and Friday Agent; enforced in the dormant HomeLab fixture service with proposer/approver separation. No production configuration, UI/RBAC endpoints, real target rights, or execution authority; full product RBAC remains pending.
 - durable append-only action audit events separate from monitoring history;
 - action request IDs/lifecycle states;
 - explicit approval workflow;
