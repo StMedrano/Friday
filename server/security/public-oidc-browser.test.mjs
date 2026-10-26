@@ -23,7 +23,7 @@ async function fixture(t,overrides={}){
    if(pending.get(state)!==applicationId)throw Error('sso-denied')
    pending.delete(state)
    return {applicationId,identity:{
-    kind:'human',subject:'authentik:issuer:user-123',expiresAtMs:clock+600000,
+    kind:'human',subject:'authentik:0123456789abcdef:user-123',expiresAtMs:clock+600000,
    }}
   },
  }
@@ -131,7 +131,7 @@ test('successful callback provisions opaque host-only session; no raw token in J
  assert.equal(login.applicationId,'friday')
  assert.equal(login.state,'authenticated')
  assert.equal(login.identity.kind,'human')
- assert.equal(login.identity.subject,'authentik:issuer:user-123')
+ assert.equal(login.identity.subject,'authentik:0123456789abcdef:user-123')
  assert.equal(login.setCookies.length,2)
  assert.match(login.setCookies[0],/^__Host-friday-oidc-friday=; Path=\/; Max-Age=0; Secure; HttpOnly; SameSite=Lax$/)
  assert.match(login.setCookies[1],/^__Host-friday-session-friday=[A-Za-z0-9_-]{43}; Path=\/; Max-Age=600; Secure; HttpOnly; SameSite=Lax$/)
@@ -141,7 +141,7 @@ test('successful callback provisions opaque host-only session; no raw token in J
  assert.equal(JSON.stringify({...login,setCookies:undefined}).includes(bearer),false)
  const row=[...f.sessions.values()][0]
  assert.equal(row.applicationId,'friday')
- assert.equal(row.subject,'authentik:issuer:user-123')
+ assert.equal(row.subject,'authentik:0123456789abcdef:user-123')
  assert.equal(row.tokenHash.includes(bearer),false)
  assert.equal(JSON.stringify(row).includes(bearer),false)
  assert.equal(f.sessions.size,1)
@@ -153,7 +153,7 @@ test('current session is bound to exact application and rejects duplicate or for
  const cookie=sessionCookie(login)
  const current=await f.browser.current({applicationId:'friday',origin:apps[0].origin,cookieHeader:cookie})
  assert.equal(current.identity.kind,'human')
- assert.equal(current.identity.subject,'authentik:issuer:user-123')
+ assert.equal(current.identity.subject,'authentik:0123456789abcdef:user-123')
  assert.match(current.csrfToken,/^[A-Za-z0-9_-]{43}$/)
  assert.equal(current.applicationId,'friday')
  for(const input of [
