@@ -9,6 +9,7 @@ import FridayComposer from '../components/FridayComposer'
 import FridayConversation from '../components/FridayConversation'
 import FridayWorkspace from '../components/FridayWorkspace'
 import IncidentsWorkspace from '../components/IncidentsWorkspace'
+import InfrastructureWorkspace from '../components/InfrastructureWorkspace'
 import MobileHome from '../components/MobileHome'
 import MobileNavigation from '../components/MobileNavigation'
 import RepositoriesWorkspace from '../components/RepositoriesWorkspace'
@@ -97,7 +98,7 @@ export default function Dashboard() {
             query={query}
             onQueryChange={setQuery}
             onSubmit={submitFriday}
-          /> : active === 'Agents' ? <AgentsWorkspace/> : active === 'Repositories' ? <RepositoriesWorkspace/> : active === 'Incidents' ? <IncidentsWorkspace
+          /> : active === 'Agents' ? <AgentsWorkspace/> : active === 'Repositories' ? <RepositoriesWorkspace/> : active === 'Infrastructure' ? <InfrastructureWorkspace overview={overview} connected={connected}/> : active === 'Incidents' ? <IncidentsWorkspace
             incidents={incidents}
             monitoring={overview.monitoring}
             history={history}
@@ -169,6 +170,7 @@ export default function Dashboard() {
           </> : active === 'FRIDAY' ? <FridayWorkspace session={friday} query={query} onQueryChange={setQuery} onSubmit={submitFriday}/>
             : active === 'Agents' ? <AgentsWorkspace/>
             : active === 'Repositories' ? <RepositoriesWorkspace/>
+            : active === 'Infrastructure' ? <InfrastructureWorkspace overview={overview} connected={connected}/>
             : active === 'Incidents' ? <IncidentsWorkspace incidents={incidents} monitoring={overview.monitoring} history={history} historyError={historyError} selectedIncident={selectedIncident} onSelectIncident={viewDiagnosis} onClearSelection={() => setSelectedIncidentId(null)}/>
             : <DetailView active={active} overview={overview} />}
         </main>
