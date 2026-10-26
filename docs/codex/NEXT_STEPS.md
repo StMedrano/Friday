@@ -128,7 +128,7 @@ Never expose arbitrary shell execution or the native Docker API through FRIDAY.
 
 ## P10 — Multi-site operations polish
 
-- Site A/Site B filtering and topology view.
+- Site-aware, host-grouped **read-only inventory topology** with exact service-site filters is implemented in draft PR #47 (desktop and phone). It does not claim verified network links, VPN state, or live deployment; source review, passing exact-head CI, and authenticated live site-data acceptance are still required. Network topology/link verification remains future work.
 - VPN status/latency history.
 - Incidents grouped by site/severity.
 - Secondary DNS/resilience visibility.
