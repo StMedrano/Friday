@@ -1,5 +1,26 @@
 # Friday Build Status
 
+## P8 private operator role provisioning — draft PR #51, source only
+
+A small internal adapter reloads an owner-private canonical JSON role
+policy on every permission check, expires each trust snapshot within
+24 hours, rejects symlinked/insecure/malformed/duplicate-key records,
+and delegates actual Viewer/Operator/Administrator/Agent capability
+intersections to PR #49's exact role policy. Source integration tests
+on PR #50's dormant HomeLab controller exercise immediate downgrades,
+administrator revocation, and fail-closed missing policy while retaining
+durable audit and non-execution semantics.
+
+This is a stacked **draft PR #51**, based on draft #50 which depends on
+draft #49; PR #48 is a separate kill-switch foundation. It is not
+deployed or configured, does not create UI/API mutation or an executor,
+and makes no HomeLab connections. CI evidence and separate owner/security
+review are required; P8 is **not yet complete**. Real trusted identity
+provisioning and rotation, multi-node revocation semantics, full
+approval lifecycle, and global production control policies remain
+pending.
+
+
 ## P8 pending approval queue — stacked draft PR #50, source only
 
 An internal, read-only approval queue now derives from the owner-private,
