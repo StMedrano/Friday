@@ -140,14 +140,14 @@ export function createPublicOidcBrowser({
       !isSubject(identity.subject)||!timeValid(identity.expiresAtMs)||
       identity.expiresAtMs<=at)denied()
    const expiresAt=Math.min(identity.expiresAtMs,at+TTL)
+   const lifespan=Math.floor((expiresAt-at)/1000)
+   if(lifespan<1)denied()
    const opaque=secret(),tokenHash=digest(app,opaque)
    const row={applicationId:app.id,tokenHash,
     subject:identity.subject,createdAt:at,expiresAt}
    try{await sessionStore.create(row)}catch{denied()}
    // Return normalized identity only. The session bearer is restricted to
    // the Set-Cookie field and is not stored in sessionStore or JSON data.
-   const lifespan=Math.floor((expiresAt-at)/1000)
-   if(lifespan<1)denied()
    return {applicationId:app.id,state:'authenticated',
     identity:{kind:'human',subject:identity.subject},
     setCookies:[cookie(app.pendingName,'',0),cookie(app.sessionName,opaque,lifespan)]}
