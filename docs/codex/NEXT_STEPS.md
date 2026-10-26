@@ -2,9 +2,9 @@
 
 Work from top to bottom. Do not skip safety prerequisites to reach action features sooner.
 
-## User-requested cloud access — cloud acceptance complete; VM102 cleanup pending
+## User-requested cloud access — completed
 
-The read-only automation API at `friday-api.mytechtactics.com` is deployed on VM102 behind its dedicated Cloudflare Access application and tunnel. The tunnel is healthy. The managed cloud runtime now has an enforced exact-host policy and ready URL/service-credential bindings; `scripts/check-cloud-connection.mjs` passed all authenticated reads, denial, write-rejection, and excluded-route checks on 2026-10-26. Next: use an authorized VM102 administrative session to delete only the temporary owner-only service-token copy, preserve the tunnel-token runtime file, and recheck API health before final PR #45 review. Do not expose the UI port as the automation origin or grant deployment/execution tools through this API.
+The read-only automation API at `friday-api.mytechtactics.com` is deployed on VM102 behind its dedicated Cloudflare Access application and tunnel. The tunnel is healthy. The managed cloud runtime has an enforced exact-host policy and ready URL/service-credential bindings; `scripts/check-cloud-connection.mjs` passed all authenticated reads, denial, write-rejection, and excluded-route checks on 2026-10-26. The temporary VM102 service-token copy was removed, the tunnel-token file was preserved, and both VM102 health and cloud acceptance passed afterward. PR #45 now needs final owner review before any merge decision. Do not expose the UI port as the automation origin or grant deployment/execution tools through this API.
 
 ## P0 — VM100 observer baseline — completed; nic1 example migrated
 

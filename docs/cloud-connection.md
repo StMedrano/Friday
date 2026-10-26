@@ -208,10 +208,11 @@ Managed-runtime acceptance passed on 2026-10-26: authenticated health,
 overview, incidents, and monitoring history returned 200; unauthenticated health
 returned 401; POST overview returned 405; and the excluded repositories route
 returned 404. The health response identified the live `friday-automation`
-listener, and the overview contained a valid generated timestamp. The remaining
-credential hygiene step is to remove the temporary owner-only service-token copy
-from VM102 through an authorized administrative session. Do not remove the
-separate tunnel-token runtime file.
+listener, and the overview contained a valid generated timestamp. Afterward, an
+authorized VM102 session removed only the temporary service-token copy from
+`/home/stalin/.config/friday-cloud-api/client.json`. The separate mode-600
+tunnel-token runtime file was preserved. VM102 `make health` and the complete
+managed-runtime acceptance checker passed again after cleanup.
 
 Also verify a different service token and an ordinary browser-session JWT fail,
 direct unauthenticated access to the local origin fails, the UI still works,
