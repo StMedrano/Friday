@@ -35,6 +35,14 @@ export async function createHomeLabAudit({directory}={}) {
   if(!validRequestId(requestId)||!EVENTS.has(event))denied()
   return join(directory,requestId+'.'+event+'.json')
  }
+ const validProposal=row=>row&&row.event==='restart-requested'&&row.target==='staging-canary'&&
+  row.expiresAt>row.at&&row.expiresAt-row.at<=300000
+ const validDecision=(decision,proposal)=>decision&&decision.event==='restart-decided'&&
+  decision.requestId===proposal.requestId&&decision.target===proposal.target&&
+  decision.expiresAt===proposal.expiresAt&&decision.at>=proposal.at&&
+  decision.at<=proposal.expiresAt&&
+  (decision.outcome==='withdrawn'?decision.actor===proposal.actor:
+    decision.actor!==proposal.actor)
  // Shared read path: never accept untrusted filenames or follow symlinked files.
  async function readRecord(requestId,event) {
   await checkDirectory()
@@ -61,6 +69,26 @@ export async function createHomeLabAudit({directory}={}) {
   async read(requestId,event) {
    return readRecord(requestId,event)
   },
+  // Bounded single-request state projection. No public endpoint or action is
+  // added here. Read a request and its *one* exclusive terminal decision;
+  // a concurrent decision can change this snapshot immediately afterward.
+  async readLifecycle({requestId,at}={}) {
+   if(!validRequestId(requestId)||!Number.isSafeInteger(at)||at<0)denied()
+   try {
+    const proposal=await readRecord(requestId,'restart-requested')
+    const decision=await readRecord(requestId,'restart-decided')
+    if(!validProposal(proposal)||proposal.at>at||
+       (decision&&!validDecision(decision,proposal)))denied()
+    await checkDirectory()
+    const state=decision?
+      {approved:'approved-execution-unavailable',rejected:'rejected',
+       withdrawn:'withdrawn'}[decision.outcome]:
+      at>=proposal.expiresAt?'expired':'pending-approval'
+    return {requestId,target:proposal.target,at:proposal.at,
+      expiresAt:proposal.expiresAt,actor:proposal.actor,
+      decidedAt:decision?.at??null,decidedBy:decision?.actor??null,state}
+   } catch {denied()}
+  },
   // Internal, bounded, read-only approval projection. No HTTP method exposes it.
   // A concurrent terminal decision can make this snapshot stale. Each
   // approve/reject/withdraw action validates the proposal and exclusively
@@ -86,12 +114,10 @@ export async function createHomeLabAudit({directory}={}) {
      if(!row)denied() // Never emit partial results during concurrent deletion.
      // Proposals in the dormant fixture may live for at most five minutes.
      // Corrupt or forged long-lived requests invalidate the entire snapshot.
-     if(row.expiresAt<=row.at||row.expiresAt-row.at>300000)denied()
+     if(!validProposal(row))denied()
      if(decided.has(id)) {
       const action=await readRecord(id,'restart-decided')
-      if(!action||action.target!==row.target||action.at<row.at||action.at>row.expiresAt||
-         action.expiresAt!==row.expiresAt||
-         (action.outcome==='withdrawn'?action.actor!==row.actor:action.actor===row.actor))denied()
+      if(!validDecision(action,row))denied()
       continue
      }
      if(row.expiresAt<=at||row.at>at)continue
