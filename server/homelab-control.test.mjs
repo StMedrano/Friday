@@ -366,3 +366,23 @@ test('switch disabled during async request audit write never reports accepted pr
  await assert.rejects(f.service.requestRestart(request(),{target:'staging-canary'}),/homelab-denied/)
  assert.equal(f.service.execute,undefined)
 })
+
+test('role revoked by diagnostic adapter denies before model inference',async t=>{
+ let allowed=true
+ let inference=0
+ const f=await fixture(t,{
+  rolePolicy:{permits:(identity,permission,target)=>
+   allowed&&identity.subject==='viewer@example.test'&&
+   permission==='diagnostics.read'&&target==='staging-canary'},
+  diagnostics:{read:async()=>{
+   allowed=false
+   return {status:'healthy'}
+  }},
+  assistant:async()=>{inference++;return {text:'must not run'}},
+ })
+ await assert.rejects(f.service.inspect(request('viewer@example.test'),{
+  target:'staging-canary',prompt:'Health',
+ }),/homelab-denied/)
+ assert.equal(inference,0)
+ assert.equal(f.service.execute,undefined)
+})
