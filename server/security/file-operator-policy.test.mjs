@@ -113,3 +113,20 @@ test('permissive directories and files, symlinks and directory targets fail clos
  await mkdir(f.filePath)
  assert.equal(f.policy.permits(operator,'action.propose','staging-canary'),false)
 })
+
+test('nested symlink ancestor and escaped duplicate authorization key deny atomically',async t=>{
+ const f=await fixture(t)
+ const nested=join(f.directory,'nested')
+ await mkdir(nested,{mode:0o700})
+ await writeFile(join(nested,'roles.json'),canonical(),{mode:0o600})
+ const alias=join(f.root,'substituted')
+ await symlink(f.directory,alias)
+ const nestedAlias=createFileOperatorRolePolicy({
+  filePath:join(alias,'nested','roles.json'),now:()=>NOW,
+ })
+ assert.equal(nestedAlias.permits(operator,'action.propose','staging-canary'),false)
+ const escapedKey=String.raw`{"schemaVersion":1,"expiresAt":1793034001000,"bindings":[],
+ "\u0062indings":`+JSON.stringify(bindings)+'}\n'
+ await writeFile(f.filePath,escapedKey,{mode:0o600})
+ assert.equal(f.policy.permits(operator,'action.propose','staging-canary'),false)
+})
