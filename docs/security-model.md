@@ -140,6 +140,45 @@ browser UI, real machine binding, operator provisioning, production deployment
 or live HomeLab access was added. This is not a complete human approval
 workflow or an authorization to run commands.
 
+## Revocable, time-bounded operator role bindings — stacked draft PR #51
+
+The internal `createFileOperatorRolePolicy` source module can reload
+a trusted, owner-private role/target snapshot **on every authorization
+check**, without an administrative HTTP endpoint or network call.
+The exact canonical JSON object is:
+
+```json
+{"schemaVersion":1,"expiresAt":1793037600000,"bindings":[{"subject":"synthetic-operator","role":"Operator","targets":["staging-canary"]}]}
+```
+
+A terminating newline is required. The sample identities and timestamp
+are illustrative only, not an enabled deployment configuration. The JSON
+schema is exact; duplicate object keys, extra fields, noncanonical
+serialization, malformed role entries, oversized files, invalid expiry,
+or a window beyond 24 hours **deny every grant**. File and directory
+must be owned by the current process user and inaccessible to
+group/others, with no symlinked path components. It reopens the file
+for every permission decision, so changing the file, removing it, role
+downgrades or expiration revoke grants on the next check, subject
+to ordinary in-flight request race constraints.
+
+The existing dormant HomeLab controller receives this module only via
+its explicit `rolePolicy` dependency injection, *after* signed
+Cloudflare Access identity verification. Test fixtures demonstrate
+that an Operator loses proposal capability and an Administrator loses
+approval/queue capability as soon as grants are removed. The file
+cannot assert an executable role or bypass independent approval,
+single-use audit, or the kill-switch requirement. No real identity,
+URL, VM, Docker container, command or key is committed.
+
+**Release boundary:** PR #51 is stacked on draft PR #50 (which itself
+depends on #49). This module is not wired to the live controller,
+the independent PR #48 kill-switch, or any web endpoint. Its
+purpose is a fail-closed role provisioning *foundation*, not a complete
+identity lifecycle, secure operator distribution procedure or
+production-ready RBAC system. Approval review and runtime multi-node
+testing are still necessary.
+
 ## Future write-action rule
 
 A future action engine must require all of the following before any infrastructure mutation:
