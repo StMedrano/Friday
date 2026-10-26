@@ -1,5 +1,37 @@
 # Friday Build Status
 
+## Public multi-site Authentik OIDC foundation — draft PR #60 (source-only)
+
+Friday's Authentik design now explicitly includes **public internet sign-in**
+for Friday, TechTactics and future third-party/client websites.
+One planned public HTTPS Authentik identity hub can serve independent
+per-application OIDC issuers, client registrations, strict redirect URIs,
+and Authentik MFA/enrollment. The source-only
+`createPublicOidcFlow` implements server-side multi-application
+authorization-code + PKCE S256 initiation and server-side callback
+exchange with one-use five-minute state, nonce, client-bound authorization,
+pinned provider discovery/RS256 JWKS, and strictly checked signed ID
+token subject, issuer, audience and expiry. Per-app confidential
+credentials stay server-side; user-facing output excludes tokens and
+secrets. Each registered app has an independent client, issuer slug
+and redirect; arbitrary request-supplied redirect/issuer/client cannot
+be accepted.
+
+AuthentiK public SSO is a **separate, lower-privilege website login**
+from the dormant P8 privileged `friday_control` token and HomeLab
+role/kill/audit requirements. Cross-domain sites share the Authentik
+login provider but **not** the site's session cookie or roles.
+Legacy sites may use Authentik single-app forward auth.
+No actual Authentik VM120, Cloudflare tunnel, public login hostname,
+provider registration, secret, session store, secure cookie,
+callback HTTP route, site account provisioning, deployment or
+HomeLab command has been configured or contacted. An owner-controlled
+atomic distributed transaction store, validated sessions, signout,
+live OIDC verification, security acceptance and ingress controls are
+prerequisites to public release. See `docs/authentik-public-sso.md`.
+This draft PR is stacked on #58. CI result pending.
+
+
 ## P8 Authentik human identity adapter — draft PR #58, source only
 
 Friday now has an **opt-in internal Authentik OIDC access-token verifier**,

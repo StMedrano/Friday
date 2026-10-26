@@ -312,6 +312,30 @@ exchange, logout, enrollment, production Authentik integration or
 deployment is included. Those require independent implementation and
 security acceptance. See `docs/authentik.md`.
 
+## Public Authentik multi-application website SSO — draft PR #60
+
+Normal **public website login** is distinct from Friday's privileged
+HomeLab authorization. A central internet-reachable Authentik service
+can serve separate provider-specific OIDC issuers for Friday and
+independent future sites. Each site must have its own pinned OIDC
+client ID, backend-only secret, exact HTTPS callback and app-specific
+roles/cookie session. The server-only `createPublicOidcFlow` performs
+authorization-code/PKCE and verifies issuer/client/nonce/time-bound
+signed ID tokens using pinned discovery and RS256 keys. It rejects
+cross-client callback state, replay, missing/expired state, untrusted
+redirects and foreign authentication responses. A successful public
+login **does not** grant `friday_control`, HomeLab or agent privileges.
+
+No public routes, session cookies, real identity service, provider
+registration, tunnel or production login changes are included.
+Actual public deployment requires an atomic expiring shared state
+store, CSRF-safe HttpOnly sessions, logout/revocation, safe redirects,
+MFA and owner approval. Do not put public Authentik login behind a
+Cloudflare Access requirement that only internal account holders can
+satisfy; use targeted protections and preserve stricter barriers for
+privileged Friday/HomeLab functionality.
+See `docs/authentik-public-sso.md`.
+
 ## Future write-action rule
 
 A future action engine must require all of the following before any infrastructure mutation:
