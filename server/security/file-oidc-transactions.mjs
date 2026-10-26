@@ -64,8 +64,10 @@ export function createFileOidcTransactions({
   async reserve(tx) {
    if(!ready||!validRecord(tx))denied()
    const at=now()
-   if(!Number.isSafeInteger(at)||at<0||tx.issuedAt!==at||
-      tx.expiresAt<=at||tx.expiresAt>at+TTL_MS)denied()
+   // Public OIDC begin() can await the store: accepting a small forward
+   // clock advance is required. Never accept future or expired issuance.
+   if(!Number.isSafeInteger(at)||at<0||tx.issuedAt>at||
+      tx.expiresAt<=at)denied()
    await dirCheck()
    const path=dest(tx.state,'.pending'),used=dest(tx.state,'.used')
    // Never resurrect a previously consumed authorization state.
