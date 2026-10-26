@@ -7,6 +7,7 @@ import {generateKeyPairSync, sign} from 'node:crypto'
 import * as control from './homelab-control.mjs'
 import * as audit from './homelab-audit.mjs'
 import {answerAssistant} from './assistant.mjs'
+import {createFileAutomationGate} from './security/automation-kill-switch.mjs'
 
 const {publicKey,privateKey}=generateKeyPairSync('rsa',{modulusLength:2048})
 const access={teamDomain:'https://fixture.cloudflareaccess.com',audience:'fixture-aud',operatorEmails:['operator@example.test']}
@@ -155,4 +156,24 @@ test('kill during diagnostics prevents subsequent model inference',async t=>{
  f=await fixture(t,{diagnostics:{read:async()=>{f.kill();return {status:'healthy'}}},assistant:async()=>{inference++}})
  await assert.rejects(f.service.inspect(request(),{target:'staging-canary',prompt:'Health'}),/homelab-denied/)
  assert.equal(inference,0)
+})
+
+test('private file kill switch gates the existing HomeLab approval seam and can revoke at runtime',async t=>{
+ const directory=await mkdtemp(join(tmpdir(),'friday-action-policy-'))
+ t.after(()=>rm(directory,{recursive:true,force:true}))
+ const filePath=join(directory,'gate.json')
+ const timestamp=Date.now()
+ const gate=createFileAutomationGate({filePath,now:()=>timestamp})
+ const f=await fixture(t,{automationAllowed:gate.isAllowed})
+ const input={target:'staging-canary'}
+ await assert.rejects(f.service.requestRestart(request(),input),/homelab-denied/)
+ await writeFile(filePath,JSON.stringify({schemaVersion:1,state:'allow-approved-actions',expiresAt:timestamp+60000}),{mode:0o600})
+ const requestResult=await f.service.requestRestart(request(),input)
+ assert.equal(requestResult.state,'pending-approval')
+ assert.equal(requestResult.execution.performed,false)
+ await writeFile(filePath,JSON.stringify({schemaVersion:1,state:'stopped',expiresAt:timestamp+60000}))
+ await assert.rejects(f.service.approveRestart(request(),{
+  requestId:requestResult.requestId,confirmation:requestResult.confirmation
+ }),/homelab-denied/)
+ assert.equal(f.service.execute,undefined)
 })

@@ -113,7 +113,7 @@ Implement before any infrastructure write operation:
 - durable append-only action audit events separate from monitoring history;
 - action request IDs/lifecycle states;
 - explicit approval workflow;
-- global automation kill switch.
+- a default-off, owner-file-backed **global automation gate foundation** is implemented in draft PR #48 and tested against the existing internal HomeLab approval seam. It is not wired into production, grants no action permission and has no user-facing toggle. Production-safe kill-switch activation, cross-instance reviews and the remaining authorization/audit/approval controls are still pending.
 
 ## P9 — Controlled actions
 

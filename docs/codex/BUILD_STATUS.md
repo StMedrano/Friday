@@ -1,5 +1,25 @@
 # Friday Build Status
 
+## P8 global automation gate foundation — draft PR #48, source only
+
+A fail-closed file-backed `createFileAutomationGate` is implemented under
+`server/security/automation-kill-switch.mjs`. A missing, corrupt, symlinked,
+group/world-accessible, expired or overly permissive gate file denies. Only an
+exact owner-private schema with `state:allow-approved-actions` and at most a
+five-minute expiration passes; the file is reopened on every check so owner
+revocation is effective without a server restart. The gate is tested with the
+existing dormant HomeLab control callback and does not create a file or an HTTP
+route. It does not enable infrastructure execution, authenticate operators,
+or confer independent RBAC/approval/audit permissions.
+
+PR #48 is for source review only, with no production wiring or HomeLab access.
+CI and a separate production/security design review must be completed before
+future action development. P8 is **not complete**: authenticated role policy,
+a durable approval queue, cross-instance audit/deny semantics, and a reviewed
+runtime kill-switch integration remain pending. The read-only cloud automation
+endpoint remains unrelated and unchanged.
+
+
 ## Two-site operations views — draft PR #47, source only
 
 `feat/site-aware-infrastructure-20261026` implements a real read-only

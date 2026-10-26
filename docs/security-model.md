@@ -81,6 +81,30 @@ Incident Diagnostics can automatically capture one metadata-only report for supp
 
 Diagnostics expose no remediation endpoint.
 
+## Global automation gate (internal foundation)
+
+`server/security/automation-kill-switch.mjs` implements a **default-deny**
+owner-controlled gate for possible future action services. It is not mounted
+into `server/index.mjs`, has no UI/HTTP route, and exposes no action executor.
+An absent or insecure gate file denies immediately; it does **not** affect
+Friday's separate read-only cloud monitoring listener.
+
+The gate accepts only a private, owner-owned regular JSON file in a private,
+owner-owned directory with no symlinked directory ancestors. The exact schema
+is `{"schemaVersion":1,"state":"allow-approved-actions","expiresAt":<epoch-milliseconds>}`
+with a finite expiration no more than five minutes into the future. All other
+data, including `state:"stopped"`, denies. It reads the file on **every**
+check rather than caching an environment flag; file removal or replacement
+revokes the gate on the next check. It never writes or creates the file.
+
+This is only a *necessary future safety condition*, not an authorization grant.
+No infrastructure mutation may be enabled until an independently reviewed
+executor also verifies the operator identity/role, exact target/tool allowlist,
+durable single-use approval/audit, and post-action health. A production operator
+runbook and multi-instance atomic semantics will be required before using it in
+a real action engine. Do not deploy or arm this gate for the current read-only
+controller.
+
 ## Future write-action rule
 
 A future action engine must require all of the following before any infrastructure mutation:
