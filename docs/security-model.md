@@ -113,6 +113,33 @@ multi-instance kill-switch semantics, threat review, and live identity tests
 still need separate approval. **Do not treat this as completed product RBAC or
 a license to enable infrastructure writes.**
 
+## Durable pending approval projection — stacked draft PR #50
+
+The internal HomeLab audit store now has a **bounded read-only** `listPending`
+method. It scans at most 512 events from its owner-private append-only event
+directory, checks exact event filenames and record permissions, rejects
+symlinks/corruption instead of returning partial results, and returns up to
+50 unexpired proposals whose matching approval event is absent. Results are
+ordered by expiration then request ID. The snapshot can become stale under
+concurrent approval; **approval always re-reads the proposal and exclusively
+appends an immutable single-use approval**. An excessively large audit backlog
+fails closed and requires independently reviewed retention/archiving before
+any production activation.
+
+`createHomeLabControl.listPendingApprovals` is **internal only** and requires
+signed Access identity, an exact Administrator permission for symbolic
+`staging-canary`, the existing kill gate and a healthy audit store. Returned
+entries contain only request ID, target, request/expiry time, pending status,
+and whether the current Administrator can approve it. No actor hashes,
+confirmation text or raw records are exposed. The controller has **no executor**
+and returns `execution.performed:false`.
+
+**Dependency:** PR #50 is based on draft PR #49's role policy. PR #48's
+global automation gate is a separate unmerged draft. No HTTP/API route,
+browser UI, real machine binding, operator provisioning, production deployment
+or live HomeLab access was added. This is not a complete human approval
+workflow or an authorization to run commands.
+
 ## Future write-action rule
 
 A future action engine must require all of the following before any infrastructure mutation:
