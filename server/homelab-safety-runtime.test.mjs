@@ -158,3 +158,43 @@ test('revoked gate is checked after async diagnostic read before provider infere
  assert.equal(inference,0)
  assert.equal(service.execute,undefined)
 })
+
+test('dormant wired runtime supports terminal rejection or proposer withdrawal, not execution',async t=>{
+ const f=await fixture(t)
+ await f.role()
+ await f.arm()
+ const service=await createDormantHomeLabRuntime(f.options)
+ const p=await service.requestRestart(operator,{target:'staging-canary'})
+ const rejected=await service.rejectRestart(admin,{
+  requestId:p.requestId,confirmation:'reject:'+p.requestId+':staging-canary:restart',
+ })
+ assert.equal(rejected.state,'rejected')
+ assert.equal(rejected.execution.performed,false)
+ await assert.rejects(service.approveRestart(admin,{
+  requestId:p.requestId,confirmation:p.confirmation,
+ }),/homelab-denied/)
+ const p2=await service.requestRestart(operator,{target:'staging-canary'})
+ const withdrawn=await service.withdrawRestart(operator,{
+  requestId:p2.requestId,confirmation:p2.withdrawalConfirmation,
+ })
+ assert.equal(withdrawn.state,'withdrawn')
+ assert.equal(withdrawn.execution.performed,false)
+ assert.deepEqual((await service.listPendingApprovals(admin,{limit:20})).items,[])
+ assert.equal(service.execute,undefined)
+})
+
+test('file-backed kill revocation denies finalizing pending requests even with signed identities',async t=>{
+ const f=await fixture(t)
+ await f.role()
+ await f.arm()
+ const service=await createDormantHomeLabRuntime(f.options)
+ const p=await service.requestRestart(operator,{target:'staging-canary'})
+ await f.arm('stopped')
+ await assert.rejects(service.rejectRestart(admin,{
+  requestId:p.requestId,confirmation:'reject:'+p.requestId+':staging-canary:restart',
+ }),/homelab-denied/)
+ await assert.rejects(service.withdrawRestart(operator,{
+  requestId:p.requestId,confirmation:p.withdrawalConfirmation,
+ }),/homelab-denied/)
+ assert.equal(service.execute,undefined)
+})
