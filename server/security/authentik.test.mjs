@@ -64,10 +64,7 @@ test('missing bearer, spoofed CF headers, malformed JWT, wrong scheme deny witho
  const f=fixture()
  for(const headers of [{},{'cf-access-authenticated-user-email':'admin@example.test'},
   {authorization:'Basic abc'}, {authorization:'Bearer x'}, {authorization:'Bearer foo.bar.baz'},
-  {authorization:'Bearer '+token().slice(0,20)+'\n'},
-  {authorization:'Bearer '+token(), 'cf-access-jwt-assertion':'spoofed', 'x-friday-role':'Administrator'}]){
-  if(headers.authorization?.startsWith('Bearer ')&&headers.authorization.length>1000&&
-     headers['x-friday-role'])continue // tested separately for immutable role scope
+  {authorization:'Bearer '+token().slice(0,20)+'\n'} ]){
   assert.equal((await f.gate({headers})).status,403)
  }
  assert.deepEqual(f.seen,[])
