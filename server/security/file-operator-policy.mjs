@@ -35,7 +35,16 @@ export function createFileOperatorRolePolicy({filePath,now=Date.now}={}) {
    // The exact canonical representation blocks duplicate keys (including
    // escaped aliases), partial writes, alternate property order, extra lines,
    // and unreviewed free-form configuration without a custom JSON parser.
-   if(raw!==JSON.stringify(parsed)+'\n'||!exact(parsed,['schemaVersion','expiresAt','bindings'])||
+   // Rebuild with the reviewed field order rather than preserving parsed key
+   // insertion order; identical data with reordered or duplicated authority
+   // keys is not an accepted provisioning artifact.
+   const canonical=JSON.stringify({
+    schemaVersion:parsed?.schemaVersion,expiresAt:parsed?.expiresAt,
+    bindings:Array.isArray(parsed?.bindings)?parsed.bindings.map(row=>({
+     subject:row?.subject,role:row?.role,targets:row?.targets,
+    })):parsed?.bindings,
+   })+'\n'
+   if(raw!==canonical||!exact(parsed,['schemaVersion','expiresAt','bindings'])||
       parsed.schemaVersion!==1)return deny
    const time=now()
    if(!Number.isSafeInteger(time)||time<0||
