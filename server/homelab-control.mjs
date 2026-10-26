@@ -126,13 +126,18 @@ export function createHomeLabControl({enabled=false,access,store,automationAllow
     const row=await store.readLifecycle({requestId:input.requestId,at:now()})
     const rights=scope()
     const terminal=['approved-execution-unavailable','rejected','withdrawn'].includes(row?.state)
+    const current=now()
     if(row?.requestId!==input.requestId||row.target!==TARGET||
        !/^[a-f0-9]{64}$/.test(row.actor)||!Number.isSafeInteger(row.at)||
        !Number.isSafeInteger(row.expiresAt)||row.expiresAt<=row.at||
-       row.expiresAt-row.at>300000||
+       row.expiresAt-row.at>300000||!Number.isSafeInteger(current)||row.at>current||
        !['pending-approval','expired','approved-execution-unavailable','rejected','withdrawn'].includes(row.state)||
+       (row.state==='pending-approval'&&row.expiresAt<=current)||
+       (row.state==='expired'&&row.expiresAt>current)||
        (terminal?(!Number.isSafeInteger(row.decidedAt)||row.decidedAt<row.at||
-         row.decidedAt>row.expiresAt||!/^[a-f0-9]{64}$/.test(row.decidedBy)):
+         row.decidedAt>row.expiresAt||!/^[a-f0-9]{64}$/.test(row.decidedBy)||
+         (row.state==='withdrawn'?row.decidedBy!==row.actor:
+           row.decidedBy===row.actor)):
          row.decidedAt!==null||row.decidedBy!==null)||
        (!rights.administrator&&(!rights.proposer||row.actor!==actor)))denied()
     // Never return actor hashes, raw durable records, JWT metadata or
