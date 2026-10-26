@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import IncidentsWorkspace from './IncidentsWorkspace'
 
@@ -91,5 +91,46 @@ describe('IncidentsWorkspace', () => {
     expect(detail).toHaveTextContent(/diagnosis for nginx-proxy-manager/i)
     expect(detail.compareDocumentPosition(recoveryHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     expect(screen.getByRole('button', { name: /back to incidents/i })).toBeInTheDocument()
+  })
+})
+
+
+describe('Read-only incident site and severity filters', () => {
+  const remote = {
+    ...active, id: 'remote-gateway-degraded', serviceId: 'remote-gateway',
+    serviceName: 'Remote Gateway', host: 'remote-host', severity: 'warning' as const,
+    detail: 'Gateway degraded', recommendedAction: 'Inspect route evidence only.',
+  }
+  const unknown = {
+    ...active, id: 'unknown-remote', serviceId: 'no-match',
+    serviceName: 'Unknown Remote', host: 'Site B router',
+    severity: 'info' as const, detail: 'Unattributed event',
+  }
+  const services = [
+    { id: 'vm100-observer-npm', name: 'nginx-proxy-manager', host: 'VM 100', site: 'Site A', status: 'offline' as const, category: 'container' as const, detail: '', updated: '' },
+    { id: 'remote-gateway', name: 'Remote Gateway', host: 'remote-host', site: 'Site B', status: 'degraded' as const, category: 'network' as const, detail: '', updated: '' },
+  ]
+
+  it('filters incident cards by exact service/site attribution and severity', () => {
+    render(<IncidentsWorkspace incidents={[active, remote, unknown]} services={services} history={history} monitoring={monitoring}/>)
+    const bySite = screen.getByRole('group', { name: 'Filter incidents by site' })
+    fireEvent.click(within(bySite).getByRole('button', { name: /site b/i }))
+    const cards = screen.getByRole('region', { name: 'Filtered incidents' })
+    expect(within(cards).getByText('Remote Gateway')).toBeInTheDocument()
+    expect(within(cards).queryByText('nginx-proxy-manager')).not.toBeInTheDocument()
+    expect(within(cards).queryByText('Unknown Remote')).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'High severity' }))
+    expect(screen.getByText('No incidents match these filters.')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Warning severity' }))
+    expect(within(cards).getByText('Remote Gateway')).toBeInTheDocument()
+    expect(screen.getByText(/health history.*unfiltered/i)).toBeInTheDocument()
+  })
+
+  it('preserves unattributed incidents when matching service evidence is absent', () => {
+    render(<IncidentsWorkspace incidents={[unknown]} services={services} history={[]}/>)
+    fireEvent.click(within(screen.getByRole('group', { name: 'Filter incidents by site' }))
+      .getByRole('button', { name: /unassigned/i }))
+    expect(within(screen.getByRole('region', { name: 'Filtered incidents' })).getByText('Unknown Remote')).toBeInTheDocument()
+    expect(screen.queryByText(/verified.*site b/i)).not.toBeInTheDocument()
   })
 })
