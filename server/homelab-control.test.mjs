@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {mkdir, mkdtemp, readFile, readdir, rm, writeFile, rename} from 'node:fs/promises'
+import {mkdir, mkdtemp, readFile, readdir, rm, writeFile} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {generateKeyPairSync, sign} from 'node:crypto'
@@ -263,7 +263,7 @@ test('owner-private live role policy revokes HomeLab proposal and approval capab
  const filePath=join(directory,'roles.json')
  const write=async bindings=>writeFile(filePath,JSON.stringify({
   schemaVersion:1,expiresAt:Date.now()+60_000,bindings,
- })+'\\n',{mode:0o600})
+ })+'\n',{mode:0o600})
  const oneRole=(role,subject)=>({subject,role,targets:['staging-canary']})
  const base=[oneRole('Operator','operator@example.test'),oneRole('Administrator','admin@example.test')]
  await write(base)
