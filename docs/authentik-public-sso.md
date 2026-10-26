@@ -107,6 +107,34 @@ login state or verifier are returned from this module.
 That high-trust HomeLab scope and separately maintained exact-role policy
 belong exclusively to the internal authorization boundary.
 
+## Encrypted single-host test-state implementation — draft PR #62
+
+The optional `createFileOidcTransactions` in
+`server/security/file-oidc-transactions.mjs` supplies the existing
+`reserve(record)` / `consume(state)` seam with an encrypted file store
+for a **single host using local POSIX filesystem semantics only**.
+It must be explicitly enabled with a pre-provisioned, non-symlinked
+owner-private 0700 directory, a separately managed server-side 32-byte
+AES-GCM key and a trusted clock. The store never creates public routes,
+provider credentials, sessions or cookies. It persists PKCE verifier,
+nonce, state and issuer/client bindings encrypted, with anonymous
+HMAC-derived filenames, O_EXCL private creation, fsync and atomic
+create-only hard-link consumption. A claim is single-use across
+cooperating local processes, including after restart. Bad permissions,
+expired state, corrupted ciphertext or key mismatch fail closed.
+
+**This is not production multi-instance state storage.** Hard-link
+atomicity on network filesystems and across hosts is not assumed,
+records are not automatically pruned, and a privileged operator must
+supply/rotate encryption keys without losing unexpired sessions.
+Do not deploy it with Docker overlay volumes, NFS, SMB, multi-region
+replicas or a read/write file share without independent review. A
+Postgres-based atomic-consume table (or comparably reviewed distributed
+store) with TTL expiration, rate limits, storage quotas and audited
+cleanup is recommended for public production login. A separate browser
+session cookie must bind the state to the initiating browser and
+protect against login-CSRF/session-swapping attacks.
+
 ## Before a real public Friday / multi-site login is ready
 
 1. Deploy and test a reachable, patched, backed-up Authentik service.
