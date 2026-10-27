@@ -1,5 +1,23 @@
 # Friday Build Status
 
+## 2026-10-27 four-project catalog bootstrap (stacked draft, source-only)
+
+Added fixed owner-selected catalog metadata for Friday AI OS,
+TechTactics, Web Growth Agents and App Builder to the trusted-grant
+draft PR. Its default-off bootstrap requires exact fresh catalog
+fingerprint and owner approval; never updates/deletes other projects.
+A server-only Supabase adapter is GET-only by default and limits an
+opt-in insert to exactly the four approved id/name pairs. Tests cover
+empty and partial catalogs, unrelated rows, conflicting IDs/names,
+stale fingerprints, invalid responses and post-write verification.
+
+The real VM132 `friday_projects` and `friday_work_items` tables
+were each observed **empty** through a read-only authenticated REST
+request. **No database write or live user grant has been made.**
+After reviewed project bootstrap, verify real catalog rows, signed
+identity subject, private policy ownership, and staging denial before
+separate production integration approval.
+
 ## 2026-10-27 four-project trusted user read scope — proposed, gated
 
 The owner selected Friday AI OS, TechTactics, Web Growth Agents and App
