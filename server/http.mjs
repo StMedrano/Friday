@@ -45,6 +45,7 @@ const mime = {
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json; charset=utf-8',
+  '.webmanifest': 'application/manifest+json; charset=utf-8',
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
@@ -84,7 +85,7 @@ function serveStatic(requestPath, response) {
   if (!existsSync(path)) return false
   response.writeHead(200, {
     'content-type': mime[extname(path)] || 'application/octet-stream',
-    'cache-control': path.endsWith('index.html') ? 'no-cache' : 'public, max-age=3600',
+    'cache-control': path.endsWith('index.html') || path.endsWith('/sw.js') || path.endsWith('.webmanifest') ? 'no-cache' : 'public, max-age=3600',
     'x-content-type-options': 'nosniff',
     'x-frame-options': 'DENY',
     'referrer-policy': 'no-referrer',
