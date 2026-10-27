@@ -1,5 +1,43 @@
 # Friday Build Status
 
+## 2026-10-27 Public Authentik: cross-instance encrypted OIDC state (draft PR #73)
+
+Friday's two separate public login site foundations are deployed as
+**disabled source code** on the production controller. Real Authentik
+on VM120 at `10.1.60.10:9000` responds to its internal health check,
+and the existing `friday` OIDC discovery endpoint responds HTTP 200.
+Neither the `family` nor the `techtactics` OIDC provider is registered
+yet (each discovery path returns 404). The live Cloudflare zone has
+`portal.mytechtactics.com` directed to an existing **Zoho Catalyst**
+service; it must not be displaced. The proposed separate TechTactics
+sign-in landing URL is now `accounts.mytechtactics.com`, pending
+owner confirmation. The DNS and identity service remain unchanged.
+
+Added a new, default-disabled `createPostgresOidcTransactions` adapter
+for **cross-instance, one-use Authentik authorization-code/PKCE state**.
+It implements the existing OIDC transaction seam with a separate
+pre-provisioned PostgreSQL connection and 32-byte encryption key
+per portal. A keyed SHA-256 state index excludes raw login-state bytes
+from filenames/SQL lookup, and AES-256-GCM protects the state,
+nonce, PKCE verifier and site/client binding at rest. Atomic
+`DELETE ... RETURNING` prevents replay across replicas.
+A new **UNAPPLIED** private SQL migration
+`20261027010000_friday_identity_oidc_transactions.sql` defines a
+five-minute TTL, unique composite key, forced RLS and disjoint Family
+vs TechTactics database-role policies. A bounded cleanup method
+requires trusted server-only scheduling. Offline disposable
+PostgreSQL and synthetic signed OIDC roundtrip tests cover the
+integration. CI result pending.
+
+This source-only release **does not deploy the database migration,
+create Authentik providers, DNS, TLS, client secrets, real site
+listeners or login sessions**. Do not replace existing Cloudflare
+Access, reveal PKCE keys or grant HomeLab executor access through
+a public login. Owner-reviewed live provider provisioning, HTTPS,
+DB credentials, user/MFA and browser acceptance remain prerequisites.
+See `docs/authentik-two-login-sites.md`.
+
+
 ## 2026-10-26 production release candidate: dormant public Authentik code
 
 This release branch contains **only public-login components** brought
