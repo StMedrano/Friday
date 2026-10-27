@@ -1,5 +1,7 @@
 # Public Authentik identity hub for Friday and future sites
 
+**Site name clarification (2026-10-27):** the existing DNS name `portal.mytechtactics.com` is occupied by an active Zoho Catalyst mapping. This plan proposes a separate `accounts.mytechtactics.com` TechTactics SSO portal; no DNS or provider changes are made without the owner's final name approval.
+
 **Two independent login-site experiences requested:** a Family HomeLab
 portal and a TechTactics business portal, with **different Authentik
 branded login domains and separate application policies**. Draft PR
