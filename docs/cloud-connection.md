@@ -36,7 +36,12 @@ slashes and all other routes are rejected:
 | `/api/incidents` | Existing incident summary and records |
 | `/api/monitoring/history` | Existing bounded monitoring history |
 
-The last three require enabled monitoring. Missing cache/data returns 503.
+The last three require enabled monitoring. Missing cache/data and invalid
+snapshot envelopes (including unresolved asynchronous values) return a generic
+503, never a successful empty object. Overview requires a valid collection
+timestamp, live/mock mode and a service list; incident and history reads require
+their existing structured envelopes. This is structural validation, **not** a
+freshness guarantee or a replacement for upstream normalization.
 Responses are limited to 2 MiB and are not cached by HTTP clients. Requests do
 not poll adapters, run AI, read repositories, fetch diagnostic logs, sync the
 registry or execute commands. Snapshot timestamps must be inspected for

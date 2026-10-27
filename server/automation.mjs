@@ -6,6 +6,28 @@ const routes = new Set(['/api/health', '/api/overview', '/api/incidents', '/api/
 const methods = new Set(['GET', 'HEAD', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'])
 const MAX_BYTES = 2 * 1024 * 1024
 
+const isObject = value => value !== null && typeof value === 'object' && !Array.isArray(value)
+
+// These are envelope checks, not a claim that a cached observation is fresh.
+// Reject Promise/undefined/malformed state instead of serializing it as 200 {}.
+// Keep authorization and field normalization with their existing upstream owners.
+function validSnapshot(route, data) {
+  if (!isObject(data)) return false
+  if (route === '/api/overview') {
+    return ['live', 'mock'].includes(data.mode) &&
+      typeof data.generatedAt === 'string' &&
+      Number.isFinite(Date.parse(data.generatedAt)) &&
+      Array.isArray(data.services)
+  }
+  if (route === '/api/incidents') {
+    return Array.isArray(data.incidents) && isObject(data.summary) &&
+      ['active', 'high', 'warning', 'resolved'].every(key =>
+        Number.isSafeInteger(data.summary[key]) && data.summary[key] >= 0)
+  }
+  if (route === '/api/monitoring/history') return Array.isArray(data.events)
+  return false
+}
+
 // Separate listener: never forwards requests into the UI, repository, AI or
 // diagnostic handlers. Reads use the controller's existing monitoring cache.
 export function createAutomationServer({ config, monitoringRuntime, accessGateImpl = null,
@@ -51,7 +73,7 @@ export function createAutomationServer({ config, monitoringRuntime, accessGateIm
       const data = route === '/api/overview' ? monitoringRuntime?.getOverview?.()
         : route === '/api/incidents' ? monitoringRuntime?.getIncidents?.()
           : monitoringRuntime?.getHistory?.()
-      if (!data) return reply(503, { error: 'snapshot-unavailable' })
+      if (!validSnapshot(route, data)) return reply(503, { error: 'snapshot-unavailable' })
       return reply(200, data)
     } catch {
       return reply(503, { error: 'automation-unavailable' })
