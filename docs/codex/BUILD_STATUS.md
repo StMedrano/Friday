@@ -1,5 +1,27 @@
 # Friday Build Status
 
+## 2026-10-27 installable FRIDAY PWA — draft and not deployed
+
+Friday gains a standards-based production-only PWA registration path,
+standalone install manifest, branded opaque 180/192/512 PNG launcher
+icons built deterministically from source, icon/favicon metadata and
+an accessible Android/desktop install prompt when offered by the browser.
+Responsive desktop/mobile layout and Cloudflare Access remain unchanged.
+
+A root-scoped service worker **never caches authenticated HTML,
+Cloudflare login pages, tasks, memory, monitoring or other API results**.
+Only correctly typed, hashed immutable Vite JS/CSS may be cached; offline
+navigation returns generic reconnect instructions with no private state.
+Missing/offline PWA support never blocks ordinary Friday. The Node
+server includes the webmanifest MIME and SW/manifest no-cache policy.
+See `docs/pwa.md` for staged Android/iOS/desktop and cache audit tests.
+
+**No production deploy, Access policy change, Supabase write, HomeLab
+action, agent execution or grant enrollment has been performed.**
+Final exact-head CI and staging browser acceptance are required before
+production promotion.
+
+
 ## 2026-10-27 signed, default-off Tasks/Memory GET transport (draft only)
 
 A fixed-origin server-side read-only PostgREST repository is included
