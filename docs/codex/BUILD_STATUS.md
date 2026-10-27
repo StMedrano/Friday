@@ -1,5 +1,36 @@
 # Friday Build Status
 
+## Opt-in per-site HTTP boundary — draft PR #68 (source only)
+
+Implemented `server/security/login-sites-http.mjs` as a real
+Node.js `http.createServer`-compatible request handler for **each**
+separate Family HomeLab and TechTactics HTTPS vhost, but it is
+**not mounted by production `server/index.mjs`** and never calls
+`.listen()` itself. Each instance must be explicitly enabled with
+a server-trusted `family` or `techtactics` site ID, exact public HTTPS
+origin, and the corresponding registered `createLoginSites` adapter.
+The adapter now exposes a minimal, read-only `originFor(id)`
+lookup to prevent misbinding family and business listeners.
+The handler never chooses a site based on untrusted Host or
+X-Forwarded-* headers and denies Host mismatch or forwarded
+override. Deployment still needs a **separate** HTTPS reverse-proxy
+vhost per portal with verified Host preservation.
+
+Real loopback HTTP tests cover independent site HTML/CSS, safe
+OAuth redirects, query-exact OIDC callback, secure Set-Cookie,
+session-gated accounts, exact-Origin/CSRF POST logout, duplicate
+callback parameters, cross-site cookies, untrusted Host/forwarded
+headers, large or wrong-type request bodies, disabled default,
+unrecognized paths and generic error messages. This is a verified
+source HTTP adapter only; no actual internet-facing route, port,
+DNS, TLS, proxy, Authentik provider, session database or user has
+been provisioned. Family public login still conveys **no HomeLab
+execution rights**, TechTactics remains independent, existing
+Cloudflare protection unchanged. Needs full CI, code/security
+review, transaction/session backend and real external acceptance
+before any deployment.
+
+
 ## Two distinct public login sites — Family HomeLab and TechTactics (draft PR #66)
 
 Added a **disabled-by-default**, source-only
