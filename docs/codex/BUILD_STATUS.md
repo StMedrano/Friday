@@ -1,5 +1,24 @@
 # Friday Build Status
 
+## 2026-10-27 signed trusted-user enrollment for Tasks/Memory (stacked draft)
+
+The opt-in `createTrustedWorkReadBridge` now binds signed human
+Cloudflare Access subjects to narrowly scoped, owner-private policy
+file grants using domain-separated subject digests, not emails or
+browser roles. The file is read per operation and must be canonical,
+owner-only, size-bounded, short-lived and exact. Revocation and
+downgrades take effect on the next request. Test-first fixtures cover
+genuine signed JWTs, email/role spoofing, denied subjects, project
+scopes, expired grants, symlinks, file permissions, replacement and
+duplicate authority keys.
+
+This is a **stacked source-only PR on the prior disabled Phase 2B
+read bridge**, not production rollout or user enrollment. Neither
+`server/index.mjs` nor the UI mounts these methods; no owner
+policy, identity subject, real token, Supabase key or approval
+authority has been provisioned. Runtime Actions remain unavailable.
+
+
 ## 2026-10-27 Phase 2B private Tasks/Memory read bridge (draft, source-only)
 
 Added a default-disabled, server-owned `createPrivateWorkReadBridge`
