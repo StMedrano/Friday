@@ -24,6 +24,18 @@ signed-human Phase 2B read bridge:
   returns `{memories:[]}` from **project scope only**. No global,
   organization, group, task or agent memory query is exposed.
 
+A companion `server/work/read-only-repository.mjs` provides only
+`get`, `list` and `memorySearch` for existing Phase 2B services.
+It pins the configured HTTPS origin to
+`https://supabase.mytechtactics.com` (fixed server configuration),
+uses exact PostgREST column selections and bounded responses, and
+exposes **no mutation method or RPC**. It requires a separately
+provisioned SELECT-only database role/key, **not**
+`FRIDAY_SUPABASE_SERVICE_KEY`. The adapter has no production
+wiring yet. A server-only method surface is necessary but not
+sufficient to prove least-privileged database permissions; verify
+effective database grants and read-only key restrictions before enabling.
+
 The transport rejects duplicate/unrecognized query keys, malformed IDs,
 excessive limits, service JWTs, missing/invalid human signed JWTs and
 cross-project requests. Read results use `cache-control: no-store`.
