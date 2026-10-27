@@ -16,6 +16,13 @@ function token(subject='trusted-123',override={}){
  const signed=head+'.'+payload
  return signed+'.'+sign('RSA-SHA256',Buffer.from(signed),privateKey).toString('base64url')
 }
+function tamperSignature(jwt){
+ const parts=jwt.split('.')
+ // Always corrupt the first six bits of the RSA signature; modifying the
+ // final base64url character may only change ignored padding bits.
+ parts[2]=(parts[2][0]==='A'?'B':'A')+parts[2].slice(1)
+ return parts.join('.')
+}
 function configuration(){
  return {mode:'live',access,ai:{enabled:false},monitoring:{enabled:false}}
 }
@@ -89,7 +96,7 @@ test('untrusted, signed different subject, forged email, unsigned, and service i
   const forged=token('untrusted-123',{email:'operator@example.test',role:'Administrator'})
   const cases=[null,forged,token('trusted-123',{aud:'wrong'}),
    token('trusted-123',{exp:1}),token('trusted-123',{type:'app',sub:''}),
-   token().replace(/.$/,'X'),'abc.def.ghi']
+   tamperSignature(token()),'abc.def.ghi']
   for(const jwt of cases){
    const response=await get(base,'/api/work/tasks?projectId=friday-ai-os',jwt)
    assert.equal(response.status,403)
