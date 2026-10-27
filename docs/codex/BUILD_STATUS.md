@@ -1,5 +1,43 @@
 # Friday Build Status
 
+## Two distinct public login sites — Family HomeLab and TechTactics (draft PR #66)
+
+Added a **disabled-by-default**, source-only
+`server/security/login-sites.mjs` adapter that composes with
+`createPublicOidcFlow` and `createPublicOidcBrowser` to provide
+**two separately branded public login entry experiences**:
+`family` (Family HomeLab / Friday family services) and
+`techtactics` (business staff, clients, future sites). The code
+only accepts exactly these two registered site identities with
+**different app HTTPS origins and different Authentik IdP HTTPS
+origins**. Both use independent login-state cookies, issuer/client
+registration, CSRF-controlled logout, session permissions and
+single-site accounts. Responsive accessible HTML/CSS pages are
+rendered for each brand; internal handlers cover login, OIDC start,
+callback, account and logout with exact-site origin checking.
+Static HTML contains no secrets, tokens or browser scripts.
+
+End-to-end synthetic tests use the existing OIDC and browser
+security components under **two distinct RSA-signed issuers**.
+They verify that identical user `sub` strings under separate
+issuers are *not* the same authority and that cookies from the
+family portal do not authenticate to business and vice versa.
+The underlying Authentik deployment can use **two Brands
+matched to distinct login domains**, but Brands only change
+appearance/default flows, not database tenant isolation.
+Actual separate user membership, client credentials, RBAC
+and group policies must be provisioned and independently
+reviewed in Authentik. See `docs/authentik-two-login-sites.md`.
+
+These URLs are **proposed only**, not registered or live.
+This does **not** register a public server route, create real
+identity providers/users, configure TLS/tunnels/DNS, provide
+a persistent cross-host session database, merge into production,
+or contact VM120/VM102 or any HomeLab executor.
+The live Friday Cloudflare Access configuration remains unchanged.
+CI and security review are required before considering rollout.
+
+
 ## P8 public Authentik browser-cookie / server-session boundary — draft PR #64 (source only)
 
 Added `server/security/public-oidc-browser.mjs` as a **disabled-by-default

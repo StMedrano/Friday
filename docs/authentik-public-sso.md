@@ -1,5 +1,13 @@
 # Public Authentik identity hub for Friday and future sites
 
+**Two independent login-site experiences requested:** a Family HomeLab
+portal and a TechTactics business portal, with **different Authentik
+branded login domains and separate application policies**. Draft PR
+#66 adds default-disabled HTML/route adapters and synthetic end-to-end
+tests. See `docs/authentik-two-login-sites.md` for the detailed
+deployment plan. Domain names there are only proposed, not live.
+
+
 **Design plus source-only OIDC login contract, not a deployed login service.**
 Draft PR #60 adds a reusable, server-only authorization-code + PKCE flow
 for multiple public applications. It is not yet mounted as a route or used
