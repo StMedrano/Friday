@@ -57,8 +57,12 @@ const ensureRows=result=>{
  * app processes sharing one transactional Postgres database. They are NOT
  * currently wired to the Friday production HTTP/server bootstrap.
  */
-export function createPostgresLoginSessions({enabled=false,query,now=Date.now}={}) {
- const ready=enabled===true&&typeof query==='function'&&typeof now==='function'
+export function createPostgresLoginSessions({enabled=false,applicationId,query,now=Date.now}={}) {
+ // Every backend is permanently bound to ONE website and must use that
+ // website's distinct DB login role. Never infer it from browser requests.
+ const configuredApplicationId=applicationId
+ const ready=enabled===true&&validApp(configuredApplicationId)&&
+  typeof query==='function'&&typeof now==='function'
  const clock=()=>{
   const value=now()
   if(!safeTime(value))deny()
@@ -72,7 +76,7 @@ export function createPostgresLoginSessions({enabled=false,query,now=Date.now}={
  return Object.freeze({
   enabled:ready,
   async create(record){
-   if(!ready||!validNew(record))deny()
+   if(!ready||!validNew(record)||record.applicationId!==applicationId)deny()
    const at=clock()
    if(record.createdAt>at||record.expiresAt<=at)deny()
    const result=await run(INSERT,[
@@ -82,7 +86,7 @@ export function createPostgresLoginSessions({enabled=false,query,now=Date.now}={
    if(result.rowCount!==1)deny()
   },
   async read(input){
-   if(!ready||!validRead(input))deny()
+   if(!ready||!validRead(input)||input.applicationId!==applicationId)deny()
    const at=clock()
    const result=await run(SELECT,[input.applicationId,input.tokenHash,at])
    if(result.rowCount===0)return null
@@ -100,7 +104,7 @@ export function createPostgresLoginSessions({enabled=false,query,now=Date.now}={
    return value
   },
   async revoke(input){
-   if(!ready||!validRead(input))deny()
+   if(!ready||!validRead(input)||input.applicationId!==applicationId)deny()
    const at=clock()
    const result=await run(REVOKE,[input.applicationId,input.tokenHash,at])
    if(result.rowCount>1)deny()
@@ -110,14 +114,16 @@ export function createPostgresLoginSessions({enabled=false,query,now=Date.now}={
   // public login, model tool or role inferred from OAuth browser headers.
   async revokeSubject(input){
    if(!ready||!exact(input,['applicationId','subject'])||
-      !validApp(input.applicationId)||!validSubject(input.subject))deny()
+      !validApp(input.applicationId)||input.applicationId!==applicationId||
+      !validSubject(input.subject))deny()
    const result=await run(REVOKE_SUBJECT,[input.applicationId,input.subject])
    return result.rowCount
   },
   // Optional application-scoped bounded cleanup. A scheduler and retention
   // policy remain a separate deployment task; no cron is created here.
   async cleanup({applicationId,limit=100}={}){
-   if(!ready||!validApp(applicationId)||!Number.isSafeInteger(limit)||
+   if(!ready||!validApp(applicationId)||applicationId!==configuredApplicationId||
+      !Number.isSafeInteger(limit)||
       limit<1||limit>1000)deny()
    const result=await run(CLEANUP,[applicationId,clock(),limit])
    if(result.rowCount>limit)deny()
