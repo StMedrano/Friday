@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, FolderGit2, HardDrive, Home, MemoryStick, Network, Search, Server, Settings, ShieldCheck, Sparkles } from 'lucide-react'
+import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, FolderGit2, HardDrive, Home, MemoryStick, Network, Server, Settings, ShieldCheck, Sparkles } from 'lucide-react'
 import { fetchMonitoringHistory, useFridayOverview, type FridayIncident, type MonitoringEvent } from '../lib/api'
 import { useFridaySession } from '../hooks/useFridaySession'
+import { statusLabel, summarizeHealth } from '../lib/status'
 import { usePhoneLayout } from '../hooks/usePhoneLayout'
 import ActiveIncidents from '../components/ActiveIncidents'
 import AgentsWorkspace from '../components/AgentsWorkspace'
@@ -36,11 +37,11 @@ export default function Dashboard() {
   const [history, setHistory] = useState<MonitoringEvent[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null)
-  const online = overview.services.filter(s => s.status === 'online').length
-  const health = Math.round((online / Math.max(overview.services.length, 1)) * 100)
   const incidents = overview.incidents ?? []
   const selectedIncident = incidents.find((incident) => incident.id === selectedIncidentId) ?? null
   const activeIncidents = overview.monitoring?.activeIncidents ?? incidents.filter((incident) => incident.status === 'open').length
+  const health = summarizeHealth(overview.services, activeIncidents)
+  const live = connected && overview.mode === 'live'
   const metrics = useMemo(() => overview.resources.slice(0, 3), [overview.resources])
 
   useEffect(() => {
@@ -127,8 +128,7 @@ export default function Dashboard() {
       <div className="v3-workspace">
         <header className="v3-topbar">
           <div><strong>FRIDAY</strong><span>AI OPERATIONS CONTROL</span></div>
-          <button className="v3-search"><Search size={16}/><span>Search or command</span><kbd>Ctrl K</kbd></button>
-          <div className="v3-system"><i /> {connected && overview.mode === 'live' ? 'READ-ONLY MONITORING' : 'LIVE STATUS UNAVAILABLE'}</div>
+          <div className={`v3-system ${live ? 'live' : 'unavailable'}`} role="status" aria-label="Live data status"><i /> {live ? 'READ-ONLY MONITORING' : 'LIVE STATUS UNAVAILABLE'}</div>
         </header>
 
         <main className="v3-main">
@@ -148,13 +148,14 @@ export default function Dashboard() {
                 <FridayComposer value={query} loading={friday.loading} placeholder="Ask FRIDAY anything…" onChange={setQuery} onSubmit={submitFriday}/>
                 {friday.messages.length > 0 && <button type="button" className="v3-friday-continue" onClick={() => navigate('FRIDAY')}>Continue conversation <ChevronRight size={14}/></button>}
               </div>
-              <div className="v3-health">
+              <section className={`v3-health ${health.level}`} aria-label="System health">
                 <span className="v3-kicker">SYSTEM HEALTH</span>
-                <div className="v3-health-score"><strong>{health}%</strong><span>{activeIncidents > 0 ? 'ATTENTION' : 'NOMINAL'}</span></div>
-                <div className="v3-health-row"><span>Services</span><b>{online}/{overview.services.length}</b></div>
+                <div className="v3-health-score"><strong>{health.percent === null ? '—' : `${health.percent}%`}</strong><span>{health.label}</span></div>
+                {health.attention.length > 0 && <ul className="v3-health-attention">{health.attention.slice(0, 2).map((service) => <li key={service.id} className={service.status}><b>{service.name}</b> <span>{statusLabel(service.status)}</span></li>)}</ul>}
+                <div className="v3-health-row"><span>Services online</span><b>{health.online}/{health.total}</b></div>
                 <div className="v3-health-row"><span>Active incidents</span><b>{activeIncidents}</b></div>
                 <div className="v3-health-row"><span>Sites</span><b>{overview.sites.length}</b></div>
-              </div>
+              </section>
             </section>
 
             <ActiveIncidents incidents={incidents} onSelectIncident={viewDiagnosis}/>
@@ -166,10 +167,10 @@ export default function Dashboard() {
 
             <section className="v3-grid">
               <div className="v3-panel"><div className="v3-section-head"><div><span className="v3-kicker">TELEMETRY</span><h2>VM 100 · Infrastructure</h2></div><span className="v3-live"><i/> LIVE</span></div><div className="v3-metrics">{metrics.map((m, i) => <div key={m.label}><span>{i === 0 ? <Cpu/> : i === 1 ? <MemoryStick/> : <HardDrive/>}{m.label}</span><strong>{m.value}%</strong><div><i style={{width:`${m.value}%`}}/></div><small>{m.helper}</small></div>)}</div></div>
-              <div className="v3-panel"><div className="v3-section-head"><div><span className="v3-kicker">AGENT MESH</span><h2>Active agents</h2></div><Bot size={18}/></div><div className="v3-agents"><div><i className="on"/><span><b>Monitoring</b><small>Watching system health</small></span><em>ACTIVE</em></div><div><i className="on"/><span><b>Infrastructure</b><small>Inventory synchronized</small></span><em>READY</em></div><div><i/><span><b>Security</b><small>Policy engine ready</small></span><em>IDLE</em></div></div></div>
+              <section className="v3-panel" aria-labelledby="v3-needs-attention"><div className="v3-section-head"><div><span className="v3-kicker">SERVICES</span><h2 id="v3-needs-attention">Needs attention</h2></div><button onClick={() => navigate('Applications')}>View applications <ChevronRight size={15}/></button></div><div className="v3-agents">{health.attention.length ? health.attention.slice(0, 4).map((service) => <div key={service.id}><i className={service.status}/><span><b>{service.name}</b><small>{service.host} · {service.detail}</small></span><em className={service.status}>{statusLabel(service.status)}</em></div>) : <div><i className="on"/><span><b>No service issues</b><small>{health.total ? 'Every observed service reports online.' : 'No services observed yet.'}</small></span></div>}</div></section>
             </section>
 
-            <section className="v3-section"><div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><span>{online} online</span></div><div className="v3-services">{overview.services.map(s => <button key={s.id} onClick={() => navigate('Applications')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span><em>{s.updated}</em></button>)}</div></section>
+            <section className="v3-section"><div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><span>{health.online} online</span></div><div className="v3-services">{overview.services.map(s => <button key={s.id} onClick={() => navigate('Applications')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span><em>{s.updated}</em></button>)}</div></section>
           </> : active === 'FRIDAY' ? <FridayWorkspace session={friday} query={query} onQueryChange={setQuery} onSubmit={submitFriday}/>
             : active === 'Agents' ? <AgentsWorkspace/>
             : active === 'Applications' ? <ApplicationsWorkspace overview={overview} connected={connected}/>
