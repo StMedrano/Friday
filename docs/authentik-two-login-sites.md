@@ -98,6 +98,41 @@ different issuers has different issuer-scoped subjects and never
 grants a session to the other portal. Family sessions must never
 grant business roles, and business sessions never HomeLab access.
 
+## Isolated Node HTTP request handler — draft PR #68
+
+`server/security/login-sites-http.mjs` now adapts the separately
+branded `createLoginSites` module to Node HTTP requests. It creates
+**no listener by itself**; a trusted server would explicitly construct
+one handler per application, each pinned to its server-configured
+site ID (`family` or `techtactics`) and the corresponding exact
+HTTPS public origin.
+
+The handler refuses an HTTP Host value different from the registered
+public origin and rejects all `Forwarded`, `X-Forwarded-*` and
+`X-Friday-Role` headers rather than trusting them as identity input.
+The reverse proxy must preserve the exact canonical Host and must not
+pass through untrusted forwarded headers. No tenant, role, URL or
+login destination is inferred from a browser-supplied hostname.
+
+The server-side routes support two distinct, responsive login
+pages, the per-site Authentik authorization start, exact-code/state
+callback, authenticated account display and logout. Callback query
+fields must be exactly one `state` and one `code`; duplicate or
+additional parameters fail before reaching the signed OIDC layer.
+Logout accepts only bounded POST `application/x-www-form-urlencoded`
+with exactly one synchronizer CSRF token and the **same site Origin**
+header; sessions and cookies are kept per host. Form requests with
+ambiguous chunked or overlarge bodies, spoofed hosts, redirected
+paths, or malformed parameters fail closed. Errors return generic
+responses with no underlying identity-store exception.
+
+**No Friday production route or public socket has been enabled**.
+The module is tested using separate Node servers bound to loopback
+with synthetic Authentik browser/OIDC providers. Actual TLS and
+reverse-proxy pinning, a transactional shared session database,
+provider configuration and security review remain prerequisites
+before running any public-facing listener.
+
 ## Real Authentik configuration required before deployment
 
 1. Decide whether both sign-in hostnames use one hardened, patched
