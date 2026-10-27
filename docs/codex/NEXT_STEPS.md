@@ -1,5 +1,28 @@
 # Friday — Ordered Finish Queue
 
+## Next: activate signed private Tasks/Memory reads through reviewed staging
+
+- Source-only GET routes are now available via `createFridayServer({workReadBridge})`.
+  `server/index.mjs` does not inject them: all `/api/work/*` still
+  return 404 without explicit secure server composition.
+- The GET-only repository adapter is implemented behind a fixed
+  `https://supabase.mytechtactics.com` origin and needs a separate
+  SELECT-only database credential. Inspect the actual effective DB role
+  grants and deny write-capable service tokens in the runtime configuration.
+- Verify and register the four owner-selected project records on VM132
+  after a separate backed-up, authorized database change. Inspect the
+  actual `friday_projects` rows rather than trusting UI labels.
+- Bind independently signed Cloudflare Access `sub` to exact current,
+  revocable private file grants; never put email/subject/JWT in Git or
+  rely on browser role headers. Provision an independently limited
+  **read-only** database credential, log denial/read outcomes safely,
+  verify cross-project isolation and expiry in staging.
+- After approvals, connect the backend and desktop/mobile Tasks/Memory
+  views, then pass live Access, browser, permission and rollback tests.
+  No HomeLab actions, agent tools, approval writes, or deployment granted
+  by this source-only API work.
+
+
 ## Staged four-project catalog registration — pending owner-reviewed apply
 
 - Code now provides `createFourProjectCatalogBootstrap` and

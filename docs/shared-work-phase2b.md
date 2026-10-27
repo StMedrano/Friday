@@ -9,6 +9,49 @@
 - Tests: `npm test`, `npm run validate:shared-work-schema`, and `npm run test:shared-work-db`. The DB runner starts **its own ephemeral PostgreSQL 16 container** without volumes, host ports or an external network; it checks no configured DB URL is present and destroys only its own container.
 - Existing Phase 1 registry migration is unchanged. No task/memory HTTP APIs, MCP writes or infrastructure executors exist in 2B. New modules are **not wired into the public running Friday controller**.
 
+## Signed Tasks and project Memory HTTP read contract — source-only (2026-10-27)
+
+A new test-first `server/work/http-reads.mjs` adapter and optional
+`workReadBridge` constructor argument in `createFridayServer` provide
+a strictly GET-only, explicitly injected transport for the existing
+signed-human Phase 2B read bridge:
+
+- `GET /api/work/tasks?projectId=ID&limit=1..25` returns `{tasks:[]}`
+  with only sanitized task IDs, title, status, version and project ID.
+- `GET /api/work/tasks/ID` returns `{task:{...}}` after exact project
+  membership checks by the private bridge.
+- `GET /api/work/memory?projectId=ID&q=TEXT&limit=1..20`
+  returns `{memories:[]}` from **project scope only**. No global,
+  organization, group, task or agent memory query is exposed.
+
+A companion `server/work/read-only-repository.mjs` provides only
+`get`, `list` and `memorySearch` for existing Phase 2B services.
+It pins the configured HTTPS origin to
+`https://supabase.mytechtactics.com` (fixed server configuration),
+uses exact PostgREST column selections and bounded responses, and
+exposes **no mutation method or RPC**. It requires a separately
+provisioned SELECT-only database role/key, **not**
+`FRIDAY_SUPABASE_SERVICE_KEY`. The adapter has no production
+wiring yet. A server-only method surface is necessary but not
+sufficient to prove least-privileged database permissions; verify
+effective database grants and read-only key restrictions before enabling.
+
+The transport rejects duplicate/unrecognized query keys, malformed IDs,
+excessive limits, service JWTs, missing/invalid human signed JWTs and
+cross-project requests. Read results use `cache-control: no-store`.
+Backend exceptions, unsafe projections and missing grants never return
+an invented empty success. POST, PATCH, PUT and DELETE all return 404,
+including when callers have a valid Access JWT. Browser emails, role
+headers, agents and model responses never create grants.
+
+**Still default-off:** `server/index.mjs` does not construct or inject
+`workReadBridge`; the production routes therefore return 404.
+Enabling requires a separately reviewed server-only composition of an
+Access application/audience, owner-private expiring grant file,
+authoritative project rows, read-limited VM132 storage client,
+audit and staged cross-project denial tests before any release.
+No production endpoint or privileged server action is enabled.
+
 ## Default-off identity-bound private reads (2026-10-27 source candidate)
 
 `server/work/private-read-bridge.mjs` composes existing Phase 2B work and
