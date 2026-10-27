@@ -29,7 +29,7 @@ const rect=(x,y,x1,y1,x2,y2)=>x>=x1&&x<=x2&&y>=y1&&y<=y2
  * inside the central maskable safe area; no third-party raster dependencies.
  */
 export function createFridayPng(size){
- if(size!==192&&size!==512)throw Error('unsupported Friday icon size')
+ if(![180,192,512].includes(size))throw Error('unsupported Friday icon size')
  const stride=1+size*3
  const pixels=Buffer.alloc(stride*size)
  for(let row=0;row<size;row++){
@@ -64,7 +64,7 @@ export function createFridayPng(size){
 export async function writeFridayPwaIcons(outDir='dist'){
  const icons=join(outDir,'icons')
  await mkdir(icons,{recursive:true})
- await Promise.all([192,512].map(size=>
+ await Promise.all([180,192,512].map(size=>
   writeFile(join(icons,`friday-${size}.png`),createFridayPng(size))))
 }
 if(process.argv[1]&&fileURLToPath(import.meta.url)===process.argv[1]){
