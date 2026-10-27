@@ -18,11 +18,11 @@ function jwt({sub='member-1',aud=audience,exp=now()+600,...claims}={}){
 const request=token=>({headers:token?{'cf-access-jwt-assertion':token}:{}})
 function fixture({enabled=true,grantsForSubject,workRows,memoryRows}={}){
  const calls=[],grants=[]
- const grantSource=grantsForSubject||async subject=>{
+ const grantSource=grantsForSubject||(async subject=>{
   grants.push(subject)
   return {allowedProjectIds:['project-a'],
    allowedMemoryScopes:[{scope:'project',ownerId:'project-a'}]}
- }
+ })
  const workService={
   async list(args){
    calls.push({operation:'tasks',args})
