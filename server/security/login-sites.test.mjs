@@ -1,7 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {createLoginSites} from './login-sites.mjs'
+import {createPublicOidcFlow} from './public-oidc.mjs'
+import {createPublicOidcBrowser} from './public-oidc-browser.mjs'
+import {generateKeyPairSync,randomBytes,sign} from 'node:crypto'
 
+const issuedNonce={}
 const origins={
  family:'https://family.example.test',
  techtactics:'https://business.example.test',
@@ -211,5 +215,93 @@ test('AuthentiK outage is generic fail-closed, never leaks exception or redirect
   const out=await bad.handle(route('family',path))
   assert.equal(out.status>=400,true)
   assert.equal(JSON.stringify(out).includes('secret-credentials'),false)
+ }
+})
+
+test('real OIDC/browser components keep the family and TechTactics identity issuers and sessions distinct',async()=>{
+ const now=1793034000000
+ const {publicKey,privateKey}=generateKeyPairSync('rsa',{modulusLength:2048})
+ const jwk={...publicKey.export({format:'jwk'}),kid:'fixture-key',alg:'RS256',use:'sig'}
+ const sites=[]
+ const sessions=new Map()
+ for(const id of ['family','techtactics']){
+  const issuer=identityOrigins[id]+'/application/o/'+id+'/'
+  const clientId=id+'-web'
+  const txns=new Map()
+  const transactions={
+   async reserve(row){if(txns.has(row.state))throw Error('duplicate');txns.set(row.state,row)},
+   async consume(state){const row=txns.get(state);txns.delete(state);return row},
+  }
+  const fetchImpl=async url=>{
+   if(url===issuer+'.well-known/openid-configuration')return {ok:true,json:async()=>({
+    issuer,jwks_uri:issuer+'jwks/',authorization_endpoint:identityOrigins[id]+'/application/o/authorize/',
+    token_endpoint:identityOrigins[id]+'/application/o/token/',
+   })}
+   if(url===identityOrigins[id]+'/application/o/token/'){
+    const tx=[...txns.values()][0]
+    // consume() removed the entry; keep a separate nonce below.
+    const nonce=issuedNonce[id]
+    const claims={iss:issuer,aud:clientId,sub:'same-user-on-both-sites',
+     nonce,iat:Math.floor(now/1000)-10,exp:Math.floor(now/1000)+300}
+    const b64=value=>Buffer.from(JSON.stringify(value)).toString('base64url')
+    const message=b64({alg:'RS256',typ:'JWT',kid:'fixture-key'})+'.'+b64(claims)
+    return {ok:true,json:async()=>({token_type:'Bearer',
+     id_token:message+'.'+sign('RSA-SHA256',Buffer.from(message),privateKey).toString('base64url')})}
+   }
+   if(url===issuer+'jwks/')return {ok:true,json:async()=>({keys:[jwk]})}
+   throw Error('unexpected IdP origin')
+  }
+  const flow=createPublicOidcFlow({enabled:true,identityOrigin:identityOrigins[id],applications:[{
+   id,slug:id,clientId,clientSecret:'fixture-only-secret-'+id,
+   redirectUri:origins[id]+'/auth/oidc/callback',
+  }]},{transactions,fetchImpl,now:()=>now})
+  const records=new Map()
+  const store={
+   async create(row){records.set(row.tokenHash,row)},
+   async read({applicationId,tokenHash}){
+    const row=records.get(tokenHash)
+    return row?.applicationId===applicationId?row:null
+   },
+   async revoke({applicationId,tokenHash}){
+    const row=records.get(tokenHash)
+    if(row?.applicationId!==applicationId)return false
+    return records.delete(tokenHash)
+   },
+  }
+  sessions.set(id,records)
+  const browser=createPublicOidcBrowser({enabled:true,
+   applications:[{id,origin:origins[id]}],flow,sessionStore:store,
+   signingKey:randomBytes(32),now:()=>now})
+  sites.push({id,origin:origins[id],identityOrigin:identityOrigins[id],browser,
+   _txns:txns})
+ }
+ const siteConfig=sites.map(({_txns,...site})=>site)
+ const router=createLoginSites({enabled:true,sites:siteConfig})
+ assert.equal(router.enabled,true)
+ const tokens=[]
+ for(const id of ['family','techtactics']){
+  const begin=await router.handle(route(id,'/auth/start'))
+  assert.equal(begin.status,302)
+  assert.equal(new URL(begin.headers.location).origin,identityOrigins[id])
+  const state=new URL(begin.headers.location).searchParams.get('state')
+  issuedNonce[id]=sites.find(x=>x.id===id)._txns.get(state).nonce
+  const callback=await router.handle(route(id,'/auth/oidc/callback',{
+   query:{state,code:'synthetic-code'},
+   cookieHeader:begin.headers['set-cookie'].split(';')[0],
+  }))
+  assert.equal(callback.status,303)
+  const bearer=callback.headers['set-cookie'][1].split(';')[0]
+  tokens.push({id,bearer})
+  const account=await router.handle(route(id,'/account',{cookieHeader:bearer}))
+  assert.equal(account.status,200)
+ }
+ assert.equal(sessions.get('family').size,1)
+ assert.equal(sessions.get('techtactics').size,1)
+ const familySubject=[...sessions.get('family').values()][0].subject
+ const businessSubject=[...sessions.get('techtactics').values()][0].subject
+ assert.notEqual(familySubject,businessSubject)
+ for(const token of tokens){
+  const other=token.id==='family'?'techtactics':'family'
+  assert.equal((await router.handle(route(other,'/account',{cookieHeader:token.bearer}))).status,403)
  }
 })
