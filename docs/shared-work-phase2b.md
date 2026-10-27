@@ -9,6 +9,29 @@
 - Tests: `npm test`, `npm run validate:shared-work-schema`, and `npm run test:shared-work-db`. The DB runner starts **its own ephemeral PostgreSQL 16 container** without volumes, host ports or an external network; it checks no configured DB URL is present and destroys only its own container.
 - Existing Phase 1 registry migration is unchanged. No task/memory HTTP APIs, MCP writes or infrastructure executors exist in 2B. New modules are **not wired into the public running Friday controller**.
 
+## Default-off identity-bound private reads (2026-10-27 source candidate)
+
+`server/work/private-read-bridge.mjs` composes existing Phase 2B work and
+memory services behind a **verified human Cloudflare Access JWT** and an
+independent server-provisioned `grantsForSubject(subject)` function. Only
+exact project grants and durable memory scope grants permit bounded
+`listTasks`, `getTask`, and `searchMemory` projections. Responses
+omit work objectives, detailed packets, credentials and unverified service
+metadata. Wrong project rows, over-limit results, malformed or untrusted
+grant snapshots, unexpected inputs, unavailable backends and invalid JWTs
+all fail closed. Service token identities cannot acquire human task access.
+The bridge offers **no writes or approval actions**.
+
+The bridge is `enabled:false` by default, has no HTTP handlers, no public
+route, no user-grant provisioner, no real credentials and no runtime wiring
+in `server/index.mjs`. It cannot be advertised as a live Tasks/Memory
+product. Before connecting a UI, implement an owner-reviewed durable
+operator/project group-membership source, signed identity lifecycle and
+revocation, bounded pagination and audit logs, independent database role
+checks and staging cross-project denial tests. Do not use browser-provided
+project/role claims as authorization. The source-only addition does not
+execute infrastructure actions.
+
 ## Read-only homelab gateway preflight
 
 Run `node scripts/preflight-shared-work-target.mjs http://10.1.20.10:8000` from VM102 to check that the intended VM132 gateway responds. Only an unauthenticated GET on `/rest/v1/` is made. HTTP **401 is an expected reachable/gated response** and **does not prove authenticated PostgREST access, successful backup/restore, SQL privileges, schema compatibility, or migration readiness**. The structured report intentionally always returns `authenticated:false` and `migrationReady:false`; only a separately approved privileged read-only audit and staged migration can close those gates. No service keys or secrets are accepted as inputs. The script is covered by three tests in GitHub CI.
