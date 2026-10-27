@@ -106,6 +106,17 @@ Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execut
 
 ## P8 — Authentication, roles, approval, and durable action audit
 
+- **Two public Authentik site handlers are now composable but disabled:**
+  `server/security/public-login-runtime.mjs` assembles distinct Family
+  and TechTactics OIDC/PKCE, encrypted state, session, cookie and HTTP
+  handlers with separate server-provided DB query functions and signing
+  keys. No listener or Friday production route is mounted. Before live
+  use, validate separate LOGIN principals/RLS, real providers and MFA,
+  approved HTTPS hostnames, ingress header stripping, distributed rate
+  controls, operational key handling, cleanup and revocation, and
+  external/browser callback/logout/isolation tests. Do not publish yet.
+
+
 - **Encrypted, atomic PostgreSQL OAuth-state source (draft PR #73):** app-pinned cross-replica PKCE transaction store, fixed five-minute TTL, AEAD-encrypted sensitive login material, disjoint Family/TechTactics RLS and one-time `DELETE RETURNING` callback consumption. Migration remains unapplied. Existing `friday` Authentik OIDC discovery works internally, but `family` and `techtactics` return 404. Register both providers, secure their separate policies and HTTPS issuer domains, then provision distinct DB credentials and externally validate sessions. `portal.mytechtactics.com` is occupied by Zoho; use a separate proposed `accounts.mytechtactics.com` after owner review. Keep production Cloudflare Access unchanged until end-to-end test approval.
 
 Implement before any infrastructure write operation:
