@@ -133,6 +133,47 @@ reverse-proxy pinning, a transactional shared session database,
 provider configuration and security review remain prerequisites
 before running any public-facing listener.
 
+## Durable session storage for both sites — draft PR #70
+
+`server/security/postgres-login-sessions.mjs` implements the OIDC
+browser session-store contract using **atomic parameterized PostgreSQL
+statements**, not an in-memory Map or local filesystem.
+Each store instance must be configured with a fixed `applicationId`
+(`family` or `techtactics`), a trusted private `query(sql,params)`
+driver, and `enabled:true` supplied from secure server configuration
+only. No browser chooses which database identity it receives.
+Only application-scoped token **hashes**, verified issuer-scoped
+subjects, creation/expiry timestamps are stored. Separate
+`revokeSubject` (per-site account offboarding) and bounded
+`cleanup` methods are for trusted server operators, **never**
+anonymous customer endpoints, frontend JavaScript or AI tools.
+
+The migration `supabase/migrations/20261026010000_friday_identity_sessions.sql`
+is **NOT applied** and must pass owner/DBA review first. It creates
+private `friday_identity.web_sessions` with forced RLS,
+site-specific policies, restricted read/insert/delete grants, and two
+separate, non-login PostgreSQL groups:
+`friday_family_login` and `friday_techtactics_login`.
+Before production, a DBA must provision *different LOGIN role
+credentials* for the two sites and grant only the matching group.
+Never give public Supabase `anon`, `authenticated`,
+`service_role`, client browsers, or AI agents these rights.
+Database roles complement, rather than replace, the application
+origin/issuer/cookie binding from the earlier PRs.
+
+The ephemeral CI harness creates its own offline PostgreSQL 16
+container (`--network none`) and tests the migration as those roles.
+It is not evidence that the real Supabase instance was changed.
+
+For production-ready public login, a **second shared transaction
+backend for authorization-code PKCE state** remains necessary:
+the previous file state store works only on one POSIX host.
+Deploy transaction/session storage with isolated credentials,
+retention quotas, expiration cleanup scheduling, key rotation,
+MFA/account deprovisioning and revocation, monitoring and backups.
+Keep the two public HTTPS login hosts disabled until this and
+provider onboarding are reviewed.
+
 ## Real Authentik configuration required before deployment
 
 1. Decide whether both sign-in hostnames use one hardened, patched
