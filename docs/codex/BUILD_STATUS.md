@@ -1,5 +1,30 @@
 # Friday Build Status
 
+## 2026-10-26 production release candidate: dormant public Authentik code
+
+This release branch contains **only public-login components** brought
+from the tested Family HomeLab and TechTactics development stack.
+It deliberately excludes HomeLab approval, executor or management
+actions from the separate P8 security branches.
+
+The included code provides two independently branded Family/HomeLab
+and TechTactics HTML sign-in screens, OIDC authorization-code+PKCE
+callbacks, cookie/session isolation, two optional HTTP handlers and
+private site-scoped PostgreSQL web session schema/tests.
+All components remain disabled/unmounted in the actual Friday
+runtime. Merging code does **not** register live login routes,
+create real Authentik apps, change Cloudflare policy, add credentials,
+publish DNS or apply the DB migration to production.
+
+The disposable PostgreSQL integration test validates the *unapplied*
+new migration and its separate database roles. To make the two
+portals operational, separately approve DNS/TLS, MFA, provider
+registration, server-only OAuth and database credentials, distributed
+OIDC transaction storage, real session lifecycle/offboarding,
+public browser acceptance and an explicit staged cutover.
+Existing Friday production Cloudflare Access remains in force.
+
+
 ## P8 global automation gate foundation — draft PR #48, source only
 
 A fail-closed file-backed `createFileAutomationGate` is implemented under
