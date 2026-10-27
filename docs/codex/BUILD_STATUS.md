@@ -1,5 +1,66 @@
 # Friday Build Status
 
+## 2026-10-27 four-project catalog bootstrap (stacked draft, source-only)
+
+Reconciled after reviewed PR #76 and signed-read bridge PR #77 joined
+main. This remains code-only and default-off pending owner-controlled
+VM132 project registration, signed-sub confirmation and grant activation.
+
+Added fixed owner-selected catalog metadata for Friday AI OS,
+TechTactics, Web Growth Agents and App Builder to the trusted-grant
+draft PR. Its default-off bootstrap requires exact fresh catalog
+fingerprint and owner approval; never updates/deletes other projects.
+A server-only Supabase adapter is GET-only by default and limits an
+opt-in insert to exactly the four approved id/name pairs. Tests cover
+empty and partial catalogs, unrelated rows, conflicting IDs/names,
+stale fingerprints, invalid responses and post-write verification.
+
+The real VM132 `friday_projects` and `friday_work_items` tables
+were each observed **empty** through a read-only authenticated REST
+request. **No database write or live user grant has been made.**
+After reviewed project bootstrap, verify real catalog rows, signed
+identity subject, private policy ownership, and staging denial before
+separate production integration approval.
+
+## 2026-10-27 four-project trusted user read scope — proposed, gated
+
+The owner selected Friday AI OS, TechTactics, Web Growth Agents and App
+Builder for one existing, Cloudflare-verified human account's **read-only
+Tasks and project Memory** authorization. Added a deterministic
+four-project policy helper on the dormant trusted-grant branch; it
+accepts a verified Access UUID, requires **four distinct owner-verified
+VM132 work project IDs** and rejects guessed, missing, duplicate,
+wildcard or extra mappings. Its output is the same short-lived
+canonical file schema tested by the signed private read bridge. Tests
+also verify no plaintext user UUID, email, role or action permissions
+are emitted.
+
+No authoritative VM132 project IDs, private policy file, real signed
+login JWT or live backend wiring have been supplied in this draft.
+The user's Cloudflare login is verified, **but no production Friday
+Tasks/Memory grant is live**. Do not infer projects from group IDs or
+the unrelated cloud Supabase project.
+
+
+## 2026-10-27 signed trusted-user enrollment for Tasks/Memory (stacked draft)
+
+The opt-in `createTrustedWorkReadBridge` now binds signed human
+Cloudflare Access subjects to narrowly scoped, owner-private policy
+file grants using domain-separated subject digests, not emails or
+browser roles. The file is read per operation and must be canonical,
+owner-only, size-bounded, short-lived and exact. Revocation and
+downgrades take effect on the next request. Test-first fixtures cover
+genuine signed JWTs, email/role spoofing, denied subjects, project
+scopes, expired grants, symlinks, file permissions, replacement and
+duplicate authority keys.
+
+This is a **stacked source-only PR on the prior disabled Phase 2B
+read bridge**, not production rollout or user enrollment. Neither
+`server/index.mjs` nor the UI mounts these methods; no owner
+policy, identity subject, real token, Supabase key or approval
+authority has been provisioned. Runtime Actions remain unavailable.
+
+
 ## 2026-10-27 Phase 2B private Tasks/Memory read bridge (draft, source-only)
 
 Added a default-disabled, server-owned `createPrivateWorkReadBridge`

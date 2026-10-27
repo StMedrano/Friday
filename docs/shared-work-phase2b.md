@@ -32,6 +32,153 @@ checks and staging cross-project denial tests. Do not use browser-provided
 project/role claims as authorization. The source-only addition does not
 execute infrastructure actions.
 
+## Trusted user enrollment for Phase 2B reads (draft-only; not live)
+
+A new optional `createTrustedWorkReadBridge` composes the signed-human
+Cloudflare Access reader with `createFileWorkSubjectGrants`: an
+**owner-private, canonical, one-day-expiring policy file** that maps the
+**SHA-256 digest of the VERIFIED Access `sub`** (domain-separated;
+`workSubjectHash(sub)`) to explicit project IDs and memory scopes.
+Matching an email, browser role, AI claim, or merely belonging to an
+Authentik Brand **does not** enroll a user.
+
+The policy must be provisioned by the actual owner outside Git, in an
+owner-owned mode-0700 directory, as a regular mode-0600 single-link
+file. It is read fresh on every request: removing the binding,
+replacing the policy atomically or letting it expire immediately denies
+subsequent reads. Maximum validity is 24 hours; stale, malformed,
+duplicated, wildcard, excessive, symlinked, group/world-readable, or
+noncanonical JSON denies **every** user instead of falling back.
+No server ever automatically creates this file. The policy is
+read-only and cannot authorize writes, HomeLab actions, agent tools,
+global memory or impersonation.
+
+The exact policy structure, with sample-only placeholders, is:
+
+```json
+{
+  "schemaVersion": 1,
+  "expiresAt": 1793103600000,
+  "users": [
+    {
+      "subjectHash": "replace-with-64-lowercase-hex-from-verified-access-sub",
+      "allowedProjectIds": ["example-project"],
+      "allowedMemoryScopes": [
+        {"scope": "project", "ownerId": "example-project"}
+      ]
+    }
+  ]
+}
+```
+
+The example expiry is **illustrative and time-limited**, not a
+production enrollment artifact. The actual file must contain compact,
+canonical JSON in the shown field order, followed by one newline;
+pretty-printed or manually edited duplicate-key JSON fails closed.
+An authorized operator must (1) inspect the signed JWT in a trusted
+backend, verify `iss`/`aud`/`exp`/`sub`, (2) compute the digest using
+the source helper rather than copying an email or token into Git, (3)
+create a narrowly scoped owner-private file and atomically replace it
+after independent review, (4) verify accepted reads and other-user
+and cross-project denials in staging, and (5) regularly renew or revoke
+the short-lived policy. Never commit personal subject IDs, Access JWTs,
+the policy file, or Supabase keys.
+
+**Important:** this PR provisions **no actual user**, real role file,
+HTTP handler, production credential or live runtime; the wrapper is
+disabled by default. Current production tasks/memory remain
+unconnected. A separate approved bootstrap, audited grant
+administration, identity lifecycle acceptance and rollout are required
+to claim a person is connected.
+
+## Four-project trusted account scope — staged bootstrap, not activated
+
+The four owner-selected project records now have an explicit **proposed,
+reviewable new ID/name catalog**, instead of being misrepresented as
+existing records. The last authorized read-only VM102-to-VM132 REST
+inspection returned HTTP 200 but **zero `friday_projects` rows and zero
+`friday_work_items` rows**. This does not authorize silent writes.
+
+`server/work/four-project-catalog.mjs` defines four fixed new records
+with IDs `friday-ai-os`, `techtactics`,
+`web-growth-agents`, `app-builder` and the owner's exact requested
+display labels. `createFourProjectCatalogBootstrap` reads the
+authoritative catalog, rejects duplicate IDs/names and conflicting
+preexisting values, and produces an exact current-snapshot fingerprint.
+By default it **only reads**. Its internal `apply` requires explicit
+opt-in, a matching fresh fingerprint and exact owner authorization,
+submits **insert-only** missing rows, and checks the four exact stored
+IDs/names afterward. No updates, deletes, role grants, task creation,
+HTTP route or server bootstrap are performed. A concurrent change
+requires a fresh review.
+
+`server/work/supabase-project-catalog.mjs` supplies a fixed,
+bounded **GET-only by default** PostgREST adapter. Its separately
+opted-in insert method sends only an exact subset of these four records
+and refuses unknown fields and attempts to alter names. Credentials
+are server-side only; it must be connected to the **verified** VM132
+Supabase gateway, not the unrelated cloud project. Integration tests
+exercise staging HTTP GET/POST contract and fail-closed behavior
+without a homelab write.
+
+**Current release gate:** reviewed project-bootstrap approval and
+transaction-safe staging/production execution have not happened.
+An approved operator must verify an up-to-date backup, a fresh project
+catalog snapshot and actual authorized database role before applying
+the insert-only bootstrap to VM132. A follow-up read must confirm four
+exact rows; **only then** may `verifyFourProjectCatalog(actualRows)`
+supply verified IDs to the existing short-lived trusted-user
+enrollment proposal. Production Tasks/Memory remain disabled.
+
+
+The owner approved **read-only Tasks and project Memory** for one existing,
+verified Cloudflare Access account across these four logical projects:
+
+| Requested project | Owner-reviewed key | Authoritative work project ID |
+| --- | --- | --- |
+| Friday AI OS | `friday-ai-os` | **Not yet resolved from VM132** |
+| TechTactics | `techtactics` | **Not yet resolved from VM132** |
+| Web Growth Agents | `web-growth-agents` | **Not yet resolved from VM132** |
+| App Builder | `app-builder` | **Not yet resolved from VM132** |
+
+The keys are *selection labels*, **not** proven Supabase
+`friday_work_items.project_id` values or activation of a group catalog.
+TechTactics and App Builder also have independent group design IDs. Those
+must not be treated as database project IDs without validation. In
+particular, the hosted Supabase cloud account is not automatically the
+VM132 homelab Supabase database. Keep every project unbound and deny
+access rather than guess database identifiers.
+
+`server/work/four-project-enrollment.mjs` provides a *pure offline
+proposal* for this exact four-project selection. It requires:
+
+1. The exact Cloudflare Access user UUID **after** Cloudflare API
+   identity validation and signed JWT `sub` acceptance. An email address
+   is not a valid subject and must never be used as the grant key.
+2. Exactly four distinct, independently verified VM132 `project_id`
+   values; unknown, duplicated, wildcard or additional projects fail.
+3. A short-lived expiration within 24 hours. No approval, agent
+   execution, group memory, global memory, customer records or write
+   permissions are included.
+
+`createFourProjectEnrollment({verifiedAccessSub,verifiedProjectIds,
+expiresAt,now})` returns the canonical policy object for subsequent
+*operator-controlled, owner-private* provisioning. The returned object
+contains only a subject hash and exact project read grants, never an
+email, plaintext user UUID, JWT or token. Write the exact compact
+JSON plus newline to a private single-link mode-0600 file under a
+mode-0700 directory by an approved atomic replacement process.
+
+**Deployment remains blocked:** the four work project IDs have not
+been verified against the authoritative VM132 database; the
+source-only bridge is unmounted and the private file is absent.
+Before enabling, confirm that the live signed `sub` equals the user
+record UUID, back up and verify the work datastore, stage identity
+and cross-project denial tests, confirm read-only audit coverage,
+and request a separate production rollout approval. Existing
+Cloudflare Access login is **not** proof that Friday project
+reads are enabled.
+
 ## Read-only homelab gateway preflight
 
 Run `node scripts/preflight-shared-work-target.mjs http://10.1.20.10:8000` from VM102 to check that the intended VM132 gateway responds. Only an unauthenticated GET on `/rest/v1/` is made. HTTP **401 is an expected reachable/gated response** and **does not prove authenticated PostgREST access, successful backup/restore, SQL privileges, schema compatibility, or migration readiness**. The structured report intentionally always returns `authenticated:false` and `migrationReady:false`; only a separately approved privileged read-only audit and staged migration can close those gates. No service keys or secrets are accepted as inputs. The script is covered by three tests in GitHub CI.
