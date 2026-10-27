@@ -1,24 +1,24 @@
--- Friday public Authentik website-session storage; SOURCE-ONLY, NOT DEPLOYED.
--- Owner review required before applying to Supabase or another PostgreSQL DB.
--- Completely independent of HomeLab action audit, AI agents and admin rights.
--- A dedicated non-login role is intentional; provision a separate LOGIN role
--- and restricted membership via a secret manager only after security review.
--- DO NOT grant this role to anon, authenticated, service_role or a browser.
+-- Friday public Authentik website sessions; SOURCE-ONLY, NEVER AUTO-DEPLOY.
+-- Separate PostgreSQL NOLOGIN roles for Family vs TechTactics. A production
+-- DBA must bind each portal's separate LOGIN principal to only its
+-- matching NOLOGIN group, with secrets provisioned outside this repository.
+-- Never attach these roles to anon, authenticated, service_role or agents.
 begin;
 
 do $roles$
 begin
- if not exists(select 1 from pg_roles where rolname='friday_sso_server') then
-  create role friday_sso_server nologin;
+ if not exists(select 1 from pg_roles where rolname='friday_family_login') then
+  create role friday_family_login nologin;
+ end if;
+ if not exists(select 1 from pg_roles where rolname='friday_techtactics_login') then
+  create role friday_techtactics_login nologin;
  end if;
 end
 $roles$;
 
 create schema if not exists friday_identity;
-revoke all on schema friday_identity from public;
--- Supabase default roles are expected; migrations are reviewed as a unit.
-revoke all on schema friday_identity from anon,authenticated,service_role;
-grant usage on schema friday_identity to friday_sso_server;
+revoke all on schema friday_identity from public,anon,authenticated,service_role;
+grant usage on schema friday_identity to friday_family_login,friday_techtactics_login;
 
 create table if not exists friday_identity.web_sessions (
  application_id text not null
@@ -41,14 +41,22 @@ create index if not exists friday_web_sessions_account_revoke
 alter table friday_identity.web_sessions enable row level security;
 alter table friday_identity.web_sessions force row level security;
 revoke all on friday_identity.web_sessions from public,anon,authenticated,service_role;
-revoke all on friday_identity.web_sessions from friday_sso_server;
-grant select,insert,delete on friday_identity.web_sessions to friday_sso_server;
--- Intentionally NO update/grants for any browser or general service role.
-create policy friday_sso_select on friday_identity.web_sessions
- for select to friday_sso_server using (true);
-create policy friday_sso_insert on friday_identity.web_sessions
- for insert to friday_sso_server with check (true);
-create policy friday_sso_delete on friday_identity.web_sessions
- for delete to friday_sso_server using (true);
+revoke all on friday_identity.web_sessions from friday_family_login,friday_techtactics_login;
+grant select,insert,delete on friday_identity.web_sessions
+ to friday_family_login,friday_techtactics_login;
+-- RLS is defense in depth beyond each server's immutable application ID.
+-- There is no UPDATE, TRUNCATE, wildcard site policy or HomeLab capability.
+create policy friday_family_select on friday_identity.web_sessions
+ for select to friday_family_login using (application_id='family');
+create policy friday_family_insert on friday_identity.web_sessions
+ for insert to friday_family_login with check (application_id='family');
+create policy friday_family_delete on friday_identity.web_sessions
+ for delete to friday_family_login using (application_id='family');
+create policy friday_techtactics_select on friday_identity.web_sessions
+ for select to friday_techtactics_login using (application_id='techtactics');
+create policy friday_techtactics_insert on friday_identity.web_sessions
+ for insert to friday_techtactics_login with check (application_id='techtactics');
+create policy friday_techtactics_delete on friday_identity.web_sessions
+ for delete to friday_techtactics_login using (application_id='techtactics');
 
 commit;
