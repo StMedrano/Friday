@@ -1,5 +1,25 @@
 # Friday Build Status
 
+## 2026-10-27 four-project trusted user read scope — proposed, gated
+
+The owner selected Friday AI OS, TechTactics, Web Growth Agents and App
+Builder for one existing, Cloudflare-verified human account's **read-only
+Tasks and project Memory** authorization. Added a deterministic
+four-project policy helper on the dormant trusted-grant branch; it
+accepts a verified Access UUID, requires **four distinct owner-verified
+VM132 work project IDs** and rejects guessed, missing, duplicate,
+wildcard or extra mappings. Its output is the same short-lived
+canonical file schema tested by the signed private read bridge. Tests
+also verify no plaintext user UUID, email, role or action permissions
+are emitted.
+
+No authoritative VM132 project IDs, private policy file, real signed
+login JWT or live backend wiring have been supplied in this draft.
+The user's Cloudflare login is verified, **but no production Friday
+Tasks/Memory grant is live**. Do not infer projects from group IDs or
+the unrelated cloud Supabase project.
+
+
 ## 2026-10-27 signed trusted-user enrollment for Tasks/Memory (stacked draft)
 
 The opt-in `createTrustedWorkReadBridge` now binds signed human
