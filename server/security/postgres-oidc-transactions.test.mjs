@@ -100,10 +100,13 @@ test('family and TechTactics have separate pinned store, encryption key and stat
  assert.deepEqual(await fam.consume(family.state),family)
 })
 
-test('wrong encryption key burns state, corrupt payload denies without revealing plaintext',async()=>{
+test('wrong encryption key cannot consume, tampered payload burns matched transaction',async()=>{
  const f=memory(),tx=example()
  await f.make().reserve(tx)
  await assert.rejects(f.make('family',randomBytes(32)).consume(tx.state),/sso-denied/)
+ // Different key produces a different opaque index and cannot consume
+ // another key's transaction. The right key still wins exactly once.
+ assert.deepEqual(await f.make().consume(tx.state),tx)
  await assert.rejects(f.make().consume(tx.state),/sso-denied/)
  const tx2=example()
  await f.make().reserve(tx2)
