@@ -91,7 +91,45 @@ unconnected. A separate approved bootstrap, audited grant
 administration, identity lifecycle acceptance and rollout are required
 to claim a person is connected.
 
-## Four-project trusted account scope — owner-selected, not activated
+## Four-project trusted account scope — staged bootstrap, not activated
+
+The four owner-selected project records now have an explicit **proposed,
+reviewable new ID/name catalog**, instead of being misrepresented as
+existing records. The last authorized read-only VM102-to-VM132 REST
+inspection returned HTTP 200 but **zero `friday_projects` rows and zero
+`friday_work_items` rows**. This does not authorize silent writes.
+
+`server/work/four-project-catalog.mjs` defines four fixed new records
+with IDs `friday-ai-os`, `techtactics`,
+`web-growth-agents`, `app-builder` and the owner's exact requested
+display labels. `createFourProjectCatalogBootstrap` reads the
+authoritative catalog, rejects duplicate IDs/names and conflicting
+preexisting values, and produces an exact current-snapshot fingerprint.
+By default it **only reads**. Its internal `apply` requires explicit
+opt-in, a matching fresh fingerprint and exact owner authorization,
+submits **insert-only** missing rows, and checks the four exact stored
+IDs/names afterward. No updates, deletes, role grants, task creation,
+HTTP route or server bootstrap are performed. A concurrent change
+requires a fresh review.
+
+`server/work/supabase-project-catalog.mjs` supplies a fixed,
+bounded **GET-only by default** PostgREST adapter. Its separately
+opted-in insert method sends only an exact subset of these four records
+and refuses unknown fields and attempts to alter names. Credentials
+are server-side only; it must be connected to the **verified** VM132
+Supabase gateway, not the unrelated cloud project. Integration tests
+exercise staging HTTP GET/POST contract and fail-closed behavior
+without a homelab write.
+
+**Current release gate:** reviewed project-bootstrap approval and
+transaction-safe staging/production execution have not happened.
+An approved operator must verify an up-to-date backup, a fresh project
+catalog snapshot and actual authorized database role before applying
+the insert-only bootstrap to VM132. A follow-up read must confirm four
+exact rows; **only then** may `verifyFourProjectCatalog(actualRows)`
+supply verified IDs to the existing short-lived trusted-user
+enrollment proposal. Production Tasks/Memory remain disabled.
+
 
 The owner approved **read-only Tasks and project Memory** for one existing,
 verified Cloudflare Access account across these four logical projects:
