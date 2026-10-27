@@ -405,6 +405,28 @@ provisioned, and production Friday/Cloudflare, Authentik VM120,
 DNS/TLS, networks, database and HomeLab remain unchanged.
 See `docs/authentik-two-login-sites.md`.
 
+## Isolated Family and TechTactics HTTP login listeners — draft PR #68
+
+The source-only `createLoginSiteHttpHandler` is opt-in and pinned
+to one server-configured application ID, its previously registered
+HTTPS origin and its own sign-in/browser policy. It does not trust
+incoming Host/Forwarded headers as identity selectors, and it rejects
+mismatched Host or forwarded override. OIDC callback query keys
+must match exactly one state and one code, and logout requires
+bounded URL-encoded POST, exact Origin, CSRF token, and the site's
+own HttpOnly opaque session. It sends no-store, restrictive CSP,
+no-referrer and anti-framing headers with generic errors and never
+surfaces token or server-side exception information in the body.
+
+The pure HTTP adapter intentionally does **not create a listener**,
+and is not imported by the production Friday HTTP server or index.
+Separate trusted reverse proxy vhosts, TLS termination, server-only
+provider credentials, durable multi-host sessions, MFA,
+administrative privilege isolation, and externally verified
+AuthentiK integration still require independent completion.
+**Family public login cannot operate Docker/Proxmox** and
+TechTactics login cannot inherit family HomeLab rights.
+
 ## Future write-action rule
 
 A future action engine must require all of the following before any infrastructure mutation:
