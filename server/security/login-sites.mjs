@@ -115,6 +115,13 @@ export function createLoginSites({enabled=false,sites}={}) {
  }
  return Object.freeze({
   enabled:ready,
+  // Read-only trusted registry lookup. The separate HTTP site adapter must
+  // prove that a static application ID matches its pinned public HTTPS origin.
+  originFor(applicationId) {
+   if(!ready||!REQUIRED_IDS.has(applicationId))return null
+   for(const [origin,site] of byOrigin)if(site.id===applicationId)return origin
+   return null
+  },
   async handle(input) {
    if(!ready)return fail(503)
    if(!input||typeof input!=='object'||Array.isArray(input))return fail(400)
