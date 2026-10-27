@@ -91,6 +91,56 @@ unconnected. A separate approved bootstrap, audited grant
 administration, identity lifecycle acceptance and rollout are required
 to claim a person is connected.
 
+## Four-project trusted account scope — owner-selected, not activated
+
+The owner approved **read-only Tasks and project Memory** for one existing,
+verified Cloudflare Access account across these four logical projects:
+
+| Requested project | Owner-reviewed key | Authoritative work project ID |
+| --- | --- | --- |
+| Friday AI OS | `friday-ai-os` | **Not yet resolved from VM132** |
+| TechTactics | `techtactics` | **Not yet resolved from VM132** |
+| Web Growth Agents | `web-growth-agents` | **Not yet resolved from VM132** |
+| App Builder | `app-builder` | **Not yet resolved from VM132** |
+
+The keys are *selection labels*, **not** proven Supabase
+`friday_work_items.project_id` values or activation of a group catalog.
+TechTactics and App Builder also have independent group design IDs. Those
+must not be treated as database project IDs without validation. In
+particular, the hosted Supabase cloud account is not automatically the
+VM132 homelab Supabase database. Keep every project unbound and deny
+access rather than guess database identifiers.
+
+`server/work/four-project-enrollment.mjs` provides a *pure offline
+proposal* for this exact four-project selection. It requires:
+
+1. The exact Cloudflare Access user UUID **after** Cloudflare API
+   identity validation and signed JWT `sub` acceptance. An email address
+   is not a valid subject and must never be used as the grant key.
+2. Exactly four distinct, independently verified VM132 `project_id`
+   values; unknown, duplicated, wildcard or additional projects fail.
+3. A short-lived expiration within 24 hours. No approval, agent
+   execution, group memory, global memory, customer records or write
+   permissions are included.
+
+`createFourProjectEnrollment({verifiedAccessSub,verifiedProjectIds,
+expiresAt,now})` returns the canonical policy object for subsequent
+*operator-controlled, owner-private* provisioning. The returned object
+contains only a subject hash and exact project read grants, never an
+email, plaintext user UUID, JWT or token. Write the exact compact
+JSON plus newline to a private single-link mode-0600 file under a
+mode-0700 directory by an approved atomic replacement process.
+
+**Deployment remains blocked:** the four work project IDs have not
+been verified against the authoritative VM132 database; the
+source-only bridge is unmounted and the private file is absent.
+Before enabling, confirm that the live signed `sub` equals the user
+record UUID, back up and verify the work datastore, stage identity
+and cross-project denial tests, confirm read-only audit coverage,
+and request a separate production rollout approval. Existing
+Cloudflare Access login is **not** proof that Friday project
+reads are enabled.
+
 ## Read-only homelab gateway preflight
 
 Run `node scripts/preflight-shared-work-target.mjs http://10.1.20.10:8000` from VM102 to check that the intended VM132 gateway responds. Only an unauthenticated GET on `/rest/v1/` is made. HTTP **401 is an expected reachable/gated response** and **does not prove authenticated PostgREST access, successful backup/restore, SQL privileges, schema compatibility, or migration readiness**. The structured report intentionally always returns `authenticated:false` and `migrationReady:false`; only a separately approved privileged read-only audit and staged migration can close those gates. No service keys or secrets are accepted as inputs. The script is covered by three tests in GitHub CI.
