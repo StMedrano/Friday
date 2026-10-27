@@ -1,5 +1,20 @@
 # Friday — Ordered Finish Queue
 
+## Phase 2B Tasks/Memory signed read bridge candidate (2026-10-27)
+
+- A **default-off internal** bridge now projects scoped task summaries and
+  memory search only after signed human Cloudflare Access authentication
+  and trusted server-derived grants. No HTTP route is connected; nothing
+  is visible in the live Tasks/Memory workspaces yet.
+- Next: create and review an owner-managed membership and project-grant
+  repository, revocation and operator audit; add opt-in read-only routes
+  and real desktop/mobile pages only after cross-project integration
+  tests. Persisted Tasks/Memory writes, decisions/approval workflows
+  and background agent execution require independent authorization gates.
+- Preserve existing read-only cloud automation API and disabled
+  HomeLab executor, and do not expose Supabase service keys in React.
+
+
 Work from top to bottom. Do not skip safety prerequisites to reach action features sooner.
 
 ## User-requested cloud access — completed
