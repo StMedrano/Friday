@@ -31,8 +31,8 @@ const REVOKE_SUBJECT=`DELETE FROM friday_identity.web_sessions
 const CLEANUP=`WITH expired AS (
  SELECT application_id,token_hash FROM friday_identity.web_sessions
  WHERE application_id=$1 AND expires_at_ms<=$2
- ORDER BY expires_at_ms
- FOR UPDATE SKIP LOCKED LIMIT $3
+ ORDER BY expires_at_ms LIMIT $3
+ FOR UPDATE SKIP LOCKED
 )
 DELETE FROM friday_identity.web_sessions AS sessions USING expired
 WHERE sessions.application_id=expired.application_id
