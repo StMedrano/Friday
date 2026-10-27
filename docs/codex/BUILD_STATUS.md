@@ -1,5 +1,48 @@
 # Friday Build Status
 
+## Opt-in PostgreSQL website sessions — draft PR #70 (source only)
+
+Family HomeLab and TechTactics now have a **database-backed session-store
+implementation**, `server/security/postgres-login-sessions.mjs`, for
+the existing browser OIDC `sessionStore.create/read/revoke` contract.
+It is **default-disabled**, requires a server-provided parameterized
+PostgreSQL `query(sql,params)` function, and is permanently pinned to
+either `family` or `techtactics` at construction time. Only an
+app-qualified HMAC session token digest, Authentik issuer-scoped human
+subject and bounded issued/expiration timestamps are persisted.
+Raw browser cookies, OIDC authorization codes, OAuth access/refresh
+tokens and user-supplied role claims are never stored or exposed.
+
+A separate, **unapplied** SQL migration
+`20261026010000_friday_identity_sessions.sql` creates a private
+`friday_identity.web_sessions` table with RLS **forced** and exact
+family/business policies for **two independent NOLOGIN PostgreSQL
+group roles**, `friday_family_login` and
+`friday_techtactics_login`. Anonymous, authenticated and generic
+Supabase `service_role` have no usage or table privileges.
+Each web app must later receive **different DBA-created login
+credentials**, members only of its site-specific role; this PR
+does not provision any real credential or touch the user's DB.
+In addition to one-statement atomic create/read/delete and
+one-website offboarding, the store supports bounded per-site
+expired-session cleanup using `FOR UPDATE SKIP LOCKED`.
+No public route grants access to account-offboarding or cleanup.
+
+Unit tests cover no implicit tenant, durable parameterized shape,
+failed/colliding insertion, session expiry, invalid/tampered rows,
+site-binding denial, logout, owner offboarding and bounded cleanup.
+Disposable PostgreSQL CI now applies the new migration and tests
+actual role/RLS denial, cross-site visibility, TTL constraints
+and site-local revocation with **no production URL**.
+This is source-only on a branch stacked over PR #68; real
+production sessions still require a securely configured server-only
+database connector, user/account lifecycle and MFA checks, audited
+rotation and revocation, browser login-state migration from the
+single-host file prototype to a transactional shared backend,
+database cleanup scheduling, HTTPS vhosts and owner review.
+Production Friday and both public login hosts remain unchanged.
+
+
 ## Opt-in per-site HTTP boundary — draft PR #68 (source only)
 
 Implemented `server/security/login-sites-http.mjs` as a real
