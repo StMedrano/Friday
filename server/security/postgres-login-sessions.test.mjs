@@ -10,12 +10,12 @@ const makeRow=(applicationId='family',extra={})=>({
  applicationId,tokenHash:tokenHash(),subject,
  createdAt:NOW,expiresAt:NOW+600000,...extra,
 })
-const fake=(implementation=async()=>({rowCount:1,rows:[{ok:1}]}))=>{
+const fake=(implementation=async()=>({rowCount:1,rows:[{ok:1}]}),applicationId='family')=>{
  const calls=[]
  const query=async(text,params)=>{calls.push({text,params});return implementation(text,params)}
  let clock=NOW
  return {calls,query,setTime:n=>{clock=n},store:createPostgresLoginSessions({
-  enabled:true,query,now:()=>clock,
+  enabled:true,applicationId,query,now:()=>clock,
  })}
 }
 
@@ -65,7 +65,7 @@ test('read is app-scoped, unexpired, and returns only exactly five verified fiel
  const f=fake(async()=>({rowCount:1,rows:[{
   application_id:row.applicationId,token_hash:row.tokenHash,subject:row.subject,
   created_at_ms:String(row.createdAt),expires_at_ms:String(row.expiresAt),
- }]}))
+ }]}),'techtactics')
  assert.deepEqual(await f.store.read({applicationId:row.applicationId,tokenHash:row.tokenHash}),row)
  const call=f.calls[0]
  assert.match(call.text,/SELECT/i)
@@ -107,7 +107,7 @@ test('missing sessions return null without exposing database exceptions or other
 
 test('logout DELETE is atomic and site-scoped and does not clear another application',async()=>{
  const row=makeRow('techtactics')
- const f=fake()
+ const f=fake(undefined,'techtactics')
  assert.equal(await f.store.revoke({applicationId:'techtactics',tokenHash:row.tokenHash}),true)
  const {text,params}=f.calls[0]
  assert.match(text,/DELETE FROM friday_identity\.web_sessions/i)
@@ -115,7 +115,7 @@ test('logout DELETE is atomic and site-scoped and does not clear another applica
  assert.match(text,/token_hash=\$2/i)
  assert.match(text,/expires_at_ms>\$3/i)
  assert.deepEqual(params,['techtactics',row.tokenHash,NOW])
- assert.equal(await fake(async()=>({rowCount:0,rows:[]})).store.revoke({
+ assert.equal(await fake(async()=>({rowCount:0,rows:[]}), 'techtactics').store.revoke({
   applicationId:'techtactics',tokenHash:row.tokenHash,
  }),false)
 })
@@ -171,4 +171,32 @@ test('database clock advancing cannot extend an existing session beyond its OIDC
  }]}))
  f.setTime(NOW+600001)
  await assert.rejects(f.store.read({applicationId:'family',tokenHash:row.tokenHash}),/sso-denied/)
+})
+
+test('family and business stores cannot query or revoke the other site, before touching SQL',async()=>{
+ const family=fake()
+ const business=fake(undefined,'techtactics')
+ const other=makeRow('techtactics')
+ const own=makeRow('family')
+ for(const action of [
+  ()=>family.store.create(other),
+  ()=>family.store.read({applicationId:'techtactics',tokenHash:other.tokenHash}),
+  ()=>family.store.revoke({applicationId:'techtactics',tokenHash:other.tokenHash}),
+  ()=>family.store.revokeSubject({applicationId:'techtactics',subject}),
+  ()=>family.store.cleanup({applicationId:'techtactics',limit:10}),
+  ()=>business.store.create(own),
+  ()=>business.store.read({applicationId:'family',tokenHash:own.tokenHash}),
+ ]){
+  await assert.rejects(action(),/sso-denied/)
+ }
+ assert.deepEqual(family.calls,[])
+ assert.deepEqual(business.calls,[])
+})
+
+test('explicitly enabled sessions never default into an implicit tenant',async()=>{
+ const disabled=createPostgresLoginSessions({
+  enabled:true,query:async()=>({rowCount:1,rows:[{ok:1}]}),
+ })
+ assert.equal(disabled.enabled,false)
+ await assert.rejects(disabled.create(makeRow()),/sso-denied/)
 })
