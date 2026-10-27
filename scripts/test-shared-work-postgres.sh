@@ -28,4 +28,8 @@ docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shar
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work-handoffs.sql >/dev/null
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work-decisions.sql >/dev/null
 FRIDAY_TEST_PG_CONTAINER="$container" sh tests/sql/shared-work-concurrency.sh
-printf 'PASS: additive shared-work migration, private grants and lease tests on disposable Postgres\n'
+# Private website-login session migration is isolated from Friday shared work.
+# Never direct this test at a live Supabase/Postgres service.
+docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < supabase/migrations/20261026010000_friday_identity_sessions.sql >/dev/null
+docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/public-login-sessions.sql >/dev/null
+printf 'PASS: shared-work transactions and private Authentik login sessions on disposable Postgres\n'
