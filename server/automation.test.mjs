@@ -19,7 +19,7 @@ async function withServer(t, overrides={}) {
  const logs=[]; let reads=0
  const server=createAutomationServer({config,monitoringRuntime:{
   getOverview:()=>{reads++;return overview},getSummary:()=>({status:'ok'}),
-  getIncidents:()=>({incidents:[]}),getHistory:()=>({events:[]}),
+  getIncidents:()=>({summary:{active:0,high:0,warning:0,resolved:0},incidents:[]}),getHistory:()=>({events:[]}),
  },accessGateImpl:createAccessGate(access,{fetchImpl:async()=>({ok:true,json:async()=>({keys:[{...publicKey.export({format:'jwk'}),kid:'test',alg:'RS256',use:'sig'}]})})}),
  logImpl:entry=>logs.push(entry),...overrides})
  server.listen(0,'127.0.0.1');await once(server,'listening')
@@ -76,4 +76,30 @@ test('oversized snapshots are rejected and security headers prevent caching',asy
  const {base}=await withServer(t,{monitoringRuntime:{getOverview:()=>({data:'x'.repeat(2*1024*1024)})}})
  const r=await fetch(base+'/api/overview',{headers:headers()})
  assert.equal(r.status,503);assert.equal(r.headers.get('cache-control'),'no-store')
+})
+
+test('cloud reads fail closed for incomplete, invalid or unresolved monitoring snapshots',async t=>{
+ let snapshot=overview
+ const {base}=await withServer(t,{monitoringRuntime:{
+  getOverview:()=>snapshot,getIncidents:()=>snapshot,getHistory:()=>snapshot,
+ }})
+ const invalid=[
+  ['/api/overview',{mode:'live',generatedAt:overview.generatedAt,services:{}}],
+  ['/api/overview',{...overview,generatedAt:'not-a-date'}],
+  ['/api/overview',{...overview,mode:'invented'}],
+  ['/api/overview',Promise.resolve(overview)],
+  ['/api/incidents',{incidents:[]}],
+  ['/api/incidents',{summary:{active:0,high:0,warning:0,resolved:0},incidents:{}}],
+  ['/api/incidents',Promise.resolve({summary:{active:0,high:0,warning:0,resolved:0},incidents:[]})],
+  ['/api/monitoring/history',{events:{}}],
+  ['/api/monitoring/history',Promise.resolve({events:[]})],
+ ]
+ for(const [path,value] of invalid){
+  snapshot=value
+  const result=await fetch(base+path,{headers:headers()})
+  assert.equal(result.status,503,`Invalid snapshot for ${path} must not return success`)
+  assert.deepEqual(await result.json(),{error:'snapshot-unavailable'})
+ }
+ snapshot={events:[]}
+ assert.deepEqual(await (await fetch(base+'/api/monitoring/history',{headers:headers()})).json(),{events:[]})
 })

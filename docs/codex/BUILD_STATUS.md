@@ -234,6 +234,24 @@ be considered ready. No merge, deployment, private services, access/role
 policy, network configuration or HomeLab command was changed.
 
 
+## Cloud snapshot boundary hardening — PR #46, source-only
+
+Draft PR #46 (`fix/cloud-automation-snapshot-contract-20261026`) extends the
+read-only automation listener's response boundary to reject invalid cache
+envelopes, including Promise-like unresolved values that otherwise serialize as
+HTTP 200 with an empty object. The overview requires mode, parsable collection
+timestamp and services array; incidents require a numeric summary and array;
+history requires an events array. Missing or malformed snapshots return
+the existing generic 503 and never trigger polling, AI or actions.
+
+Failing-first test commit `a9e59e7` reproduced the defect in GitHub CI:
+468 of 469 Node tests passed; the new case failed on actual HTTP 200 instead
+of expected 503. Subsequent implementation, documentation and final-head
+verification are tracked in PR #46. No change to credentials, Access grants,
+cloud deployment, live monitoring, HomeLab execution or production occurred.
+Snapshot-envelope validation does not attest cache freshness.
+
+
 ## Cloud automation API — deployed and live-validated, 2026-10-26
 
 Prepared the user-selected `friday-api.mytechtactics.com` connection: an optional separate port 3011 listener accepts only signed, explicitly allowlisted Cloudflare Access service identities for a dedicated application audience. It exposes authenticated health plus cached overview, incidents and monitoring history. All writes, query strings, repository/AI/diagnostic endpoints and other routes are denied. The existing UI's human/operator authentication remains separate. No infrastructure calls are triggered by cloud reads.
@@ -246,7 +264,7 @@ Validation: Node 22 `make verify` passed **90 frontend and 453 server/observer/s
 
 VM102 is checked out at deployment-record commit `5021012` from `codex/friday-cloud-api-read-adapters`; its running image contains application commit `608d85b`. Friday and the dedicated connector are healthy. Public acceptance returned 200 for authenticated health, overview, incidents, and monitoring history; 401 without the service token; 405 for a write attempt; and 404 for the excluded repositories route. Live identity, mode, service inventory, and overview timestamp checks passed. The tunnel token remains in its owner-only runtime file.
 
-**Managed cloud acceptance and credential cleanup passed on 2026-10-26.** The runtime reports its restricted hostname policy enforced, `FRIDAY_CLOUD_URL` ready, and both hostname-scoped service credential bindings ready. Running `node scripts/check-cloud-connection.mjs` from that runtime reproduced all seven expected results: four authenticated 200 reads, unauthenticated 401, write rejection 405, and excluded repository route 404. An authorized VM102 session then removed only the temporary owner-only service-token copy at `/home/stalin/.config/friday-cloud-api/client.json`; the separate mode-600 tunnel-token runtime file was preserved. VM102 `make health` passed, and the cloud acceptance checker reproduced all seven results after cleanup. PR #45 remains draft pending final owner review.
+**Managed cloud acceptance and credential cleanup passed on 2026-10-26.** The runtime reports its restricted hostname policy enforced, `FRIDAY_CLOUD_URL` ready, and both hostname-scoped service credential bindings ready. Running `node scripts/check-cloud-connection.mjs` from that runtime reproduced all seven expected results: four authenticated 200 reads, unauthenticated 401, write rejection 405, and excluded repository route 404. An authorized VM102 session then removed only the temporary owner-only service-token copy at `/home/stalin/.config/friday-cloud-api/client.json`; the separate mode-600 tunnel-token runtime file was preserved. VM102 `make health` passed, and the cloud acceptance checker reproduced all seven results after cleanup. PR #45 merged into `main` on 2026-10-26 (`7b89228`). The separately reported VM102 running image remains at application commit `608d85b` until a new deployment is verified; GitHub source merge alone is not deployment acceptance.
 
 ## Uptime Kuma monitor health — local implementation, 2026-10-25
 
