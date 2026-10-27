@@ -32,4 +32,7 @@ FRIDAY_TEST_PG_CONTAINER="$container" sh tests/sql/shared-work-concurrency.sh
 # Never direct this test at a live Supabase/Postgres service.
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < supabase/migrations/20261026010000_friday_identity_sessions.sql >/dev/null
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/public-login-sessions.sql >/dev/null
+# Offline acceptance for shared, encrypted OAuth state; NEVER touch live DB.
+docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < supabase/migrations/20261027010000_friday_identity_oidc_transactions.sql >/dev/null
+docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/public-oidc-transactions.sql >/dev/null
 printf 'PASS: shared-work transactions and private Authentik login sessions on disposable Postgres\n'
