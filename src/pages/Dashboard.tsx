@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, FolderGit2, Gauge, HardDrive, Home, MemoryStick, Network, Search, Server, Settings, ShieldCheck, Sparkles, TerminalSquare } from 'lucide-react'
+import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, FolderGit2, HardDrive, Home, MemoryStick, Network, Search, Server, Settings, ShieldCheck, Sparkles } from 'lucide-react'
 import { fetchMonitoringHistory, useFridayOverview, type FridayIncident, type MonitoringEvent } from '../lib/api'
 import { useFridaySession } from '../hooks/useFridaySession'
 import { usePhoneLayout } from '../hooks/usePhoneLayout'
 import ActiveIncidents from '../components/ActiveIncidents'
 import AgentsWorkspace from '../components/AgentsWorkspace'
+import ApplicationsWorkspace from '../components/ApplicationsWorkspace'
 import FridayComposer from '../components/FridayComposer'
 import FridayConversation from '../components/FridayConversation'
 import FridayWorkspace from '../components/FridayWorkspace'
@@ -18,6 +19,7 @@ import '../mobile.css'
 import '../assistant.css'
 import '../agents.css'
 import '../repositories.css'
+import '../applications.css'
 
 const nav = [
   ['Overview', Home], ['FRIDAY', Sparkles], ['Infrastructure', Server], ['Applications', AppWindow],
@@ -30,7 +32,6 @@ export default function Dashboard() {
   const friday = useFridaySession()
   const isPhone = usePhoneLayout()
   const [active, setActive] = useState('Overview')
-  const [automation, setAutomation] = useState(true)
   const [query, setQuery] = useState('')
   const [history, setHistory] = useState<MonitoringEvent[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
@@ -98,7 +99,7 @@ export default function Dashboard() {
             query={query}
             onQueryChange={setQuery}
             onSubmit={submitFriday}
-          /> : active === 'Agents' ? <AgentsWorkspace/> : active === 'Repositories' ? <RepositoriesWorkspace/> : active === 'Infrastructure' ? <InfrastructureWorkspace overview={overview} connected={connected}/> : active === 'Incidents' ? <IncidentsWorkspace
+          /> : active === 'Agents' ? <AgentsWorkspace/> : active === 'Repositories' ? <RepositoriesWorkspace/> : active === 'Applications' ? <ApplicationsWorkspace overview={overview} connected={connected}/> : active === 'Infrastructure' ? <InfrastructureWorkspace overview={overview} connected={connected}/> : active === 'Incidents' ? <IncidentsWorkspace
             incidents={incidents}
             services={overview.services}
             sites={overview.sites}
@@ -108,7 +109,7 @@ export default function Dashboard() {
             selectedIncident={selectedIncident}
             onSelectIncident={viewDiagnosis}
             onClearSelection={() => setSelectedIncidentId(null)}
-          /> : <DetailView active={active} overview={overview}/>} 
+          /> : <PendingCapabilityView name={active}/>} 
         </main>
       </div>
       <MobileNavigation active={active} activeIncidents={activeIncidents} onNavigate={navigate}/>
@@ -119,7 +120,7 @@ export default function Dashboard() {
     <div className="v3-shell">
       <aside className="v3-rail">
         <button className="v3-logo" onClick={() => navigate('Overview')} aria-label="FRIDAY home"><span /></button>
-        <nav>{nav.map(([label, Icon]) => <button key={label} className={active === label ? 'active' : ''} onClick={() => navigate(label)} title={label}><Icon size={19}/>{label === 'Approvals' && <i>2</i>}{label === 'Incidents' && activeIncidents > 0 && <i>{activeIncidents}</i>}</button>)}</nav>
+        <nav>{nav.map(([label, Icon]) => <button key={label} aria-label={label} className={active === label ? 'active' : ''} onClick={() => navigate(label)} title={label}><Icon size={19}/>{label === 'Incidents' && activeIncidents > 0 && <i>{activeIncidents}</i>}</button>)}</nav>
         <div className="v3-avatar">SM</div>
       </aside>
 
@@ -127,13 +128,13 @@ export default function Dashboard() {
         <header className="v3-topbar">
           <div><strong>FRIDAY</strong><span>AI OPERATIONS CONTROL</span></div>
           <button className="v3-search"><Search size={16}/><span>Search or command</span><kbd>Ctrl K</kbd></button>
-          <div className="v3-system"><i /> SYSTEM OPERATIONAL</div>
+          <div className="v3-system"><i /> {connected && overview.mode === 'live' ? 'READ-ONLY MONITORING' : 'LIVE STATUS UNAVAILABLE'}</div>
         </header>
 
         <main className="v3-main">
           <section className="v3-intro">
             <div><span className="v3-kicker">COMMAND CENTER / {active.toUpperCase()}</span><h1>{active === 'Overview' ? 'Good afternoon.' : active}</h1><p>{connected ? `API connected · ${overview.mode} mode` : 'Local preview data · safe read-only interface'}</p></div>
-            <label className="v3-automation"><span><b>Automation</b><small>{automation ? 'Enabled · policy gated' : 'Disabled · read only'}</small></span><input type="checkbox" checked={automation} onChange={e => setAutomation(e.target.checked)}/><em /></label>
+            <div className="v3-automation" role="status" aria-label="Automation execution status"><span><b>Automation</b><small>Automation is unavailable for execution · read only</small></span><em aria-hidden="true" /></div>
           </section>
 
           {active === 'Overview' ? <>
@@ -171,20 +172,30 @@ export default function Dashboard() {
             <section className="v3-section"><div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><span>{online} online</span></div><div className="v3-services">{overview.services.map(s => <button key={s.id} onClick={() => navigate('Applications')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span><em>{s.updated}</em></button>)}</div></section>
           </> : active === 'FRIDAY' ? <FridayWorkspace session={friday} query={query} onQueryChange={setQuery} onSubmit={submitFriday}/>
             : active === 'Agents' ? <AgentsWorkspace/>
+            : active === 'Applications' ? <ApplicationsWorkspace overview={overview} connected={connected}/>
             : active === 'Repositories' ? <RepositoriesWorkspace/>
             : active === 'Infrastructure' ? <InfrastructureWorkspace overview={overview} connected={connected}/>
             : active === 'Incidents' ? <IncidentsWorkspace incidents={incidents} services={overview.services} sites={overview.sites} monitoring={overview.monitoring} history={history} historyError={historyError} selectedIncident={selectedIncident} onSelectIncident={viewDiagnosis} onClearSelection={() => setSelectedIncidentId(null)}/>
-            : <DetailView active={active} overview={overview} />}
+                        : <PendingCapabilityView name={active} />}
         </main>
       </div>
     </div>
   )
 }
 
-function DetailView({ active, overview }: { active: string, overview: ReturnType<typeof useFridayOverview>['overview'] }) {
-  return <section className="v3-detail">
-    <div className="v3-detail-hero"><div className="v3-node-icon large">{active === 'Infrastructure' ? <Server/> : active === 'Applications' ? <AppWindow/> : active === 'Agents' ? <Bot/> : <TerminalSquare/>}</div><div><span className="v3-kicker">FRIDAY CONTROL PLANE</span><h2>{active}</h2><p>Operational view backed by the existing FRIDAY read-only API boundary.</p></div></div>
-    <div className="v3-detail-grid"><article><Gauge/><strong>{overview.services.length}</strong><span>Tracked services</span></article><article><ShieldCheck/><strong>{overview.mode.toUpperCase()}</strong><span>Control mode</span></article><article><Activity/><strong>{overview.activities.length}</strong><span>Recent events</span></article></div>
-    <div className="v3-panel v3-list"><div className="v3-section-head"><div><span className="v3-kicker">CURRENT STATE</span><h2>Environment inventory</h2></div></div>{overview.services.map(s => <div className="v3-list-row" key={s.id}><i className={s.status}/><span><b>{s.name}</b><small>{s.site} · {s.host}</small></span><p>{s.detail}</p><em>{s.status}</em></div>)}</div>
+function PendingCapabilityView({ name }: { name: string }) {
+  const details: Record<string, string> = {
+    Tasks: 'The Phase 2B task and handoff services exist internally, but are not yet exposed through an authenticated, project-scoped production API.',
+    Memory: 'Scoped persistent and short-lived memory services exist internally, but the production UI has no approved identity-bound memory API.',
+    Approvals: 'The durable internal approval foundations are not a public approval queue. Signed identity, operator policy and audit must be connected first.',
+    Audit: 'Monitoring events are not a substitute for the durable action audit. An identity-scoped operator audit API has not been activated.',
+    Settings: 'Server-side integration, authorization and automation settings must be inspected through a reviewed administrative interface before controls become available.',
+  }
+  return <section className="v3-pending-capability" aria-label={name + ' availability'}>
+    <span className="v3-kicker">FRIDAY / RELEASE STATUS</span>
+    <h2>{name} is not connected</h2>
+    <p>{details[name] || 'This workspace has no production-backed service yet.'}</p>
+    <p>No production task, memory or approval operation is available on this screen.</p>
+    <div role="status">Not activated · read only · no action controls</div>
   </section>
 }

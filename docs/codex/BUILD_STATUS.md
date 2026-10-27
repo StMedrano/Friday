@@ -1,5 +1,32 @@
 # Friday Build Status
 
+## 2026-10-27 operator dashboard honesty and Applications slice (draft, source-only)
+
+The mainline Dashboard's previously hardcoded Approvals count `2` and
+unconnected, initially enabled Automation toggle are removed. A static
+read-only automation-unavailable state now makes clear that a browser
+switch cannot arm HomeLab actions. The top bar describes read-only live
+monitoring rather than promising unrestricted operational authority.
+
+The Applications navigation now opens a real, responsive read-only
+workspace backed **only by Friday's existing normalized overview**:
+observed `app`, `media` and `container` category services; measured
+status counts; search/status filters; and selected service identifiers,
+source site/host/details/timestamps. No unverified website URLs, service
+discovery, credential-backed launchers or app management endpoints are
+invented. Offline fixtures are explicitly labelled preview only.
+Desktop and mobile use the same workspace.
+
+Tasks, Memory, Approvals, Audit and Settings now explain explicitly
+that production identity-bound operations are **not connected** instead
+of displaying the same unrelated generic inventory for every tab.
+Existing Phase 2B shared-work and memory services remain internal and
+unmounted. Existing HomeLab actions remain non-executable. No production
+deployment, database migration or Authentik/DNS/Cloudflare change has
+been performed. Review exact-head CI, production build, accessibility,
+staging desktop/mobile and release approval before promotion.
+
+
 ## 2026-10-27 Authentik public-login runtime assembly (draft, not deployed)
 
 The default-disabled `createPublicLoginRuntime` factory combines the
