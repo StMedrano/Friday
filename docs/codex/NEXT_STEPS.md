@@ -1,5 +1,26 @@
 # Friday — Ordered Finish Queue
 
+## Production UI integrity and Applications release candidate (2026-10-27)
+
+- Source-only feature branch `feat/real-apps-workspaces-controls-20261027`
+  replaces the fake Approvals badge/Automation switch, connects
+  Applications to honest read-only normalized inventory and displays
+  explicit unconnected states for Tasks, Memory, Approvals, Audit and
+  Settings rather than repurposing unrelated service data.
+- Complete exact-head CI, responsive/browser checks and reviewed
+  VM102 release before calling the UI correction deployed. Do not
+  infer application endpoints or launch URLs from status descriptions.
+- **Next functional milestone:** connect Phase 2B `server/work/`
+  services under verified, server-derived identity and exact project
+  grants; implement paginated read-only task/memory views first,
+  then independently authorized/audited task mutations and decision
+  approval. Reconcile the three-group UI from PR #33's feature-base
+  branch rather than assuming it entered `main`.
+- Keep HomeLab executor and automation toggle OFF; public Authentik
+  portal activation and infrastructure action approvals have separate
+  release requirements.
+
+
 Work from top to bottom. Do not skip safety prerequisites to reach action features sooner.
 
 ## User-requested cloud access — completed
