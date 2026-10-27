@@ -5,6 +5,10 @@
 - Source-only GET routes are now available via `createFridayServer({workReadBridge})`.
   `server/index.mjs` does not inject them: all `/api/work/*` still
   return 404 without explicit secure server composition.
+- The GET-only repository adapter is implemented behind a fixed
+  `https://supabase.mytechtactics.com` origin and needs a separate
+  SELECT-only database credential. Inspect the actual effective DB role
+  grants and deny write-capable service tokens in the runtime configuration.
 - Verify and register the four owner-selected project records on VM132
   after a separate backed-up, authorized database change. Inspect the
   actual `friday_projects` rows rather than trusting UI labels.
