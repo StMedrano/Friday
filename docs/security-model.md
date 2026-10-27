@@ -379,6 +379,32 @@ site callback/CSRF middleware, logout session revocation,
 session/user offboarding, MFA and security review remain mandatory.
 There is no connection to existing live Friday authentication.
 
+## Family HomeLab vs TechTactics login-domain isolation — draft PR #66
+
+`server/security/login-sites.mjs` defines exactly two explicitly
+enabled login entry-site identities with independent HTTPS origins,
+independent Authentik-branded IdP origins, independent login state
+cookies and browser sessions. The host-specific route adapter
+renders separate Family HomeLab and TechTactics login/account
+screens, delegates login/callback/logout to the existing browser
+and signed OIDC layers, denies mismatched hosts, client redirects
+and cross-site cookies, and never transmits raw token/secret
+fields in page bodies.
+
+**Authentik Brands are only presentation/default-flow boundaries;
+they are not tenant isolation or role authorization.** Both Family
+and TechTactics must have distinct OAuth/OIDC clients, exact
+callback URIs, permission scopes, user groups and MFA/enrollment
+rules. A family login does not grant TechTactics Admin, and a
+business customer login cannot reach Friday privileged HomeLab
+controls. Even within the family realm, public login by itself
+never authorizes an infrastructure action.
+
+No actual HTTP endpoint is mounted, no passwords or sessions are
+provisioned, and production Friday/Cloudflare, Authentik VM120,
+DNS/TLS, networks, database and HomeLab remain unchanged.
+See `docs/authentik-two-login-sites.md`.
+
 ## Future write-action rule
 
 A future action engine must require all of the following before any infrastructure mutation:
