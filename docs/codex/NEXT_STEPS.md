@@ -1,5 +1,21 @@
 # Friday — Ordered Finish Queue
 
+## Trusted user binding on dormant Phase 2B reader (2026-10-27)
+
+- Stacked draft adds a private, expiring, subject-digest based
+  grant source feeding the existing signed human Cloudflare Access
+  Phase 2B reader. This is source-only: no actual user's verified
+  subject or project grants have been enrolled.
+- Next: an owner/operator must supply and verify the intended
+  Access `sub` and authorized project(s), provision the private
+  policy outside Git, then stage signed good-user, denied-user,
+  cross-project, expired and revoked acceptance.
+- After identity/grant lifecycle and audit review, wire explicit
+  **read-only** Tasks/Memory routes to VM102, implement desktop/mobile
+  views and validate RLS. Approval mutations and HomeLab execution
+  remain separate and disabled.
+
+
 ## Phase 2B Tasks/Memory signed read bridge candidate (2026-10-27)
 
 - A **default-off internal** bridge now projects scoped task summaries and
