@@ -9,6 +9,7 @@ import { answerAssistant } from './assistant.mjs'
 import { normalizeAssistantHistory, validateAssistantPrompt } from './assistant-input.mjs'
 import { validateAgentId, validateAgentPrompt, validateRegistrySyncBody } from './agents/input.mjs'
 import { createAccessGate } from './security/access.mjs'
+import { handleWorkReadHttp } from './work/http-reads.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -157,6 +158,7 @@ export function createFridayServer({
   buildOverviewImpl = buildOverview,
   answerAssistantImpl = answerAssistant,
   accessGateImpl = null,
+  workReadBridge = null,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
   const securityRequired = config.access?.enabled === true ||
@@ -192,6 +194,12 @@ export function createFridayServer({
       if (operatorOnly && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
         return json(response, 415, {error:'json-required'})
     }
+
+    // Opt-in read-only transport; server/index.mjs does not inject a bridge.
+    // The bridge independently verifies the signed Access human JWT and
+    // resolves private grants on every request; no browser-supplied roles.
+    const workRead = await handleWorkReadHttp({request,url,bridge:workReadBridge})
+    if (workRead) return json(response, workRead.status, workRead.body)
 
     if (request.method === 'GET' && url.pathname === '/api/overview') {
       try {
