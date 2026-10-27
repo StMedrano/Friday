@@ -1,6 +1,19 @@
 # Two public-facing Authentik login sites: Family HomeLab and TechTactics
 
 **Current status: proposed DNS/brands and tested source adapter only.**
+
+**2026-10-27 discovery:** The connected Cloudflare zone already assigns
+`portal.mytechtactics.com` to the existing proxied Zoho Catalyst
+hostname `catalyst.cs.zohohost.com`. **Do not replace that DNS
+record or hijack that service.** This guide therefore proposes
+`accounts.mytechtactics.com` as a *new* business portal hostname,
+pending owner confirmation; it is not live. The connected Friday
+controller reaches Authentik on VM120 `10.1.60.10:9000`; its
+`/-/health/live/` returns HTTP 200, and the `friday` OIDC
+discovery returns 200. The `family` and `techtactics`
+OIDC discovery paths return 404; actual provider/app registrations,
+groups, MFA and brand assignments remain to be configured.
+No live Authentik, Cloudflare or Supabase write was performed.
 No login hostname, public DNS record, Authentik Brand, OAuth provider,
 real account or live controller configuration has been provisioned.
 This source is default-disabled and is **not mounted** in Friday's
@@ -11,12 +24,12 @@ existing production `server/http.mjs` or `server/index.mjs`.
 | Separate experience | Family HomeLab | TechTactics |
 |---|---|---|
 | Identity purpose | Private family HomeLab, Friday, future family services | Staff, clients, business apps, future TechTactics websites |
-| Login portal origin **(proposed)** | `https://family.mytechtactics.com` | `https://portal.mytechtactics.com` |
+| Login portal origin **(proposed)** | `https://family.mytechtactics.com` | `https://accounts.mytechtactics.com` |
 | Authentik-hosted branded sign-in **(proposed)** | `https://family-login.mytechtactics.com` | `https://login.mytechtactics.com` |
 | Brand title | Family HomeLab | TechTactics |
 | Authentik OAuth provider slug | `family` | `techtactics` |
 | Example OIDC issuer | `https://family-login.mytechtactics.com/application/o/family/` | `https://login.mytechtactics.com/application/o/techtactics/` |
-| Portal OIDC callback **(proposed)** | `https://family.mytechtactics.com/auth/oidc/callback` | `https://portal.mytechtactics.com/auth/oidc/callback` |
+| Portal OIDC callback **(proposed)** | `https://family.mytechtactics.com/auth/oidc/callback` | `https://accounts.mytechtactics.com/auth/oidc/callback` |
 | Minimum admission policy | Owner-invited family members only | Explicitly provisioned business staff/clients |
 | MFA policy | Strong MFA mandatory for adults and all admin functions | MFA mandatory for staff; role-specific policy for clients |
 | Application permissions | Family/member/operator permissions **separately reviewed** | Independent employee/customer/admin business roles |
@@ -35,7 +48,7 @@ Friday's private automation API, Omada or any infrastructure mutation.
                  +------------------+------------------+
                  |                                     |
      Family HomeLab portal                    TechTactics portal
-     family.mytechtactics.com                 portal.mytechtactics.com
+     family.mytechtactics.com                 accounts.mytechtactics.com
                  |                                     |
         OIDC authorization                    OIDC authorization
                  |                                     |
@@ -173,6 +186,30 @@ retention quotas, expiration cleanup scheduling, key rotation,
 MFA/account deprovisioning and revocation, monitoring and backups.
 Keep the two public HTTPS login hosts disabled until this and
 provider onboarding are reviewed.
+
+## Durable cross-replica login transactions (draft PR #73)
+
+The optional `createPostgresOidcTransactions` implements the existing
+public OIDC `reserve(tx)` and `consume(state)` contract for **multiple
+replicas** of either Family HomeLab or TechTactics, using parameterized
+one-statement PostgreSQL inserts and atomic `DELETE ... RETURNING`
+consumption. The data at rest is encrypted with AES-256-GCM and a private
+server-managed 32-byte key, including the original OAuth state, signed
+nonce and PKCE verifier. Database indexed identifiers are keyed hashes
+rather than raw state; access is additionally limited by separate
+per-site PostgreSQL roles and forced row-level security.
+
+The migration `supabase/migrations/20261027010000_friday_identity_oidc_transactions.sql`
+is **not applied to production**. It relies on the preceding private
+website-sessions migration and maintains disjoint Family and
+TechTactics RLS policies. The disposable offline PostgreSQL test
+runner verifies schema grants, five-minute TTL and cross-site denial.
+The optional adapter requires a separately supplied private DB
+connection, application-specific 32-byte key and bounded cleanup
+scheduler; no public listener or application permission is granted.
+Live key distribution, restart/rotation, concurrent DB behavior,
+cleanup, MFA/session revocation and external login still require
+staging acceptance.
 
 ## Real Authentik configuration required before deployment
 
