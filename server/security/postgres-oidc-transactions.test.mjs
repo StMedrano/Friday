@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {randomBytes} from 'node:crypto'
+import {randomBytes,generateKeyPairSync,sign} from 'node:crypto'
+import {createPublicOidcFlow} from './public-oidc.mjs'
 import {createPostgresOidcTransactions} from './postgres-oidc-transactions.mjs'
 
 const NOW=1793090000000
@@ -172,4 +173,53 @@ test('cleanup is site-scoped, bounded, uses SKIP LOCKED and cannot be browser-tr
  assert.deepEqual(q.params,['family',NOW,25])
  await assert.rejects(store.cleanup({limit:1001}),/sso-denied/)
  await assert.rejects(store.cleanup({applicationId:'techtactics',limit:2}),/sso-denied/)
+})
+
+test('end-to-end OIDC/PKCE across fresh Postgres store instances validates RSA ID token and rejects replay',async()=>{
+ const f=memory()
+ const issuer='https://family-login.example.test/application/o/family/'
+ const origin='https://family-login.example.test'
+ const {publicKey,privateKey}=generateKeyPairSync('rsa',{modulusLength:2048})
+ const jwk={...publicKey.export({format:'jwk'}),kid:'synthetic',alg:'RS256',use:'sig'}
+ const config={enabled:true,identityOrigin:origin,applications:[{
+  id:'family',slug:'family',clientId:'family-web',
+  clientSecret:'fixture-backend-only-secret',redirectUri:'https://family.example.test/auth/oidc/callback',
+ }]}
+ const b64=value=>Buffer.from(JSON.stringify(value)).toString('base64url')
+ let transaction
+ const start=createPublicOidcFlow(config,{now:()=>NOW,
+  transactions:{
+   reserve:async tx=>{transaction=tx;await f.make().reserve(tx)},
+   consume:async state=>f.make().consume(state),
+  },
+  fetchImpl:async()=>{throw Error('not used before callback')},
+ })
+ const started=await start.begin({applicationId:'family'})
+ const state=new URL(started.authorizationUrl).searchParams.get('state')
+ assert.equal(transaction.state,state)
+ assert.equal([...f.table.values()][0].ciphertext.includes(transaction.verifier),false)
+ const resumed=createPublicOidcFlow(config,{now:()=>NOW,
+  transactions:f.make(),
+  fetchImpl:async url=>{
+   if(url===issuer+'.well-known/openid-configuration')return {
+    ok:true,json:async()=>({issuer,jwks_uri:issuer+'jwks/',
+     authorization_endpoint:origin+'/application/o/authorize/',
+     token_endpoint:origin+'/application/o/token/'})}
+   if(url===origin+'/application/o/token/'){
+    const payload={iss:issuer,aud:'family-web',sub:'verified-family-person',
+     nonce:transaction.nonce,iat:Math.floor(NOW/1000)-20,exp:Math.floor(NOW/1000)+240}
+    const message=b64({alg:'RS256',typ:'JWT',kid:'synthetic'})+'.'+b64(payload)
+    const id_token=message+'.'+sign('RSA-SHA256',Buffer.from(message),privateKey).toString('base64url')
+    return {ok:true,json:async()=>({token_type:'Bearer',id_token,access_token:'not-returned'})}
+   }
+   if(url===issuer+'jwks/')return {ok:true,json:async()=>({keys:[jwk]})}
+   throw Error('unexpected OIDC endpoint')
+  },
+ })
+ const identity=await resumed.complete({applicationId:'family',state,code:'valid-code'})
+ assert.equal(identity.applicationId,'family')
+ assert.equal(identity.identity.kind,'human')
+ assert.equal(identity.identity.subject.endsWith(':verified-family-person'),true)
+ assert.equal(JSON.stringify(identity).includes('not-returned'),false)
+ await assert.rejects(resumed.complete({applicationId:'family',state,code:'replay'}),/sso-denied/)
 })
