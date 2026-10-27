@@ -32,6 +32,65 @@ checks and staging cross-project denial tests. Do not use browser-provided
 project/role claims as authorization. The source-only addition does not
 execute infrastructure actions.
 
+## Trusted user enrollment for Phase 2B reads (draft-only; not live)
+
+A new optional `createTrustedWorkReadBridge` composes the signed-human
+Cloudflare Access reader with `createFileWorkSubjectGrants`: an
+**owner-private, canonical, one-day-expiring policy file** that maps the
+**SHA-256 digest of the VERIFIED Access `sub`** (domain-separated;
+`workSubjectHash(sub)`) to explicit project IDs and memory scopes.
+Matching an email, browser role, AI claim, or merely belonging to an
+Authentik Brand **does not** enroll a user.
+
+The policy must be provisioned by the actual owner outside Git, in an
+owner-owned mode-0700 directory, as a regular mode-0600 single-link
+file. It is read fresh on every request: removing the binding,
+replacing the policy atomically or letting it expire immediately denies
+subsequent reads. Maximum validity is 24 hours; stale, malformed,
+duplicated, wildcard, excessive, symlinked, group/world-readable, or
+noncanonical JSON denies **every** user instead of falling back.
+No server ever automatically creates this file. The policy is
+read-only and cannot authorize writes, HomeLab actions, agent tools,
+global memory or impersonation.
+
+The exact policy structure, with sample-only placeholders, is:
+
+```json
+{
+  "schemaVersion": 1,
+  "expiresAt": 1793103600000,
+  "users": [
+    {
+      "subjectHash": "replace-with-64-lowercase-hex-from-verified-access-sub",
+      "allowedProjectIds": ["example-project"],
+      "allowedMemoryScopes": [
+        {"scope": "project", "ownerId": "example-project"}
+      ]
+    }
+  ]
+}
+```
+
+The example expiry is **illustrative and time-limited**, not a
+production enrollment artifact. The actual file must contain compact,
+canonical JSON in the shown field order, followed by one newline;
+pretty-printed or manually edited duplicate-key JSON fails closed.
+An authorized operator must (1) inspect the signed JWT in a trusted
+backend, verify `iss`/`aud`/`exp`/`sub`, (2) compute the digest using
+the source helper rather than copying an email or token into Git, (3)
+create a narrowly scoped owner-private file and atomically replace it
+after independent review, (4) verify accepted reads and other-user
+and cross-project denials in staging, and (5) regularly renew or revoke
+the short-lived policy. Never commit personal subject IDs, Access JWTs,
+the policy file, or Supabase keys.
+
+**Important:** this PR provisions **no actual user**, real role file,
+HTTP handler, production credential or live runtime; the wrapper is
+disabled by default. Current production tasks/memory remain
+unconnected. A separate approved bootstrap, audited grant
+administration, identity lifecycle acceptance and rollout are required
+to claim a person is connected.
+
 ## Read-only homelab gateway preflight
 
 Run `node scripts/preflight-shared-work-target.mjs http://10.1.20.10:8000` from VM102 to check that the intended VM132 gateway responds. Only an unauthenticated GET on `/rest/v1/` is made. HTTP **401 is an expected reachable/gated response** and **does not prove authenticated PostgREST access, successful backup/restore, SQL privileges, schema compatibility, or migration readiness**. The structured report intentionally always returns `authenticated:false` and `migrationReady:false`; only a separately approved privileged read-only audit and staged migration can close those gates. No service keys or secrets are accepted as inputs. The script is covered by three tests in GitHub CI.
