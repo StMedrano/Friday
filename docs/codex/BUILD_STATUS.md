@@ -1,5 +1,25 @@
 # Friday Build Status
 
+## 2026-10-27 Phase 2B private Tasks/Memory read bridge (draft, source-only)
+
+Added a default-disabled, server-owned `createPrivateWorkReadBridge`
+that verifies signed human Cloudflare Access JWTs, resolves project and
+memory-scope grants from a separate trusted server-side source and
+calls existing Phase 2B services for bounded read-only task lists,
+individual task summaries and memory search. Read results are
+explicitly projected and fail closed on malformed, wrong-project,
+untrusted, excessive or sensitive data. Test-first coverage includes
+denied/expired/mismatched JWTs, subject-only grants, cross-project
+isolation, strict bounds and unavailable providers.
+
+**No live routes, production database connections, user/team grants,
+approval buttons, writes or VM102 deployment**. The dashboard still
+correctly identifies Tasks and Memory as not connected. Activation
+requires a trusted role/grant source, audited access, staging and
+production review; do not give human rights to Cloudflare service
+tokens or LLM output.
+
+
 ## 2026-10-27 Authentik public-login runtime assembly (draft, not deployed)
 
 The default-disabled `createPublicLoginRuntime` factory combines the
