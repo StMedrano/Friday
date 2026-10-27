@@ -13,6 +13,7 @@ import IncidentsWorkspace from '../components/IncidentsWorkspace'
 import InfrastructureWorkspace from '../components/InfrastructureWorkspace'
 import MobileHome from '../components/MobileHome'
 import MobileNavigation from '../components/MobileNavigation'
+import PwaControls from '../components/PwaControls'
 import RepositoriesWorkspace from '../components/RepositoriesWorkspace'
 import '../monitoring.css'
 import '../mobile.css'
@@ -82,6 +83,7 @@ export default function Dashboard() {
         <header className="v3-mobile-header">
           <div className="v3-mobile-brand"><span className="v3-live-dot"/><strong>FRIDAY</strong><small>AI OPERATIONS</small></div>
           <div className={`v3-mobile-status ${connected ? 'online' : 'warning'}`}><i/>{connected ? 'LIVE' : 'SAFE'}</div>
+          <PwaControls/>
         </header>
         <main className="v3-main">
           {active === 'Overview' ? <MobileHome
@@ -128,7 +130,7 @@ export default function Dashboard() {
         <header className="v3-topbar">
           <div><strong>FRIDAY</strong><span>AI OPERATIONS CONTROL</span></div>
           <button className="v3-search"><Search size={16}/><span>Search or command</span><kbd>Ctrl K</kbd></button>
-          <div className="v3-system"><i /> {connected && overview.mode === 'live' ? 'READ-ONLY MONITORING' : 'LIVE STATUS UNAVAILABLE'}</div>
+          <div className="v3-system"><i /> {connected && overview.mode === 'live' ? 'READ-ONLY MONITORING' : 'LIVE STATUS UNAVAILABLE'} <PwaControls/></div>
         </header>
 
         <main className="v3-main">
