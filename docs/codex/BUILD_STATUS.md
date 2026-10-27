@@ -1,5 +1,22 @@
 # Friday Build Status
 
+## 2026-10-27 signed, default-off Tasks/Memory GET transport (draft only)
+
+The merged private signed human Access read bridge can now be called from
+the Friday HTTP server through an explicitly injected
+`workReadBridge`. Exact routes support bounded GET-only task list,
+task detail and **project-scoped** durable Memory search. The adapter
+rejects duplicate/unknown query keys, unverified users, cross-project
+reads, malformed IDs, invalid data, non-GET methods and backend errors.
+It returns no private storage errors and sends `cache-control:no-store`.
+
+**No running Friday feature activated.** `server/index.mjs` injects no
+bridge; missing dependency returns 404 even for an authenticated user.
+Before activation, require verified VM132 project rows, owner-private
+grant-file lifecycle, signed-sub confirmation, independent read-only DB
+permissions, audit, end-to-end staging tests and reviewed deployment.
+
+
 ## P8 pending approval queue — stacked draft PR #50, source only
 
 An internal, read-only approval queue now derives from the owner-private,
