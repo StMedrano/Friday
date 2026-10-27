@@ -8,7 +8,7 @@ import {createLoginSiteHttpHandler} from './login-sites-http.mjs'
 const IDS=['family','techtactics']
 const FIELDS=['id','publicOrigin','identityOrigin','clientId','clientSecret',
  'signingKey','transactionKey','query']
-const unavailable=Object.freeze({enabled:false,handlerFor:()=>null})
+const unavailable=Object.freeze({enabled:false,handlerFor:()=>null,maintenanceFor:()=>null})
 const exact=(value,keys)=>value!==null&&typeof value==='object'&&
  !Array.isArray(value)&&Object.keys(value).length===keys.length&&
  keys.every(key=>Object.hasOwn(value,key))
@@ -59,6 +59,7 @@ export function createPublicLoginRuntime({
   return unavailable
 
  const entries=[]
+ const maintenance=new Map()
  for(const id of IDS) {
   const site=byId.get(id)
   // Copy keys so later mutations of the owner's config Buffers cannot
@@ -83,6 +84,38 @@ export function createPublicLoginRuntime({
    flow,sessionStore:sessions,signingKey:Buffer.from(site.signingKey),now,
   })
   if(!browser.enabled)return unavailable
+
+  // Trusted process-local lifecycle access only. This is NOT an HTTP,
+  // browser, AI tool, operator-role or scheduler interface. A deployment
+  // must separately authorize the caller and audit offboarding requests.
+  const reject=()=>{throw Error('sso-denied')}
+  const maintainer=Object.freeze({
+   enabled:true,
+   async revokeSubject(input){
+    if(!exact(input,['subject']))reject()
+    try {
+     return await sessions.revokeSubject({
+      applicationId:id,subject:input.subject,
+     })
+    }catch{reject()}
+   },
+   async cleanup(input){
+    // Each sweep is bounded per table, not one unbounded database delete.
+    // Steps are idempotent, but not a cross-table transaction: if the
+    // second sweep fails, report failure and allow a later retry.
+    if(!exact(input,['limit'])||
+       !Number.isSafeInteger(input.limit)||input.limit<1||
+       input.limit>1000)reject()
+    try {
+     const expiredTransactions=await transactions.cleanup({limit:input.limit})
+     const expiredSessions=await sessions.cleanup({
+      applicationId:id,limit:input.limit,
+     })
+     return {expiredTransactions,expiredSessions}
+    }catch{reject()}
+   },
+  })
+  maintenance.set(id,maintainer)
   entries.push({id,origin:site.publicOrigin,
    identityOrigin:site.identityOrigin,browser})
  }
@@ -97,5 +130,8 @@ export function createPublicLoginRuntime({
   // Site choice is permitted only at trusted server bootstrap. Never
   // route a browser-selected Host, cookie, OAuth claim or user role here.
   handlerFor(applicationId){return handlers.get(applicationId)||null},
+  // For an independently authenticated, audited operator job. Never
+  // invoke this through request-selected app IDs or expose it as a route.
+  maintenanceFor(applicationId){return maintenance.get(applicationId)||null},
  })
 }

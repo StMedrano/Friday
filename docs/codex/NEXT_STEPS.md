@@ -195,6 +195,18 @@ Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execut
 
 ## P8 — Authentication, roles, approval, and durable action audit
 
+- **Per-site session maintenance is implemented in a draft-only source
+  change:** trusted server bootstrap can access isolated
+  `maintenanceFor('family'|'techtactics')` operations for exact
+  issuer-scoped subject session revocation and bounded old login-state
+  and session sweeps, with no HTTP exposure or production scheduler.
+  Before real offboarding, add auditable operator authorization,
+  Authentik account disable and IdP session revocation, atomic
+  prevention of in-flight re-login, tested database role isolation
+  and a reviewed rotation/retention runbook. This is not a public
+  customer or HomeLab action endpoint.
+
+
 - **Two public Authentik site handlers are now composable but disabled:**
   `server/security/public-login-runtime.mjs` assembles distinct Family
   and TechTactics OIDC/PKCE, encrypted state, session, cookie and HTTP

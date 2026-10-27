@@ -108,6 +108,28 @@ been performed. Review exact-head CI, production build, accessibility,
 staging desktop/mobile and release approval before promotion.
 
 
+## 2026-10-27 Authentik per-site session lifecycle (source-only draft)
+
+The disabled `createPublicLoginRuntime` now exposes a **trusted-process
+only** `maintenanceFor(siteId)` adapter, independently bound to Family
+and TechTactics. A caller with independently authenticated and audited
+operator authority can request an exact issuer-scoped subject session
+revocation or bounded per-site sweeps of expired encrypted OIDC
+transactions and website sessions. Wrong tenants, unknown subjects,
+extra fields and unbounded cleanup requests fail closed. A cleanup
+failure returns no success claim; partial sweeps are idempotent and
+can be retried. Tests cover tenant isolation, expiry, revoked subjects
+and backend failure sanitization.
+
+This adds **no public API route, listener, scheduler, real DB access,
+Authentik user lifecycle, role assignment or HomeLab permission**.
+A website session revocation does not disable the account at the
+identity provider, invalidate Authentik SSO cookies, or stop an
+already in-flight callback; true offboarding still requires IdP
+disable/revocation, an account-deny barrier and operator audit.
+Production remains unchanged.
+
+
 ## 2026-10-27 Authentik public-login runtime assembly (draft, not deployed)
 
 The default-disabled `createPublicLoginRuntime` factory combines the
