@@ -189,14 +189,14 @@ describe('Honest overview status', () => {
     expect(screen.queryByText(/inventory synchronized/i)).not.toBeInTheDocument()
   })
 
-  it('lists services that need attention with a path to the Applications view', async () => {
+  it('lists services that need attention with a path to the full service inventory', async () => {
     installMatchMedia(false)
     const user = userEvent.setup()
     render(<Dashboard />)
     const panel = screen.getByRole('region', { name: /needs attention/i })
     expect(within(panel).getByText('VM 110 · Umbrel')).toBeInTheDocument()
-    await user.click(within(panel).getByRole('button', { name: /view applications/i }))
-    expect(screen.getByRole('region', { name: 'Observed application services' })).toBeInTheDocument()
+    await user.click(within(panel).getByRole('button', { name: /view all services/i }))
+    expect(screen.getByRole('region', { name: 'Infrastructure workspace' })).toBeInTheDocument()
   })
 })
 

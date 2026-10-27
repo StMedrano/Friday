@@ -125,6 +125,15 @@ describe('MobileHome', () => {
     expect(within(attention).queryByRole('button', { name: /view diagnosis/i })).not.toBeInTheDocument()
   })
 
+  it('routes service attention to the full infrastructure inventory', async () => {
+    const onNavigate = vi.fn()
+    const user = userEvent.setup()
+    render(<MobileHome overview={{ ...overview, incidents: [] }} {...baseProps} onNavigate={onNavigate}/>)
+    const attention = document.querySelector('[data-mobile-section="attention"]') as HTMLElement
+    await user.click(within(attention).getByRole('button', { name: /view services/i }))
+    expect(onNavigate).toHaveBeenCalledWith('Infrastructure')
+  })
+
   it('prioritizes offline then degraded services and limits the preview to five', async () => {
     const onNavigate = vi.fn()
     const user = userEvent.setup()
