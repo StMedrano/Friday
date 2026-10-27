@@ -81,6 +81,66 @@ Incident Diagnostics can automatically capture one metadata-only report for supp
 
 Diagnostics expose no remediation endpoint.
 
+## Operator role policy — internal foundation (draft PR #49)
+
+`server/security/operator-policy.mjs` supplies a strictly validated,
+**server-owned** role and target binding snapshot for the existing dormant
+HomeLab controller. The policy uses the `sub` of a **cryptographically verified
+Cloudflare Access JWT**, never role, permission, email or target assertions
+from untrusted browser headers, agent prompts, or AI output. Missing, malformed,
+duplicate, wildcard, unsupported or extra-field bindings deny all grants.
+
+| Role | Fixture diagnostics | Request restart proposal | Approve another principal's proposal |
+| --- | --- | --- | --- |
+| Viewer | Yes | No | No |
+| Operator | Yes | Yes | No |
+| Administrator | Yes | Yes | Yes |
+| Friday Agent | Yes (read-only) | No | No |
+
+Roles apply only to exact configured target identifiers (currently the
+unbound symbolic `staging-canary`). No role, including Administrator, grants
+execution authority. The internal HomeLab controller now requires this
+independent policy alongside Access authentication, the separate
+`automationAllowed` kill gate, and durable audit. A proposer cannot approve
+their own request, even when also an Administrator. Approval remains an
+immutable *record*, not execution. Service tokens cannot become human roles.
+
+This module is not configured, mounted, or served by production
+`server/index.mjs`, and it does not modify the read-only cloud automation
+listener. Before production use, trusted provisioning/rotation of subject
+bindings, user lifecycle and revocation, audit completeness, role governance,
+multi-instance kill-switch semantics, threat review, and live identity tests
+still need separate approval. **Do not treat this as completed product RBAC or
+a license to enable infrastructure writes.**
+
+## Durable pending approval projection — stacked draft PR #50
+
+The internal HomeLab audit store now has a **bounded read-only** `listPending`
+method. It scans at most 512 events from its owner-private append-only event
+directory, checks exact event filenames and record permissions, rejects
+symlinks/corruption instead of returning partial results, and returns up to
+50 unexpired proposals whose matching approval event is absent. Results are
+ordered by expiration then request ID. The snapshot can become stale under
+concurrent approval; **approval always re-reads the proposal and exclusively
+appends an immutable single-use approval**. An excessively large audit backlog
+fails closed and requires independently reviewed retention/archiving before
+any production activation.
+
+`createHomeLabControl.listPendingApprovals` is **internal only** and requires
+signed Access identity, an exact Administrator permission for symbolic
+`staging-canary`, the existing kill gate and a healthy audit store. Returned
+entries contain only request ID, target, request/expiry time, pending status,
+and whether the current Administrator can approve it. No actor hashes,
+confirmation text or raw records are exposed. The controller has **no executor**
+and returns `execution.performed:false`.
+
+**Dependency:** PR #50 is based on draft PR #49's role policy. PR #48's
+global automation gate is a separate unmerged draft. No HTTP/API route,
+browser UI, real machine binding, operator provisioning, production deployment
+or live HomeLab access was added. This is not a complete human approval
+workflow or an authorization to run commands.
+
+
 ## Global automation gate (internal foundation)
 
 `server/security/automation-kill-switch.mjs` implements a **default-deny**
