@@ -20,7 +20,7 @@ const example: FridayOverview = {
 }
 
 describe('ApplicationsWorkspace observed, read-only application inventory', () => {
-  it('shows only observed app/media/container services with exact status and source metadata', () => {
+  it('shows only observed app/media/container services with exact status and source metadata', async () => {
     render(<ApplicationsWorkspace overview={example} connected />)
     const inventory = screen.getByRole('region', { name: 'Observed application services' })
     expect(within(inventory).getByText('Nextcloud')).toBeInTheDocument()
@@ -28,6 +28,7 @@ describe('ApplicationsWorkspace observed, read-only application inventory', () =
     expect(within(inventory).getByText('Homepage')).toBeInTheDocument()
     expect(within(inventory).queryByText('Core Router')).not.toBeInTheDocument()
     expect(screen.getByText(/not an installed-app catalog/i)).toBeInTheDocument()
+    await userEvent.setup().click(within(inventory).getByRole('button', { name: /Emby/i }))
     expect(screen.getByText(/last observed/i)).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /restart|deploy|launch|open app|remove/i })).not.toBeInTheDocument()
     expect(screen.queryByRole('link', { name: /nextcloud|emby/i })).not.toBeInTheDocument()
