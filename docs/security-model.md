@@ -427,6 +427,37 @@ AuthentiK integration still require independent completion.
 **Family public login cannot operate Docker/Proxmox** and
 TechTactics login cannot inherit family HomeLab rights.
 
+## Private per-site PostgreSQL sessions — draft PR #70
+
+The source-only `createPostgresLoginSessions` store accepts
+only server-injected parameterized DB operations and a permanently
+configured `family` OR `techtactics` application ID. It stores no
+raw session cookie; browser auth supplies a site-qualified HMAC
+token digest and verified issuer-scoped human subject.
+A unique `(application_id,token_hash)` constraint enforces
+collision/replay denial; atomic database DELETE supports
+per-session logout, owner-only per-subject revocation and
+bounded expiry cleanup. Expiration and role-independent
+session validation are applied on every read.
+
+The **unapplied** `friday_identity.web_sessions` SQL migration adds
+FORCE RLS and two disjoint policies for separate NOLOGIN
+`friday_family_login` / `friday_techtactics_login` groups.
+Neither `anon`, `authenticated` nor Supabase `service_role`
+receive schema/table access, and there are no browser-facing
+RPC endpoints. A future deployment must create and securely
+rotate one dedicated LOGIN principal for each portal and verify
+its membership. Compromising one site's SQL account must not
+reveal, insert or revoke the other site's session rows.
+RLS is independently validated against a disposable real
+Postgres database in CI.
+
+This adds **no public endpoint**, persistent PKCE state backend,
+actual account provisioning, HomeLab privileges, Supabase migration
+on user data, production deployment, or access to other network
+services. The private Friday control plane remains protected
+by its existing independent policy/kill/audit boundaries.
+
 ## Future write-action rule
 
 A future action engine must require all of the following before any infrastructure mutation:
