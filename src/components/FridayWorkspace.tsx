@@ -3,6 +3,13 @@ import type { FridaySession } from '../hooks/useFridaySession'
 import FridayComposer from './FridayComposer'
 import FridayConversation from './FridayConversation'
 
+const suggestions = [
+  'What needs attention right now?',
+  'Summarize the health of each site.',
+  'Which services changed status recently?',
+  'Explain the open incidents.',
+]
+
 type FridayWorkspaceProps = {
   session: FridaySession
   query: string
@@ -27,7 +34,9 @@ export default function FridayWorkspace({ session, query, onQueryChange, onSubmi
     <div className="v3-friday-workspace-body">
       {session.messages.length > 0
         ? <FridayConversation messages={session.messages}/>
-        : <div className="v3-friday-empty"><span>SESSION READY</span><p>Ask FRIDAY about the current observed infrastructure state.</p></div>}
+        : <div className="v3-friday-empty"><span>SESSION READY</span><p>Ask FRIDAY about the current observed infrastructure state.</p>
+          <div className="v3-friday-suggestions">{suggestions.map((prompt) => <button key={prompt} type="button" disabled={session.loading} onClick={() => session.sendMessage(prompt)}>{prompt}</button>)}</div>
+        </div>}
     </div>
 
     <FridayComposer
