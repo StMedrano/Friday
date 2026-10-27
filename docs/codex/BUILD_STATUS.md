@@ -2,6 +2,13 @@
 
 ## 2026-10-27 signed, default-off Tasks/Memory GET transport (draft only)
 
+A fixed-origin server-side read-only PostgREST repository is included
+(`server/work/read-only-repository.mjs`). It selects only projected task
+and project Memory fields, validates bounded row shapes and responses
+and exposes no writes or RPCs. Before activation, provision and
+independently audit a dedicated SELECT-only credential; reusing the
+existing writable Supabase service key is prohibited.
+
 The merged private signed human Access read bridge can now be called from
 the Friday HTTP server through an explicitly injected
 `workReadBridge`. Exact routes support bounded GET-only task list,
