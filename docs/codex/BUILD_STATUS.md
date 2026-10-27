@@ -1,23 +1,422 @@
 # Friday Build Status
 
-## P8 global automation gate foundation — draft PR #48, source only
+## Opt-in PostgreSQL website sessions — draft PR #70 (source only)
 
-A fail-closed file-backed `createFileAutomationGate` is implemented under
-`server/security/automation-kill-switch.mjs`. A missing, corrupt, symlinked,
-group/world-accessible, expired or overly permissive gate file denies. Only an
-exact owner-private schema with `state:allow-approved-actions` and at most a
-five-minute expiration passes; the file is reopened on every check so owner
-revocation is effective without a server restart. The gate is tested with the
-existing dormant HomeLab control callback and does not create a file or an HTTP
-route. It does not enable infrastructure execution, authenticate operators,
-or confer independent RBAC/approval/audit permissions.
+Family HomeLab and TechTactics now have a **database-backed session-store
+implementation**, `server/security/postgres-login-sessions.mjs`, for
+the existing browser OIDC `sessionStore.create/read/revoke` contract.
+It is **default-disabled**, requires a server-provided parameterized
+PostgreSQL `query(sql,params)` function, and is permanently pinned to
+either `family` or `techtactics` at construction time. Only an
+app-qualified HMAC session token digest, Authentik issuer-scoped human
+subject and bounded issued/expiration timestamps are persisted.
+Raw browser cookies, OIDC authorization codes, OAuth access/refresh
+tokens and user-supplied role claims are never stored or exposed.
 
-PR #48 is for source review only, with no production wiring or HomeLab access.
-CI and a separate production/security design review must be completed before
-future action development. P8 is **not complete**: authenticated role policy,
-a durable approval queue, cross-instance audit/deny semantics, and a reviewed
-runtime kill-switch integration remain pending. The read-only cloud automation
-endpoint remains unrelated and unchanged.
+A separate, **unapplied** SQL migration
+`20261026010000_friday_identity_sessions.sql` creates a private
+`friday_identity.web_sessions` table with RLS **forced** and exact
+family/business policies for **two independent NOLOGIN PostgreSQL
+group roles**, `friday_family_login` and
+`friday_techtactics_login`. Anonymous, authenticated and generic
+Supabase `service_role` have no usage or table privileges.
+Each web app must later receive **different DBA-created login
+credentials**, members only of its site-specific role; this PR
+does not provision any real credential or touch the user's DB.
+In addition to one-statement atomic create/read/delete and
+one-website offboarding, the store supports bounded per-site
+expired-session cleanup using `FOR UPDATE SKIP LOCKED`.
+No public route grants access to account-offboarding or cleanup.
+
+Unit tests cover no implicit tenant, durable parameterized shape,
+failed/colliding insertion, session expiry, invalid/tampered rows,
+site-binding denial, logout, owner offboarding and bounded cleanup.
+Disposable PostgreSQL CI now applies the new migration and tests
+actual role/RLS denial, cross-site visibility, TTL constraints
+and site-local revocation with **no production URL**.
+This is source-only on a branch stacked over PR #68; real
+production sessions still require a securely configured server-only
+database connector, user/account lifecycle and MFA checks, audited
+rotation and revocation, browser login-state migration from the
+single-host file prototype to a transactional shared backend,
+database cleanup scheduling, HTTPS vhosts and owner review.
+Production Friday and both public login hosts remain unchanged.
+
+
+## Opt-in per-site HTTP boundary — draft PR #68 (source only)
+
+Implemented `server/security/login-sites-http.mjs` as a real
+Node.js `http.createServer`-compatible request handler for **each**
+separate Family HomeLab and TechTactics HTTPS vhost, but it is
+**not mounted by production `server/index.mjs`** and never calls
+`.listen()` itself. Each instance must be explicitly enabled with
+a server-trusted `family` or `techtactics` site ID, exact public HTTPS
+origin, and the corresponding registered `createLoginSites` adapter.
+The adapter now exposes a minimal, read-only `originFor(id)`
+lookup to prevent misbinding family and business listeners.
+The handler never chooses a site based on untrusted Host or
+X-Forwarded-* headers and denies Host mismatch or forwarded
+override. Deployment still needs a **separate** HTTPS reverse-proxy
+vhost per portal with verified Host preservation.
+
+Real loopback HTTP tests cover independent site HTML/CSS, safe
+OAuth redirects, query-exact OIDC callback, secure Set-Cookie,
+session-gated accounts, exact-Origin/CSRF POST logout, duplicate
+callback parameters, cross-site cookies, untrusted Host/forwarded
+headers, large or wrong-type request bodies, disabled default,
+unrecognized paths and generic error messages. This is a verified
+source HTTP adapter only; no actual internet-facing route, port,
+DNS, TLS, proxy, Authentik provider, session database or user has
+been provisioned. Family public login still conveys **no HomeLab
+execution rights**, TechTactics remains independent, existing
+Cloudflare protection unchanged. Needs full CI, code/security
+review, transaction/session backend and real external acceptance
+before any deployment.
+
+
+## Two distinct public login sites — Family HomeLab and TechTactics (draft PR #66)
+
+Added a **disabled-by-default**, source-only
+`server/security/login-sites.mjs` adapter that composes with
+`createPublicOidcFlow` and `createPublicOidcBrowser` to provide
+**two separately branded public login entry experiences**:
+`family` (Family HomeLab / Friday family services) and
+`techtactics` (business staff, clients, future sites). The code
+only accepts exactly these two registered site identities with
+**different app HTTPS origins and different Authentik IdP HTTPS
+origins**. Both use independent login-state cookies, issuer/client
+registration, CSRF-controlled logout, session permissions and
+single-site accounts. Responsive accessible HTML/CSS pages are
+rendered for each brand; internal handlers cover login, OIDC start,
+callback, account and logout with exact-site origin checking.
+Static HTML contains no secrets, tokens or browser scripts.
+
+End-to-end synthetic tests use the existing OIDC and browser
+security components under **two distinct RSA-signed issuers**.
+They verify that identical user `sub` strings under separate
+issuers are *not* the same authority and that cookies from the
+family portal do not authenticate to business and vice versa.
+The underlying Authentik deployment can use **two Brands
+matched to distinct login domains**, but Brands only change
+appearance/default flows, not database tenant isolation.
+Actual separate user membership, client credentials, RBAC
+and group policies must be provisioned and independently
+reviewed in Authentik. See `docs/authentik-two-login-sites.md`.
+
+These URLs are **proposed only**, not registered or live.
+This does **not** register a public server route, create real
+identity providers/users, configure TLS/tunnels/DNS, provide
+a persistent cross-host session database, merge into production,
+or contact VM120/VM102 or any HomeLab executor.
+The live Friday Cloudflare Access configuration remains unchanged.
+CI and security review are required before considering rollout.
+
+
+## P8 public Authentik browser-cookie / server-session boundary — draft PR #64 (source only)
+
+Added `server/security/public-oidc-browser.mjs` as a **disabled-by-default
+browser-bound coordinator** over the existing per-app public Authentik
+authorization-code+PKCE flow. On login start it issues a host-only
+`__Host-friday-oidc-<app>` Secure, HttpOnly, SameSite=Lax, Path=/
+short-lived cookie containing a key-HMAC state binding, **not the raw
+OAuth state**. Callback requires the matching browser cookie and
+exact trusted application origin BEFORE touching the one-use OAuth
+transaction or redeeming the authorization code. A different website
+or attacker-supplied login state cannot consume the same browser's
+transaction.
+
+The successful verified OIDC callback creates a fresh random opaque
+`__Host-friday-session-<app>` cookie, whose bearer is never stored
+in the app's session store: only an app+origin HMAC digest and verified
+issuer-scoped subject with a bounded lifetime. A **separately supplied,
+revocable server-side session backend** must implement
+create/read/revoke and expire sessions on each read. The source provides
+a minimal current-session projection (human subject and a synchronizer
+CSRF token) and exact-origin, CSRF-protected logout, clearing both
+cookies and invalidating the server-side session. Same-site users
+retain *independent* per-application sessions and roles, even when
+Authentik itself shares a central identity login.
+
+Test-first cases cover default-disabled behavior, host/origin isolation,
+HttpOnly/secure flags, browser binding, duplicate/forged cookies,
+cross-site callback mixups, expiry, persistent revocation, CSRF logout,
+malformed sessions and absent backend. Browser login is **not** wired
+into `server/http.mjs` or `server/index.mjs`: no live HTTP endpoint,
+cookie, Authentik credentials, external ingress, session DB, signup
+or privileged HomeLab action exists. Production prerequisites:
+transactional multi-host login-state and session stores with TTL
+cleanup, browser route handling, CSRF preflight, strict reverse proxy,
+actual Authentik provider acceptance, MFA and explicit owner review.
+This PR stacks on draft PR #62; source CI pending.
+
+
+## Public Authentik restart-durable encrypted login state — draft PR #62
+
+Added `server/security/file-oidc-transactions.mjs` as an **explicitly
+enabled, single-host POSIX** storage prototype for public Authentik
+authorization-code + PKCE login transactions. It implements the
+`reserve(record)` / `consume(state)` seam required by
+`createPublicOidcFlow`. Authentication state, nonce, per-login PKCE
+verifier, client identity and timestamps are encrypted at rest using
+AES-256-GCM with a server-only supplied 256-bit key; raw login state is
+never included in filenames. A verified private 0700 directory and
+create-only 0600 files are required. HMAC-derived filenames,
+O_EXCL create, fsync, no-follow reads and atomic POSIX hard-link
+`.used` marker prevent concurrent same-state consumption by independent
+processes sharing the *same local directory*. Replay denies even
+when an earlier callback failed or the process restarted.
+Corrupt, insecure, expired, tampered or forged state denies.
+
+The store has **no production bootstrap, HTTP route, cookie, credential,
+login UI, site registration, migration, cleanup job or cloud deployment**.
+It is not a cross-host/durable distributed session solution: network
+filesystem atomic semantics are not trusted, and old `.pending`/`.used`
+records accumulate pending an audited retention/cleanup design.
+Before multi-replica production SSO, replace with transactional database
+state and a supported secure session store, add browser-bound CSRF/state
+cookie, logout, rate limiting and owner review. This is a source-only
+step stacked on PR #60; no HomeLab actions. Tests cover encryption,
+replay/races, restart, expiry, file ownership, corruption, app
+separation and complete synthetic OIDC roundtrip.
+
+
+## Public multi-site Authentik OIDC foundation — draft PR #60 (source-only)
+
+Friday's Authentik design now explicitly includes **public internet sign-in**
+for Friday, TechTactics and future third-party/client websites.
+One planned public HTTPS Authentik identity hub can serve independent
+per-application OIDC issuers, client registrations, strict redirect URIs,
+and Authentik MFA/enrollment. The source-only
+`createPublicOidcFlow` implements server-side multi-application
+authorization-code + PKCE S256 initiation and server-side callback
+exchange with one-use five-minute state, nonce, client-bound authorization,
+pinned provider discovery/RS256 JWKS, and strictly checked signed ID
+token subject, issuer, audience and expiry. Per-app confidential
+credentials stay server-side; user-facing output excludes tokens and
+secrets. Each registered app has an independent client, issuer slug
+and redirect; arbitrary request-supplied redirect/issuer/client cannot
+be accepted.
+
+AuthentiK public SSO is a **separate, lower-privilege website login**
+from the dormant P8 privileged `friday_control` token and HomeLab
+role/kill/audit requirements. Cross-domain sites share the Authentik
+login provider but **not** the site's session cookie or roles.
+Legacy sites may use Authentik single-app forward auth.
+No actual Authentik VM120, Cloudflare tunnel, public login hostname,
+provider registration, secret, session store, secure cookie,
+callback HTTP route, site account provisioning, deployment or
+HomeLab command has been configured or contacted. An owner-controlled
+atomic distributed transaction store, validated sessions, signout,
+live OIDC verification, security acceptance and ingress controls are
+prerequisites to public release. See `docs/authentik-public-sso.md`.
+This draft PR is stacked on #58. CI result pending.
+
+
+## P8 Authentik human identity adapter — draft PR #58, source only
+
+Friday now has an **opt-in internal Authentik OIDC access-token verifier**,
+complementing (not replacing) the signed Cloudflare Access boundary.
+The source-only `createAuthentikAccessGate` pins an HTTPS provider-specific
+issuer, exact OIDC discovery/JWKS endpoints, client audience, RS256 signing
+keys and a dedicated signed `friday_control` access-token scope.
+It fails closed on unsupported global issuer, HS256, wrong issuer/audience,
+unsigned/expired/unscoped/malformed/service tokens, malicious discovery,
+invalid keys, and missing config. There is no secret or source of roles in
+claims. Authentik subjects are qualified by an issuer-specific hash to
+prevent Cloudflare subject/role collisions.
+
+The disabled-by-default HomeLab safety-runtime can *explicitly* select
+the Authentik verifier for isolated tests, with no request-based provider
+choice or fallthrough to Cloudflare. It still needs server-owned exact
+subject/role bindings, owner-private append-only audit and five-minute
+revocable kill switch. Verified identity expiration is rechecked after
+async diagnostics/approval boundaries; roles and kill gates continue to
+be revalidated. All allowed fixture actions remain non-executable.
+
+Test-first Authentik JWT, discovery/JWKS, boundary and synthetic signed
+Operator/Administrator/Viewer integration cases cover two-person approval,
+authorization failures, no cross-provider fallback, session expiry,
+and emergency kill. No live Authentik/Cloudflare/HomeLab connection
+was made; there is **no OIDC browser login/callback**, cookie/session,
+HTTP endpoint, real role provisioning, executor or production deployment.
+Full confidential code+PKCE login, MFA/account-lifecycle acceptance,
+trusted reverse-proxy boundary and live OIDC interoperability remain
+future tasks. See `docs/authentik.md`. This draft stacks on PR #56.
+Independent review and CI evidence are needed before production integration.
+
+
+## P8 private read-only proposal lifecycle lookup — draft PR #56 (source only)
+
+A bounded `readLifecycle({requestId,at})` projection in the owner-private
+append-only audit store validates the original symbolic staging proposal
+against its sole terminal decision event, expiration, actor attribution,
+action target, event timestamps and strict five-minute lifetime.
+It denies missing, orphaned, corrupt, symlinked, forged, incomplete or
+inconsistent records instead of returning partial results. Historical
+approval is a non-executable audit state, never authority to restart.
+
+The dormant `getRequestStatus` control requires a verified Cloudflare
+Access human identity and currently effective server-owned rights.
+Only the original proposer, while retaining `action.propose`, or an
+Administrator with `action.approve` may inspect a request.
+Viewer/Agent and unrelated Operators are denied. It repeats both policy
+and kill-switch checks before and after asynchronous storage reads,
+returns pending/expired/approved/rejected/withdrawn statuses, and never
+returns actor hashes, raw audit data, emails, JWTs or confirmations.
+Every result explicitly states `execution.performed:false`.
+
+Test-first coverage includes private-store reload, terminal outcomes,
+clock rollback/expiry, tampered files and symlinks, role scope, privacy,
+unexpected audit failure, mid-read revocation, and the real dormant
+file-backed kill/role composition using synthetic identities. No live
+HTTP route, UI, HomeLab connection, executor, deployment or new secret
+is added. PR #56 is stacked on draft PR #54. CI and owner review are
+required; production identity, request status UI, multi-process
+consistency, log retention and P9 independent action gates remain open.
+
+
+## P8 terminal proposal decisions — draft PR #54, source only
+
+The internal dormant HomeLab approval workflow now supports **exactly one**
+durable terminal outcome for a symbolic staging restart proposal:
+- Approved by a *different* signed Administrator.
+- Rejected by a *different* signed Administrator.
+- Withdrawn by the verified original proposer.
+
+All three decisions use the *same* create-only,
+fsynced `<requestId>.restart-decided.json` audit file, with an explicit
+validated `outcome` field. Competing decisions cannot each persist their
+own separate terminal file. Pending-approval scans exclude every terminal
+outcome and fail closed on orphan, corrupt, missing, misattributed or
+inconsistent events. An expired request has no accepted final decision.
+A successful result always states `execution.performed:false`.
+
+New test-first audit, controller and wired dormant-runtime tests cover
+signed role scopes, same-person denial, wrong-owner denial, confirmation,
+expiry, replay prevention, simultaneous approve/reject/withdraw races,
+audit reload and immutable storage, revocation/kill-gate denial,
+and corrupted decision records. This is not connected to production
+server/index.mjs and creates no real HomeLab executor.
+
+**Dependency:** draft PR #54 is stacked above the approved source
+branch from prior PR #53. PR #48 is merged on main and PRs #50-53
+were merged into their parent development branches; PR #49 remains
+awaiting main merge. Do not deploy or infer live approval availability
+from these source changes. CI/review gates remain mandatory.
+
+
+## P8 dormant safety-boundary composition — draft PR #53 (source only)
+
+The standalone internal `createDormantHomeLabRuntime` composes Friday's
+already-tested signed Cloudflare Access human identity, exact role/target
+policy, owner-private short-lived revocable **file-based role bindings**,
+durable private action audit, and **owner-private five-minute kill switch**.
+The kill gate and its five regression tests are copied byte-for-byte from
+unmerged PR #48 to enable exact-head integration testing in the stacked PR
+chain; this is a deliberate temporary overlap, not a competing rewrite.
+
+Absent explicit `enabled:true`, the factory creates no audit directory,
+reads no role/kill files, makes no infrastructure connections, and returns
+a disabled control. An opted-in *internal fixture* still needs valid private
+files, signed human JWT, role permission and kill arm **at every authorization
+boundary**. All actions remain symbolic `staging-canary` proposals or
+durable, non-executable two-person approval records. No HomeLab Docker,
+Proxmox, shell, SSH, container restart, public API, UI, AI executor, real
+target mapping, secret or production deployment is introduced.
+
+Tests exercise default-disable, missing/invalid private files, signed
+operator/administrator/viewer flows, disarm and expiry, role downgrade, and
+disarming during read-only diagnostics, plus PR #48's original kill tests.
+PR #53 stacks on draft #52 -> #51 -> #50 -> #49. PR #48 remains separate
+until a reviewed integration/merge decision resolves the duplicate file
+diffs. Exact-head CI and owner/security review required. P8 remains
+**incomplete**: trusted live identity lifecycle, production kill control,
+full approval state machine, multi-instance revocation and action-boundary
+audit/verification need independent work.
+
+
+## P8 async reauthorization — draft PR #52, source only
+
+The dormant HomeLab control now rechecks the verified Access JWT subject's current
+server-owned role and target policy, plus the independent automation gate,
+after asynchronous audit reads, queue scans, diagnostics, assistant inference,
+and before/after durable audit appends. This closes a stale-permission response
+gap during role changes or kill-gate revocation. Tests cover role downgrade
+during the approval read, pending queue scan, diagnostic read and assistant
+inference, and disarming during a proposal audit append.
+
+A successfully fsynced append cannot be rolled back if revocation occurs
+mid-write; the post-write recheck denies a stale success response but the
+historical event can exist. No executor exists and any future action must
+independently revalidate identity, policy, approval and kill status at execution.
+This draft depends on PR #51 -> #50 -> #49; the separate PR #48 is unmerged.
+P8 is incomplete, with no merge, deployment, runtime binding, new credentials
+or HomeLab contact.
+
+
+## P8 private operator role provisioning — draft PR #51, source only
+
+A small internal adapter reloads an owner-private canonical JSON role
+policy on every permission check, expires each trust snapshot within
+24 hours, rejects symlinked/insecure/malformed/duplicate-key records,
+and delegates actual Viewer/Operator/Administrator/Agent capability
+intersections to PR #49's exact role policy. Source integration tests
+on PR #50's dormant HomeLab controller exercise immediate downgrades,
+administrator revocation, and fail-closed missing policy while retaining
+durable audit and non-execution semantics.
+
+This is a stacked **draft PR #51**, based on draft #50 which depends on
+draft #49; PR #48 is a separate kill-switch foundation. It is not
+deployed or configured, does not create UI/API mutation or an executor,
+and makes no HomeLab connections. CI evidence and separate owner/security
+review are required; P8 is **not yet complete**. Real trusted identity
+provisioning and rotation, multi-node revocation semantics, full
+approval lifecycle, and global production control policies remain
+pending.
+
+
+## P8 pending approval queue — stacked draft PR #50, source only
+
+An internal, read-only approval queue now derives from the owner-private,
+append-only HomeLab audit store. Pending proposals are limited to the symbolic
+unbound `staging-canary`, exclude approved/expired entries, and sort by expiry.
+The bounded 512-event scan validates each record, ownership, file mode, symlink
+safety and pairing; corruption or overflow fails closed rather than returning
+partial results. The service verifies an Administrator's signed Access subject,
+exact target role policy and independent automation gate before revealing only
+safe request metadata and self-approval eligibility. No requester hash or
+confirmation string is emitted. All results include `execution.performed:false`.
+
+Test-first Node cases cover store reload, approval/expiry transitions, scan
+limits, malformed/symlinked/permissive records, denial for other roles, absent
+JWT/policy/store, kill revocation, and unavailable storage. PR #50 **depends on
+unmerged draft PR #49** and must be reviewed with its exact-head verification.
+PR #48 is a separate kill-switch foundation; no production integration or
+executor is authorized. Live UI, durable event pagination/retention, production
+role provisioning, a full human approval workflow, and all HomeLab action
+control-plane security gates remain incomplete.
+
+
+## P8 operator RBAC foundation — draft PR #49, source only
+
+Internal operator policy now defines explicit server-injected, verified Cloudflare
+Access JWT subject grants for the four intended roles: Viewer, Operator,
+Administrator and Friday Agent. The dormant `createHomeLabControl` interface
+requires a trusted exact-role/target policy on top of the signed human identity,
+its existing durable audit, and its independently injected automation kill gate.
+Missing/malformed bindings deny all. Proposal requires Operator/Admin;
+approval requires Administrator and a **different verified subject** than the
+original requester. Viewers and agent roles are read-only. The symbolic
+`staging-canary` remains unbound and **no execution path exists**.
+
+Test-first Node regressions exercise denied/invalid bindings, role matrix,
+identity/target spoof attempts, snapshot mutation, missing policy, viewer and
+agent restrictions, separation of duties, concurrent single-use approval, and
+existing safety invariants. PR #49 is source-only. Its exact-head CI and
+review status must be checked separately; no deployment, merge, or HomeLab
+access was performed. It does not implement user-account provisioning,
+session management, production policy binding, real target controls, or
+global control-plane RBAC. P8 remains incomplete.
 
 
 ## Two-site operations views — draft PR #47, source only
