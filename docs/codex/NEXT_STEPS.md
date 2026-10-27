@@ -1,5 +1,58 @@
 # Friday — Ordered Finish Queue
 
+## Staged four-project catalog registration — pending owner-reviewed apply
+
+- Code now provides `createFourProjectCatalogBootstrap` and
+  `createSupabaseProjectCatalogRepository`: exact metadata, bounded
+  read-only inspection by default, opt-in insert-only subset and
+  fresh-fingerprint check. No live runtime imports these modules.
+- An authorized production change must begin with backup/restore
+  verification and a fresh VM132 `friday_projects` inspection.
+  Approve precisely the four owner-selected fixed new IDs/names,
+  preserve unrelated catalog records, then perform a transaction-safe
+  insert and verify authoritative rows. No automatic deployment.
+- Only afterward convert real verified project rows into scoped
+  `createFourProjectEnrollment` policy input, match a genuinely
+  signed Access JWT `sub` to the Cloudflare identity, and provision
+  revocable owner-private policy outside Git. Do not grant server
+  execution or task writes.
+- Runtime signed GET-only Tasks/Memory HTTP wiring, audit, browser
+  access and production deployment remain separate release gates.
+
+## Owner approved four-project read-only user scope — gated by database IDs
+
+- Selected: Friday AI OS, TechTactics, Web Growth Agents and App
+  Builder for read-only Tasks + project Memory. Their *logical*
+  selection keys are defined in `server/work/four-project-enrollment.mjs`.
+- Before provisioning, verify four **distinct actual** work
+  `project_id` values on VM132; existing group IDs alone do not
+  establish work-item project IDs. Cross-check the verified Cloudflare
+  user UUID with a signed Access JWT `sub` at the private runtime.
+- Prepare short-lived canonical hashed-subject policy *outside Git*
+  using the owner-controlled reader grant file; no secrets or personal
+  IDs in source code. Stage deny on other users, project mismatch,
+  expiry, replacement and removal. Then explicitly approve
+  runtime/API/UI wiring and VM102 rollout.
+- No approvals, agent tools, HomeLab execution or administrative
+  scope accompanies this read-only selection.
+
+
+## Trusted user binding on dormant Phase 2B reader (2026-10-27)
+
+- Stacked draft adds a private, expiring, subject-digest based
+  grant source feeding the existing signed human Cloudflare Access
+  Phase 2B reader. This is source-only: no actual user's verified
+  subject or project grants have been enrolled.
+- Next: an owner/operator must supply and verify the intended
+  Access `sub` and authorized project(s), provision the private
+  policy outside Git, then stage signed good-user, denied-user,
+  cross-project, expired and revoked acceptance.
+- After identity/grant lifecycle and audit review, wire explicit
+  **read-only** Tasks/Memory routes to VM102, implement desktop/mobile
+  views and validate RLS. Approval mutations and HomeLab execution
+  remain separate and disabled.
+
+
 ## Phase 2B Tasks/Memory signed read bridge candidate (2026-10-27)
 
 - A **default-off internal** bridge now projects scoped task summaries and
