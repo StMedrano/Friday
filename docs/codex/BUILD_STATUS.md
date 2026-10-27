@@ -2,6 +2,10 @@
 
 ## 2026-10-27 four-project catalog bootstrap (stacked draft, source-only)
 
+Reconciled after reviewed PR #76 and signed-read bridge PR #77 joined
+main. This remains code-only and default-off pending owner-controlled
+VM132 project registration, signed-sub confirmation and grant activation.
+
 Added fixed owner-selected catalog metadata for Friday AI OS,
 TechTactics, Web Growth Agents and App Builder to the trusted-grant
 draft PR. Its default-off bootstrap requires exact fresh catalog
