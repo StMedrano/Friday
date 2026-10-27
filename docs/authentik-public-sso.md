@@ -135,6 +135,49 @@ cleanup is recommended for public production login. A separate browser
 session cookie must bind the state to the initiating browser and
 protect against login-CSRF/session-swapping attacks.
 
+## Browser-bound cookies and server sessions — draft PR #64
+
+The optional `createPublicOidcBrowser` coordinator implements a
+website-facing **security contract**, not a mounted HTTP endpoint. It
+accepts only explicitly registered application IDs and exact HTTPS
+origins from server configuration; no browser-specified redirect
+destinations, issuer, client ID or role. It calls the existing
+`createPublicOidcFlow` begin/complete methods and binds OAuth state
+to the initiating browser using a cryptographically signed
+`__Host-friday-oidc-<app>` cookie (Secure, HttpOnly, SameSite=Lax,
+Path=/, five-minute lifespan). The cookie contains only a keyed state
+digest and never the state itself. The callback must present that
+cookie before the single-use login state is consumed.
+
+A verified callback uses a separate, server-managed 32-byte HMAC
+key to generate an application-origin-scoped opaque 256-bit session
+cookie named `__Host-friday-session-<app>`. Only its keyed digest,
+issuer-scoped human subject and bounded expiry are written to an
+**injected** session backend, never the raw bearer. The current-session
+method returns human identity plus a synchronizer CSRF token for
+state-changing site endpoints; exact-Origin CSRF-protected logout
+revokes the backing record and clears both host-only cookies. Cookies
+must be set as actual HTTP `Set-Cookie` headers by a trusted future
+controller; no tokens should be copied into JSON responses or logs.
+Browser callback success and logout must use `Cache-Control: no-store`.
+
+`createPublicOidcBrowser` requires a separately provisioned,
+transactional `sessionStore.create/read/revoke` backend capable of
+unique insertion, atomic revoke, forced logout, expiry, secure storage
+and **cross-replica consistency**. A frontend JavaScript client
+must NOT read session cookies. Future HTTP adapters must bind the
+short-lived state cookie to the initiating browser, enforce
+expected callback method, anti-login-CSRF and exact origin checks
+(with a reviewed approach for callback redirects), rotate sessions,
+return generic failures, and handle cookie clearing on failed login.
+Public-site login supplies no HomeLab permission; role checks remain
+independent and privileged workflows stay behind current security.
+
+**No HTTP route or real session database is included in PR #64.**
+The flow has only synthetic test identities and injected storage.
+Do not enable it in production until session/storage/ingress
+acceptance and security review are complete.
+
 ## Before a real public Friday / multi-site login is ready
 
 1. Deploy and test a reachable, patched, backed-up Authentik service.

@@ -356,6 +356,29 @@ consume+expiry/cleanup, browser-bound login state, secure cookie/session
 rotation, CSRF protection, MFA, rate limiting and revocation. Normal
 public login remains entirely separate from HomeLab tool authorization.
 
+## Public browser cookie/session isolation — stacked draft PR #64
+
+The disabled-by-default `createPublicOidcBrowser` source boundary
+binds one-use OAuth state to a specific initiating browser using an
+HMAC-authenticated host-only `__Host-` Secure, HttpOnly,
+SameSite=Lax state cookie. Before any code exchange, callback
+must prove the matching browser state cookie, exact application ID
+and registered HTTPS origin. Successfully verified Authentik users
+receive fresh random opaque per-site session cookies, while only
+HMAC token digests and issuer-qualified human identities may be
+persisted in a separately injected session backend. Any unrecognized,
+expired, forged, cross-site or duplicated session cookie denies.
+Session reads must be backed by current, separately expiring records,
+and logout requires the site's exact Origin and a CSRF synchronizer
+token before durable backend revocation.
+
+This is not a session database, browser UI, OIDC callback route,
+external ingress change, role mapping or permission to execute
+infrastructure operations. Multi-host transactionality, cleanup,
+site callback/CSRF middleware, logout session revocation,
+session/user offboarding, MFA and security review remain mandatory.
+There is no connection to existing live Friday authentication.
+
 ## Future write-action rule
 
 A future action engine must require all of the following before any infrastructure mutation:
