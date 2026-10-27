@@ -241,6 +241,30 @@ rate controls and operational cutover approval are still mandatory.
 
 
 
+
+## Site-bound session revocation and expiry maintenance (source-only)
+
+The optional `createPublicLoginRuntime` now offers
+`maintenanceFor('family')` and `maintenanceFor('techtactics')` to
+**trusted server bootstrap only**. It is not reachable from the public
+website, Friday's existing API or any AI tool. Both adapters offer
+`revokeSubject({subject})` to delete website sessions for a pinned,
+issuer-scoped subject at one site only, and `cleanup({limit})` to delete
+at most `limit` expired OIDC transactions and at most `limit`
+expired web sessions. Limits are 1–1000, and invalid or wrong-site
+arguments fail closed. A failed partial sweep reports no success and
+can be retried safely.
+
+**Account disable remains external:** a website session revocation
+does not disable an Authentik user, invalidate IdP SSO cookies, or
+prevent already initiated OIDC callbacks from creating a fresh session.
+Real offboarding requires IdP-side deprovisioning plus a durable login
+denial barrier, independently authorized and audited operator actions,
+and live acceptance. This code adds no scheduler, route or production
+database credentials.
+
+## Real Authentik configuration required before deployment
+
 1. Decide whether both sign-in hostnames use one hardened, patched
    Authentik instance with two Brands and strict policies, or two
    independent Authentik instances for stronger administrative
