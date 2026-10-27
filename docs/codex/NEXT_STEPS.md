@@ -1,5 +1,23 @@
 # Friday — Ordered Finish Queue
 
+## Owner approved four-project read-only user scope — gated by database IDs
+
+- Selected: Friday AI OS, TechTactics, Web Growth Agents and App
+  Builder for read-only Tasks + project Memory. Their *logical*
+  selection keys are defined in `server/work/four-project-enrollment.mjs`.
+- Before provisioning, verify four **distinct actual** work
+  `project_id` values on VM132; existing group IDs alone do not
+  establish work-item project IDs. Cross-check the verified Cloudflare
+  user UUID with a signed Access JWT `sub` at the private runtime.
+- Prepare short-lived canonical hashed-subject policy *outside Git*
+  using the owner-controlled reader grant file; no secrets or personal
+  IDs in source code. Stage deny on other users, project mismatch,
+  expiry, replacement and removal. Then explicitly approve
+  runtime/API/UI wiring and VM102 rollout.
+- No approvals, agent tools, HomeLab execution or administrative
+  scope accompanies this read-only selection.
+
+
 ## Trusted user binding on dormant Phase 2B reader (2026-10-27)
 
 - Stacked draft adds a private, expiring, subject-digest based
