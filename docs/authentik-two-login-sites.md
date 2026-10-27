@@ -211,7 +211,35 @@ Live key distribution, restart/rotation, concurrent DB behavior,
 cleanup, MFA/session revocation and external login still require
 staging acceptance.
 
-## Real Authentik configuration required before deployment
+## Disabled runtime composition of both login sites — draft follow-on
+
+`server/security/public-login-runtime.mjs` now assembles the
+previously independent public Authentik components with a single explicit
+**off-by-default** `createPublicLoginRuntime` factory. The factory requires
+exactly two site configurations (`family`, `techtactics`), their pinned
+public/identity HTTPS origins, different OIDC clients and secrets, independent
+32-byte session and encrypted transaction keys, and different
+server-provided PostgreSQL query functions. It wires an independently
+scoped OIDC flow, one-use encrypted transaction store, session store, browser
+cookie adapter, branded site handler, and pinned Node HTTP handler **per site**.
+Invalid, incomplete, overlapping, shared-key or shared-query configurations
+return `enabled:false` and no handlers.
+
+The returned `handlerFor('family')` / `handlerFor('techtactics')`
+functions are for **trusted deployment bootstrap only**; never dispatch
+them from client-controlled Host, headers, cookies or OAuth claims. Integration
+tests use synthetic signed Authentik identities, two isolated fake PostgreSQL
+roles, loopback HTTP, OIDC callback replay denial and per-site logout.
+These tests are not public-site live acceptance and do not attest to database
+role assignments in production.
+
+The composition does **not** connect into `server/index.mjs`, start listeners,
+supply real secrets, connect to a real DB, apply migrations, enable sign-in
+or change Cloudflare Access. Separate externally provisioned PostgreSQL
+LOGIN roles and reviewed RLS grants, Authentik providers/MFA, HTTPS routing,
+rate controls and operational cutover approval are still mandatory.
+
+
 
 1. Decide whether both sign-in hostnames use one hardened, patched
    Authentik instance with two Brands and strict policies, or two

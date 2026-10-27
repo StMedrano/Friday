@@ -1,5 +1,23 @@
 # Friday Build Status
 
+## 2026-10-27 Authentik public-login runtime assembly (draft, not deployed)
+
+The default-disabled `createPublicLoginRuntime` factory combines the
+merged dual-site login pages, signed OIDC authorization-code/PKCE flow,
+cross-replica encrypted PostgreSQL state, durable website sessions,
+browser cookie binding and strict per-site HTTP handler into one
+server-owned composition. Two independent websites are required;
+reused OIDC clients/secrets, DB query connections or encryption keys
+fail closed. The test suite covers synthetic signed identities, real
+loopback HTTP, callback replay denial and site-isolated sessions/logout.
+
+This is a **source-only implementation** and is not imported by
+Friday's production server. There are no public sockets, real OIDC
+providers, applied migrations, DB credentials or DNS changes. Real
+database-role and TLS verification, MFA, rate controls, end-to-end
+browser acceptance and owner release approval are still pending.
+
+
 ## 2026-10-27 Public Authentik: cross-instance encrypted OIDC state (draft PR #73)
 
 Friday's two separate public login site foundations are deployed as
