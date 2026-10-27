@@ -1,5 +1,24 @@
 # Friday — Ordered Finish Queue
 
+## Staged four-project catalog registration — pending owner-reviewed apply
+
+- Code now provides `createFourProjectCatalogBootstrap` and
+  `createSupabaseProjectCatalogRepository`: exact metadata, bounded
+  read-only inspection by default, opt-in insert-only subset and
+  fresh-fingerprint check. No live runtime imports these modules.
+- An authorized production change must begin with backup/restore
+  verification and a fresh VM132 `friday_projects` inspection.
+  Approve precisely the four owner-selected fixed new IDs/names,
+  preserve unrelated catalog records, then perform a transaction-safe
+  insert and verify authoritative rows. No automatic deployment.
+- Only afterward convert real verified project rows into scoped
+  `createFourProjectEnrollment` policy input, match a genuinely
+  signed Access JWT `sub` to the Cloudflare identity, and provision
+  revocable owner-private policy outside Git. Do not grant server
+  execution or task writes.
+- Runtime signed GET-only Tasks/Memory HTTP wiring, audit, browser
+  access and production deployment remain separate release gates.
+
 ## Owner approved four-project read-only user scope — gated by database IDs
 
 - Selected: Friday AI OS, TechTactics, Web Growth Agents and App
