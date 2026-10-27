@@ -61,7 +61,7 @@ async function serve(t,handler){
 function call(port,{host=family.slice(8),method='GET',path='/login',headers={},body}={}){
  return new Promise((resolve,reject)=>{
   const req=httpRequest({hostname:'127.0.0.1',port,method,path,
-   headers:{host,...headers}},async response=>{
+   headers:{host,...(body!==undefined?{'content-length':Buffer.byteLength(body)}:{}),...headers}},async response=>{
     const data=[]
     for await(const part of response)data.push(part)
     resolve({status:response.statusCode,headers:response.headers,
