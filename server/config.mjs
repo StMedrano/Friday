@@ -199,6 +199,13 @@ export function getConfig(env = process.env) {
     diagnostics: {
       enabled: enabled(env.FRIDAY_DIAGNOSTICS_ENABLED),
     },
+    supabaseHealth: {
+      // On with the agent registry unless explicitly disabled; reuses its server-side credentials.
+      enabled: agentRegistryEnabled && env.FRIDAY_SUPABASE_HEALTH_ENABLED !== 'false',
+      supabaseUrl: env.FRIDAY_SUPABASE_URL || '',
+      serviceKey: env.FRIDAY_SUPABASE_SERVICE_KEY || '',
+      site: siteLabel(env.FRIDAY_SUPABASE_SITE),
+    },
     agents: {
       enabled: agentRegistryEnabled,
       registry: {
