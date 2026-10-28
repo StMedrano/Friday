@@ -1,19 +1,130 @@
-.v3-settings-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px;margin-top:18px}
-.v3-settings-wide{grid-column:1/-1}
-.v3-settings-list{list-style:none;margin:10px 0 0;padding:0;display:grid;gap:4px}
-.v3-settings-list li{display:grid;grid-template-columns:minmax(0,1fr) auto auto auto;align-items:center;gap:4px 8px;padding:9px 10px;border:1px solid var(--line);border-radius:10px;font-size:12px}
-.v3-settings-list.compact li{grid-template-columns:minmax(0,1fr) auto auto}
-.v3-settings-list code{grid-column:1/-1;font-size:11px;color:var(--amber)}
-.v3-settings-name{min-width:0}.v3-settings-name b,.v3-settings-name small{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.v3-settings-name small{color:var(--muted);font-size:11px;margin-top:3px;min-height:1em}
-.v3-settings-pill{font-size:11px;padding:2px 8px;border-radius:999px;border:1px solid var(--line);color:#9aa8b2;white-space:nowrap}
-.v3-settings-pill.on{color:var(--green)}.v3-settings-pill.warn{color:var(--amber)}
-.v3-settings-mode{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
-.v3-settings-order{list-style:none;display:flex;flex-wrap:wrap;gap:6px;margin:10px 0 0;padding:0;font-size:12px;color:#cfe9f3}
-.v3-settings-order li{padding:3px 8px;border:1px solid rgba(103,217,255,.18);border-radius:8px}
-.v3-settings-facts{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px 14px;margin:12px 0 0;font-size:12px}
-.v3-settings-facts dt{color:var(--muted)}.v3-settings-facts dd{margin:0;color:#c7d2d9}
-.v3-settings-safety{display:flex;gap:6px;align-items:center;margin:14px 0 0;font-size:11px;color:var(--green)}
-.v3-settings-message{color:#81909c;font-size:12px;line-height:1.6}
-@media(max-width:900px){.v3-settings-grid{grid-template-columns:minmax(0,1fr)}}
-@media(max-width:700px){.v3-settings-grid{gap:10px;margin-top:12px}.v3-settings-list li,.v3-settings-list.compact li{grid-template-columns:minmax(0,1fr) auto}.v3-settings-name{grid-column:1/-1}}
+.v3-settings-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 14px;
+  margin-top: 18px;
+}
+.v3-settings-wide {
+  grid-column: 1/-1;
+}
+.v3-settings-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.v3-settings-list li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto auto;
+  align-items: center;
+  gap: 4px 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  font-size: 12px;
+}
+.v3-settings-list.compact li {
+  grid-template-columns: minmax(0, 1fr) auto auto;
+}
+.v3-settings-list code {
+  grid-column: 1/-1;
+  font-size: 11px;
+  color: var(--amber);
+}
+.v3-settings-name {
+  min-width: 0;
+}
+.v3-settings-name b,
+.v3-settings-name small {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.v3-settings-name small {
+  color: var(--muted);
+  font-size: 11px;
+  margin-top: 3px;
+  min-height: 1em;
+}
+.v3-settings-pill {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: #9aa8b2;
+  white-space: nowrap;
+}
+.v3-settings-pill.on {
+  color: var(--green);
+}
+.v3-settings-pill.warn {
+  color: var(--amber);
+}
+.v3-settings-mode {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.v3-settings-order {
+  list-style: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 10px 0 0;
+  padding: 0;
+  font-size: 12px;
+  color: #cfe9f3;
+}
+.v3-settings-order li {
+  padding: 3px 8px;
+  border: 1px solid rgba(103, 217, 255, 0.18);
+  border-radius: 8px;
+}
+.v3-settings-facts {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 8px 14px;
+  margin: 12px 0 0;
+  font-size: 12px;
+}
+.v3-settings-facts dt {
+  color: var(--muted);
+}
+.v3-settings-facts dd {
+  margin: 0;
+  color: #c7d2d9;
+}
+.v3-settings-safety {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  margin: 14px 0 0;
+  font-size: 11px;
+  color: var(--green);
+}
+.v3-settings-message {
+  color: #81909c;
+  font-size: 12px;
+  line-height: 1.6;
+}
+@media (max-width: 900px) {
+  .v3-settings-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 700px) {
+  .v3-settings-grid {
+    gap: 10px;
+    margin-top: 12px;
+  }
+  .v3-settings-list li,
+  .v3-settings-list.compact li {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+  .v3-settings-name {
+    grid-column: 1/-1;
+  }
+}
