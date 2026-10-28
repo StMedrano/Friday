@@ -4,10 +4,10 @@ import diagnosticsPolishCss from './diagnostics-polish.css?inline'
 
 describe('FRIDAY mobile CSS contract', () => {
   it('contains the phone breakpoint and safe-area command bar protections', () => {
-    expect(mobileCss).toContain('@media(max-width:700px)')
+    expect(mobileCss).toMatch(/@media\s*\(\s*max-width\s*:\s*700px\s*\)/)
     expect(mobileCss).toContain('env(safe-area-inset-bottom)')
-    expect(mobileCss).toContain('max-width:100%')
-    expect(mobileCss).toContain('overflow-x:hidden')
+    expect(mobileCss).toMatch(/max-width\s*:\s*100%/)
+    expect(mobileCss).toMatch(/overflow-x\s*:\s*hidden/)
   })
 
   it('provides reduced motion handling for decorative phone animation', () => {
