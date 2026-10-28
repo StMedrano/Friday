@@ -5,10 +5,10 @@ export type Site = {
   name: string
   location: string
   status: InfrastructureStatus
-  gateway: string
-  network: string
-  latencyMs: number
-  vpn: InfrastructureStatus
+  gateway?: string
+  network?: string
+  latencyMs?: number
+  vpn?: InfrastructureStatus
   devicesOnline: number
   devicesTotal: number
 }

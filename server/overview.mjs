@@ -1,4 +1,5 @@
 import { integrationSummary, normalizeOverview } from './core.mjs'
+import { deriveSites } from './site-settings.mjs'
 import { getMockOverview } from './adapters/mock.mjs'
 import { getDockerServices as defaultGetDockerServices } from './adapters/docker.mjs'
 import { getProxmoxServices as defaultGetProxmoxServices } from './adapters/proxmox.mjs'
@@ -68,6 +69,7 @@ export async function buildOverview(config, adapters = {}) {
     ...normalizeOverview({
       mode: 'live',
       // Missing live telemetry stays unavailable; sample data is for mock mode only.
+      sites: deriveSites(config.declaredSites, liveServices),
       services: liveServices,
       alerts: errors.map((message, index) => ({ id: `integration-${index}`, title: 'Integration degraded', detail: message, severity: 'warning', source: 'Friday' })),
     }),
