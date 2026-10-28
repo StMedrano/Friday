@@ -165,3 +165,38 @@ test('local model failure never falls back to cloud providers and returns saniti
   })
   assert.equal(JSON.stringify(result).includes('secret'), false)
 })
+
+test('ungrounded local drafts fail closed with the grounding code and never reach cloud providers', async () => {
+  let localCalls = 0
+  const cloudFetches = []
+  const fetchImpl = async (url) => {
+    if (!String(url).startsWith('http://ct108:11434')) {
+      cloudFetches.push(String(url))
+      throw new Error('cloud provider must not be called')
+    }
+    localCalls += 1
+    return new Response(JSON.stringify({ message: { content: 'Site A is fully healthy with no incidents. Critical severity.' } }), { status: 200 })
+  }
+  const service = createAgentService({ registryService: registry(), config, fetchImpl })
+  const overview = {
+    mode: 'live', sites: [], alerts: [],
+    services: [
+      { id: 'wga-development', name: 'wga-development', status: 'offline', updated: 'stopped' },
+      { id: 'proxmox-qemu-100', name: 'ubuntu-docker', status: 'online', updated: 'live' },
+    ],
+  }
+
+  const result = await service.ask('proxmox-observer', { prompt: 'Summarize Proxmox health.', overview })
+  assert.equal(localCalls, 2)
+  assert.deepEqual(cloudFetches, [])
+  assert.deepEqual(result, {
+    available: false,
+    error: 'local-agent-unavailable',
+    code: 'FRIDAY_AGENT_GROUNDING_INVALID',
+    agentId: 'proxmox-observer',
+    agentName: 'Proxmox Observer',
+    reason: 'Local agent response contradicted authoritative state.',
+    execution: { performed: false, reason: 'Phase 1 agents are advisory only.' },
+  })
+  assert.equal(JSON.stringify(result).includes('Site A'), false)
+})

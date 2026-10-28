@@ -89,3 +89,75 @@ test('runs through the resolved Ollama model profile', async () => {
   assert.match(body.messages[1].content, /"id":"proxmox-qemu-100"/)
   assert.equal(body.model, 'qwen3:4b-instruct')
 })
+
+test('retries one ungrounded local draft with exact machine-state feedback', async () => {
+  const requests = []
+  const drafts = [
+    'Site A is fully healthy. All services are running and there are no incidents. Two critical services are offline.',
+    'One service is online and stopped-db is offline. Site and incident data are absent, so no site label or incident count is asserted.',
+  ]
+  const fetchImpl = async (_url, options) => {
+    requests.push(JSON.parse(options.body))
+    return new Response(JSON.stringify({ message: { content: drafts[requests.length - 1] } }), { status: 200 })
+  }
+  const overview = {
+    mode: 'live', sites: [], alerts: [],
+    services: [
+      { id: 'proxmox-qemu-100', name: 'ubuntu-docker', status: 'online', updated: 'live' },
+      { id: 'vm100-observer-deadbeef', name: 'stopped-db', status: 'offline', updated: 'Exited (0) 3 days ago' },
+    ],
+  }
+
+  const result = await runLocalAgent({ agent, modelProfile, prompt: 'Summarize health.', overview, fetchImpl })
+
+  assert.equal(result.text, drafts[1])
+  assert.equal(requests.length, 2)
+  assert.match(requests[1].messages[1].content, /prior draft was rejected/i)
+  assert.match(requests[1].messages[1].content, /unsupported site label/i)
+  assert.match(requests[1].messages[1].content, /unsupported severity/i)
+})
+
+test('fails closed after two ungrounded local drafts', async () => {
+  let calls = 0
+  const fetchImpl = async () => {
+    calls += 1
+    return new Response(JSON.stringify({ message: { content: 'Site A is fully healthy with no incidents.' } }), { status: 200 })
+  }
+  const overview = {
+    mode: 'live', sites: [], alerts: [],
+    services: [{ id: 'proxmox-qemu-100', name: 'ubuntu-docker', status: 'offline', updated: 'stopped' }],
+  }
+
+  await assert.rejects(
+    runLocalAgent({ agent, modelProfile, prompt: 'Summarize health.', overview, fetchImpl }),
+    (error) => error?.code === 'FRIDAY_AGENT_GROUNDING_INVALID',
+  )
+  assert.equal(calls, 2)
+})
+
+test('one inference deadline spans the original and corrective attempts', async () => {
+  let calls = 0
+  const fetchImpl = async (_url, options) => {
+    calls += 1
+    if (calls === 1) {
+      await new Promise((resolve) => setTimeout(resolve, 70))
+      return new Response(JSON.stringify({ message: { content: 'Site A is fully healthy.' } }), { status: 200 })
+    }
+    return new Promise((resolve, reject) => {
+      // Ref'd fallback keeps the event loop alive; it answers only if the deadline never fires.
+      const fallback = setTimeout(() => resolve(new Response(JSON.stringify({ message: { content: 'late' } }), { status: 200 })), 1000)
+      const abort = () => { clearTimeout(fallback); reject(options.signal.reason ?? new Error('aborted')) }
+      if (options.signal.aborted) abort()
+      else options.signal.addEventListener('abort', abort, { once: true })
+    })
+  }
+  const overview = { mode: 'live', sites: [], alerts: [], services: [{ id: 'proxmox-qemu-100', name: 'ubuntu-docker', status: 'offline', updated: 'stopped' }] }
+  const started = Date.now()
+
+  await assert.rejects(
+    runLocalAgent({ agent, modelProfile: { ...modelProfile, timeoutMs: 100 }, prompt: 'Summarize health.', overview, fetchImpl }),
+    (error) => error?.code !== 'FRIDAY_AGENT_GROUNDING_INVALID',
+  )
+  assert.equal(calls, 2)
+  assert.ok(Date.now() - started < 150, 'the corrective attempt must not receive a fresh timeout budget')
+})

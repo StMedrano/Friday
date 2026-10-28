@@ -320,6 +320,47 @@ test('matched local-agent failure returns local-agent-unavailable without invoki
   })
 })
 
+test('matched local-agent grounding failure keeps its code and never invokes general providers', async () => {
+  let assistantCalls = 0
+  const agentService = {
+    async route() {
+      return { matched: true, agentId: 'proxmox-observer', agentName: 'Proxmox Observer', routing: 'deterministic', confidence: 0.98, reason: 'Strong Proxmox scope match.' }
+    },
+    async ask() {
+      return {
+        available: false,
+        error: 'local-agent-unavailable',
+        code: 'FRIDAY_AGENT_GROUNDING_INVALID',
+        agentId: 'proxmox-observer',
+        agentName: 'Proxmox Observer',
+        reason: 'Local agent response contradicted authoritative state.',
+        execution: { performed: false, reason: 'Phase 1 agents are advisory only.' },
+      }
+    },
+  }
+
+  await withServer({
+    config: baseConfig(true),
+    monitoringRuntime: runtime(),
+    agentService,
+    answerAssistantImpl: async () => {
+      assistantCalls += 1
+      return { available: true, mode: 'cloud-ai', provider: 'groq', text: 'must not run' }
+    },
+  }, async (base) => {
+    const response = await postAssistant(base, 'Summarize the current Proxmox health.')
+    const body = await response.json()
+    assert.equal(response.status, 503)
+    assert.equal(assistantCalls, 0)
+    assert.equal(body.available, false)
+    assert.equal(body.error, 'local-agent-unavailable')
+    assert.equal(body.code, 'FRIDAY_AGENT_GROUNDING_INVALID')
+    assert.equal(body.provider, 'ollama')
+    assert.equal(body.mode, 'local-agent')
+    assert.equal(body.execution.performed, false)
+  })
+})
+
 for (const matched of [true, false]) {
   test(`stalled local ${matched ? 'matched agent fails without cloud' : 'router permits general fallback'}`, async () => {
     const config = getConfig({ FRIDAY_AGENT_LOCAL_GENERAL_TIMEOUT_MS: '10', FRIDAY_AGENT_LOCAL_ROUTER_TIMEOUT_MS: '10' })

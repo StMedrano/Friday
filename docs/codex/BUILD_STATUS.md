@@ -495,11 +495,11 @@ The proposed values `10.1.2.211`, `10.1.10.100`, `10.1.20.131`, `10.1.20.132`, a
 
 ## Current deployed controller baseline
 
-On 2026-09-24, read-only SSH confirmed VM102 (`friday-controller`, `10.1.10.11`) has a clean checkout at `127af8a` on the PR branch. This is behind the GitHub PR head `1f7bc0a` and does not include the current uncommitted timeout patch. VM102 `make preflight` completed without blocking errors and `make health` reported the Friday container running with health/overview endpoints OK.
+On 2026-10-28, VM102 reported a clean checkout at current `main` `0ee4f0a` (PR #91) with a healthy Friday container, a running dedicated cloud-tunnel connector, and CT108 Ollama at `10.1.10.12:11434` answering HTTP 200. On 2026-10-26, an authorized read-only VM102 inspection had confirmed a clean detached checkout at `8dfe66b` with running application commit `608d85b`. The controller is healthy in live mode, retains `FRIDAY_DOCKER_ENABLED=false`, uses `http://10.1.10.12:11434` for all three agent profiles, mounts no controller Docker socket, and routes to CT108 through `eth1` with source `10.1.10.11`. Base plus live plus cloud-tunnel Compose resolves with the Friday data volume only; the dedicated connector remains unpublished.
 
-Live API checks from VM102 on 2026-09-24 returned one enabled `proxmox-observer` definition with the checked-in checksum, registry status `ok` with one synced and zero rejected agents, and deterministic `/api/agents/route` selection of `proxmox-observer` at confidence `0.98` for “Summarize the current Proxmox health.” Direct Ask returned local provenance (`ollama`, `qwen3:4b-instruct`) and `execution.performed:false`, but failed grounding: it invented Site A/B networks, gateways, device counts, resource metrics, and incident history absent from the normalized live overview. It also conflated legacy and current VM100 observer addresses. This is the production failure addressed by PR head `1f7bc0a`; it is not deployed yet. Shared-composer live acceptance remains pending on a grounded build.
+That 2026-10-26 in-container, read-only service check returned one enabled `proxmox-observer` definition with checksum `2ee1f134d03d61dad46ebb7e0c693e54740bb945cb00d8cc7d3a61b64677f92f`, registry status `ok` with one synced and zero rejected agents, and deterministic routing at confidence `0.98`. Direct Ask used `ollama` with `qwen3:4b-instruct`, remained advisory, and exposed `execution.performed:false`. Grounding nevertheless failed twice: the normalized overview had no sites, 30 online services, and two offline services (`wga-development` and `wga-platform-postgres`), while the model invented Site A, reported incorrect counts or all services healthy, assigned unsupported `critical` severity, and generalized per-service uptime.
 
-Do not infer that GitHub's green check on `1f7bc0a` validates either the uncommitted timeout changes or the currently deployed `127af8a` image. The production agent endpoint remains the verified CT108 nic1 address `10.1.10.12:11434`; the timeout patch has not been deployed.
+This is a failed live acceptance gate, so no Friday rebuild, registry write, or infrastructure change was attempted. Shared-composer and desktop/phone UI acceptance remain pending on a grounded build.
 
 ## Monitoring, diagnostics, mobile, and assistant — merged
 
@@ -523,9 +523,9 @@ Issue #20 starts the repository-aware, read-only agent milestone. The local regi
 
 Read-only Explorer tools expose Git branch/dirty status, bounded file listings, and bounded text reads for registered roots. The responsive Repositories workspace browses those endpoints without write or execution controls. Paths remain canonicalized and exclusion-checked; reads cap at 64 KiB. Repository-scoped task flow remains unfinished. Source verification does not establish VM102 integration or live acceptance.
 
-## Local Agent Platform Phase 1 — implemented in draft PR #19
+## Local Agent Platform Phase 1 — merged; rollout acceptance pending
 
-Source branch: `feature/friday-local-agent-platform-phase1-20260830`.
+The original implementation merged to `main` in `ecb0c9e`. The later PR #19 branch is stale relative to current `main`; it must not be deployed over the merged PR #44/#45 baseline.
 
 Implemented behavior:
 
@@ -547,6 +547,14 @@ Implemented behavior:
 Task 8 regression gates are part of CI: exact two-table schema validation, local-only matched-agent behavior, no-execution regression, secret-boundary scan, and agent-route/shell safety scans.
 
 Shared-composer implementation tests cover deterministic Proxmox routing, same-overview identity, response provenance, grounded output, no cloud/general fallback after a matched local failure, safe no-match fallback, routing-service failure fallback, and `execution.performed=false`. Live shared-composer acceptance remains pending deployment.
+
+### Rollout continuation and grounding hardening — 2026-10-26, ported 2026-10-28
+
+- Current merged `main` already contains the substantive post-merge PR #19 fixes: CT108 nic1 defaults, removal of sample state from live overview, registry/router/inference deadlines, and the shared state-grounding policy. The stale PR branch will not be cherry-picked.
+- VM102 reaches VM132 on TCP/8000 and TCP/5432. Three authenticated PostgREST reads at `2026-10-26T18:06:26Z`, `18:11:33Z`, and `18:16:45Z` returned 200 with exactly `proxmox-observer`.
+- On 2026-10-26 the strict database prerequisite was blocked because that VM102 session could not run `SELECT 1` or read the `supabase-db` restart count. On 2026-10-28 an owner read-only check reported `supabase-db` running and healthy with restart count 1, `SELECT 1` returning 1, and authenticated PostgREST returning exactly `proxmox-observer`. The three-snapshot, five-minute-spaced stability gate must still pass before deployment.
+- The live-model grounding failure above showed that prompt instructions alone are insufficient for the 4B local model. The original continuation commits (`de567b5`, `c270fc6`) were based on old `main` `7b89228`, so they were ported onto current `main` rather than deployed. The ported code now derives exact service/site/incident/integration constraints before inference, rejects contradictory site/health/incident/severity claims, retries once with machine-derived rejection reasons, and then fails closed with `FRIDAY_AGENT_GROUNDING_INVALID`; it never falls back to a cloud provider. The agent service keeps the sanitized `local-agent-unavailable` error and adds `code: "FRIDAY_AGENT_GROUNDING_INVALID"` so operators can distinguish a grounding rejection from a transport failure; the shared composer returns 503 with that code and `execution.performed=false`. One inference deadline spans both attempts.
+- Test-first coverage proves one corrective retry, fail-closed behavior after a second invalid draft, the surfaced grounding code through the agent service and shared composer, no cloud provider calls, and a single shared inference deadline. On 2026-10-28, Node 22.22.1 `make verify` on the ported branch passed 139 frontend tests, 657 server/observer/script tests, the production build, and all six Compose validations. This is source verification only; the grounding guard is not deployed or live-accepted.
 
 ### Verification result — 2026-09-22
 

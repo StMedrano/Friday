@@ -160,9 +160,9 @@ Completed behavior:
 
 The old “finish Friday Assistant experience” milestone is retired.
 
-## P5 — Local Agent Platform Phase 1 — implementation and network validation complete; live acceptance pending
+## P5 — Local Agent Platform Phase 1 — merged; live acceptance blocked
 
-Draft PR #19 implements the Phase 1 local advisory agent platform.
+The Phase 1 implementation is in `main`. The old PR #19 head is stale relative to the merged security and cloud-API work and must not be used as a deployment source.
 
 Implemented source behavior:
 
@@ -176,20 +176,20 @@ Implemented source behavior:
 8. Every Phase 1 response remains advisory with `execution.performed=false`.
 9. CI validates the exact two-table schema and rejects agent execution routes, shell/SSH paths, and browser-visible Supabase credentials.
 
-### Required live acceptance before PR #19 merge readiness
+### Required live acceptance before rollout completion
 
 1. CT108 nic1 validation is complete: its running-container interface reports `10.1.10.12/24`, and authoritative VM102 passes TCP/11434, `/api/tags`, and `/api/chat` over vmbr1.
 2. Agent defaults now use `http://10.1.10.12:11434`; post-migration `make verify` passed on 2026-09-22.
-3. PR head `0e241b4` contains timeout hardening: registry requests are bounded to 10 seconds, local routing to 15 seconds, and matched local inference to 90 seconds by default. TDD tests, full `make verify`, and GitHub CI passed on 2026-09-24. The patch is not deployed to VM102 yet.
-4. VM132's PostgreSQL ownership failure caused one automatic database restart on 2026-09-22. Later authenticated SQL and service-role REST passed; investigate the ownership incident and require sustained readiness before deploying Friday. See the [PR #19 rollout plan](../superpowers/plans/2026-09-22-pr19-rollout-completion.md).
+3. Current `main` contains timeout hardening: registry requests are bounded to 10 seconds, local routing to 15 seconds, and matched local inference to 90 seconds by default.
+4. VM132's PostgreSQL ownership failure caused one automatic database restart on 2026-09-22. On 2026-10-26, three authenticated PostgREST reads five minutes apart passed, but that VM102 session could not run `SELECT 1` or verify the database container restart count. On 2026-10-28 an owner read-only check reported restart count 1, healthy, and `SELECT 1` = 1. Complete three snapshots at least five minutes apart (restart count, `SELECT 1`, authenticated PostgREST) and stop on any failure or restart-count change before deploying. See the [PR #19 rollout plan](../superpowers/plans/2026-09-22-pr19-rollout-completion.md).
 5. The existing `friday_agents` and `friday_agent_registry_state` tables matched the checked-in migration on 2026-09-22. No schema write is currently needed.
-6. Back up/preserve VM102 `.env`, then configure the three agent URLs to `http://10.1.10.12:11434` through an owner-capable VM102 session.
-7. Fast-forward the clean VM102 PR branch to the reviewed head and rebuild only Friday with base Compose; `make update` is unsuitable because it switches to `main`.
-8. Run `make preflight` and `make health`; verify `GET /api/agents`, agent detail, and registry status.
+6. Preserve VM102 `.env`; its three agent URLs are already configured as `http://10.1.10.12:11434`. Keep all other production values and `FRIDAY_DOCKER_ENABLED=false` unchanged.
+7. Deploy only a reviewed continuation based on current `main`; include `compose.cloud-tunnel.yaml` when resolving the existing production project and rebuild only Friday so the connector remains intact.
+8. Rerun `make preflight` before deployment and `make health` afterward; verify `GET /api/agents`, agent detail, and registry status.
 9. Run `POST /api/agents/registry/sync` with `{}` only if registry state is stale, then verify a healthy sync.
 10. Route a Proxmox prompt and verify `proxmox-observer` is selected.
-11. Directly ask `proxmox-observer` and require `provider:"ollama"`, `mode:"local-agent"`, expected model/profile, and `execution.performed:false`.
-12. Send a Proxmox request through the normal shared Friday composer and verify automatic local-agent routing/provenance; the older running VM102 build currently answers through Groq.
+11. Directly ask `proxmox-observer` and require `provider:"ollama"`, `mode:"local-agent"`, expected model/profile, `execution.performed:false`, and text that matches current service/site/incident/severity facts. The 2026-10-26 live check failed this grounding gate, so the new retry-and-fail-closed guard must be deployed and revalidated first.
+12. Send a Proxmox request through the normal shared Friday composer and verify automatic local-agent routing/provenance with the same grounding requirements.
 13. Complete desktop and phone Agents workspace acceptance and confirm no action controls appear. Obtain explicit owner approval before merge.
 
 Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execution, restart endpoints, or cloud fallback for matched agents as part of this rollout.
