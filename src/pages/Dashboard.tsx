@@ -1,12 +1,14 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, FolderGit2, HardDrive, Home, MemoryStick, Network, Server, Settings, ShieldCheck, Sparkles } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, FolderGit2, HardDrive, Home, MemoryStick, Network, Search, Server, Settings, ShieldCheck, Sparkles } from 'lucide-react'
 import { fetchMonitoringHistory, useFridayOverview, type FridayIncident, type MonitoringEvent } from '../lib/api'
 import { useFridaySession } from '../hooks/useFridaySession'
 import { statusLabel, summarizeHealth } from '../lib/status'
+import { greeting } from '../lib/greeting'
 import { usePhoneLayout } from '../hooks/usePhoneLayout'
 import ActiveIncidents from '../components/ActiveIncidents'
 import AgentsWorkspace from '../components/AgentsWorkspace'
 import ApplicationsWorkspace from '../components/ApplicationsWorkspace'
+import CommandPalette, { type PaletteItem } from '../components/CommandPalette'
 import FridayComposer from '../components/FridayComposer'
 import FridayConversation from '../components/FridayConversation'
 import FridayWorkspace from '../components/FridayWorkspace'
@@ -24,9 +26,15 @@ import '../applications.css'
 
 const nav = [
   ['Overview', Home], ['FRIDAY', Sparkles], ['Infrastructure', Server], ['Applications', AppWindow],
-  ['Agents', Bot], ['Repositories', FolderGit2], ['Tasks', CheckCircle2], ['Approvals', ShieldCheck], ['Incidents', AlertTriangle],
-  ['Memory', Database], ['Audit', Activity], ['Settings', Settings],
+  ['Incidents', AlertTriangle], ['Agents', Bot], ['Repositories', FolderGit2],
 ] as const
+
+const pendingNav = [
+  ['Tasks', CheckCircle2], ['Approvals', ShieldCheck], ['Memory', Database], ['Audit', Activity], ['Settings', Settings],
+] as const
+
+// Workspaces that render their own titled hero; the page h1 stays for assistive tech only.
+const selfTitled = new Set(['Infrastructure', 'Applications', 'Incidents', 'Repositories', 'Agents'])
 
 export default function Dashboard() {
   const { overview, connected } = useFridayOverview()
@@ -37,6 +45,7 @@ export default function Dashboard() {
   const [history, setHistory] = useState<MonitoringEvent[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null)
+  const [paletteOpen, setPaletteOpen] = useState(false)
   const incidents = overview.incidents ?? []
   const selectedIncident = incidents.find((incident) => incident.id === selectedIncidentId) ?? null
   const activeIncidents = overview.monitoring?.activeIncidents ?? incidents.filter((incident) => incident.status === 'open').length
@@ -58,6 +67,39 @@ export default function Dashboard() {
       })
     return () => controller.abort()
   }, [active])
+
+  useEffect(() => {
+    if (isPhone) return
+    const onKeyDown = (event: KeyboardEvent) => {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') {
+        event.preventDefault()
+        setPaletteOpen((open) => !open)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [isPhone])
+
+  const askFromPalette = useCallback((prompt: string) => {
+    setActive('FRIDAY')
+    void friday.sendMessage(prompt)
+  }, [friday])
+
+  const paletteItems = useMemo<PaletteItem[]>(() => [
+    ...[...nav, ...pendingNav].map(([label]) => ({
+      id: `go-${label}`, group: 'Go to', label,
+      hint: label === 'Incidents' && activeIncidents > 0 ? `${activeIncidents} active` : pendingNav.some(([name]) => name === label) ? 'not connected' : undefined,
+      run: () => navigate(label),
+    })),
+    ...health.attention.concat(overview.services.filter((service) => !health.attention.includes(service))).map((service) => ({
+      id: `svc-${service.id}`, group: 'Service', label: service.name, hint: `${service.host} · ${service.status}`,
+      run: () => navigate('Infrastructure'),
+    })),
+    ...incidents.filter((incident) => incident.status === 'open').map((incident) => ({
+      id: `inc-${incident.id}`, group: 'Incident', label: incident.serviceName || incident.title, hint: `${incident.severity} · ${incident.host || incident.source}`,
+      run: () => viewDiagnosis(incident),
+    })),
+  ], [activeIncidents, health.attention, overview.services, incidents])
 
   async function submitFriday(event: React.FormEvent) {
     event.preventDefault()
@@ -121,20 +163,25 @@ export default function Dashboard() {
     <div className="v3-shell">
       <aside className="v3-rail">
         <button className="v3-logo" onClick={() => navigate('Overview')} aria-label="FRIDAY home"><span /></button>
-        <nav>{nav.map(([label, Icon]) => <button key={label} aria-label={label} className={active === label ? 'active' : ''} onClick={() => navigate(label)} title={label}><Icon size={19}/>{label === 'Incidents' && activeIncidents > 0 && <i>{activeIncidents}</i>}</button>)}</nav>
+        <nav>
+          {nav.map(([label, Icon]) => <button key={label} aria-label={label} data-label={label} className={active === label ? 'active' : ''} onClick={() => navigate(label)} title={label}><Icon size={19}/>{label === 'Incidents' && activeIncidents > 0 && <i>{activeIncidents}</i>}</button>)}
+          <hr aria-hidden="true"/>
+          {pendingNav.map(([label, Icon]) => <button key={label} aria-label={label} data-label={`${label} · not connected`} className={`pending${active === label ? ' active' : ''}`} onClick={() => navigate(label)} title={`${label} · not connected`}><Icon size={19}/></button>)}
+        </nav>
         <div className="v3-avatar">SM</div>
       </aside>
 
       <div className="v3-workspace">
         <header className="v3-topbar">
           <div><strong>FRIDAY</strong><span>AI OPERATIONS CONTROL</span></div>
+          <button type="button" className="v3-search" onClick={() => setPaletteOpen(true)} aria-label="Search or command"><Search size={16}/><span>Search or command</span><kbd>Ctrl K</kbd></button>
           <div className={`v3-system ${live ? 'live' : 'unavailable'}`} role="status" aria-label="Live data status"><i /> {live ? 'READ-ONLY MONITORING' : 'LIVE STATUS UNAVAILABLE'}</div>
         </header>
 
         <main className="v3-main">
           <section className="v3-intro">
-            <div><span className="v3-kicker">COMMAND CENTER / {active.toUpperCase()}</span><h1>{active === 'Overview' ? 'Good afternoon.' : active}</h1><p>{connected ? `API connected · ${overview.mode} mode` : 'Local preview data · safe read-only interface'}</p></div>
-            <div className="v3-automation" role="status" aria-label="Automation execution status"><span><b>Automation</b><small>Automation is unavailable for execution · read only</small></span><em aria-hidden="true" /></div>
+            <div><span className="v3-kicker">COMMAND CENTER / {active.toUpperCase()}</span><h1 className={selfTitled.has(active) ? 'v3-visually-hidden' : undefined}>{active === 'Overview' ? greeting() : active}</h1><p>{connected ? `API connected · ${overview.mode} mode` : 'Local preview data · safe read-only interface'}</p></div>
+            <div className="v3-readonly-badge" role="status" aria-label="Automation execution status" title="Automation is unavailable for execution"><ShieldCheck size={15}/><span><b>Read only</b><small>Automation is unavailable for execution</small></span></div>
           </section>
 
           {active === 'Overview' ? <>
@@ -180,6 +227,7 @@ export default function Dashboard() {
                         : <PendingCapabilityView name={active} />}
         </main>
       </div>
+      <CommandPalette open={paletteOpen} items={paletteItems} onAsk={askFromPalette} onClose={() => setPaletteOpen(false)}/>
     </div>
   )
 }

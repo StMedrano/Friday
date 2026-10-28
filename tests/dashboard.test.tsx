@@ -86,7 +86,7 @@ describe('Friday v3 command center', () => {
   it('presents the authoritative Friday command surface and live infrastructure data', () => {
     installMatchMedia(false)
     render(<Dashboard />)
-    expect(screen.getByRole('heading', { name: /good afternoon/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /good (morning|afternoon|evening)/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /what would you like me to handle/i })).toBeInTheDocument()
     expect(screen.getAllByText('Proxmox VE').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Omada Controller').length).toBeGreaterThan(0)
@@ -181,10 +181,9 @@ describe('Honest overview status', () => {
     expect(status).toHaveClass('unavailable')
   })
 
-  it('does not render a search control with no behavior or a hard-coded agent mesh', () => {
+  it('does not render a hard-coded agent mesh', () => {
     installMatchMedia(false)
     render(<Dashboard />)
-    expect(screen.queryByText(/search or command/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/policy engine ready/i)).not.toBeInTheDocument()
     expect(screen.queryByText(/inventory synchronized/i)).not.toBeInTheDocument()
   })
@@ -197,6 +196,52 @@ describe('Honest overview status', () => {
     expect(within(panel).getByText('VM 110 · Umbrel')).toBeInTheDocument()
     await user.click(within(panel).getByRole('button', { name: /view all services/i }))
     expect(screen.getByRole('region', { name: 'Infrastructure workspace' })).toBeInTheDocument()
+  })
+})
+
+describe('Desktop navigation and layout', () => {
+  it('opens the command palette with Ctrl K and the top-bar button, and navigates', async () => {
+    installMatchMedia(false)
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    await user.keyboard('{Control>}k{/Control}')
+    expect(screen.getByRole('dialog', { name: /command palette/i })).toBeInTheDocument()
+    await user.type(screen.getByRole('combobox'), 'applications')
+    await user.keyboard('{Enter}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Observed application services' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /search or command/i }))
+    expect(screen.getByRole('dialog', { name: /command palette/i })).toBeInTheDocument()
+    await user.type(screen.getByRole('combobox'), 'AdGuard')
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('region', { name: 'Infrastructure workspace' })).toBeInTheDocument()
+  })
+
+  it('separates not-connected workspaces in the rail', () => {
+    installMatchMedia(false)
+    render(<Dashboard />)
+    for (const name of ['Tasks', 'Approvals', 'Memory', 'Audit', 'Settings']) {
+      expect(screen.getByRole('button', { name })).toHaveClass('pending')
+      expect(screen.getByRole('button', { name })).toHaveAttribute('title', `${name} · not connected`)
+    }
+    expect(screen.getByRole('button', { name: 'Incidents' })).not.toHaveClass('pending')
+  })
+
+  it('shows one visible page title per workspace', async () => {
+    installMatchMedia(false)
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    await user.click(screen.getByRole('button', { name: 'Infrastructure' }))
+    const visible = screen.getAllByRole('heading', { name: 'Infrastructure' }).filter((el) => !el.classList.contains('v3-visually-hidden'))
+    expect(visible).toHaveLength(1)
+  })
+
+  it('shows read-only status as a badge rather than a disabled toggle', () => {
+    installMatchMedia(false)
+    render(<Dashboard />)
+    const badge = screen.getByRole('status', { name: /automation execution status/i })
+    expect(badge).toHaveTextContent(/read only/i)
+    expect(badge.querySelector('em')).toBeNull()
   })
 })
 
