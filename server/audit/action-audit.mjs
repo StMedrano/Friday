@@ -98,6 +98,15 @@ export async function createActionAudit({directory, maxBytes = DEFAULT_MAX_BYTES
     catch { unavailable() }
   }
   let queue = Promise.resolve()
+  // Reads and writes share one queue so a read never observes a half-applied append.
+  function serialized(task) {
+    const result = queue.then(task)
+    queue = result.catch(() => {})
+    return result
+  }
+  // The on-disk log must be exactly the chain this process last wrote or verified.
+  const matchesHead = loaded => loaded.intact && loaded.records.length === seq &&
+    (seq === 0 ? loaded.bytes === 0 : loaded.records[seq - 1].hash === last) && loaded.bytes === bytes
 
   async function append(input) {
     if (!input || typeof input !== 'object' || Object.keys(input).some(key => !INPUT_FIELDS.has(key))) rejected()
@@ -105,7 +114,9 @@ export async function createActionAudit({directory, maxBytes = DEFAULT_MAX_BYTES
     if (!ACTIONS.has(action) || !PHASES.has(phase) || !validActor(actor) || !text(target, 256) || !text(detail, 240) ||
       typeof requestId !== 'string' || !UUID.test(requestId)) rejected()
     if (!intact) unavailable()
-    await checkDirectory()
+    // Re-verify the whole chain and its head before every append: an in-place
+    // edit of equal length or a truncation must never be extended.
+    if (!matchesHead(await load())) { intact = false; unavailable() }
     const record = {seq: seq + 1, requestId, at: new Date(now()).toISOString(), action, phase,
       actor: {kind: actor.kind, id: actor.id, label: actor.label}, target, detail, prev: last}
     record.hash = sha256(body(record))
@@ -127,28 +138,30 @@ export async function createActionAudit({directory, maxBytes = DEFAULT_MAX_BYTES
 
   return Object.freeze({
     record(input) {
-      const result = queue.then(() => append(input))
-      queue = result.catch(() => {})
-      return result
+      return serialized(() => append(input))
     },
     async list({limit = 50, before = null, action = null} = {}) {
       if (!Number.isSafeInteger(limit) || limit < 1 || limit > 200 ||
         (before !== null && (!Number.isSafeInteger(before) || before < 1)) || (action !== null && !ACTIONS.has(action))) rejected()
-      const loaded = await load()
-      if (!loaded.intact) { intact = false; return {integrity: 'broken', events: [], nextBefore: null} }
-      const events = []
-      for (let i = loaded.records.length - 1; i >= 0 && events.length <= limit; i--) {
-        const record = loaded.records[i]
-        if (before !== null && record.seq >= before) continue
-        if (action !== null && record.action !== action) continue
-        events.push(record)
-      }
-      const more = events.length > limit
-      const page = events.slice(0, limit)
-      return {integrity: 'verified', events: page, nextBefore: more ? page[page.length - 1].seq : null}
+      return serialized(() => listVerified({limit, before, action}))
     },
     status() {
       return {integrity: intact ? 'verified' : 'broken', events: seq, bytes, maxBytes}
     },
   })
+
+  async function listVerified({limit, before, action}) {
+    const loaded = await load()
+    if (!intact || !matchesHead(loaded)) { intact = false; return {integrity: 'broken', events: [], nextBefore: null} }
+    const events = []
+    for (let i = loaded.records.length - 1; i >= 0 && events.length <= limit; i--) {
+      const record = loaded.records[i]
+      if (before !== null && record.seq >= before) continue
+      if (action !== null && record.action !== action) continue
+      events.push(record)
+    }
+    const more = events.length > limit
+    const page = events.slice(0, limit)
+    return {integrity: 'verified', events: page, nextBefore: more ? page[page.length - 1].seq : null}
+  }
 }

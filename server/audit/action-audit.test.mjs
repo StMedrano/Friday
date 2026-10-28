@@ -145,3 +145,30 @@ test('exposes no update or delete operations', async t => {
   assert.deepEqual(Object.keys(audit).sort(), ['list', 'record', 'status'])
   assert.ok(Object.isFrozen(audit))
 })
+
+test('a same-length in-place edit is detected before the next append', async t => {
+  const {audit, file} = await fixture(t)
+  await audit.record({action: 'agents.registry.sync', phase: 'requested', actor: human})
+  const raw = await readFile(file, 'utf8')
+  // 'requested' and 'succeeded' have the same length, so the file size is unchanged.
+  await writeFile(file, raw.replace('"phase":"requested"', '"phase":"succeeded"'))
+  await assert.rejects(audit.record({action: 'agents.registry.sync', phase: 'requested', actor: human}), /audit-unavailable/)
+  assert.equal(audit.status().integrity, 'broken')
+  assert.equal((await audit.list()).integrity, 'broken')
+})
+
+test('truncation to a record boundary or deletion is reported as broken while running', async t => {
+  const {audit, file} = await fixture(t)
+  await audit.record({action: 'agents.registry.sync', phase: 'requested', actor: human})
+  await audit.record({action: 'agents.registry.sync', phase: 'succeeded', actor: human})
+  const [first] = (await readFile(file, 'utf8')).split('\n')
+  await writeFile(file, first + '\n')
+  assert.equal((await audit.list()).integrity, 'broken')
+  assert.equal(audit.status().integrity, 'broken')
+
+  const other = await fixture(t)
+  await other.audit.record({action: 'agents.registry.sync', phase: 'requested', actor: human})
+  await rm(other.file)
+  assert.equal((await other.audit.list()).integrity, 'broken')
+  await assert.rejects(other.audit.record({action: 'agents.registry.sync', phase: 'requested', actor: human}), /audit-unavailable/)
+})

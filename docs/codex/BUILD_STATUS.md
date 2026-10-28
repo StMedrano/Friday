@@ -6,9 +6,10 @@
 audit, separate from monitoring history. Each lifecycle event is one
 SHA-256 hash-chained JSON line in a private (0700/0600, no symlinks)
 `actions.jsonl`, fsynced before the caller continues. Writes are
-serialized; the store verifies the entire chain on open and on every
-read, and refuses further writes after tampering, truncation or an
-unexpected writer. There is no update, delete, rotation or repair API;
+serialized with reads; the store verifies the entire chain on open,
+before every append and on every read, compares it with the last head it
+wrote, and refuses further writes after tampering, truncation, deletion
+or an unexpected writer. There is no update, delete, rotation or repair API;
 at the size cap (default 16 MiB) audited actions are refused.
 
 Registry sync and diagnostic rerun now record `requested` before running
