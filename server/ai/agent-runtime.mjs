@@ -68,6 +68,21 @@ function groundingViolations(text, overview) {
   return violations
 }
 
+const AGENT_INCIDENT_FIELDS = ['id', 'type', 'title', 'severity', 'status', 'host', 'serviceId', 'serviceName', 'openedAt', 'lastSeen']
+
+// Local models have small contexts; resolved incident history and raw evidence would overflow them.
+function agentOverview(overview) {
+  if (!overview || typeof overview !== 'object' || Array.isArray(overview) || !Array.isArray(overview.incidents)) return overview
+  const open = overview.incidents.filter((incident) => incident?.status === 'open')
+  return {
+    ...overview,
+    incidents: open.map((incident) => Object.fromEntries(
+      AGENT_INCIDENT_FIELDS.filter((field) => incident[field] !== undefined).map((field) => [field, incident[field]]),
+    )),
+    resolvedIncidentCount: overview.incidents.length - open.length,
+  }
+}
+
 export function validateAgentSpec(agent = {}) {
   const errors = []
   if (!agent || typeof agent !== 'object') errors.push('agent must be an object')
@@ -130,10 +145,11 @@ export async function runLocalAgent({
   agent,
   modelProfile,
   prompt,
-  overview = '',
+  overview: suppliedOverview = '',
   fetchImpl = globalThis.fetch,
   signal,
 } = {}) {
+  const overview = agentOverview(suppliedOverview)
   const validation = validateAgentSpec(agent)
   if (!validation.valid) {
     const error = new Error(`Invalid agent spec: ${validation.errors.join('; ')}`)

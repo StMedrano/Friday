@@ -227,3 +227,32 @@ test('rejects critical severity separated from its noun and incident absence fol
   assert.match(requests[1].messages[1].content, /unsupported severity/)
   assert.match(requests[1].messages[1].content, /incident absence was asserted without incident data/)
 })
+
+test('sends the local agent only open incidents with compact fields so the prompt fits the local context', async () => {
+  const requests = []
+  const fetchImpl = async (_url, options) => {
+    requests.push(JSON.parse(options.body))
+    return new Response(JSON.stringify({ message: { content: 'wga-development is offline; one high incident is open.' } }), { status: 200 })
+  }
+  const evidence = { raw: 'x'.repeat(4000) }
+  const overview = {
+    mode: 'live', sites: [], alerts: [],
+    services: [{ id: 'vm100-observer-1', name: 'wga-development', site: 'Site A', status: 'offline', updated: 'stopped' }],
+    incidents: [
+      { id: 'open-1', fingerprint: 'fp-open', type: 'service-down', title: 'wga-development down', detail: 'Exited (137)', severity: 'high', status: 'open', source: 'monitoring', host: 'vm100', serviceId: 'vm100-observer-1', serviceName: 'wga-development', firstSeen: 't0', lastSeen: 't1', openedAt: 't0', resolvedAt: null, recommendedAction: 'Inspect logs.', evidence },
+      { id: 'resolved-1', fingerprint: 'fp-r1', type: 'service-down', title: 'old outage', severity: 'warning', status: 'resolved', evidence },
+      { id: 'resolved-2', fingerprint: 'fp-r2', type: 'service-down', title: 'older outage', severity: 'warning', status: 'resolved', evidence },
+    ],
+  }
+
+  const result = await runLocalAgent({ agent, modelProfile, prompt: 'Summarize health.', overview, fetchImpl })
+  const content = requests[0].messages[1].content
+  assert.equal(result.text, 'wga-development is offline; one high incident is open.')
+  assert.equal(requests.length, 1)
+  assert.match(content, /"id":"open-1"/)
+  assert.match(content, /"severity":"high"/)
+  assert.match(content, /"resolvedIncidentCount":2/)
+  assert.doesNotMatch(content, /resolved-1|resolved-2|fp-open|xxxxxxxx|recommendedAction/)
+  assert.ok(content.length < 4000, `agent prompt should stay compact, got ${content.length} characters`)
+  assert.equal(overview.incidents.length, 3, 'the caller overview is not mutated')
+})
