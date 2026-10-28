@@ -495,11 +495,11 @@ The proposed values `10.1.2.211`, `10.1.10.100`, `10.1.20.131`, `10.1.20.132`, a
 
 ## Current deployed controller baseline
 
-On 2026-10-28, VM102 reported a clean checkout at current `main` `0ee4f0a` (PR #91) with a healthy Friday container, a running dedicated cloud-tunnel connector, and CT108 Ollama at `10.1.10.12:11434` answering HTTP 200. On 2026-10-26, an authorized read-only VM102 inspection had confirmed a clean detached checkout at `8dfe66b` with running application commit `608d85b`. The controller is healthy in live mode, retains `FRIDAY_DOCKER_ENABLED=false`, uses `http://10.1.10.12:11434` for all three agent profiles, mounts no controller Docker socket, and routes to CT108 through `eth1` with source `10.1.10.11`. Base plus live plus cloud-tunnel Compose resolves with the Friday data volume only; the dedicated connector remains unpublished.
+On 2026-10-28 (evening), VM102 was returned to `main` with `make update` and runs `cd94dfc` (PR #88 on top of PR #92), with a healthy Friday container. Earlier that day it reported a clean checkout at `0ee4f0a` (PR #91) with a healthy Friday container, a running dedicated cloud-tunnel connector, and CT108 Ollama at `10.1.10.12:11434` answering HTTP 200. On 2026-10-26, an authorized read-only VM102 inspection had confirmed a clean detached checkout at `8dfe66b` with running application commit `608d85b`. The controller is healthy in live mode, retains `FRIDAY_DOCKER_ENABLED=false`, uses `http://10.1.10.12:11434` for all three agent profiles, mounts no controller Docker socket, and routes to CT108 through `eth1` with source `10.1.10.11`. Base plus live plus cloud-tunnel Compose resolves with the Friday data volume only; the dedicated connector remains unpublished.
 
 That 2026-10-26 in-container, read-only service check returned one enabled `proxmox-observer` definition with checksum `2ee1f134d03d61dad46ebb7e0c693e54740bb945cb00d8cc7d3a61b64677f92f`, registry status `ok` with one synced and zero rejected agents, and deterministic routing at confidence `0.98`. Direct Ask used `ollama` with `qwen3:4b-instruct`, remained advisory, and exposed `execution.performed:false`. Grounding nevertheless failed twice: the normalized overview had no sites, 30 online services, and two offline services (`wga-development` and `wga-platform-postgres`), while the model invented Site A, reported incorrect counts or all services healthy, assigned unsupported `critical` severity, and generalized per-service uptime.
 
-This is a failed live acceptance gate, so no Friday rebuild, registry write, or infrastructure change was attempted. Shared-composer and desktop/phone UI acceptance remain pending on a grounded build.
+That 2026-10-26 result was a failed live acceptance gate. It was resolved by PR #92 and accepted live on 2026-10-28; see the Local Agent Platform Phase 1 section.
 
 ## Monitoring, diagnostics, mobile, and assistant — merged
 
@@ -523,7 +523,7 @@ Issue #20 starts the repository-aware, read-only agent milestone. The local regi
 
 Read-only Explorer tools expose Git branch/dirty status, bounded file listings, and bounded text reads for registered roots. The responsive Repositories workspace browses those endpoints without write or execution controls. Paths remain canonicalized and exclusion-checked; reads cap at 64 KiB. Repository-scoped task flow remains unfinished. Source verification does not establish VM102 integration or live acceptance.
 
-## Local Agent Platform Phase 1 — merged; rollout acceptance pending
+## Local Agent Platform Phase 1 — merged and live-accepted 2026-10-28
 
 The original implementation merged to `main` in `ecb0c9e`. The later PR #19 branch is stale relative to current `main`; it must not be deployed over the merged PR #44/#45 baseline.
 
@@ -558,6 +558,13 @@ Shared-composer implementation tests cover deterministic Proxmox routing, same-o
 - On the real request path (monitoring enabled), the overview sent to the local agent carried every monitoring incident, including resolved history and raw evidence. With 23 incidents (19 resolved) the prompt reached about 9,800 tokens against the 8,192-token `local-general` context, so CT108 returned `exceed_context_size_error` and every matched local-agent request failed as `local-agent-unavailable`; current `main` also exceeded the limit. The local agent now receives only open incidents with compact fields plus `resolvedIncidentCount`; grounding checks use the same view. Against the same live overview and CT108, the prompt dropped to about 4,100 tokens and three of three direct asks answered with correct service counts, offline services and four open high-severity incidents.
 - PR #92 review follow-up: complete multiword declared site labels are matched before unknown site labels are flagged, a negation anywhere earlier in the sentence ("No services are critical.") negates a critical-severity claim, and health claims are checked against the sites or services the sentence names, falling back to the whole environment only when it names none.
 - Test-first coverage proves one corrective retry, fail-closed behavior after a second invalid draft, the surfaced grounding code through the agent service and shared composer, no cloud provider calls, and a single shared inference deadline. On 2026-10-28, Node 22.22.1 `make verify` on the ported branch passed 139 frontend tests, 657 server/observer/script tests, the production build, and all six Compose validations. This is source verification only; the grounding guard is not deployed or live-accepted.
+
+### Live acceptance — 2026-10-28
+
+- PR #92 merged as `407fd85`; VM102 returned to `main` with `make update` and is healthy.
+- A production-path direct Ask, using the monitoring-decorated overview with 23 incidents, answered on the first attempt locally with 30 online and 2 offline services, both offline service names, `Site A`, and four open `high` incidents; `execution.performed=false`.
+- Owner-supplied evidence: the shared composer routed to the local agent with `ollama · qwen3:4b-instruct` provenance and grounded facts, and desktop/phone Agents layouts showed no action controls. The managed-cloud checker passed all eight gates.
+- Follow-ups: live adapters hardcode `site: 'Site A'` on every service while no sites are declared (P6 normalization); VM102 had an unexplained hard power-off at about 18:34Z on 2026-10-28 with no shutdown or OOM lines in its journal; the 2026-09-22 VM132 PostgreSQL ownership incident has not been root-caused.
 
 ### Verification result — 2026-09-22
 
@@ -641,7 +648,7 @@ Docker's native TCP API must never be exposed. Inventory/diagnostic IDs come fro
 
 ## Next product milestone
 
-Finish **Local Agent Platform Phase 1 live rollout and acceptance** without adding execution authority. After that, continue read-only adapter coverage and design authentication/RBAC + durable audit + approval + kill-switch prerequisites before any controlled action work.
+Local Agent Platform Phase 1 is live-accepted. Next, fix site normalization, continue read-only adapter coverage and design authentication/RBAC + durable audit + approval + kill-switch prerequisites before any controlled action work.
 
 ## Safety gate
 
