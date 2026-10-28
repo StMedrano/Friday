@@ -164,6 +164,12 @@ export function getConfig(env = process.env) {
       apiKey: env.FRIDAY_UPTIME_KUMA_API_KEY || '',
       site: env.FRIDAY_UPTIME_KUMA_SITE || '',
     },
+    grafana: {
+      enabled: enabled(env.FRIDAY_GRAFANA_ENABLED),
+      baseUrl: env.FRIDAY_GRAFANA_URL || '',
+      token: env.FRIDAY_GRAFANA_TOKEN || '',
+      site: env.FRIDAY_GRAFANA_SITE || '',
+    },
     monitoring: {
       enabled: enabled(env.FRIDAY_MONITORING_ENABLED),
       pollSeconds: positiveNumber(env.FRIDAY_MONITORING_POLL_SECONDS, 30),
