@@ -116,7 +116,7 @@ export function fetchFridayRepositoryFile(id: string, path: string, signal?: Abo
   return repositoryGet<{ path: string; content: string }>(`/api/repositories/${encodeURIComponent(id)}/file?${query}`, signal)
 }
 
-export type FridayCredentialState = 'present' | 'missing' | 'none' | 'not-required'
+export type FridayCredentialState = 'present' | 'missing' | 'not-required'
 export type FridaySettingsIntegration = {
   id: string; name: string; enabled: boolean; configured: boolean; credentials: FridayCredentialState
   site: string | null; tls: 'verified' | 'unverified' | null; checks?: number; error?: string | null

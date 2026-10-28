@@ -3,7 +3,7 @@ import { Lock, Settings, ShieldCheck } from 'lucide-react'
 import { fetchFridaySettings, type FridayCredentialState, type FridaySettings } from '../lib/api'
 
 const CREDENTIALS: Record<FridayCredentialState, string> = {
-  present: 'Credentials present', missing: 'Credentials missing', none: 'No credentials', 'not-required': 'No credentials needed',
+  present: 'Credentials present', missing: 'Credentials missing', 'not-required': 'No credentials needed',
 }
 const onOff = (value: boolean) => value ? 'Enabled' : 'Disabled'
 

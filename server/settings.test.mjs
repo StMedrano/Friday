@@ -40,12 +40,23 @@ test('reports integration posture as enabled/configured/credential presence', ()
   }))
   const byId = Object.fromEntries(view.integrations.map(item => [item.id, item]))
   assert.deepEqual(byId.proxmox, {id: 'proxmox', name: 'Proxmox VE', enabled: true, configured: false, credentials: 'missing', site: null, tls: 'unverified'})
-  assert.deepEqual(byId.adguard, {id: 'adguard', name: 'AdGuard Home', enabled: true, configured: true, credentials: 'none', site: 'Site A', tls: null})
+  // The AdGuard and Prometheus adapters require Basic credentials.
+  assert.deepEqual(byId.adguard, {id: 'adguard', name: 'AdGuard Home', enabled: true, configured: false, credentials: 'missing', site: 'Site A', tls: null})
   assert.equal(byId.endpoints.configured, true)
   assert.equal(byId.endpoints.checks, 2)
   assert.equal(byId.docker.credentials, 'not-required')
   assert.equal(byId['uptime-kuma'].enabled, false)
   assert.deepEqual(view.integrations.map(item => item.id), ['proxmox', 'vm100-observer', 'docker', 'endpoints', 'omada', 'adguard', 'prometheus', 'uptime-kuma', 'agent-registry'])
+})
+
+test('AdGuard and Prometheus are configured only with URL, site and both credentials', () => {
+  const view = buildSettingsView(getConfig({
+    FRIDAY_ADGUARD_URL: 'https://dns', FRIDAY_ADGUARD_SITE: 'Site A', FRIDAY_ADGUARD_USERNAME: 'u', FRIDAY_ADGUARD_PASSWORD: 'p',
+    FRIDAY_PROMETHEUS_URL: 'https://prom', FRIDAY_PROMETHEUS_SITE: 'Site B', FRIDAY_PROMETHEUS_USERNAME: 'u',
+  }))
+  const byId = Object.fromEntries(view.integrations.map(item => [item.id, item]))
+  assert.deepEqual([byId.adguard.configured, byId.adguard.credentials], [true, 'present'])
+  assert.deepEqual([byId.prometheus.configured, byId.prometheus.credentials], [false, 'missing'])
 })
 
 test('reports AI provider order, credential presence and timeouts', () => {

@@ -9,7 +9,7 @@ const settings = {
   access: { originVerification: true, configured: true, operators: 0 },
   integrations: [
     { id: 'proxmox', name: 'Proxmox VE', enabled: true, configured: true, credentials: 'present', site: null, tls: 'unverified' },
-    { id: 'adguard', name: 'AdGuard Home', enabled: false, configured: false, credentials: 'none', site: 'Site A', tls: null },
+    { id: 'adguard', name: 'AdGuard Home', enabled: false, configured: false, credentials: 'missing', site: 'Site A', tls: null },
     { id: 'endpoints', name: 'HTTP endpoint checks', enabled: true, configured: false, credentials: 'not-required', site: null, tls: null, checks: 0, error: 'invalid-endpoint-configuration' },
   ],
   ai: { enabled: true, providerOrder: ['groq', 'ollama'], cloudTimeoutMs: 15000, localTimeoutMs: 45000, providers: [

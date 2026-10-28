@@ -9,11 +9,6 @@ function credentials(...values) {
   return values.every(present) ? 'present' : 'missing'
 }
 
-function optionalPair(a, b) {
-  if (!present(a) && !present(b)) return 'none'
-  return credentials(a, b)
-}
-
 function integration(id, name, section, {configured, credentials: creds, site = null, tls = null}) {
   return {id, name, enabled: section?.enabled === true, configured, credentials: creds, site: present(site) ? site : null, tls}
 }
@@ -51,10 +46,12 @@ export function buildSettingsView(config) {
         credentials: credentials(omada.clientId, omada.clientSecret),
       }),
       integration('adguard', 'AdGuard Home', adguard, {
-        configured: present(adguard.baseUrl) && present(adguard.site), credentials: optionalPair(adguard.username, adguard.password), site: adguard.site,
+        configured: present(adguard.baseUrl) && present(adguard.site) && present(adguard.username) && present(adguard.password),
+        credentials: credentials(adguard.username, adguard.password), site: adguard.site,
       }),
       integration('prometheus', 'Prometheus', prometheus, {
-        configured: present(prometheus.baseUrl) && present(prometheus.site), credentials: optionalPair(prometheus.username, prometheus.password), site: prometheus.site,
+        configured: present(prometheus.baseUrl) && present(prometheus.site) && present(prometheus.username) && present(prometheus.password),
+        credentials: credentials(prometheus.username, prometheus.password), site: prometheus.site,
       }),
       integration('uptime-kuma', 'Uptime Kuma', uptimeKuma, {
         configured: present(uptimeKuma.baseUrl) && present(uptimeKuma.apiKey) && present(uptimeKuma.site),

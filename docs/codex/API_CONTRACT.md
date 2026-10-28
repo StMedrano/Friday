@@ -36,7 +36,7 @@ Read-only projection of the controller's effective configuration, behind
 the same verified Access identity as `/api/overview`. Reports posture
 only: mode, Access (origin verification, configured, operator count),
 each integration's `enabled`, `configured` (required fields present),
-`credentials` (`present`/`missing`/`none`/`not-required`), site label and
+`credentials` (`present`/`missing`/`not-required`), site label and
 Proxmox TLS verification, AI provider order with credential presence and
 model names, monitoring/diagnostics, the automation API, and fixed
 `safety` facts (`writableSettings`, `infrastructureActions`, `executor`
