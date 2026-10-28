@@ -10,6 +10,7 @@ import { createAgentRegistryService } from './agents/registry-service.mjs'
 import { syncAgentRegistry } from './agents/registry-sync.mjs'
 import { createAgentService } from './agents/agent-service.mjs'
 import { LocalRepositoryRegistry } from './repositories/repository.mjs'
+import { createActionAudit } from './audit/action-audit.mjs'
 
 const config = getConfig()
 if (config.automation.enabled && (!Number.isInteger(config.automation.port) ||
@@ -53,8 +54,21 @@ if (config.agents.registry.enabled) {
   }
 }
 
+// When enabled but unusable, audited actions are refused rather than run unaudited.
+let actionAudit = null
+if (config.audit.enabled) {
+  try {
+    actionAudit = await createActionAudit({ directory: config.audit.directory, maxBytes: config.audit.maxBytes })
+    if (actionAudit.status().integrity !== 'verified') console.warn('Friday action audit integrity check failed; audited actions are refused')
+  } catch {
+    console.warn('Friday action audit unavailable; audited actions are refused')
+    const unavailable = async () => { throw new Error('audit-unavailable') }
+    actionAudit = Object.freeze({ record: unavailable, list: unavailable, status: () => ({ integrity: 'unavailable' }) })
+  }
+}
+
 const repositoryRegistry = new LocalRepositoryRegistry({ registryPath: config.repositories.registryPath })
-const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry })
+const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit })
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`Friday listening on 0.0.0.0:${config.port} (${config.mode} mode)`)
 })

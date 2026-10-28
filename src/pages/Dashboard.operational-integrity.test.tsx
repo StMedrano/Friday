@@ -1,13 +1,14 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const liveService = { id: 'cloud', name: 'Cloud Portal', category: 'app', host: 'vm100',
   site: 'Infrastructure', status: 'online', detail: 'Observed web service', updated: '2026-10-27T12:00:00Z' }
+const liveServices: Array<Record<string, string>> = [liveService]
 
 vi.mock('../lib/api', () => ({
   useFridayOverview: () => ({ connected: true, overview: {
-    mode: 'live', sites: [], services: [liveService], alerts: [], resources: [],
+    mode: 'live', sites: [], services: liveServices, alerts: [], resources: [],
     activities: [], incidents: [], monitoring: null,
   } }),
   fetchMonitoringHistory: vi.fn(async () => []),
@@ -19,6 +20,12 @@ vi.mock('../components/AgentsWorkspace', () => ({
 }))
 vi.mock('../components/RepositoriesWorkspace', () => ({
   default: () => <div>Repository view</div>,
+}))
+vi.mock('../components/AuditWorkspace', () => ({
+  default: () => <div>Action audit view</div>,
+}))
+vi.mock('../components/SettingsWorkspace', () => ({
+  default: () => <div>Settings inspection view</div>,
 }))
 
 import Dashboard from './Dashboard'
@@ -53,5 +60,30 @@ describe('Dashboard operator integrity and honest feature status', () => {
       expect(screen.getByText(/No production task, memory or approval operation is available on this screen/i)).toBeInTheDocument()
     }
     expect(screen.queryByRole('button', { name: /approve|delete|restart|execute/i })).not.toBeInTheDocument()
+  })
+
+  it('routes Audit to the durable action audit view', async () => {
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    await user.click(screen.getByRole('button', { name: 'Audit' }))
+    expect(screen.getByText('Action audit view')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Audit is not connected' })).not.toBeInTheDocument()
+  })
+
+  it('routes Settings to the read-only settings inspection view', async () => {
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(screen.getByText('Settings inspection view')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Settings is not connected' })).not.toBeInTheDocument()
+  })
+
+  it('does not call an inventory with a maintenance service all online', () => {
+    liveServices.splice(0, liveServices.length, liveService, { ...liveService, id: 'kuma', name: 'Uptime Kuma', status: 'maintenance' })
+    render(<Dashboard />)
+    const panel = screen.getByRole('region', { name: /needs attention/i })
+    expect(within(panel).queryByText(/every observed service reports online/i)).not.toBeInTheDocument()
+    expect(within(panel).getByText(/1 in maintenance/i)).toBeInTheDocument()
+    liveServices.splice(0, liveServices.length, liveService)
   })
 })

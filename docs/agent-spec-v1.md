@@ -67,7 +67,7 @@ The first shipped definition, `agents/proxmox-observer.json`, is intentionally d
 
 `server/ai/agent-runtime.mjs` validates the v1.1 definition, constructs a constrained system prompt, and delegates inference to Friday's existing Ollama transport using a resolved model profile. Agent JSON never selects a cloud provider and never embeds CT108 credentials or deployment-specific model endpoints.
 
-Phase 1 registry, routing, API, shared-session auto-routing, manual override, and the read-only Agents workspace are implemented in PR #19. Live VM102/Supabase/UI acceptance remains a separate rollout gate before the PR is ready to merge.
+Phase 1 registry, routing, API, shared-session auto-routing, manual override, and the read-only Agents workspace are merged in `main`. Live VM102/Supabase/UI acceptance remains a separate rollout gate before the feature is considered operationally complete.
 
 ## Future executor prerequisite
 

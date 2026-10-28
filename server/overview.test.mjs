@@ -17,6 +17,20 @@ test('Uptime Kuma joins the overview and failures leave other adapters available
   assert.equal(degraded.alerts[0].detail, 'uptime-kuma: Uptime Kuma authentication failed')
 })
 
+test('Grafana services join the live overview and failures preserve other adapters', async () => {
+  const config = getConfig({ FRIDAY_MODE: 'live', FRIDAY_GRAFANA_ENABLED: 'true' })
+  const service = { id: 'grafana', name: 'Grafana', category: 'monitoring', host: 'grafana.test', site: 'Site A', status: 'online', detail: 'Database ok', updated: 'now' }
+  const result = await buildOverview(config, { getGrafanaServices: async () => [service] })
+  assert.deepEqual(result.services, [service])
+  assert.equal(result.integrations.find(item => item.id === 'grafana').enabled, true)
+  const degraded = await buildOverview(config, {
+    getGrafanaServices: async () => { throw Error('Grafana authentication failed') },
+    getEndpointServices: async () => [{ ...service, id: 'endpoint' }],
+  })
+  assert.equal(degraded.services[0].id, 'endpoint')
+  assert.equal(degraded.alerts[0].detail, 'grafana: Grafana authentication failed')
+})
+
 test('Prometheus target services join live overview and failures preserve other adapters', async () => {
   const config = getConfig({ FRIDAY_MODE: 'live', FRIDAY_PROMETHEUS_ENABLED: 'true' })
   const service = { id: 'prometheus-target', name: 'Prometheus · node', category: 'monitoring', host: 'node.test:9100', site: 'Site B', status: 'offline', detail: 'Scrape failed', updated: 'now' }

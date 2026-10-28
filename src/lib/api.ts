@@ -116,6 +116,50 @@ export function fetchFridayRepositoryFile(id: string, path: string, signal?: Abo
   return repositoryGet<{ path: string; content: string }>(`/api/repositories/${encodeURIComponent(id)}/file?${query}`, signal)
 }
 
+export type FridayAuditEvent = {
+  seq: number; requestId: string; at: string; action: string
+  phase: 'requested' | 'succeeded' | 'failed' | 'denied'
+  actor: { kind: 'human' | 'service' | 'unauthenticated'; id: string | null; label: string | null }
+  target: string | null; detail: string | null; prev: string; hash: string
+}
+export type FridayAuditPage = { integrity: 'verified' | 'broken'; events: FridayAuditEvent[]; nextBefore: number | null }
+
+export class FridayAuditError extends Error {
+  constructor(readonly code: string, readonly status: number) { super(code) }
+}
+
+export async function fetchFridayAuditEvents(before: number | null = null, signal?: AbortSignal): Promise<FridayAuditPage> {
+  const query = new URLSearchParams({ limit: '50' })
+  if (before !== null) query.set('before', String(before))
+  const response = await fetch(`/api/audit/events?${query}`, { method: 'GET', signal })
+  const body = await response.json().catch(() => ({})) as FridayAuditPage | { error?: string }
+  if (!response.ok) throw new FridayAuditError('error' in body && body.error ? body.error : 'audit-unavailable', response.status)
+  return body as FridayAuditPage
+}
+
+export type FridayCredentialState = 'present' | 'missing' | 'not-required'
+export type FridaySettingsIntegration = {
+  id: string; name: string; enabled: boolean; configured: boolean; credentials: FridayCredentialState
+  site: string | null; tls: 'verified' | 'unverified' | null; checks?: number; error?: string | null
+}
+export type FridaySettings = {
+  mode: 'live' | 'mock'
+  access: { originVerification: boolean; configured: boolean; operators: number }
+  integrations: FridaySettingsIntegration[]
+  ai: { enabled: boolean; providerOrder: string[]; cloudTimeoutMs: number | null; localTimeoutMs: number | null
+    providers: Array<{ id: string; inOrder: boolean; credentials: FridayCredentialState; model: string | null; enabled?: boolean }> }
+  monitoring: { enabled: boolean; pollSeconds: number | null; offlineGraceSeconds: number | null; historyLimit: number | null; diagnostics: boolean }
+  automationApi: { enabled: boolean; port: number | null; serviceTokens: number; readOnly: boolean }
+  audit: { enabled: boolean; integrity: 'verified' | 'broken' | 'unavailable' | null; events: number | null }
+  safety: { writableSettings: boolean; infrastructureActions: boolean; executor: boolean }
+}
+
+export async function fetchFridaySettings(signal?: AbortSignal): Promise<FridaySettings> {
+  const response = await fetch('/api/settings', { method: 'GET', signal })
+  if (!response.ok) throw new Error('settings-unavailable')
+  return await response.json() as FridaySettings
+}
+
 export type FridayIncident = {
   id: string; fingerprint?: string; type: string; title: string; detail: string
   severity: 'high' | 'warning' | 'info'; status: 'open' | 'resolved'; source: string; host: string

@@ -4,6 +4,7 @@ import type { FridayIncident, FridayOverview } from '../lib/api'
 import type { FridaySessionMessage } from '../hooks/useFridaySession'
 import FridayComposer from './FridayComposer'
 import FridayConversation from './FridayConversation'
+import { summarizeHealth } from '../lib/status'
 
 const severityRank = { high: 0, warning: 1, info: 2 } as const
 const statusRank = { offline: 0, degraded: 1, maintenance: 2, online: 3 } as const
@@ -41,8 +42,8 @@ export default function MobileHome({
     .slice()
     .sort((a, b) => severityRank[a.severity] - severityRank[b.severity] || b.openedAt.localeCompare(a.openedAt))
   const primaryIncident = active[0]
-  const online = overview.services.filter((service) => service.status === 'online').length
-  const health = Math.round((online / Math.max(overview.services.length, 1)) * 100)
+  const health = summarizeHealth(overview.services, active.length)
+  const serviceAttention = health.attention
   const prioritizedServices = overview.services
     .slice()
     .sort((a, b) => statusRank[a.status] - statusRank[b.status])
@@ -60,17 +61,21 @@ export default function MobileHome({
   }).slice(0, 3)
 
   return <div className="v3-mobile-home" data-testid="mobile-home">
-    <section className={`v3-mobile-attention ${primaryIncident ? primaryIncident.severity : 'nominal'}`} data-mobile-section="attention">
+    <section className={`v3-mobile-attention ${primaryIncident ? primaryIncident.severity : serviceAttention.length ? health.level : 'nominal'}`} data-mobile-section="attention">
       {primaryIncident ? <>
         <div className="v3-mobile-attention-head"><AlertTriangle size={18}/><span>{active.length} {primaryIncident.severity.toUpperCase()} INCIDENT{active.length === 1 ? '' : 'S'}</span></div>
         <div className="v3-mobile-attention-main"><div><span className="v3-kicker">REQUIRES ATTENTION / READ ONLY</span><h1>{primaryIncident.serviceName || primaryIncident.title}</h1><p>{primaryIncident.host || primaryIncident.source} · {primaryIncident.type.replaceAll('-', ' ')}</p></div><span className={`v3-severity ${primaryIncident.severity}`}>{primaryIncident.severity.toUpperCase()}</span></div>
         <div className="v3-mobile-attention-foot"><span>First seen {displayTime(primaryIncident.firstSeen)}</span><button className="v3-readonly-action" onClick={() => onSelectIncident(primaryIncident)}>View Diagnosis <ChevronRight size={14}/></button></div>
+      </> : serviceAttention.length ? <>
+        <div className="v3-mobile-attention-head"><AlertTriangle size={18}/><span>{health.label.toUpperCase()} · NO OPEN INCIDENT</span></div>
+        <div className="v3-mobile-attention-main"><div><span className="v3-kicker">CURRENT ATTENTION</span><h1>{serviceAttention.length} {serviceAttention.length === 1 ? 'service needs' : 'services need'} attention</h1>{serviceAttention.slice(0, 3).map((service) => <p key={service.id}>{service.name} · {service.status}</p>)}</div></div>
+        <div className="v3-mobile-attention-foot"><span>Reported by service status</span><button className="v3-readonly-action" onClick={() => onNavigate('Infrastructure')}>View services <ChevronRight size={14}/></button></div>
       </> : <div className="v3-mobile-nominal"><ShieldCheck size={20}/><div><span className="v3-kicker">CURRENT ATTENTION</span><h1>System nominal</h1><p>No open operational incidents require attention.</p></div></div>}
     </section>
 
     <section className="v3-mobile-health" data-mobile-section="health" aria-label="System health summary">
-      <article><span>Health</span><strong>{health}%</strong></article>
-      <article><span>Services</span><strong>{online}/{overview.services.length}</strong></article>
+      <article><span>Health</span><strong>{health.percent === null ? '—' : `${health.percent}%`}</strong></article>
+      <article><span>Services</span><strong>{health.online}/{health.total}</strong></article>
       <article><span>Incidents</span><strong>{active.length}</strong></article>
       <article><span>Sites</span><strong>{overview.sites.length} {overview.sites.length === 1 ? 'site' : 'sites'}</strong></article>
     </section>

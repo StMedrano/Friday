@@ -130,7 +130,7 @@ Work from top to bottom. Do not skip safety prerequisites to reach action featur
 
 ## User-requested cloud access — completed
 
-The read-only automation API at `friday-api.mytechtactics.com` is deployed on VM102 behind its dedicated Cloudflare Access application and tunnel. The tunnel is healthy. The managed cloud runtime has an enforced exact-host policy and ready URL/service-credential bindings; `scripts/check-cloud-connection.mjs` passed all authenticated reads, denial, write-rejection, and excluded-route checks on 2026-10-26. The temporary VM102 service-token copy was removed, the tunnel-token file was preserved, and both VM102 health and cloud acceptance passed afterward. PR #45 was merged to `main` on 2026-10-26 (`7b89228`); the running VM102 image is separately recorded at application commit `608d85b`, so do not infer a later deployment from the merge. Draft PR #46 adds fail-closed cloud snapshot shape validation with test-first coverage; require exact-head CI and review before its own merge or any production rollout. Do not expose the UI port as the automation origin or grant deployment/execution tools through this API.
+The read-only automation API at `friday-api.mytechtactics.com` is deployed on VM102 behind its dedicated Cloudflare Access application and tunnel. The tunnel is healthy. The managed cloud runtime has an enforced exact-host policy and ready URL/service-credential bindings; `scripts/check-cloud-connection.mjs` passed all authenticated reads, denial, write-rejection, and excluded-route checks on 2026-10-26. The temporary VM102 service-token copy was removed, the tunnel-token file was preserved, and both VM102 health and cloud acceptance passed afterward. PR #45 was merged to `main` on 2026-10-26 (`7b89228`); the running VM102 image is separately recorded at application commit `608d85b`, so do not infer a later deployment from the merge. PR #46 (fail-closed cloud snapshot shape validation) merged as `c0e5024`. The acceptance checker now also requires query-suffixed-route rejection and bounded overview freshness (at most five minutes old, at most one minute in the future); rerun it against the live endpoint after the next reviewed deployment. Rotate or replace the current service token before its documented 2026-11-24 expiry. Do not expose the UI port as the automation origin or grant deployment/execution tools through this API.
 
 ## P0 — VM100 observer baseline — completed; nic1 example migrated
 
@@ -174,9 +174,9 @@ Completed behavior:
 
 The old “finish Friday Assistant experience” milestone is retired.
 
-## P5 — Local Agent Platform Phase 1 — implementation and network validation complete; live acceptance pending
+## P5 — Local Agent Platform Phase 1 — merged; live acceptance blocked
 
-Draft PR #19 implements the Phase 1 local advisory agent platform.
+The Phase 1 implementation is in `main`. The old PR #19 head is stale relative to the merged security and cloud-API work and must not be used as a deployment source.
 
 Implemented source behavior:
 
@@ -190,20 +190,20 @@ Implemented source behavior:
 8. Every Phase 1 response remains advisory with `execution.performed=false`.
 9. CI validates the exact two-table schema and rejects agent execution routes, shell/SSH paths, and browser-visible Supabase credentials.
 
-### Required live acceptance before PR #19 merge readiness
+### Required live acceptance before rollout completion
 
 1. CT108 nic1 validation is complete: its running-container interface reports `10.1.10.12/24`, and authoritative VM102 passes TCP/11434, `/api/tags`, and `/api/chat` over vmbr1.
 2. Agent defaults now use `http://10.1.10.12:11434`; post-migration `make verify` passed on 2026-09-22.
-3. PR head `0e241b4` contains timeout hardening: registry requests are bounded to 10 seconds, local routing to 15 seconds, and matched local inference to 90 seconds by default. TDD tests, full `make verify`, and GitHub CI passed on 2026-09-24. The patch is not deployed to VM102 yet.
-4. VM132's PostgreSQL ownership failure caused one automatic database restart on 2026-09-22. Later authenticated SQL and service-role REST passed; investigate the ownership incident and require sustained readiness before deploying Friday. See the [PR #19 rollout plan](../superpowers/plans/2026-09-22-pr19-rollout-completion.md).
+3. Current `main` contains timeout hardening: registry requests are bounded to 10 seconds, local routing to 15 seconds, and matched local inference to 90 seconds by default.
+4. VM132's PostgreSQL ownership failure caused one automatic database restart on 2026-09-22. On 2026-10-26, three authenticated PostgREST reads five minutes apart passed, but that VM102 session could not run `SELECT 1` or verify the database container restart count. On 2026-10-28 an owner read-only check reported restart count 1, healthy, and `SELECT 1` = 1. Complete three snapshots at least five minutes apart (restart count, `SELECT 1`, authenticated PostgREST) and stop on any failure or restart-count change before deploying. See the [PR #19 rollout plan](../superpowers/plans/2026-09-22-pr19-rollout-completion.md).
 5. The existing `friday_agents` and `friday_agent_registry_state` tables matched the checked-in migration on 2026-09-22. No schema write is currently needed.
-6. Back up/preserve VM102 `.env`, then configure the three agent URLs to `http://10.1.10.12:11434` through an owner-capable VM102 session.
-7. Fast-forward the clean VM102 PR branch to the reviewed head and rebuild only Friday with base Compose; `make update` is unsuitable because it switches to `main`.
-8. Run `make preflight` and `make health`; verify `GET /api/agents`, agent detail, and registry status.
+6. Preserve VM102 `.env`; its three agent URLs are already configured as `http://10.1.10.12:11434`. Keep all other production values and `FRIDAY_DOCKER_ENABLED=false` unchanged.
+7. Deploy only a reviewed continuation based on current `main`; include `compose.cloud-tunnel.yaml` when resolving the existing production project and rebuild only Friday so the connector remains intact.
+8. Rerun `make preflight` before deployment and `make health` afterward; verify `GET /api/agents`, agent detail, and registry status.
 9. Run `POST /api/agents/registry/sync` with `{}` only if registry state is stale, then verify a healthy sync.
 10. Route a Proxmox prompt and verify `proxmox-observer` is selected.
-11. Directly ask `proxmox-observer` and require `provider:"ollama"`, `mode:"local-agent"`, expected model/profile, and `execution.performed:false`.
-12. Send a Proxmox request through the normal shared Friday composer and verify automatic local-agent routing/provenance; the older running VM102 build currently answers through Groq.
+11. Directly ask `proxmox-observer` and require `provider:"ollama"`, `mode:"local-agent"`, expected model/profile, `execution.performed:false`, and text that matches current service/site/incident/severity facts. The 2026-10-26 live check failed this grounding gate, so the new retry-and-fail-closed guard must be deployed and revalidated first.
+12. Send a Proxmox request through the normal shared Friday composer and verify automatic local-agent routing/provenance with the same grounding requirements.
 13. Complete desktop and phone Agents workspace acceptance and confirm no action controls appear. Obtain explicit owner approval before merge.
 
 Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execution, restart endpoints, or cloud fallback for matched agents as part of this rollout.
@@ -227,7 +227,7 @@ Do **not** add an executor, approvals/tasks/memory persistence, shell/SSH execut
 
 1. Omada Open API v1 read-only site/device inventory is implemented and disabled by default. Live acceptance still requires a reachable controller, trusted TLS certificate, controller API/version confirmation, and a dedicated read-only application scoped to approved sites; compare IDs/counts/status to Omada before activation. WAN/VPN/routing health remains outside this inventory slice. See `docs/integrations.md`.
 2. AdGuard Home status and aggregate DNS statistics are implemented for one explicitly configured instance and disabled by default. Live acceptance requires a trusted HTTPS endpoint, suitable server-only credentials/access restrictions, and the correct site label; compare running/protection state and counters with AdGuard. Secondary DNS instances remain future work. See `docs/integrations.md`.
-3. Prometheus active-target scrape health and Uptime Kuma monitor metrics are implemented and disabled by default, using existing monitoring data without duplicate probes. Prometheus acceptance requires restricted Basic credentials and accurate site labels. Kuma acceptance requires a metrics-only key, exported `monitor_id` labels, and an explicit site label. Both require trusted HTTPS and comparison against their source inventories. Grafana remains future work. See `docs/integrations.md`.
+3. Prometheus active-target scrape health and Uptime Kuma monitor metrics are implemented and disabled by default, using existing monitoring data without duplicate probes. Prometheus acceptance requires restricted Basic credentials and accurate site labels. Kuma acceptance requires a metrics-only key, exported `monitor_id` labels, and an explicit site label. Both require trusted HTTPS and comparison against their source inventories. Grafana health and Grafana-managed alert rule state are also implemented and disabled by default; acceptance requires a Viewer service account token, trusted HTTPS, a site label and comparison against Grafana's alert list. See `docs/integrations.md`.
 4. Keep provider failure non-fatal to `/api/overview` and visible to monitoring.
 
 ## P8 — Authentication, roles, approval, and durable action audit
@@ -261,7 +261,7 @@ Implement before any infrastructure write operation:
 
 - authentication or a documented trusted reverse-proxy identity boundary;
 - **internal role policy foundation in draft PR #49**: exact JWT subject-to-role-and-target bindings for Viewer, Operator, Administrator and Friday Agent; enforced in the dormant HomeLab fixture service with proposer/approver separation. No production configuration, UI/RBAC endpoints, real target rights, or execution authority; full product RBAC remains pending.
-- durable append-only action audit events separate from monitoring history;
+- **durable append-only action audit events separate from monitoring history: implemented, default off** (`server/audit/action-audit.mjs`, `GET /api/audit/events`); enable with `FRIDAY_AUDIT_ENABLED=true` after reviewing the `/data/audit` volume;
 - action request IDs/lifecycle states;
 - **internal read-only pending-approval queue in stacked draft PR #50 (depends on #49)**: private bounded audit scan for unexpired, unapproved symbolic staging requests; signed Administrator-only projection with proposer/approver separation. No public UI/API, production operator identity provisioning or executor; full human approval workflow remains outstanding.
 - a default-off, owner-file-backed **global automation gate foundation** is implemented in draft PR #48 and tested against the existing internal HomeLab approval seam. It is not wired into production, grants no action permission and has no user-facing toggle. Production-safe kill-switch activation, cross-instance reviews and the remaining authorization/audit/approval controls are still pending.

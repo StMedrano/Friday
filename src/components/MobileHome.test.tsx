@@ -108,10 +108,30 @@ describe('MobileHome', () => {
   })
 
   it('shows System nominal instead of an empty incident shell when nothing is open', () => {
-    render(<MobileHome overview={{ ...overview, incidents: [], monitoring: { ...overview.monitoring!, activeIncidents: 0, openHigh: 0 } }} {...baseProps}/>)
+    const allOnline = overview.services.map((service) => ({ ...service, status: 'online' as const }))
+    render(<MobileHome overview={{ ...overview, services: allOnline, incidents: [], monitoring: { ...overview.monitoring!, activeIncidents: 0, openHigh: 0 } }} {...baseProps}/>)
     expect(screen.getByText(/system nominal/i)).toBeInTheDocument()
     expect(screen.queryByText(/high incident/i)).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: /view diagnosis/i })).not.toBeInTheDocument()
+  })
+
+  it('does not claim System nominal while services are offline or degraded without an incident', () => {
+    render(<MobileHome overview={{ ...overview, incidents: [], monitoring: { ...overview.monitoring!, activeIncidents: 0, openHigh: 0 } }} {...baseProps}/>)
+    const attention = document.querySelector('[data-mobile-section="attention"]') as HTMLElement
+    expect(within(attention).queryByText(/system nominal/i)).not.toBeInTheDocument()
+    expect(within(attention).getByRole('heading', { name: /2 services need attention/i })).toBeInTheDocument()
+    expect(within(attention).getByText(/nginx-proxy-manager · offline/i)).toBeInTheDocument()
+    expect(within(attention).getByText(/AdGuard Home · degraded/i)).toBeInTheDocument()
+    expect(within(attention).queryByRole('button', { name: /view diagnosis/i })).not.toBeInTheDocument()
+  })
+
+  it('routes service attention to the full infrastructure inventory', async () => {
+    const onNavigate = vi.fn()
+    const user = userEvent.setup()
+    render(<MobileHome overview={{ ...overview, incidents: [] }} {...baseProps} onNavigate={onNavigate}/>)
+    const attention = document.querySelector('[data-mobile-section="attention"]') as HTMLElement
+    await user.click(within(attention).getByRole('button', { name: /view services/i }))
+    expect(onNavigate).toHaveBeenCalledWith('Infrastructure')
   })
 
   it('prioritizes offline then degraded services and limits the preview to five', async () => {

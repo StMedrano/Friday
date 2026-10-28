@@ -67,4 +67,18 @@ describe('FridayWorkspace', () => {
 
     expect(screen.getByRole('button', { name: /clear session/i })).toBeDisabled()
   })
+
+  it('offers suggested prompts in an empty session and sends the chosen one', async () => {
+    const sendMessage = vi.fn(async () => {})
+    const user = userEvent.setup()
+    render(<FridayWorkspace session={session({ messages: [], sendMessage })} query="" onQueryChange={vi.fn()} onSubmit={vi.fn()}/>)
+    const suggestion = screen.getByRole('button', { name: /what needs attention right now/i })
+    await user.click(suggestion)
+    expect(sendMessage).toHaveBeenCalledWith('What needs attention right now?')
+  })
+
+  it('does not show suggestions once a conversation exists', () => {
+    render(<FridayWorkspace session={session()} query="" onQueryChange={vi.fn()} onSubmit={vi.fn()}/>)
+    expect(screen.queryByRole('button', { name: /what needs attention right now/i })).not.toBeInTheDocument()
+  })
 })

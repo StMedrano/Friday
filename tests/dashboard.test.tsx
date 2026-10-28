@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Dashboard from '../src/pages/Dashboard'
@@ -86,7 +86,7 @@ describe('Friday v3 command center', () => {
   it('presents the authoritative Friday command surface and live infrastructure data', () => {
     installMatchMedia(false)
     render(<Dashboard />)
-    expect(screen.getByRole('heading', { name: /good afternoon/i })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: /good (morning|afternoon|evening)/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /what would you like me to handle/i })).toBeInTheDocument()
     expect(screen.getAllByText('Proxmox VE').length).toBeGreaterThan(0)
     expect(screen.getAllByText('Omada Controller').length).toBeGreaterThan(0)
@@ -161,6 +161,127 @@ describe('Friday v3 command center', () => {
   })
 })
 
+
+describe('Honest overview status', () => {
+  it('does not call the system nominal while a service is degraded and names it', () => {
+    installMatchMedia(false)
+    render(<Dashboard />)
+    const health = screen.getByRole('region', { name: /system health/i })
+    expect(within(health).getByText('Attention')).toBeInTheDocument()
+    expect(within(health).queryByText(/nominal/i)).not.toBeInTheDocument()
+    expect(within(health).getByText('VM 110 · Umbrel')).toBeInTheDocument()
+    expect(within(health).getByText(/degraded/i)).toBeInTheDocument()
+  })
+
+  it('shows unavailable live status as a warning, not a green online signal', () => {
+    installMatchMedia(false)
+    render(<Dashboard />)
+    const status = screen.getByRole('status', { name: /live data status/i })
+    expect(status).toHaveTextContent(/live status unavailable/i)
+    expect(status).toHaveClass('unavailable')
+  })
+
+  it('does not render a hard-coded agent mesh', () => {
+    installMatchMedia(false)
+    render(<Dashboard />)
+    expect(screen.queryByText(/policy engine ready/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/inventory synchronized/i)).not.toBeInTheDocument()
+  })
+
+  it('lists services that need attention with a path to the full service inventory', async () => {
+    installMatchMedia(false)
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    const panel = screen.getByRole('region', { name: /needs attention/i })
+    expect(within(panel).getByText('VM 110 · Umbrel')).toBeInTheDocument()
+    await user.click(within(panel).getByRole('button', { name: /view all services/i }))
+    expect(screen.getByRole('region', { name: 'Infrastructure workspace' })).toBeInTheDocument()
+  })
+})
+
+describe('Desktop navigation and layout', () => {
+  it('opens the command palette with Ctrl K and the top-bar button, and navigates', async () => {
+    installMatchMedia(false)
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    await user.keyboard('{Control>}k{/Control}')
+    expect(screen.getByRole('dialog', { name: /command palette/i })).toBeInTheDocument()
+    await user.type(screen.getByRole('combobox'), 'applications')
+    await user.keyboard('{Enter}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Observed application services' })).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /search or command/i }))
+    expect(screen.getByRole('dialog', { name: /command palette/i })).toBeInTheDocument()
+    await user.type(screen.getByRole('combobox'), 'AdGuard')
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('region', { name: 'Infrastructure workspace' })).toBeInTheDocument()
+  })
+
+  it('separates not-connected workspaces in the rail', () => {
+    installMatchMedia(false)
+    render(<Dashboard />)
+    for (const name of ['Tasks', 'Approvals', 'Memory', 'Audit', 'Settings']) {
+      expect(screen.getByRole('button', { name })).toHaveClass('pending')
+      expect(screen.getByRole('button', { name })).toHaveAttribute('title', `${name} · not connected`)
+    }
+    expect(screen.getByRole('button', { name: 'Incidents' })).not.toHaveClass('pending')
+  })
+
+  it('shows one visible page title per workspace', async () => {
+    installMatchMedia(false)
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    await user.click(screen.getByRole('button', { name: 'Infrastructure' }))
+    const visible = screen.getAllByRole('heading', { name: 'Infrastructure' }).filter((el) => !el.classList.contains('v3-visually-hidden'))
+    expect(visible).toHaveLength(1)
+  })
+
+  it('shows read-only status as a badge rather than a disabled toggle', () => {
+    installMatchMedia(false)
+    render(<Dashboard />)
+    const badge = screen.getByRole('status', { name: /automation execution status/i })
+    expect(badge).toHaveTextContent(/read only/i)
+    expect(badge.querySelector('em')).toBeNull()
+  })
+})
+
+describe('Preview data and service scanability', () => {
+  it('announces preview data on desktop and phone when the API is not connected', () => {
+    installMatchMedia(false)
+    const { unmount } = render(<Dashboard />)
+    expect(screen.getByRole('note', { name: /preview data/i })).toHaveTextContent(/sample data/i)
+    expect(screen.queryByText('LIVE')).not.toBeInTheDocument()
+    expect(screen.getByText('SAMPLE')).toBeInTheDocument()
+    unmount()
+    installMatchMedia(true)
+    render(<Dashboard />)
+    expect(screen.getByRole('note', { name: /preview data/i })).toBeInTheDocument()
+  })
+
+  it('hides the preview banner once live data arrives', async () => {
+    installMatchMedia(false)
+    vi.stubGlobal('fetch', liveFetch())
+    render(<Dashboard />)
+    await screen.findByText(/API connected · live mode/i)
+    expect(screen.queryByRole('note', { name: /preview data/i })).not.toBeInTheDocument()
+  })
+
+  it('orders service tiles by severity and labels non-online status in text', () => {
+    installMatchMedia(false)
+    render(<Dashboard />)
+    const tiles = within(screen.getByRole('region', { name: /service health/i })).getAllByRole('button')
+    expect(tiles[0]).toHaveTextContent('VM 110 · Umbrel')
+    expect(tiles[0]).toHaveTextContent(/degraded/i)
+  })
+
+  it('puts the active incident count in the browser tab title', async () => {
+    installMatchMedia(false)
+    vi.stubGlobal('fetch', liveFetch())
+    render(<Dashboard />)
+    await screen.findByText(/API connected · live mode/i)
+    expect(document.title).toBe('(1) Friday · Control Plane')
+  })
+})
 
 describe('Site topology navigation', () => {
   it('replaces the desktop Infrastructure placeholder with site filters and host inventory', async () => {
