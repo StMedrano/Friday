@@ -12,7 +12,7 @@ const NON_ONLINE_HEALTH_CLAIMS = [
 const NEGATED_PREFIX = /\b(?:not|isn't|is not|aren't|never)\s+(?:\w+\s+)?$/i
 const SEVERITY_CLAIMS = [
   /\bseverity\b[^.\n]{0,20}\bcritical\b/i,
-  /\bcritical\s+(?:severity|alerts?|incidents?|issues?|failures?|state|status|outages?|errors?|services?|problems?)\b/gi,
+  /\bcritical\s+(?:\w+\s+){0,2}?(?:severity|alerts?|incidents?|issues?|failures?|state|status|outages?|errors?|services?|problems?|containers?|hosts?|nodes?|vms?)\b/gi,
   /\b(?:is|are|was|were|marked|rated|considered)\s+critical\b/i,
 ]
 const NEGATED_SEVERITY_PREFIX = /\b(?:no|not|without|zero)\s+$/i
@@ -54,7 +54,7 @@ function groundingViolations(text, overview) {
     NON_ONLINE_HEALTH_CLAIMS.some((pattern) => affirmativeMatch(pattern, output, NEGATED_PREFIX))) {
     violations.push('overall-health claim contradicts non-online services')
   }
-  if (!incidents && /\b(?:no|zero)\s+(?:(?:active|open)\s+)?incidents?\b(?!\s+(?:count|data))/i.test(output)) {
+  if (!incidents && /\b(?:no|zero)\s+(?:(?:active|open|current)\s+)?(?:(?:alerts?|issues?)\s+(?:or|and|nor)\s+)?incidents?\b(?!\s+(?:count|data))/i.test(output)) {
     violations.push('incident absence was asserted without incident data')
   }
   const declaredSeverities = new Set([

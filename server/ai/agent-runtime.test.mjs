@@ -206,3 +206,24 @@ test('still rejects undeclared sites, affirmative health claims and asserted cri
   assert.match(requests[1].messages[1].content, /overall-health claim contradicts non-online services/)
   assert.match(requests[1].messages[1].content, /unsupported severity/)
 })
+test('rejects critical severity separated from its noun and incident absence folded into alerts', async () => {
+  const requests = []
+  const drafts = [
+    'Two critical container services are offline. No active alerts or incidents are currently present.',
+    'Two container services are offline. No alerts are present, and incident data is absent.',
+  ]
+  const fetchImpl = async (_url, options) => {
+    requests.push(JSON.parse(options.body))
+    return new Response(JSON.stringify({ message: { content: drafts[requests.length - 1] } }), { status: 200 })
+  }
+  const overview = {
+    mode: 'live', sites: [], alerts: [],
+    services: [{ id: 'vm100-observer-1', name: 'wga-development', site: 'Site A', status: 'offline', updated: 'stopped' }],
+  }
+
+  const result = await runLocalAgent({ agent, modelProfile, prompt: 'Summarize health.', overview, fetchImpl })
+  assert.equal(result.text, drafts[1])
+  assert.equal(requests.length, 2)
+  assert.match(requests[1].messages[1].content, /unsupported severity/)
+  assert.match(requests[1].messages[1].content, /incident absence was asserted without incident data/)
+})
