@@ -128,3 +128,26 @@
     grid-column: 1/-1;
   }
 }
+
+.v3-settings-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.v3-settings-form label,
+.v3-settings-select {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+}
+
+.v3-settings-form input,
+.v3-settings-select input,
+.v3-settings-select select {
+  min-width: 180px;
+  max-width: 100%;
+}

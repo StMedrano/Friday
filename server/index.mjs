@@ -3,6 +3,7 @@ import { getConfig } from './config.mjs'
 import { createFridayServer } from './http.mjs'
 import { createAutomationServer } from './automation.mjs'
 import { buildOverview } from './overview.mjs'
+import { applySiteSettings, createSiteSettingsStore } from './site-settings.mjs'
 import { createMonitoringRuntime } from './monitoring/runtime.mjs'
 import { createFileMonitoringStore } from './monitoring/store.mjs'
 import { createSupabaseRegistryClient } from './agents/supabase-client.mjs'
@@ -17,10 +18,11 @@ if (config.automation.enabled && (!Number.isInteger(config.automation.port) ||
     config.automation.port < 1 || config.automation.port > 65535 || config.automation.port === config.port)) {
   throw new Error('Automation port must be valid and separate from the UI port')
 }
+const siteSettings = await createSiteSettingsStore({ path: config.siteSettings.path })
 const store = createFileMonitoringStore({ statePath: config.monitoring.statePath })
 const monitoringRuntime = createMonitoringRuntime({
   config,
-  collectOverview: buildOverview,
+  collectOverview: (effectiveConfig) => buildOverview(applySiteSettings(effectiveConfig, siteSettings.get())),
   store,
 })
 
@@ -68,7 +70,7 @@ if (config.audit.enabled) {
 }
 
 const repositoryRegistry = new LocalRepositoryRegistry({ registryPath: config.repositories.registryPath })
-const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit })
+const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings })
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`Friday listening on 0.0.0.0:${config.port} (${config.mode} mode)`)
 })

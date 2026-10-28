@@ -12,6 +12,7 @@ import { createAccessGate } from './security/access.mjs'
 import { handleWorkReadHttp } from './work/http-reads.mjs'
 import { auditActor } from './audit/action-audit.mjs'
 import { buildSettingsView } from './settings.mjs'
+import { applySiteSettings, siteSettingsView } from './site-settings.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -199,8 +200,11 @@ export function createFridayServer({
   accessGateImpl = null,
   workReadBridge = null,
   actionAudit = null,
+  siteSettings = null,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
+  const buildEffectiveOverview = (effectiveConfig) =>
+    buildOverviewImpl(siteSettings ? applySiteSettings(effectiveConfig, siteSettings.get()) : effectiveConfig)
   const securityRequired = config.access?.enabled === true ||
     (config.mode === 'live' && config.access?.enabled !== false)
   const accessGate = securityRequired ? (accessGateImpl || createAccessGate(config.access)) : null
@@ -221,7 +225,8 @@ export function createFridayServer({
     let identity = null
     if (accessGate && url.pathname.startsWith('/api/')) {
       const registrySync = request.method === 'POST' && url.pathname === '/api/agents/registry/sync'
-      const operatorOnly = registrySync || url.pathname === '/api/audit/events'
+      const siteSettingsWrite = request.method === 'PUT' && url.pathname === '/api/settings/sites'
+      const operatorOnly = registrySync || siteSettingsWrite || url.pathname === '/api/audit/events'
       let verdict
       try { verdict = await accessGate(request, operatorOnly) }
       catch { verdict = {status:503,error:'access-verification-unavailable'} }
@@ -231,10 +236,10 @@ export function createFridayServer({
       }
       identity = verdict.identity || null
       // Do not allow browser-origin cross-site requests to use a verified session
-      // for operational POST handlers. The registry sync additionally requires JSON.
-      if (request.method === 'POST' && request.headers['sec-fetch-site'] === 'cross-site')
+      // for operational POST/PUT handlers. Registry sync and site settings additionally require JSON.
+      if ((request.method === 'POST' || request.method === 'PUT') && request.headers['sec-fetch-site'] === 'cross-site')
         return json(response, 403, {error:'access-denied'})
-      if (registrySync && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
+      if ((registrySync || siteSettingsWrite) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
         return json(response, 415, {error:'json-required'})
     }
 
@@ -246,7 +251,7 @@ export function createFridayServer({
 
     if (request.method === 'GET' && url.pathname === '/api/overview') {
       try {
-        return json(response, 200, await currentOverview({ config, monitoringRuntime, buildOverviewImpl }))
+        return json(response, 200, await currentOverview({ config, monitoringRuntime, buildOverviewImpl: buildEffectiveOverview }))
       } catch (error) {
         return json(response, 500, { error: 'overview-failed', detail: error.message })
       }
@@ -254,6 +259,22 @@ export function createFridayServer({
 
     if (request.method === 'GET' && url.pathname === '/api/settings') {
       return json(response, 200, buildSettingsView(config, { actionAudit }))
+    }
+
+    if (url.pathname === '/api/settings/sites' && (request.method === 'GET' || request.method === 'PUT')) {
+      if (!siteSettings) return json(response, 503, { error: 'site-settings-unavailable' })
+      if (request.method === 'GET') return json(response, 200, siteSettingsView(config, siteSettings.get()))
+      const result = await runAudited({ actionAudit, identity, action: 'settings.sites.update' }, async () => {
+        let body
+        try { body = await readBody(request) } catch { return { status: 400, body: { error: 'invalid-json' } } }
+        try { await siteSettings.save(body) } catch (error) {
+          return error?.code === 'invalid-site-settings'
+            ? { status: 400, body: { error: error.message } }
+            : { status: 503, body: { error: 'site-settings-unavailable' } }
+        }
+        return { status: 200, body: siteSettingsView(config, siteSettings.get()) }
+      })
+      return json(response, result.status, result.body)
     }
 
     if (request.method === 'GET' && url.pathname === '/api/incidents') {
@@ -365,7 +386,7 @@ export function createFridayServer({
         const body = await readBody(request)
         const promptResult = validateAgentPrompt(body.prompt)
         if (!promptResult.ok) return json(response, 400, promptResult.result)
-        const overview = await currentOverview({ config, monitoringRuntime, buildOverviewImpl })
+        const overview = await currentOverview({ config, monitoringRuntime, buildOverviewImpl: buildEffectiveOverview })
         const result = await agentService.ask(agentAskRoute.agentId, { prompt: promptResult.prompt, overview })
         if (result.available) return json(response, 200, result)
         if (result.error === 'agent-unavailable') return json(response, 404, result)
@@ -435,7 +456,7 @@ export function createFridayServer({
         if (!promptResult.ok) return json(response, 400, promptResult.result)
 
         const history = normalizeAssistantHistory(body.history)
-        const overview = await currentOverview({ config, monitoringRuntime, buildOverviewImpl })
+        const overview = await currentOverview({ config, monitoringRuntime, buildOverviewImpl: buildEffectiveOverview })
 
         let route = null
         if (agentService) {
