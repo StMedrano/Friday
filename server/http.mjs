@@ -13,6 +13,7 @@ import { handleWorkReadHttp } from './work/http-reads.mjs'
 import { auditActor } from './audit/action-audit.mjs'
 import { buildSettingsView } from './settings.mjs'
 import { applySiteSettings, siteSettingsView } from './site-settings.mjs'
+import { applyEndpointChecks, endpointChecksView, environmentEndpointChecks } from './endpoint-checks.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -144,6 +145,29 @@ const AUDIT_DETAIL = /^[a-z0-9-]{1,64}$/
 
 // Writes `requested` before running and the outcome after. When an audit
 // store is configured but cannot persist the request, the action never runs.
+const ENDPOINT_CHECK_ROOT = '/api/settings/endpoints'
+const ENDPOINT_CHECK_ID = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/
+const ENDPOINT_CHECK_ERRORS = {
+  'invalid-endpoint-check': 400, 'endpoint-check-not-found': 404, 'endpoint-check-exists': 409, 'endpoint-check-limit': 409,
+}
+
+function isEndpointChecksPath(pathname) {
+  return pathname === ENDPOINT_CHECK_ROOT || pathname.startsWith(ENDPOINT_CHECK_ROOT + '/')
+}
+
+function parseEndpointChecksRoute(method, pathname) {
+  if (pathname === ENDPOINT_CHECK_ROOT) {
+    if (method === 'GET') return { action: 'list', id: null }
+    if (method === 'POST') return { action: 'create', id: null }
+    return null
+  }
+  const id = pathname.slice(ENDPOINT_CHECK_ROOT.length + 1)
+  if (!ENDPOINT_CHECK_ID.test(id)) return null
+  if (method === 'PUT') return { action: 'update', id }
+  if (method === 'DELETE') return { action: 'delete', id }
+  return null
+}
+
 async function runAudited({ actionAudit, identity, action, target = null }, run) {
   if (!actionAudit) return run()
   const actor = auditActor(identity)
@@ -201,10 +225,13 @@ export function createFridayServer({
   workReadBridge = null,
   actionAudit = null,
   siteSettings = null,
+  endpointChecks = null,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
-  const buildEffectiveOverview = (effectiveConfig) =>
-    buildOverviewImpl(siteSettings ? applySiteSettings(effectiveConfig, siteSettings.get()) : effectiveConfig)
+  const buildEffectiveOverview = (effectiveConfig) => {
+    const labelled = siteSettings ? applySiteSettings(effectiveConfig, siteSettings.get()) : effectiveConfig
+    return buildOverviewImpl(endpointChecks ? applyEndpointChecks(labelled, endpointChecks.get()) : labelled)
+  }
   const securityRequired = config.access?.enabled === true ||
     (config.mode === 'live' && config.access?.enabled !== false)
   const accessGate = securityRequired ? (accessGateImpl || createAccessGate(config.access)) : null
@@ -226,7 +253,8 @@ export function createFridayServer({
     if (accessGate && url.pathname.startsWith('/api/')) {
       const registrySync = request.method === 'POST' && url.pathname === '/api/agents/registry/sync'
       const siteSettingsWrite = request.method === 'PUT' && url.pathname === '/api/settings/sites'
-      const operatorOnly = registrySync || siteSettingsWrite || url.pathname === '/api/audit/events'
+      const endpointChecksWrite = request.method !== 'GET' && request.method !== 'HEAD' && isEndpointChecksPath(url.pathname)
+      const operatorOnly = registrySync || siteSettingsWrite || endpointChecksWrite || url.pathname === '/api/audit/events'
       let verdict
       try { verdict = await accessGate(request, operatorOnly) }
       catch { verdict = {status:503,error:'access-verification-unavailable'} }
@@ -236,10 +264,10 @@ export function createFridayServer({
       }
       identity = verdict.identity || null
       // Do not allow browser-origin cross-site requests to use a verified session
-      // for operational POST/PUT handlers. Registry sync and site settings additionally require JSON.
-      if ((request.method === 'POST' || request.method === 'PUT') && request.headers['sec-fetch-site'] === 'cross-site')
+      // for operational POST/PUT/DELETE handlers. Settings and registry writes with a body additionally require JSON.
+      if (['POST', 'PUT', 'DELETE'].includes(request.method) && request.headers['sec-fetch-site'] === 'cross-site')
         return json(response, 403, {error:'access-denied'})
-      if ((registrySync || siteSettingsWrite) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
+      if ((registrySync || siteSettingsWrite || (endpointChecksWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
         return json(response, 415, {error:'json-required'})
     }
 
@@ -275,6 +303,35 @@ export function createFridayServer({
         return { status: 200, body: siteSettingsView(config, siteSettings.get()) }
       })
       return json(response, result.status, result.body)
+    }
+
+    if (isEndpointChecksPath(url.pathname)) {
+      const route = parseEndpointChecksRoute(request.method, url.pathname)
+      if (route && !endpointChecks) return json(response, 503, { error: 'endpoint-checks-unavailable' })
+      if (route?.action === 'list') return json(response, 200, endpointChecksView(config, endpointChecks.get()))
+      if (route) {
+        const result = await runAudited({ actionAudit, identity, action: `settings.endpoints.${route.action}`, target: route.id }, async () => {
+          let body = null
+          if (route.action !== 'delete') {
+            try { body = await readBody(request) } catch { return { status: 400, body: { error: 'invalid-json' } } }
+          }
+          const baseline = environmentEndpointChecks(config.endpoints)
+          let check
+          try {
+            if (route.action === 'create') check = await endpointChecks.create(body, baseline)
+            else if (route.action === 'update') check = await endpointChecks.update(route.id, body, baseline)
+            else await endpointChecks.remove(route.id, baseline)
+          } catch (error) {
+            const status = ENDPOINT_CHECK_ERRORS[error?.code]
+            return status
+              ? { status, body: { error: error.code === 'invalid-endpoint-check' ? error.message : error.code } }
+              : { status: 503, body: { error: 'endpoint-checks-unavailable' } }
+          }
+          const view = endpointChecksView(config, endpointChecks.get())
+          return { status: route.action === 'create' ? 201 : 200, body: check ? { ...view, check } : view }
+        })
+        return json(response, result.status, result.body)
+      }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/incidents') {
