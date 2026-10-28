@@ -26,15 +26,15 @@ function getJson(config, path) {
   })
 }
 
-export async function getProxmoxServices(config) {
+export async function getProxmoxServices(config, requestImpl = getJson) {
   if (!config.enabled || !config.baseUrl || !config.tokenId || !config.tokenSecret) return []
-  const resources = await getJson(config, '/cluster/resources?type=vm')
+  const resources = await requestImpl(config, '/cluster/resources?type=vm')
   return resources.map((vm) => ({
     id: `proxmox-${vm.type}-${vm.vmid}`,
     name: vm.name || `${vm.type?.toUpperCase() || 'VM'} ${vm.vmid}`,
     category: 'virtualization',
     host: vm.node || 'Proxmox',
-    site: 'Site A',
+    site: config.site || 'Site A',
     status: vm.status === 'running' ? 'online' : 'offline',
     detail: `${vm.type?.toUpperCase() || 'VM'} ${vm.vmid}`,
     updated: 'live',
