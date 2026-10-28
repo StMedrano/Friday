@@ -24,7 +24,7 @@ function integration(id, name, section, {configured, credentials: creds, site = 
 }
 
 export function buildSettingsView(config, {actionAudit = null} = {}) {
-  const {proxmox = {}, vm100Observer = {}, docker = {}, endpoints = {}, omada = {}, adguard = {}, prometheus = {}, uptimeKuma = {}} = config
+  const {proxmox = {}, vm100Observer = {}, docker = {}, endpoints = {}, omada = {}, adguard = {}, prometheus = {}, uptimeKuma = {}, grafana = {}} = config
   const registry = config.agents?.registry || {}
   const endpointChecks = (endpoints.checks?.length || 0) + (endpoints.urls?.length || 0)
   const access = config.access || {}
@@ -66,6 +66,10 @@ export function buildSettingsView(config, {actionAudit = null} = {}) {
       integration('uptime-kuma', 'Uptime Kuma', uptimeKuma, {
         configured: present(uptimeKuma.baseUrl) && present(uptimeKuma.apiKey) && present(uptimeKuma.site),
         credentials: credentials(uptimeKuma.apiKey), site: uptimeKuma.site,
+      }),
+      integration('grafana', 'Grafana', grafana, {
+        configured: present(grafana.baseUrl) && present(grafana.token) && present(grafana.site),
+        credentials: credentials(grafana.token), site: grafana.site,
       }),
       integration('agent-registry', 'Local agent registry (Supabase)', registry, {
         configured: present(registry.supabaseUrl) && present(registry.supabaseServiceKey), credentials: credentials(registry.supabaseServiceKey),

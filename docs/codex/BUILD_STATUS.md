@@ -1,5 +1,19 @@
 # Friday Build Status
 
+## 2026-10-28 Grafana health and alert rule state (default off)
+
+`server/adapters/grafana.mjs` adds the last planned monitoring adapter. It
+reads `GET /api/health` and Grafana-managed alert rules with a Viewer
+service account token and normalizes Grafana itself plus one service per
+alerting rule; a rule firing beyond the grace period opens a warning
+incident. Queries, annotations, labels other than `severity`, alert
+instances and the token never leave the server. Disabled by default
+(`FRIDAY_GRAFANA_ENABLED=false`); Settings reports its posture.
+
+**Not deployed or live-validated.** No Grafana connection was made from
+the cloud workspace. Activation requires a trusted HTTPS endpoint, a
+Viewer token, a site label and comparison against Grafana's alert list.
+
 ## 2026-10-28 durable action audit (default off)
 
 `server/audit/action-audit.mjs` adds the P8 durable append-only action
@@ -603,7 +617,7 @@ Docker's native TCP API must never be exposed. Inventory/diagnostic IDs come fro
 
 - Omada WAN/VPN/routing health (site/device inventory is implemented above; live acceptance remains pending).
 - AdGuard live acceptance and secondary DNS visibility (single-instance status/statistics adapter is implemented above).
-- Grafana native adapter (Prometheus target scrape health and Uptime Kuma monitor metrics are implemented above; live acceptance remains pending).
+- Live acceptance of the Prometheus, Uptime Kuma and Grafana adapters.
 - Application authentication and RBAC.
 - Durable action audit/action request store.
 - Human approval queue and global automation kill switch.

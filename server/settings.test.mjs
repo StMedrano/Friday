@@ -10,7 +10,7 @@ const SECRET_ENV = {
   FRIDAY_VM100_OBSERVER_TOKEN: 'secret-observer', FRIDAY_OMADA_CLIENT_ID: 'secret-omada-id',
   FRIDAY_OMADA_CLIENT_SECRET: 'secret-omada-value', FRIDAY_ADGUARD_USERNAME: 'secret-adguard-user',
   FRIDAY_ADGUARD_PASSWORD: 'secret-adguard-pass', FRIDAY_PROMETHEUS_USERNAME: 'secret-prom-user',
-  FRIDAY_PROMETHEUS_PASSWORD: 'secret-prom-pass', FRIDAY_UPTIME_KUMA_API_KEY: 'secret-kuma',
+  FRIDAY_PROMETHEUS_PASSWORD: 'secret-prom-pass', FRIDAY_UPTIME_KUMA_API_KEY: 'secret-kuma', FRIDAY_GRAFANA_TOKEN: 'secret-grafana',
   FRIDAY_SUPABASE_SERVICE_KEY: 'secret-supabase', GROQ_API_KEY: 'secret-groq', GEMINI_API_KEY: 'secret-gemini',
   OPENAI_API_KEY: 'secret-openai', ANTHROPIC_API_KEY: 'secret-anthropic',
   FRIDAY_ACCESS_OPERATOR_EMAILS: 'secret-operator@example.com', FRIDAY_ACCESS_AUD: 'secret-audience-tag',
@@ -19,7 +19,7 @@ const SECRET_ENV = {
 const URL_ENV = {
   FRIDAY_PROXMOX_URL: 'https://10.9.9.1:8006', FRIDAY_VM100_OBSERVER_URL: 'http://10.9.9.2:3199',
   FRIDAY_OMADA_URL: 'https://10.9.9.3', FRIDAY_ADGUARD_URL: 'https://10.9.9.4', FRIDAY_PROMETHEUS_URL: 'https://10.9.9.5',
-  FRIDAY_UPTIME_KUMA_URL: 'https://10.9.9.6', FRIDAY_SUPABASE_URL: 'https://10.9.9.7', FRIDAY_LOCAL_AI_URL: 'http://10.9.9.8:11434',
+  FRIDAY_UPTIME_KUMA_URL: 'https://10.9.9.6', FRIDAY_GRAFANA_URL: 'https://10.9.9.10', FRIDAY_SUPABASE_URL: 'https://10.9.9.7', FRIDAY_LOCAL_AI_URL: 'http://10.9.9.8:11434',
   FRIDAY_ACCESS_TEAM_DOMAIN: 'https://secretteam.cloudflareaccess.com',
   FRIDAY_ENDPOINT_CHECKS_JSON: JSON.stringify([{id: 'portal', name: 'Portal', site: 'Site A', url: 'https://10.9.9.9/health'}]),
 }
@@ -46,7 +46,7 @@ test('reports integration posture as enabled/configured/credential presence', ()
   assert.equal(byId.endpoints.checks, 2)
   assert.equal(byId.docker.credentials, 'not-required')
   assert.equal(byId['uptime-kuma'].enabled, false)
-  assert.deepEqual(view.integrations.map(item => item.id), ['proxmox', 'vm100-observer', 'docker', 'endpoints', 'omada', 'adguard', 'prometheus', 'uptime-kuma', 'agent-registry'])
+  assert.deepEqual(view.integrations.map(item => item.id), ['proxmox', 'vm100-observer', 'docker', 'endpoints', 'omada', 'adguard', 'prometheus', 'uptime-kuma', 'grafana', 'agent-registry'])
 })
 
 test('AdGuard and Prometheus are configured only with URL, site and both credentials', () => {
@@ -57,6 +57,14 @@ test('AdGuard and Prometheus are configured only with URL, site and both credent
   const byId = Object.fromEntries(view.integrations.map(item => [item.id, item]))
   assert.deepEqual([byId.adguard.configured, byId.adguard.credentials], [true, 'present'])
   assert.deepEqual([byId.prometheus.configured, byId.prometheus.credentials], [false, 'missing'])
+})
+
+test('Grafana is configured only with URL, token and site', () => {
+  const partial = buildSettingsView(getConfig({FRIDAY_GRAFANA_ENABLED: 'true', FRIDAY_GRAFANA_URL: 'https://g', FRIDAY_GRAFANA_SITE: 'Site A'}))
+  assert.deepEqual(partial.integrations.find(item => item.id === 'grafana'),
+    {id: 'grafana', name: 'Grafana', enabled: true, configured: false, credentials: 'missing', site: 'Site A', tls: null})
+  const full = buildSettingsView(getConfig({FRIDAY_GRAFANA_URL: 'https://g', FRIDAY_GRAFANA_SITE: 'Site A', FRIDAY_GRAFANA_TOKEN: 't'}))
+  assert.equal(full.integrations.find(item => item.id === 'grafana').configured, true)
 })
 
 test('reports AI provider order, credential presence and timeouts', () => {

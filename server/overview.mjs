@@ -8,6 +8,7 @@ import { getOmadaServices as defaultGetOmadaServices } from './adapters/omada.mj
 import { getAdguardServices as defaultGetAdguardServices } from './adapters/adguard.mjs'
 import { getPrometheusServices as defaultGetPrometheusServices } from './adapters/prometheus.mjs'
 import { getUptimeKumaServices as defaultGetUptimeKumaServices } from './adapters/uptime-kuma.mjs'
+import { getGrafanaServices as defaultGetGrafanaServices } from './adapters/grafana.mjs'
 
 async function safe(label, fn) {
   try {
@@ -45,6 +46,7 @@ export async function buildOverview(config, adapters = {}) {
   const getAdguardServices = adapters.getAdguardServices || defaultGetAdguardServices
   const getPrometheusServices = adapters.getPrometheusServices || defaultGetPrometheusServices
   const getUptimeKumaServices = adapters.getUptimeKumaServices || defaultGetUptimeKumaServices
+  const getGrafanaServices = adapters.getGrafanaServices || defaultGetGrafanaServices
 
   if (config.mode !== 'live') {
     return { ...normalizeOverview(getMockOverview()), integrations: integrationSummary({}) }
@@ -58,8 +60,9 @@ export async function buildOverview(config, adapters = {}) {
   const adguard = await safe('adguard', () => getAdguardServices(config.adguard))
   const prometheus = await safe('prometheus', () => getPrometheusServices(config.prometheus))
   const uptimeKuma = await safe('uptime-kuma', () => getUptimeKumaServices(config.uptimeKuma))
-  const liveServices = [...docker.items, ...proxmox.items, ...vm100Observer.items, ...endpoints.items, ...omada.items, ...adguard.items, ...prometheus.items, ...uptimeKuma.items]
-  const errors = [docker.error, proxmox.error, vm100Observer.error, endpoints.error, omada.error, adguard.error, prometheus.error, uptimeKuma.error].filter(Boolean)
+  const grafana = await safe('grafana', () => getGrafanaServices(config.grafana))
+  const liveServices = [...docker.items, ...proxmox.items, ...vm100Observer.items, ...endpoints.items, ...omada.items, ...adguard.items, ...prometheus.items, ...uptimeKuma.items, ...grafana.items]
+  const errors = [docker.error, proxmox.error, vm100Observer.error, endpoints.error, omada.error, adguard.error, prometheus.error, uptimeKuma.error, grafana.error].filter(Boolean)
 
   return {
     ...normalizeOverview({
@@ -77,6 +80,7 @@ export async function buildOverview(config, adapters = {}) {
       adguard: config.adguard?.enabled,
       prometheus: config.prometheus?.enabled,
       uptimeKuma: config.uptimeKuma?.enabled,
+      grafana: config.grafana?.enabled,
     }),
   }
 }
