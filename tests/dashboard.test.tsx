@@ -212,6 +212,9 @@ describe('Desktop navigation and layout', () => {
     expect(screen.getByRole('region', { name: 'Observed application services' })).toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: /search or command/i }))
     expect(screen.getByRole('dialog', { name: /command palette/i })).toBeInTheDocument()
+    await user.type(screen.getByRole('combobox'), 'AdGuard')
+    await user.keyboard('{Enter}')
+    expect(screen.getByRole('region', { name: 'Infrastructure workspace' })).toBeInTheDocument()
   })
 
   it('separates not-connected workspaces in the rail', () => {

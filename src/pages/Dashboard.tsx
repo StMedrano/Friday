@@ -93,7 +93,7 @@ export default function Dashboard() {
     })),
     ...health.attention.concat(overview.services.filter((service) => !health.attention.includes(service))).map((service) => ({
       id: `svc-${service.id}`, group: 'Service', label: service.name, hint: `${service.host} · ${service.status}`,
-      run: () => navigate('Applications'),
+      run: () => navigate('Infrastructure'),
     })),
     ...incidents.filter((incident) => incident.status === 'open').map((incident) => ({
       id: `inc-${incident.id}`, group: 'Incident', label: incident.serviceName || incident.title, hint: `${incident.severity} · ${incident.host || incident.source}`,
