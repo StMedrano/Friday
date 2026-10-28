@@ -30,6 +30,20 @@ The optional Prometheus adapter adds a `prometheus` integration entry and `monit
 
 The optional Uptime Kuma adapter adds an `uptime-kuma` integration entry and `monitoring` services with stable IDs `uptime-kuma-{monitor_id}`. It exposes monitor name/type and last reported status (including pending and maintenance), with the configured site and collector hostname. `updated` is the collection time, not a fresh heartbeat timestamp. Monitored URLs, tags, raw metrics, and API keys are excluded. No Kuma-specific browser route, live probe, or control operation exists.
 
+### `GET /api/settings`
+
+Read-only projection of the controller's effective configuration, behind
+the same verified Access identity as `/api/overview`. Reports posture
+only: mode, Access (origin verification, configured, operator count),
+each integration's `enabled`, `configured` (required fields present),
+`credentials` (`present`/`missing`/`not-required`), site label and
+Proxmox TLS verification, AI provider order with credential presence and
+model names, monitoring/diagnostics, the automation API, and fixed
+`safety` facts (`writableSettings`, `infrastructureActions`, `executor`
+all `false`). It never returns secrets, tokens, usernames, operator
+emails, Access team/audience values, URLs or addresses. No write method
+exists; settings change only through the server environment.
+
 ## Monitoring and diagnostics
 
 ### `GET /api/incidents`

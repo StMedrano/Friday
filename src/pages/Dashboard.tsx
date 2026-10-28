@@ -17,12 +17,14 @@ import InfrastructureWorkspace from '../components/InfrastructureWorkspace'
 import MobileHome from '../components/MobileHome'
 import MobileNavigation from '../components/MobileNavigation'
 import RepositoriesWorkspace from '../components/RepositoriesWorkspace'
+import SettingsWorkspace from '../components/SettingsWorkspace'
 import '../monitoring.css'
 import '../mobile.css'
 import '../assistant.css'
 import '../agents.css'
 import '../repositories.css'
 import '../applications.css'
+import '../settings.css'
 
 const nav = [
   ['Overview', Home], ['FRIDAY', Sparkles], ['Infrastructure', Server], ['Applications', AppWindow],
@@ -237,6 +239,7 @@ export default function Dashboard() {
             : active === 'Agents' ? <AgentsWorkspace/>
             : active === 'Applications' ? <ApplicationsWorkspace overview={overview} connected={connected}/>
             : active === 'Repositories' ? <RepositoriesWorkspace/>
+            : active === 'Settings' ? <SettingsWorkspace/>
             : active === 'Infrastructure' ? <InfrastructureWorkspace overview={overview} connected={connected}/>
             : active === 'Incidents' ? <IncidentsWorkspace incidents={incidents} services={overview.services} sites={overview.sites} monitoring={overview.monitoring} history={history} historyError={historyError} selectedIncident={selectedIncident} onSelectIncident={viewDiagnosis} onClearSelection={() => setSelectedIncidentId(null)}/>
                         : <PendingCapabilityView name={active} />}
@@ -253,7 +256,6 @@ function PendingCapabilityView({ name }: { name: string }) {
     Memory: 'Scoped persistent and short-lived memory services exist internally, but the production UI has no approved identity-bound memory API.',
     Approvals: 'The durable internal approval foundations are not a public approval queue. Signed identity, operator policy and audit must be connected first.',
     Audit: 'Monitoring events are not a substitute for the durable action audit. An identity-scoped operator audit API has not been activated.',
-    Settings: 'Server-side integration, authorization and automation settings must be inspected through a reviewed administrative interface before controls become available.',
   }
   return <section className="v3-pending-capability" aria-label={name + ' availability'}>
     <span className="v3-kicker">FRIDAY / RELEASE STATUS</span>

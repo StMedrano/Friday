@@ -21,6 +21,9 @@ vi.mock('../components/AgentsWorkspace', () => ({
 vi.mock('../components/RepositoriesWorkspace', () => ({
   default: () => <div>Repository view</div>,
 }))
+vi.mock('../components/SettingsWorkspace', () => ({
+  default: () => <div>Settings inspection view</div>,
+}))
 
 import Dashboard from './Dashboard'
 
@@ -54,6 +57,14 @@ describe('Dashboard operator integrity and honest feature status', () => {
       expect(screen.getByText(/No production task, memory or approval operation is available on this screen/i)).toBeInTheDocument()
     }
     expect(screen.queryByRole('button', { name: /approve|delete|restart|execute/i })).not.toBeInTheDocument()
+  })
+
+  it('routes Settings to the read-only settings inspection view', async () => {
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(screen.getByText('Settings inspection view')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Settings is not connected' })).not.toBeInTheDocument()
   })
 
   it('does not call an inventory with a maintenance service all online', () => {
