@@ -69,7 +69,7 @@ export default function MobileHome({
       </> : serviceAttention.length ? <>
         <div className="v3-mobile-attention-head"><AlertTriangle size={18}/><span>{health.label.toUpperCase()} · NO OPEN INCIDENT</span></div>
         <div className="v3-mobile-attention-main"><div><span className="v3-kicker">CURRENT ATTENTION</span><h1>{serviceAttention.length} {serviceAttention.length === 1 ? 'service needs' : 'services need'} attention</h1>{serviceAttention.slice(0, 3).map((service) => <p key={service.id}>{service.name} · {service.status}</p>)}</div></div>
-        <div className="v3-mobile-attention-foot"><span>Reported by service status</span><button className="v3-readonly-action" onClick={() => onNavigate('Applications')}>View services <ChevronRight size={14}/></button></div>
+        <div className="v3-mobile-attention-foot"><span>Reported by service status</span><button className="v3-readonly-action" onClick={() => onNavigate('Infrastructure')}>View services <ChevronRight size={14}/></button></div>
       </> : <div className="v3-mobile-nominal"><ShieldCheck size={20}/><div><span className="v3-kicker">CURRENT ATTENTION</span><h1>System nominal</h1><p>No open operational incidents require attention.</p></div></div>}
     </section>
 
