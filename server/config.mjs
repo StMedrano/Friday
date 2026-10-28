@@ -164,12 +164,24 @@ export function getConfig(env = process.env) {
       apiKey: env.FRIDAY_UPTIME_KUMA_API_KEY || '',
       site: env.FRIDAY_UPTIME_KUMA_SITE || '',
     },
+    grafana: {
+      enabled: enabled(env.FRIDAY_GRAFANA_ENABLED),
+      baseUrl: env.FRIDAY_GRAFANA_URL || '',
+      token: env.FRIDAY_GRAFANA_TOKEN || '',
+      site: env.FRIDAY_GRAFANA_SITE || '',
+    },
     monitoring: {
       enabled: enabled(env.FRIDAY_MONITORING_ENABLED),
       pollSeconds: positiveNumber(env.FRIDAY_MONITORING_POLL_SECONDS, 30),
       offlineGraceSeconds: positiveNumber(env.FRIDAY_MONITORING_OFFLINE_GRACE_SECONDS, 300),
       statePath: env.FRIDAY_MONITORING_STATE_PATH || '/data/monitoring-state.json',
       historyLimit: positiveNumber(env.FRIDAY_MONITORING_HISTORY_LIMIT, 2000),
+    },
+    audit: {
+      // Durable operator action audit; opt-in so enabling it is a reviewed deployment step.
+      enabled: enabled(env.FRIDAY_AUDIT_ENABLED),
+      directory: env.FRIDAY_AUDIT_DIR || '/data/audit',
+      maxBytes: Math.floor(positiveNumber(env.FRIDAY_AUDIT_MAX_BYTES, 16 * 1024 * 1024)),
     },
     repositories: { registryPath: env.FRIDAY_REPOSITORY_REGISTRY_PATH || './repositories.json' },
     diagnostics: {

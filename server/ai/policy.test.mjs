@@ -58,3 +58,44 @@ test('provider-facing prompt makes absence of prior context explicit', () => {
   assert.match(prompt, /Current operator request:\nCheck health/)
   assert.match(prompt, /Authoritative normalized Friday state:/)
 })
+
+test('provider-facing prompt derives explicit grounding constraints from current state', () => {
+  const prompt = fridayUserPrompt('Summarize health', {
+    mode: 'live',
+    sites: [],
+    services: [
+      { id: 'proxmox-qemu-100', name: 'ubuntu-docker', status: 'online', updated: 'live' },
+      { id: 'vm100-observer-deadbeef', name: 'stopped-db', status: 'offline', updated: 'Exited (0) 3 days ago' },
+    ],
+    alerts: [],
+    integrations: [
+      { id: 'proxmox', enabled: true, mode: 'live' },
+      { id: 'docker', enabled: false, mode: 'mock' },
+    ],
+  })
+
+  assert.match(prompt, /Machine-derived current-state constraints:/)
+  assert.match(prompt, /Declared sites: none; site metadata is absent/i)
+  assert.match(prompt, /"online":1/)
+  assert.match(prompt, /"offline":1/)
+  assert.match(prompt, /"id":"vm100-observer-deadbeef"/)
+  assert.match(prompt, /must not be described as fully healthy/i)
+  assert.match(prompt, /incident data is absent/i)
+  assert.match(prompt, /do not assign severity or business impact/i)
+  assert.match(prompt, /do not generalize per-service update or uptime text/i)
+  assert.doesNotMatch(prompt, /Site A/)
+})
+
+test('provider-facing prompt lists site labels carried by services when no sites are declared', () => {
+  const prompt = fridayUserPrompt('Summarize health', {
+    mode: 'live',
+    sites: [],
+    services: [
+      { id: 'proxmox-qemu-100', name: 'ubuntu-docker', site: 'Site A', status: 'online' },
+      { id: 'vm100-observer-1', name: 'wga-development', site: 'Site A', status: 'offline' },
+    ],
+  })
+
+  assert.match(prompt, /Declared sites: none/)
+  assert.match(prompt, /Service site labels: \["Site A"\]/)
+})

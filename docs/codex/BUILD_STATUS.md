@@ -1,5 +1,50 @@
 # Friday Build Status
 
+## 2026-10-28 Grafana health and alert rule state (default off)
+
+`server/adapters/grafana.mjs` adds the last planned monitoring adapter. It
+reads `GET /api/health` and Grafana-managed alert rules with a Viewer
+service account token and normalizes Grafana itself plus one service per
+alerting rule; a rule firing beyond the grace period opens a warning
+incident. Queries, annotations, labels other than `severity`, alert
+instances and the token never leave the server. Disabled by default
+(`FRIDAY_GRAFANA_ENABLED=false`); Settings reports its posture.
+
+**Not deployed or live-validated.** No Grafana connection was made from
+the cloud workspace. Activation requires a trusted HTTPS endpoint, a
+Viewer token, a site label and comparison against Grafana's alert list.
+
+## 2026-10-28 durable action audit (default off)
+
+`server/audit/action-audit.mjs` adds the P8 durable append-only action
+audit, separate from monitoring history. Each lifecycle event is one
+SHA-256 hash-chained JSON line in a private (0700/0600, no symlinks)
+`actions.jsonl`, fsynced before the caller continues. Writes are
+serialized with reads; the store verifies the entire chain on open,
+before every append and on every read, compares it with the last head it
+wrote, and refuses further writes after tampering, truncation, deletion
+or an unexpected writer. There is no update, delete, rotation or repair API;
+at the size cap (default 16 MiB) audited actions are refused.
+
+Registry sync and diagnostic rerun now record `requested` before running
+and `succeeded`/`failed` after, with the verified Access actor (hashed
+subject plus email or service label). When enabled, an action whose
+request cannot be audited does not run. `GET /api/audit/events` is an
+operator-only, bounded, paginated read. `FRIDAY_AUDIT_ENABLED=false`
+by default, so behaviour is unchanged until an operator enables it and
+adds an operator email; no infrastructure action or executor was added.
+Approval queue, RBAC and kill switch remain separate P8 items.
+
+## 2026-10-28 read-only settings inspection
+
+`server/settings.mjs` and `GET /api/settings` replace the Settings
+placeholder with a read-only view of the effective server configuration:
+integration enabled/configured/credential-presence posture, AI failover
+order, Access, monitoring and automation API state. Tests assert that no
+secret, identity, Access value, URL or address from the environment ever
+appears in the response. There is deliberately no write path; changing
+settings remains a reviewed server-environment and deployment step.
+
 ## 2026-10-27 signed, default-off Tasks/Memory GET transport (draft only)
 
 A fixed-origin server-side read-only PostgREST repository is included
@@ -357,6 +402,8 @@ VM102 is checked out at deployment-record commit `5021012` from `codex/friday-cl
 
 **Managed cloud acceptance and credential cleanup passed on 2026-10-26.** The runtime reports its restricted hostname policy enforced, `FRIDAY_CLOUD_URL` ready, and both hostname-scoped service credential bindings ready. Running `node scripts/check-cloud-connection.mjs` from that runtime reproduced all seven expected results: four authenticated 200 reads, unauthenticated 401, write rejection 405, and excluded repository route 404. An authorized VM102 session then removed only the temporary owner-only service-token copy at `/home/stalin/.config/friday-cloud-api/client.json`; the separate mode-600 tunnel-token runtime file was preserved. VM102 `make health` passed, and the cloud acceptance checker reproduced all seven results after cleanup. PR #45 merged into `main` on 2026-10-26 (`7b89228`). The separately reported VM102 running image remains at application commit `608d85b` until a new deployment is verified; GitHub source merge alone is not deployment acceptance.
 
+Post-merge acceptance hardening (ported onto current `main` on 2026-10-28 from `de567b5`) requires the live overview snapshot to be no older than five minutes and no more than one minute in the future, and adds a query-suffixed overview request (`/api/overview?probe=1`) that must return 404. On 2026-10-26 the original branch checker passed all eight managed-runtime gates: four authenticated 200 reads, unauthenticated 401, write rejection 405, excluded repository route 404, and query-suffixed overview rejection 404. Node 22 regression tests cover both freshness boundaries and the exact query rejection. The ported checker has not yet been rerun against the live endpoint from current `main`.
+
 ## Uptime Kuma monitor health — local implementation, 2026-10-25
 
 Friday now reads Uptime Kuma's existing `monitor_status` metrics through fixed `GET /metrics` access using a dedicated metrics API key. Monitor IDs stay stable across renames, label ordering, target URL changes, and health transitions. Down/up/pending/maintenance map to offline/online/degraded/maintenance, preserving existing incident grace and recovery behavior. No monitor controls, administrator login, Socket.IO access, or duplicate probes were added.
@@ -448,11 +495,11 @@ The proposed values `10.1.2.211`, `10.1.10.100`, `10.1.20.131`, `10.1.20.132`, a
 
 ## Current deployed controller baseline
 
-On 2026-09-24, read-only SSH confirmed VM102 (`friday-controller`, `10.1.10.11`) has a clean checkout at `127af8a` on the PR branch. This is behind the GitHub PR head `1f7bc0a` and does not include the current uncommitted timeout patch. VM102 `make preflight` completed without blocking errors and `make health` reported the Friday container running with health/overview endpoints OK.
+On 2026-10-28, VM102 reported a clean checkout at current `main` `0ee4f0a` (PR #91) with a healthy Friday container, a running dedicated cloud-tunnel connector, and CT108 Ollama at `10.1.10.12:11434` answering HTTP 200. On 2026-10-26, an authorized read-only VM102 inspection had confirmed a clean detached checkout at `8dfe66b` with running application commit `608d85b`. The controller is healthy in live mode, retains `FRIDAY_DOCKER_ENABLED=false`, uses `http://10.1.10.12:11434` for all three agent profiles, mounts no controller Docker socket, and routes to CT108 through `eth1` with source `10.1.10.11`. Base plus live plus cloud-tunnel Compose resolves with the Friday data volume only; the dedicated connector remains unpublished.
 
-Live API checks from VM102 on 2026-09-24 returned one enabled `proxmox-observer` definition with the checked-in checksum, registry status `ok` with one synced and zero rejected agents, and deterministic `/api/agents/route` selection of `proxmox-observer` at confidence `0.98` for “Summarize the current Proxmox health.” Direct Ask returned local provenance (`ollama`, `qwen3:4b-instruct`) and `execution.performed:false`, but failed grounding: it invented Site A/B networks, gateways, device counts, resource metrics, and incident history absent from the normalized live overview. It also conflated legacy and current VM100 observer addresses. This is the production failure addressed by PR head `1f7bc0a`; it is not deployed yet. Shared-composer live acceptance remains pending on a grounded build.
+That 2026-10-26 in-container, read-only service check returned one enabled `proxmox-observer` definition with checksum `2ee1f134d03d61dad46ebb7e0c693e54740bb945cb00d8cc7d3a61b64677f92f`, registry status `ok` with one synced and zero rejected agents, and deterministic routing at confidence `0.98`. Direct Ask used `ollama` with `qwen3:4b-instruct`, remained advisory, and exposed `execution.performed:false`. Grounding nevertheless failed twice: the normalized overview had no sites, 30 online services, and two offline services (`wga-development` and `wga-platform-postgres`), while the model invented Site A, reported incorrect counts or all services healthy, assigned unsupported `critical` severity, and generalized per-service uptime.
 
-Do not infer that GitHub's green check on `1f7bc0a` validates either the uncommitted timeout changes or the currently deployed `127af8a` image. The production agent endpoint remains the verified CT108 nic1 address `10.1.10.12:11434`; the timeout patch has not been deployed.
+This is a failed live acceptance gate, so no Friday rebuild, registry write, or infrastructure change was attempted. Shared-composer and desktop/phone UI acceptance remain pending on a grounded build.
 
 ## Monitoring, diagnostics, mobile, and assistant — merged
 
@@ -476,9 +523,9 @@ Issue #20 starts the repository-aware, read-only agent milestone. The local regi
 
 Read-only Explorer tools expose Git branch/dirty status, bounded file listings, and bounded text reads for registered roots. The responsive Repositories workspace browses those endpoints without write or execution controls. Paths remain canonicalized and exclusion-checked; reads cap at 64 KiB. Repository-scoped task flow remains unfinished. Source verification does not establish VM102 integration or live acceptance.
 
-## Local Agent Platform Phase 1 — implemented in draft PR #19
+## Local Agent Platform Phase 1 — merged; rollout acceptance pending
 
-Source branch: `feature/friday-local-agent-platform-phase1-20260830`.
+The original implementation merged to `main` in `ecb0c9e`. The later PR #19 branch is stale relative to current `main`; it must not be deployed over the merged PR #44/#45 baseline.
 
 Implemented behavior:
 
@@ -500,6 +547,17 @@ Implemented behavior:
 Task 8 regression gates are part of CI: exact two-table schema validation, local-only matched-agent behavior, no-execution regression, secret-boundary scan, and agent-route/shell safety scans.
 
 Shared-composer implementation tests cover deterministic Proxmox routing, same-overview identity, response provenance, grounded output, no cloud/general fallback after a matched local failure, safe no-match fallback, routing-service failure fallback, and `execution.performed=false`. Live shared-composer acceptance remains pending deployment.
+
+### Rollout continuation and grounding hardening — 2026-10-26, ported 2026-10-28
+
+- Current merged `main` already contains the substantive post-merge PR #19 fixes: CT108 nic1 defaults, removal of sample state from live overview, registry/router/inference deadlines, and the shared state-grounding policy. The stale PR branch will not be cherry-picked.
+- VM102 reaches VM132 on TCP/8000 and TCP/5432. Three authenticated PostgREST reads at `2026-10-26T18:06:26Z`, `18:11:33Z`, and `18:16:45Z` returned 200 with exactly `proxmox-observer`.
+- On 2026-10-26 the strict database prerequisite was blocked because that VM102 session could not run `SELECT 1` or read the `supabase-db` restart count. On 2026-10-28 an owner read-only check reported `supabase-db` running and healthy with restart count 1, `SELECT 1` returning 1, and authenticated PostgREST returning exactly `proxmox-observer`. The three-snapshot, five-minute-spaced stability gate must still pass before deployment.
+- The live-model grounding failure above showed that prompt instructions alone are insufficient for the 4B local model. The original continuation commits (`de567b5`, `c270fc6`) were based on old `main` `7b89228`, so they were ported onto current `main` rather than deployed. The ported code now derives exact service/site/incident/integration constraints before inference, rejects contradictory site/health/incident/severity claims, retries once with machine-derived rejection reasons, and then fails closed with `FRIDAY_AGENT_GROUNDING_INVALID`; it never falls back to a cloud provider. The agent service keeps the sanitized `local-agent-unavailable` error and adds `code: "FRIDAY_AGENT_GROUNDING_INVALID"` so operators can distinguish a grounding rejection from a transport failure; the shared composer returns 503 with that code and `execution.performed=false`. One inference deadline spans both attempts.
+- Live acceptance on 2026-10-28 after deploying `771cc9d` to VM102: the controller was healthy and routing selected `proxmox-observer` at `0.98`, but every direct Ask failed closed with `FRIDAY_AGENT_GROUNDING_INVALID`. The live adapters label every service `site: 'Site A'` while `sites` is empty, so the original rule rejected a faithful site label; "not fully healthy" and a "Critical Observations" heading also tripped the health and severity rules. The rules now accept site labels carried by services, ignore negated health phrases, flag `critical` only as an asserted severity, and do not treat "no incident count" as asserted incident absence. Asserting no incidents without incident data is still rejected. After `041ec3a` was deployed, one live Ask correctly failed closed on "no active incidents" and a second answered with correct counts, offline services and site label, but still let through "two critical container services" and "No active alerts or incidents". The severity rule now also matches `critical` up to two words before its noun, and the incident rule matches incident absence folded into "alerts or incidents". These follow-up rules are source-verified only.
+- On the real request path (monitoring enabled), the overview sent to the local agent carried every monitoring incident, including resolved history and raw evidence. With 23 incidents (19 resolved) the prompt reached about 9,800 tokens against the 8,192-token `local-general` context, so CT108 returned `exceed_context_size_error` and every matched local-agent request failed as `local-agent-unavailable`; current `main` also exceeded the limit. The local agent now receives only open incidents with compact fields plus `resolvedIncidentCount`; grounding checks use the same view. Against the same live overview and CT108, the prompt dropped to about 4,100 tokens and three of three direct asks answered with correct service counts, offline services and four open high-severity incidents.
+- PR #92 review follow-up: complete multiword declared site labels are matched before unknown site labels are flagged, a negation anywhere earlier in the sentence ("No services are critical.") negates a critical-severity claim, and health claims are checked against the sites or services the sentence names, falling back to the whole environment only when it names none.
+- Test-first coverage proves one corrective retry, fail-closed behavior after a second invalid draft, the surfaced grounding code through the agent service and shared composer, no cloud provider calls, and a single shared inference deadline. On 2026-10-28, Node 22.22.1 `make verify` on the ported branch passed 139 frontend tests, 657 server/observer/script tests, the production build, and all six Compose validations. This is source verification only; the grounding guard is not deployed or live-accepted.
 
 ### Verification result — 2026-09-22
 
@@ -572,7 +630,7 @@ Docker's native TCP API must never be exposed. Inventory/diagnostic IDs come fro
 
 - Omada WAN/VPN/routing health (site/device inventory is implemented above; live acceptance remains pending).
 - AdGuard live acceptance and secondary DNS visibility (single-instance status/statistics adapter is implemented above).
-- Grafana native adapter (Prometheus target scrape health and Uptime Kuma monitor metrics are implemented above; live acceptance remains pending).
+- Live acceptance of the Prometheus, Uptime Kuma and Grafana adapters.
 - Application authentication and RBAC.
 - Durable action audit/action request store.
 - Human approval queue and global automation kill switch.
