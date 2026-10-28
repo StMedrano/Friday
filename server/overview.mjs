@@ -8,6 +8,7 @@ import { getEndpointServices as defaultGetEndpointServices } from './adapters/en
 import { getOmadaServices as defaultGetOmadaServices } from './adapters/omada.mjs'
 import { getAdguardServices as defaultGetAdguardServices } from './adapters/adguard.mjs'
 import { getPrometheusServices as defaultGetPrometheusServices } from './adapters/prometheus.mjs'
+import { getSupabaseHealthServices as defaultGetSupabaseHealthServices } from './adapters/supabase-health.mjs'
 import { getUptimeKumaServices as defaultGetUptimeKumaServices } from './adapters/uptime-kuma.mjs'
 import { getGrafanaServices as defaultGetGrafanaServices } from './adapters/grafana.mjs'
 
@@ -48,6 +49,7 @@ export async function buildOverview(config, adapters = {}) {
   const getPrometheusServices = adapters.getPrometheusServices || defaultGetPrometheusServices
   const getUptimeKumaServices = adapters.getUptimeKumaServices || defaultGetUptimeKumaServices
   const getGrafanaServices = adapters.getGrafanaServices || defaultGetGrafanaServices
+  const getSupabaseHealthServices = adapters.getSupabaseHealthServices || defaultGetSupabaseHealthServices
 
   if (config.mode !== 'live') {
     return { ...normalizeOverview(getMockOverview()), integrations: integrationSummary({}) }
@@ -62,8 +64,9 @@ export async function buildOverview(config, adapters = {}) {
   const prometheus = await safe('prometheus', () => getPrometheusServices(config.prometheus))
   const uptimeKuma = await safe('uptime-kuma', () => getUptimeKumaServices(config.uptimeKuma))
   const grafana = await safe('grafana', () => getGrafanaServices(config.grafana))
-  const liveServices = [...docker.items, ...proxmox.items, ...vm100Observer.items, ...endpoints.items, ...omada.items, ...adguard.items, ...prometheus.items, ...uptimeKuma.items, ...grafana.items]
-  const errors = [docker.error, proxmox.error, vm100Observer.error, endpoints.error, omada.error, adguard.error, prometheus.error, uptimeKuma.error, grafana.error].filter(Boolean)
+  const supabase = await safe('supabase', () => getSupabaseHealthServices(config.supabaseHealth))
+  const liveServices = [...docker.items, ...proxmox.items, ...vm100Observer.items, ...endpoints.items, ...omada.items, ...adguard.items, ...prometheus.items, ...uptimeKuma.items, ...grafana.items, ...supabase.items]
+  const errors = [docker.error, proxmox.error, vm100Observer.error, endpoints.error, omada.error, adguard.error, prometheus.error, uptimeKuma.error, grafana.error, supabase.error].filter(Boolean)
 
   return {
     ...normalizeOverview({
@@ -83,6 +86,7 @@ export async function buildOverview(config, adapters = {}) {
       prometheus: config.prometheus?.enabled,
       uptimeKuma: config.uptimeKuma?.enabled,
       grafana: config.grafana?.enabled,
+      supabase: config.supabaseHealth?.enabled,
     }),
   }
 }

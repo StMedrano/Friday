@@ -454,6 +454,12 @@ PR #41 merged and deployed to VM102 as `5cfeae3` on 2026-10-19. Exact-head GitHu
 
 This is the source-of-truth handoff ledger for coding agents. Update it when a major capability changes.
 
+## VM132 database ownership incident — root cause and alerting, 2026-10-28
+
+Root cause of the 2026-09-22 `supabase-db` restart: on 2026-09-19 17:34 UTC a host-side `sudo chown -R stalin:stalin /srv/production` re-owned the bind-mounted PostgreSQL data directory `/srv/production/supabase/supabase-project/volumes/db/data`. PostgreSQL (container uid 100) then rejected about 114,000 connections with `could not open file "global/pg_filenode.map": Permission denied` for three days, until a PANIC on `global/pg_control` at 2026-09-22 12:36:47 UTC restarted the container, whose entrypoint restored ownership. No manual repair occurred. Never run recursive ownership changes over `/srv/production` on VM132; scope them to a single project directory.
+
+Because that outage went unnoticed, Friday now probes VM132 with one bounded read-only PostgREST request per overview collection (`vm132-supabase`, on whenever the agent registry is enabled, `FRIDAY_SUPABASE_HEALTH_ENABLED=false` disables it). Server errors and failed requests report the service offline, so normal monitoring opens an incident after the offline grace period. No URL, key or response body is exposed.
+
 ## Operator-editable site labels — source only, 2026-10-28
 
 Proxmox, VM100 observer, local Docker and legacy endpoint URL services read their site label from `FRIDAY_PROXMOX_SITE`, `FRIDAY_VM100_OBSERVER_SITE`, `FRIDAY_DOCKER_SITE` and `FRIDAY_ENDPOINTS_SITE` (default `Site A`). Operators can override those labels and declare up to eight sites from the Settings workspace. `GET /api/settings/sites` is available to any Access-verified user; `PUT /api/settings/sites` requires the operator role, JSON and a same-site request, and is recorded in the action audit as `settings.sites.update`. Settings persist atomically to `/data/site-settings.json` (`FRIDAY_SITE_SETTINGS_PATH`) and apply at the next overview collection. Declared sites appear in the live overview with status and counts derived only from member services; gateway, network, VPN and latency stay unmonitored. This relabels observed state only and grants no infrastructure action.

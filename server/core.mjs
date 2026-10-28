@@ -61,5 +61,6 @@ export function integrationSummary(config = {}) {
     { id: 'prometheus', enabled: config.prometheus === true, mode: config.prometheus ? 'live' : 'mock' },
     { id: 'uptime-kuma', enabled: config.uptimeKuma === true, mode: config.uptimeKuma ? 'live' : 'mock' },
     { id: 'grafana', enabled: config.grafana === true, mode: config.grafana ? 'live' : 'mock' },
+    { id: 'supabase', enabled: config.supabase === true, mode: config.supabase ? 'live' : 'mock' },
   ]
 }

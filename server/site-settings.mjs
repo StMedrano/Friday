@@ -10,6 +10,7 @@ export const SITE_SOURCES = Object.freeze([
   {id: 'vm100-observer', configKey: 'vm100Observer', name: 'VM100 Docker observer'},
   {id: 'docker', configKey: 'docker', name: 'Local Docker (VM102)'},
   {id: 'endpoints', configKey: 'endpoints', name: 'HTTP endpoint URLs'},
+  {id: 'supabase', configKey: 'supabaseHealth', name: 'Supabase database (VM132)'},
 ])
 const SOURCE_IDS = new Set(SITE_SOURCES.map(source => source.id))
 const LABEL = /^[\p{L}\p{N}][\p{L}\p{N} ._'-]{0,47}$/u
