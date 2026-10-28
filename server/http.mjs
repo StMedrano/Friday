@@ -10,6 +10,7 @@ import { normalizeAssistantHistory, validateAssistantPrompt } from './assistant-
 import { validateAgentId, validateAgentPrompt, validateRegistrySyncBody } from './agents/input.mjs'
 import { createAccessGate } from './security/access.mjs'
 import { handleWorkReadHttp } from './work/http-reads.mjs'
+import { buildSettingsView } from './settings.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -207,6 +208,10 @@ export function createFridayServer({
       } catch (error) {
         return json(response, 500, { error: 'overview-failed', detail: error.message })
       }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/settings') {
+      return json(response, 200, buildSettingsView(config))
     }
 
     if (request.method === 'GET' && url.pathname === '/api/incidents') {

@@ -1,5 +1,15 @@
 # Friday Build Status
 
+## 2026-10-28 read-only settings inspection
+
+`server/settings.mjs` and `GET /api/settings` replace the Settings
+placeholder with a read-only view of the effective server configuration:
+integration enabled/configured/credential-presence posture, AI failover
+order, Access, monitoring and automation API state. Tests assert that no
+secret, identity, Access value, URL or address from the environment ever
+appears in the response. There is deliberately no write path; changing
+settings remains a reviewed server-environment and deployment step.
+
 ## 2026-10-27 signed, default-off Tasks/Memory GET transport (draft only)
 
 A fixed-origin server-side read-only PostgREST repository is included
