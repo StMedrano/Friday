@@ -11,6 +11,7 @@ import { validateAgentId, validateAgentPrompt, validateRegistrySyncBody } from '
 import { createAccessGate } from './security/access.mjs'
 import { handleWorkReadHttp } from './work/http-reads.mjs'
 import { auditActor } from './audit/action-audit.mjs'
+import { buildSettingsView } from './settings.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -249,6 +250,10 @@ export function createFridayServer({
       } catch (error) {
         return json(response, 500, { error: 'overview-failed', detail: error.message })
       }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/settings') {
+      return json(response, 200, buildSettingsView(config, { actionAudit }))
     }
 
     if (request.method === 'GET' && url.pathname === '/api/incidents') {

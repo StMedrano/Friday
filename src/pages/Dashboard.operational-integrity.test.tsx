@@ -24,6 +24,9 @@ vi.mock('../components/RepositoriesWorkspace', () => ({
 vi.mock('../components/AuditWorkspace', () => ({
   default: () => <div>Action audit view</div>,
 }))
+vi.mock('../components/SettingsWorkspace', () => ({
+  default: () => <div>Settings inspection view</div>,
+}))
 
 import Dashboard from './Dashboard'
 
@@ -65,6 +68,14 @@ describe('Dashboard operator integrity and honest feature status', () => {
     await user.click(screen.getByRole('button', { name: 'Audit' }))
     expect(screen.getByText('Action audit view')).toBeInTheDocument()
     expect(screen.queryByRole('heading', { name: 'Audit is not connected' })).not.toBeInTheDocument()
+  })
+
+  it('routes Settings to the read-only settings inspection view', async () => {
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    await user.click(screen.getByRole('button', { name: 'Settings' }))
+    expect(screen.getByText('Settings inspection view')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Settings is not connected' })).not.toBeInTheDocument()
   })
 
   it('does not call an inventory with a maintenance service all online', () => {
