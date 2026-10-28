@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import Dashboard from '../src/pages/Dashboard'
@@ -161,6 +161,44 @@ describe('Friday v3 command center', () => {
   })
 })
 
+
+describe('Honest overview status', () => {
+  it('does not call the system nominal while a service is degraded and names it', () => {
+    installMatchMedia(false)
+    render(<Dashboard />)
+    const health = screen.getByRole('region', { name: /system health/i })
+    expect(within(health).getByText('Attention')).toBeInTheDocument()
+    expect(within(health).queryByText(/nominal/i)).not.toBeInTheDocument()
+    expect(within(health).getByText('VM 110 · Umbrel')).toBeInTheDocument()
+    expect(within(health).getByText(/degraded/i)).toBeInTheDocument()
+  })
+
+  it('shows unavailable live status as a warning, not a green online signal', () => {
+    installMatchMedia(false)
+    render(<Dashboard />)
+    const status = screen.getByRole('status', { name: /live data status/i })
+    expect(status).toHaveTextContent(/live status unavailable/i)
+    expect(status).toHaveClass('unavailable')
+  })
+
+  it('does not render a search control with no behavior or a hard-coded agent mesh', () => {
+    installMatchMedia(false)
+    render(<Dashboard />)
+    expect(screen.queryByText(/search or command/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/policy engine ready/i)).not.toBeInTheDocument()
+    expect(screen.queryByText(/inventory synchronized/i)).not.toBeInTheDocument()
+  })
+
+  it('lists services that need attention with a path to the full service inventory', async () => {
+    installMatchMedia(false)
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    const panel = screen.getByRole('region', { name: /needs attention/i })
+    expect(within(panel).getByText('VM 110 · Umbrel')).toBeInTheDocument()
+    await user.click(within(panel).getByRole('button', { name: /view all services/i }))
+    expect(screen.getByRole('region', { name: 'Infrastructure workspace' })).toBeInTheDocument()
+  })
+})
 
 describe('Site topology navigation', () => {
   it('replaces the desktop Infrastructure placeholder with site filters and host inventory', async () => {
