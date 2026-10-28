@@ -149,7 +149,7 @@ test('endpoint checks parse bounded structured server-only definitions',()=>{
   {id:'site-b-edge',name:'Remote edge',site:'Site B',url:'https://remote.example.test/status',expectedStatuses:[204,302]},
  ]
  const config=getConfig({FRIDAY_ENDPOINTS_ENABLED:'true',FRIDAY_ENDPOINT_CHECKS_JSON:JSON.stringify(checks)})
- assert.deepEqual(config.endpoints,{enabled:true,checks,urls:[],configurationError:null})
+ assert.deepEqual(config.endpoints,{enabled:true,site:'Site A',checks,urls:[],configurationError:null})
 })
 
 test('endpoint checks reject duplicate ids, credentials, queries, fragments, invalid protocols and malformed JSON',()=>{
@@ -177,7 +177,7 @@ test('endpoint checks cap definitions at sixteen and preserve legacy URL configu
  }))
  assert.equal(getConfig({FRIDAY_ENDPOINT_CHECKS_JSON:JSON.stringify(checks)}).endpoints.configurationError,'invalid-endpoint-configuration')
  assert.deepEqual(getConfig({FRIDAY_ENDPOINT_URLS:'https://one.example.test/health, https://two.example.test/status'}).endpoints,{
-  enabled:false,checks:[],urls:['https://one.example.test/health','https://two.example.test/status'],configurationError:null,
+  enabled:false,site:'Site A',checks:[],urls:['https://one.example.test/health','https://two.example.test/status'],configurationError:null,
  })
 })
 

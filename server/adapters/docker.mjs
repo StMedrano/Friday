@@ -38,7 +38,7 @@ export async function getDockerServices(config, requestImpl = requestJson) {
     name: String(container.Names?.[0] || container.Id).replace(/^\//, ''),
     category: 'container',
     host: config.hostName || 'VM 102',
-    site: 'Site A',
+    site: config.site || 'Site A',
     status: stateToStatus(container.State),
     detail: container.Image || 'Docker container',
     updated: container.Status || 'unknown',
