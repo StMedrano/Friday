@@ -23,9 +23,11 @@ export default function CommandPalette({ open, items, onAsk, onClose }: CommandP
 
   useEffect(() => {
     if (!open) return
+    const opener = document.activeElement instanceof HTMLElement ? document.activeElement : null
     setQuery('')
     setSelected(0)
     inputRef.current?.focus()
+    return () => { opener?.focus() }
   }, [open])
 
   const results = useMemo(() => {
@@ -47,6 +49,7 @@ export default function CommandPalette({ open, items, onAsk, onClose }: CommandP
 
   function onKeyDown(event: React.KeyboardEvent) {
     if (event.key === 'Escape') { event.preventDefault(); onClose() }
+    else if (event.key === 'Tab') { event.preventDefault(); inputRef.current?.focus() }
     else if (event.key === 'ArrowDown') { event.preventDefault(); setSelected((index) => Math.min(index + 1, results.length - 1)) }
     else if (event.key === 'ArrowUp') { event.preventDefault(); setSelected((index) => Math.max(index - 1, 0)) }
     else if (event.key === 'Enter') { event.preventDefault(); choose(results[selected]) }

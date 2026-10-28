@@ -1,5 +1,6 @@
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
+import { useState } from 'react'
 import { describe, expect, it, vi } from 'vitest'
 import CommandPalette, { type PaletteItem } from './CommandPalette'
 
@@ -53,5 +54,28 @@ describe('CommandPalette', () => {
     expect(onClose).toHaveBeenCalled()
     rerender(<CommandPalette open={false} items={items()} onAsk={vi.fn()} onClose={onClose}/>)
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  })
+
+  it('keeps keyboard focus inside the palette and restores it on close', async () => {
+    const user = userEvent.setup()
+    const Harness = () => {
+      const [open, setOpen] = useState(false)
+      return <>
+        <button onClick={() => setOpen(true)}>Open palette</button>
+        <button>Background control</button>
+        <CommandPalette open={open} items={items()} onAsk={vi.fn()} onClose={() => setOpen(false)}/>
+      </>
+    }
+    render(<Harness/>)
+    const trigger = screen.getByRole('button', { name: 'Open palette' })
+    await user.click(trigger)
+    const input = screen.getByRole('combobox')
+    await user.tab()
+    expect(input).toHaveFocus()
+    await user.tab({ shift: true })
+    expect(input).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(trigger).toHaveFocus()
   })
 })
