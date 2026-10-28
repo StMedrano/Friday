@@ -70,7 +70,18 @@ export function createAgentService({
           text: result?.text || '',
           execution: { ...NO_EXECUTION },
         }
-      } catch {
+      } catch (error) {
+        if (error?.code === 'FRIDAY_AGENT_GROUNDING_INVALID') {
+          return {
+            available: false,
+            error: 'local-agent-unavailable',
+            code: 'FRIDAY_AGENT_GROUNDING_INVALID',
+            agentId: agent.id,
+            agentName: agent.name,
+            reason: 'Local agent response contradicted authoritative state.',
+            execution: { ...NO_EXECUTION },
+          }
+        }
         return {
           available: false,
           error: 'local-agent-unavailable',
