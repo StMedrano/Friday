@@ -183,6 +183,40 @@ export async function saveSiteSettings(settings: { sites: string[]; sources: Rec
   return siteSettingsBody(await response.json().catch(() => ({})), response.status)
 }
 
+export type FridayEndpointCheck = { id: string; name: string; site: string; url: string; expectedStatuses: number[] | null }
+export type FridayEndpointCheckInput = Omit<FridayEndpointCheck, 'id'>
+export type FridayEndpointChecks = { managed: boolean; enabled: boolean; limit: number; checks: FridayEndpointCheck[] }
+
+export class FridayEndpointChecksError extends Error {
+  constructor(readonly code: string, readonly status: number) { super(code) }
+}
+
+async function endpointChecksResponse(response: Response): Promise<FridayEndpointChecks> {
+  const value = await response.json().catch(() => ({})) as Partial<FridayEndpointChecks> & { error?: string }
+  if (response.status >= 400 || !Array.isArray(value?.checks))
+    throw new FridayEndpointChecksError(typeof value?.error === 'string' ? value.error : 'endpoint-checks-unavailable', response.status)
+  return value as FridayEndpointChecks
+}
+
+const ENDPOINT_CHECKS = '/api/settings/endpoints'
+const jsonRequest = (method: string, body: unknown): RequestInit => ({ method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) })
+
+export async function fetchEndpointChecks(signal?: AbortSignal): Promise<FridayEndpointChecks> {
+  return endpointChecksResponse(await fetch(ENDPOINT_CHECKS, { method: 'GET', signal }))
+}
+
+export async function createEndpointCheck(check: FridayEndpointCheckInput): Promise<FridayEndpointChecks> {
+  return endpointChecksResponse(await fetch(ENDPOINT_CHECKS, jsonRequest('POST', check)))
+}
+
+export async function updateEndpointCheck(id: string, check: FridayEndpointCheckInput): Promise<FridayEndpointChecks> {
+  return endpointChecksResponse(await fetch(`${ENDPOINT_CHECKS}/${encodeURIComponent(id)}`, jsonRequest('PUT', check)))
+}
+
+export async function deleteEndpointCheck(id: string): Promise<FridayEndpointChecks> {
+  return endpointChecksResponse(await fetch(`${ENDPOINT_CHECKS}/${encodeURIComponent(id)}`, { method: 'DELETE' }))
+}
+
 export async function fetchFridaySettings(signal?: AbortSignal): Promise<FridaySettings> {
   const response = await fetch('/api/settings', { method: 'GET', signal })
   if (!response.ok) throw new Error('settings-unavailable')

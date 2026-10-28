@@ -5,6 +5,7 @@ import { createAutomationServer } from './automation.mjs'
 import { buildOverview } from './overview.mjs'
 import { applySiteSettings, createSiteSettingsStore } from './site-settings.mjs'
 import { createNtfyNotifier } from './notifications/ntfy.mjs'
+import { applyEndpointChecks, createEndpointCheckStore } from './endpoint-checks.mjs'
 import { createMonitoringRuntime } from './monitoring/runtime.mjs'
 import { createFileMonitoringStore } from './monitoring/store.mjs'
 import { createSupabaseRegistryClient } from './agents/supabase-client.mjs'
@@ -22,10 +23,12 @@ if (config.automation.enabled && (!Number.isInteger(config.automation.port) ||
 const notifier = createNtfyNotifier(config.notifications.ntfy)
 if (config.notifications.ntfy.url && !notifier) console.warn('Friday notifications: FRIDAY_NTFY_URL must be an https topic URL; notifications disabled')
 const siteSettings = await createSiteSettingsStore({ path: config.siteSettings.path })
+const endpointChecks = await createEndpointCheckStore({ path: config.endpointChecks.path })
 const store = createFileMonitoringStore({ statePath: config.monitoring.statePath })
 const monitoringRuntime = createMonitoringRuntime({
   config,
-  collectOverview: (effectiveConfig) => buildOverview(applySiteSettings(effectiveConfig, siteSettings.get())),
+  collectOverview: (effectiveConfig) =>
+    buildOverview(applyEndpointChecks(applySiteSettings(effectiveConfig, siteSettings.get()), endpointChecks.get())),
   notifyIncidents: notifier ? (changes) => notifier.notify(changes) : null,
   store,
 })
@@ -74,7 +77,7 @@ if (config.audit.enabled) {
 }
 
 const repositoryRegistry = new LocalRepositoryRegistry({ registryPath: config.repositories.registryPath })
-const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings })
+const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, endpointChecks })
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`Friday listening on 0.0.0.0:${config.port} (${config.mode} mode)`)
 })

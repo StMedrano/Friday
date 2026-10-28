@@ -6,6 +6,9 @@ const ACTION_LABELS: Record<string, string> = {
   'agents.registry.sync': 'Registry sync',
   'incidents.diagnostics.rerun': 'Diagnostic rerun',
   'settings.sites.update': 'Site settings update',
+  'settings.endpoints.create': 'Endpoint check created',
+  'settings.endpoints.update': 'Endpoint check edited',
+  'settings.endpoints.delete': 'Endpoint check deleted',
 }
 const PHASE_LABELS: Record<string, string> = { requested: 'Requested', succeeded: 'Succeeded', failed: 'Failed', denied: 'Denied' }
 
