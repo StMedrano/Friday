@@ -2,7 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, FolderGit2, HardDrive, Home, MemoryStick, Network, Search, Server, Settings, ShieldCheck, Sparkles } from 'lucide-react'
 import { fetchMonitoringHistory, useFridayOverview, type FridayIncident, type MonitoringEvent } from '../lib/api'
 import { useFridaySession } from '../hooks/useFridaySession'
-import { statusLabel, summarizeHealth } from '../lib/status'
+import { statusLabel, statusPriority, summarizeHealth } from '../lib/status'
 import { greeting } from '../lib/greeting'
 import { usePhoneLayout } from '../hooks/usePhoneLayout'
 import ActiveIncidents from '../components/ActiveIncidents'
@@ -34,6 +34,12 @@ const pendingNav = [
 ] as const
 
 // Workspaces that render their own titled hero; the page h1 stays for assistive tech only.
+const baseTitle = typeof document === 'undefined' ? 'Friday · Control Plane' : document.title || 'Friday · Control Plane'
+
+function PreviewBanner() {
+  return <div className="v3-preview-banner" role="note" aria-label="Preview data"><b>Preview data</b><span>The Friday API isn't connected, so the numbers on this screen are sample data.</span></div>
+}
+
 const selfTitled = new Set(['Infrastructure', 'Applications', 'Incidents', 'Repositories', 'Agents'])
 
 export default function Dashboard() {
@@ -67,6 +73,13 @@ export default function Dashboard() {
       })
     return () => controller.abort()
   }, [active])
+
+  useEffect(() => {
+    document.title = activeIncidents > 0 ? `(${activeIncidents}) ${baseTitle}` : baseTitle
+  }, [activeIncidents])
+
+  const orderedServices = useMemo(() => overview.services.slice().sort((a, b) => statusPriority(b.status) - statusPriority(a.status)), [overview.services])
+  const preview = overview.mode === 'mock'
 
   useEffect(() => {
     if (isPhone) return
@@ -127,6 +140,7 @@ export default function Dashboard() {
           <div className={`v3-mobile-status ${connected ? 'online' : 'warning'}`}><i/>{connected ? 'LIVE' : 'SAFE'}</div>
         </header>
         <main className="v3-main">
+          {preview && <PreviewBanner/>}
           {active === 'Overview' ? <MobileHome
             overview={overview}
             connected={connected}
@@ -179,6 +193,7 @@ export default function Dashboard() {
         </header>
 
         <main className="v3-main">
+          {preview && <PreviewBanner/>}
           <section className="v3-intro">
             <div><span className="v3-kicker">COMMAND CENTER / {active.toUpperCase()}</span><h1 className={selfTitled.has(active) ? 'v3-visually-hidden' : undefined}>{active === 'Overview' ? greeting() : active}</h1><p>{connected ? `API connected · ${overview.mode} mode` : 'Local preview data · safe read-only interface'}</p></div>
             <div className="v3-readonly-badge" role="status" aria-label="Automation execution status" title="Automation is unavailable for execution"><ShieldCheck size={15}/><span><b>Read only</b><small>Automation is unavailable for execution</small></span></div>
@@ -213,11 +228,11 @@ export default function Dashboard() {
             </section>
 
             <section className="v3-grid">
-              <div className="v3-panel"><div className="v3-section-head"><div><span className="v3-kicker">TELEMETRY</span><h2>VM 100 · Infrastructure</h2></div><span className="v3-live"><i/> LIVE</span></div><div className="v3-metrics">{metrics.map((m, i) => <div key={m.label}><span>{i === 0 ? <Cpu/> : i === 1 ? <MemoryStick/> : <HardDrive/>}{m.label}</span><strong>{m.value}%</strong><div><i style={{width:`${m.value}%`}}/></div><small>{m.helper}</small></div>)}</div></div>
+              <div className="v3-panel"><div className="v3-section-head"><div><span className="v3-kicker">TELEMETRY</span><h2>VM 100 · Infrastructure</h2></div>{live ? <span className="v3-live"><i/> LIVE</span> : <span className="v3-live sample"><i/> SAMPLE</span>}</div><div className="v3-metrics">{metrics.map((m, i) => <div key={m.label}><span>{i === 0 ? <Cpu/> : i === 1 ? <MemoryStick/> : <HardDrive/>}{m.label}</span><strong>{m.value}%</strong><div><i style={{width:`${m.value}%`}}/></div><small>{m.helper}</small></div>)}</div></div>
               <section className="v3-panel" aria-labelledby="v3-needs-attention"><div className="v3-section-head"><div><span className="v3-kicker">SERVICES</span><h2 id="v3-needs-attention">Needs attention</h2></div><button onClick={() => navigate('Infrastructure')}>View all services <ChevronRight size={15}/></button></div><div className="v3-agents">{health.attention.length ? health.attention.slice(0, 4).map((service) => <div key={service.id}><i className={service.status}/><span><b>{service.name}</b><small>{service.host} · {service.detail}</small></span><em className={service.status}>{statusLabel(service.status)}</em></div>) : <div><i className="on"/><span><b>No service issues</b><small>{!health.total ? 'No services observed yet.' : health.online === health.total ? 'Every observed service reports online.' : `${health.total - health.online} in maintenance · the rest report online.`}</small></span></div>}</div></section>
             </section>
 
-            <section className="v3-section"><div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><span>{health.online} online</span></div><div className="v3-services">{overview.services.map(s => <button key={s.id} onClick={() => navigate('Applications')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span><em>{s.updated}</em></button>)}</div></section>
+            <section className="v3-section" aria-labelledby="v3-service-health"><div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2 id="v3-service-health">Service health</h2></div><span>{health.online} online</span></div><div className="v3-services">{orderedServices.map(s => <button key={s.id} onClick={() => navigate('Infrastructure')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span>{s.status === 'online' ? <em>{s.updated}</em> : <em className={`v3-service-state ${s.status}`}>{statusLabel(s.status)}</em>}</button>)}</div></section>
           </> : active === 'FRIDAY' ? <FridayWorkspace session={friday} query={query} onQueryChange={setQuery} onSubmit={submitFriday}/>
             : active === 'Agents' ? <AgentsWorkspace/>
             : active === 'Applications' ? <ApplicationsWorkspace overview={overview} connected={connected}/>

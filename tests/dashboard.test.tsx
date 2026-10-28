@@ -245,6 +245,44 @@ describe('Desktop navigation and layout', () => {
   })
 })
 
+describe('Preview data and service scanability', () => {
+  it('announces preview data on desktop and phone when the API is not connected', () => {
+    installMatchMedia(false)
+    const { unmount } = render(<Dashboard />)
+    expect(screen.getByRole('note', { name: /preview data/i })).toHaveTextContent(/sample data/i)
+    expect(screen.queryByText('LIVE')).not.toBeInTheDocument()
+    expect(screen.getByText('SAMPLE')).toBeInTheDocument()
+    unmount()
+    installMatchMedia(true)
+    render(<Dashboard />)
+    expect(screen.getByRole('note', { name: /preview data/i })).toBeInTheDocument()
+  })
+
+  it('hides the preview banner once live data arrives', async () => {
+    installMatchMedia(false)
+    vi.stubGlobal('fetch', liveFetch())
+    render(<Dashboard />)
+    await screen.findByText(/API connected · live mode/i)
+    expect(screen.queryByRole('note', { name: /preview data/i })).not.toBeInTheDocument()
+  })
+
+  it('orders service tiles by severity and labels non-online status in text', () => {
+    installMatchMedia(false)
+    render(<Dashboard />)
+    const tiles = within(screen.getByRole('region', { name: /service health/i })).getAllByRole('button')
+    expect(tiles[0]).toHaveTextContent('VM 110 · Umbrel')
+    expect(tiles[0]).toHaveTextContent(/degraded/i)
+  })
+
+  it('puts the active incident count in the browser tab title', async () => {
+    installMatchMedia(false)
+    vi.stubGlobal('fetch', liveFetch())
+    render(<Dashboard />)
+    await screen.findByText(/API connected · live mode/i)
+    expect(document.title).toBe('(1) Friday · Control Plane')
+  })
+})
+
 describe('Site topology navigation', () => {
   it('replaces the desktop Infrastructure placeholder with site filters and host inventory', async () => {
     installMatchMedia(false)
