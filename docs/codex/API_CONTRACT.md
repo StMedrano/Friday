@@ -264,6 +264,33 @@ GET /api/v1/containers/:id/logs?tail=100
 
 The observer is not a generic Docker API proxy.
 
+## Durable action audit
+
+### `GET /api/audit/events`
+
+Operator-only (same Access operator list as registry sync). Read-only;
+no write, update or delete method exists. Query: `limit` (1–200,
+default 50), `before` (sequence cursor), `action` (one of the audited
+actions). Returns newest first:
+
+```json
+{ "integrity": "verified", "nextBefore": 12,
+  "events": [{ "seq": 13, "requestId": "uuid", "at": "ISO-8601",
+    "action": "agents.registry.sync", "phase": "succeeded",
+    "actor": { "kind": "human", "id": "sha256", "label": "owner@example.com" },
+    "target": null, "detail": null, "prev": "sha256", "hash": "sha256" }] }
+```
+
+`integrity` is `broken` (with no events) when the hash chain, sequence or
+any line fails verification. Errors: `503 audit-not-enabled` when
+`FRIDAY_AUDIT_ENABLED` is off, `503 audit-unavailable`, `400 invalid-audit-query`.
+
+Audited actions today are `POST /api/agents/registry/sync` and
+`POST /api/incidents/:id/diagnostics/rerun`. Each writes `requested`
+before running and `succeeded`/`failed` after, sharing a `requestId`.
+With auditing enabled, an action whose `requested` record cannot be
+persisted is refused with `503 audit-unavailable` and does not run.
+
 ## Future action APIs
 
 Do not add execution to the endpoints above. Future actions require a separate, explicitly reviewed policy-gated design after authentication/RBAC, durable append-only action audit, explicit approval workflow, and a global automation kill switch exist and are tested.

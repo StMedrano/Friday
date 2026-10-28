@@ -10,6 +10,7 @@ import { normalizeAssistantHistory, validateAssistantPrompt } from './assistant-
 import { validateAgentId, validateAgentPrompt, validateRegistrySyncBody } from './agents/input.mjs'
 import { createAccessGate } from './security/access.mjs'
 import { handleWorkReadHttp } from './work/http-reads.mjs'
+import { auditActor } from './audit/action-audit.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -137,6 +138,43 @@ function parseRepositoryToolRoute(pathname) {
   return SAFE_REPOSITORY_ID.test(id) ? { id, tool: match[2] } : { invalid: true }
 }
 
+const AUDIT_DETAIL = /^[a-z0-9-]{1,64}$/
+
+// Writes `requested` before running and the outcome after. When an audit
+// store is configured but cannot persist the request, the action never runs.
+async function runAudited({ actionAudit, identity, action, target = null }, run) {
+  if (!actionAudit) return run()
+  const actor = auditActor(identity)
+  let requested
+  try { requested = await actionAudit.record({ action, phase: 'requested', actor, target }) }
+  catch { return { status: 503, body: { error: 'audit-unavailable' } } }
+  let result
+  try { result = await run() }
+  catch (error) {
+    await actionAudit.record({ action, phase: 'failed', actor, target, requestId: requested.requestId, detail: 'exception' }).catch(() => {})
+    throw error
+  }
+  const failed = result.status >= 400
+  const code = failed && typeof result.body?.error === 'string' && AUDIT_DETAIL.test(result.body.error) ? result.body.error : null
+  try {
+    await actionAudit.record({ action, phase: failed ? 'failed' : 'succeeded', actor, target, requestId: requested.requestId, detail: code })
+  } catch {
+    console.warn('Friday action audit could not record an outcome for ' + action)
+  }
+  return result
+}
+
+function parseAuditQuery(searchParams) {
+  const integer = (name) => {
+    const raw = searchParams.get(name)
+    if (raw === null) return null
+    return /^[0-9]{1,9}$/.test(raw) ? Number(raw) : NaN
+  }
+  const limit = integer('limit')
+  const before = integer('before')
+  return { limit: limit ?? 50, before, action: searchParams.get('action') }
+}
+
 async function currentOverview({ config, monitoringRuntime, buildOverviewImpl }) {
   const cached = monitoringRuntime?.getOverview?.()
   if (config.monitoring?.enabled && cached) {
@@ -159,6 +197,7 @@ export function createFridayServer({
   answerAssistantImpl = answerAssistant,
   accessGateImpl = null,
   workReadBridge = null,
+  actionAudit = null,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
   const securityRequired = config.access?.enabled === true ||
@@ -178,20 +217,23 @@ export function createFridayServer({
 
     // Protect every operational API before any service method is reached.
     // Health probes alone are public; browser UI assets are static.
+    let identity = null
     if (accessGate && url.pathname.startsWith('/api/')) {
-      const operatorOnly = request.method === 'POST' && url.pathname === '/api/agents/registry/sync'
-      let identity
-      try { identity = await accessGate(request, operatorOnly) }
-      catch { identity = {status:503,error:'access-verification-unavailable'} }
-      if (identity?.status !== 200) {
-        const denied = identity?.status === 503
+      const registrySync = request.method === 'POST' && url.pathname === '/api/agents/registry/sync'
+      const operatorOnly = registrySync || url.pathname === '/api/audit/events'
+      let verdict
+      try { verdict = await accessGate(request, operatorOnly) }
+      catch { verdict = {status:503,error:'access-verification-unavailable'} }
+      if (verdict?.status !== 200) {
+        const denied = verdict?.status === 503
         return json(response, denied ? 503 : 403, {error:denied?'access-verification-unavailable':'access-denied'})
       }
+      identity = verdict.identity || null
       // Do not allow browser-origin cross-site requests to use a verified session
       // for operational POST handlers. The registry sync additionally requires JSON.
       if (request.method === 'POST' && request.headers['sec-fetch-site'] === 'cross-site')
         return json(response, 403, {error:'access-denied'})
-      if (operatorOnly && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
+      if (registrySync && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
         return json(response, 415, {error:'json-required'})
     }
 
@@ -215,6 +257,17 @@ export function createFridayServer({
 
     if (request.method === 'GET' && url.pathname === '/api/monitoring/history') {
       return json(response, 200, monitoringRuntime?.getHistory?.() || { events: [] })
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/audit/events') {
+      if (!actionAudit) return json(response, 503, { error: 'audit-not-enabled' })
+      try {
+        return json(response, 200, await actionAudit.list(parseAuditQuery(url.searchParams)))
+      } catch (error) {
+        return error?.message === 'audit-rejected'
+          ? json(response, 400, { error: 'invalid-audit-query' })
+          : json(response, 503, { error: 'audit-unavailable' })
+      }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/agents') {
@@ -273,7 +326,9 @@ export function createFridayServer({
         const body = await readBody(request)
         const validated = validateRegistrySyncBody(body)
         if (!validated.ok) return json(response, 400, { error: validated.error })
-        return json(response, 200, await agentRegistryService.sync())
+        const result = await runAudited({ actionAudit, identity, action: 'agents.registry.sync' },
+          async () => ({ status: 200, body: await agentRegistryService.sync() }))
+        return json(response, result.status, result.body)
       } catch {
         return json(response, 503, { error: 'agent-registry-unavailable' })
       }
@@ -333,8 +388,12 @@ export function createFridayServer({
       const handler = monitoringRuntime?.rerunDiagnostic
       if (typeof handler !== 'function') return json(response, 503, { error: 'diagnostics-unavailable' })
       try {
-        const result = await handler.call(monitoringRuntime, diagnosticRerunRoute.incidentId)
-        return json(response, result.statusCode, result.body)
+        const result = await runAudited({ actionAudit, identity, action: 'incidents.diagnostics.rerun', target: diagnosticRerunRoute.incidentId },
+          async () => {
+            const outcome = await handler.call(monitoringRuntime, diagnosticRerunRoute.incidentId)
+            return { status: outcome.statusCode, body: outcome.body }
+          })
+        return json(response, result.status, result.body)
       } catch {
         return json(response, 502, { error: 'diagnostics-failed' })
       }

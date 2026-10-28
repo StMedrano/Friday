@@ -116,6 +116,27 @@ export function fetchFridayRepositoryFile(id: string, path: string, signal?: Abo
   return repositoryGet<{ path: string; content: string }>(`/api/repositories/${encodeURIComponent(id)}/file?${query}`, signal)
 }
 
+export type FridayAuditEvent = {
+  seq: number; requestId: string; at: string; action: string
+  phase: 'requested' | 'succeeded' | 'failed' | 'denied'
+  actor: { kind: 'human' | 'service' | 'unauthenticated'; id: string | null; label: string | null }
+  target: string | null; detail: string | null; prev: string; hash: string
+}
+export type FridayAuditPage = { integrity: 'verified' | 'broken'; events: FridayAuditEvent[]; nextBefore: number | null }
+
+export class FridayAuditError extends Error {
+  constructor(readonly code: string, readonly status: number) { super(code) }
+}
+
+export async function fetchFridayAuditEvents(before: number | null = null, signal?: AbortSignal): Promise<FridayAuditPage> {
+  const query = new URLSearchParams({ limit: '50' })
+  if (before !== null) query.set('before', String(before))
+  const response = await fetch(`/api/audit/events?${query}`, { method: 'GET', signal })
+  const body = await response.json().catch(() => ({})) as FridayAuditPage | { error?: string }
+  if (!response.ok) throw new FridayAuditError('error' in body && body.error ? body.error : 'audit-unavailable', response.status)
+  return body as FridayAuditPage
+}
+
 export type FridayIncident = {
   id: string; fingerprint?: string; type: string; title: string; detail: string
   severity: 'high' | 'warning' | 'info'; status: 'open' | 'resolved'; source: string; host: string

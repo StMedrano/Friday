@@ -247,7 +247,7 @@ Implement before any infrastructure write operation:
 
 - authentication or a documented trusted reverse-proxy identity boundary;
 - **internal role policy foundation in draft PR #49**: exact JWT subject-to-role-and-target bindings for Viewer, Operator, Administrator and Friday Agent; enforced in the dormant HomeLab fixture service with proposer/approver separation. No production configuration, UI/RBAC endpoints, real target rights, or execution authority; full product RBAC remains pending.
-- durable append-only action audit events separate from monitoring history;
+- **durable append-only action audit events separate from monitoring history: implemented, default off** (`server/audit/action-audit.mjs`, `GET /api/audit/events`); enable with `FRIDAY_AUDIT_ENABLED=true` after reviewing the `/data/audit` volume;
 - action request IDs/lifecycle states;
 - **internal read-only pending-approval queue in stacked draft PR #50 (depends on #49)**: private bounded audit scan for unexpired, unapproved symbolic staging requests; signed Administrator-only projection with proposer/approver separation. No public UI/API, production operator identity provisioning or executor; full human approval workflow remains outstanding.
 - a default-off, owner-file-backed **global automation gate foundation** is implemented in draft PR #48 and tested against the existing internal HomeLab approval seam. It is not wired into production, grants no action permission and has no user-facing toggle. Production-safe kill-switch activation, cross-instance reviews and the remaining authorization/audit/approval controls are still pending.
