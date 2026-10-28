@@ -85,3 +85,17 @@ test('provider-facing prompt derives explicit grounding constraints from current
   assert.match(prompt, /do not generalize per-service update or uptime text/i)
   assert.doesNotMatch(prompt, /Site A/)
 })
+
+test('provider-facing prompt lists site labels carried by services when no sites are declared', () => {
+  const prompt = fridayUserPrompt('Summarize health', {
+    mode: 'live',
+    sites: [],
+    services: [
+      { id: 'proxmox-qemu-100', name: 'ubuntu-docker', site: 'Site A', status: 'online' },
+      { id: 'vm100-observer-1', name: 'wga-development', site: 'Site A', status: 'offline' },
+    ],
+  })
+
+  assert.match(prompt, /Declared sites: none/)
+  assert.match(prompt, /Service site labels: \["Site A"\]/)
+})

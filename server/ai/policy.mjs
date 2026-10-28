@@ -31,6 +31,7 @@ function groundingConstraints(overview) {
   const nonOnline = services
     .filter((service) => service?.status !== 'online')
     .map(({ id, name, status, updated }) => ({ id, name, status, updated }))
+  const serviceSiteLabels = [...new Set(services.map((service) => service?.site).filter((site) => typeof site === 'string' && site.trim()))].sort()
   const siteSummary = sites.length
     ? JSON.stringify(sites.map(({ id, name, status }) => ({ id, name, status })))
     : 'none; site metadata is absent, so do not invent site names or labels'
@@ -45,6 +46,7 @@ function groundingConstraints(overview) {
   return [
     'Machine-derived current-state constraints:',
     `Declared sites: ${siteSummary}.`,
+    `Service site labels: ${JSON.stringify(serviceSiteLabels)}; mention a site only by one of these labels or a declared site.`,
     `Service status counts: ${JSON.stringify(statusCounts)}.`,
     `Non-online services: ${JSON.stringify(nonOnline)}.`,
     nonOnline.length

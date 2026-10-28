@@ -4,11 +4,37 @@ import { fridaySystemPrompt } from './policy.mjs'
 const VALID_PERMISSION_MODES = new Set(['auto', 'approval', 'forbidden'])
 const DEPLOYMENT_MODEL_FIELDS = ['provider', 'model', 'baseUrl', 'context', 'maxTokens']
 const NON_ONLINE_HEALTH_CLAIMS = [
-  /\bfully healthy\b/i,
-  /\bfully operational\b/i,
-  /\ball services (?:are )?(?:online|running|healthy)\b/i,
-  /\bno active issues\b/i,
+  /\bfully healthy\b/gi,
+  /\bfully operational\b/gi,
+  /\ball services (?:are )?(?:online|running|healthy)\b/gi,
+  /\bno active issues\b/gi,
 ]
+const NEGATED_PREFIX = /\b(?:not|isn't|is not|aren't|never)\s+(?:\w+\s+)?$/i
+const SEVERITY_CLAIMS = [
+  /\bseverity\b[^.\n]{0,20}\bcritical\b/i,
+  /\bcritical\s+(?:severity|alerts?|incidents?|issues?|failures?|state|status|outages?|errors?|services?|problems?)\b/gi,
+  /\b(?:is|are|was|were|marked|rated|considered)\s+critical\b/i,
+]
+const NEGATED_SEVERITY_PREFIX = /\b(?:no|not|without|zero)\s+$/i
+
+function affirmativeMatch(pattern, output, negatedPrefix) {
+  if (!pattern.global) {
+    const match = pattern.exec(output)
+    return Boolean(match) && !negatedPrefix.test(output.slice(Math.max(0, match.index - 20), match.index))
+  }
+  pattern.lastIndex = 0
+  for (const match of output.matchAll(pattern)) {
+    if (!negatedPrefix.test(output.slice(Math.max(0, match.index - 20), match.index))) return true
+  }
+  return false
+}
+
+function siteLabels(sites, services) {
+  return new Set([
+    ...sites.flatMap((site) => [site?.name, site?.id]),
+    ...services.map((service) => service?.site),
+  ].filter((label) => typeof label === 'string' && label.trim()).map((label) => label.trim().toLowerCase()))
+}
 
 function groundingViolations(text, overview) {
   const state = overview && typeof overview === 'object' && !Array.isArray(overview) ? overview : {}
@@ -19,21 +45,24 @@ function groundingViolations(text, overview) {
   const incidents = Array.isArray(state.incidents) ? state.incidents : null
   const alerts = Array.isArray(state.alerts) ? state.alerts : []
 
-  if (!sites.length && /\bSite\s+[A-Z0-9][\w-]*/.test(output)) {
+  const knownSites = siteLabels(sites, services)
+  const mentionedSites = output.match(/\bSite\s+[A-Z0-9][\w-]*/g) || []
+  if (mentionedSites.some((label) => !knownSites.has(label.toLowerCase()))) {
     violations.push('unsupported site label')
   }
   if (services.some((service) => service?.status !== 'online') &&
-    NON_ONLINE_HEALTH_CLAIMS.some((pattern) => pattern.test(output))) {
+    NON_ONLINE_HEALTH_CLAIMS.some((pattern) => affirmativeMatch(pattern, output, NEGATED_PREFIX))) {
     violations.push('overall-health claim contradicts non-online services')
   }
-  if (!incidents && /\b(?:no|zero)\s+(?:(?:active|open)\s+)?incidents?\b/i.test(output)) {
+  if (!incidents && /\b(?:no|zero)\s+(?:(?:active|open)\s+)?incidents?\b(?!\s+(?:count|data))/i.test(output)) {
     violations.push('incident absence was asserted without incident data')
   }
   const declaredSeverities = new Set([
     ...alerts.map((alert) => String(alert?.severity || '').toLowerCase()),
     ...(incidents || []).map((incident) => String(incident?.severity || '').toLowerCase()),
   ].filter(Boolean))
-  if (/\bcritical\b/i.test(output) && !declaredSeverities.has('critical')) {
+  if (!declaredSeverities.has('critical') &&
+    SEVERITY_CLAIMS.some((pattern) => affirmativeMatch(pattern, output, NEGATED_SEVERITY_PREFIX))) {
     violations.push('unsupported severity')
   }
   return violations

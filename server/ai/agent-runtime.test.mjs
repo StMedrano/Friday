@@ -161,3 +161,48 @@ test('one inference deadline spans the original and corrective attempts', async 
   assert.equal(calls, 2)
   assert.ok(Date.now() - started < 150, 'the corrective attempt must not receive a fresh timeout budget')
 })
+
+test('accepts faithful drafts that use service site labels, negated health claims and non-severity critical wording', async () => {
+  const draft = [
+    '**Critical Observations**',
+    'All services are hosted on Site A. The environment is not fully healthy: wga-development is offline.',
+    'Incident data is absent, so no incident count is asserted. There are no critical alerts.',
+  ].join('\n')
+  let calls = 0
+  const fetchImpl = async () => {
+    calls += 1
+    return new Response(JSON.stringify({ message: { content: draft } }), { status: 200 })
+  }
+  const overview = {
+    mode: 'live', sites: [], alerts: [],
+    services: [
+      { id: 'proxmox-qemu-100', name: 'ubuntu-docker', site: 'Site A', status: 'online', updated: 'live' },
+      { id: 'vm100-observer-1', name: 'wga-development', site: 'Site A', status: 'offline', updated: 'Exited (137) 2 weeks ago' },
+    ],
+  }
+
+  const result = await runLocalAgent({ agent, modelProfile, prompt: 'Summarize health.', overview, fetchImpl })
+  assert.equal(result.text, draft)
+  assert.equal(calls, 1)
+})
+
+test('still rejects undeclared sites, affirmative health claims and asserted critical severity on live-shaped state', async () => {
+  const requests = []
+  const fetchImpl = async (_url, options) => {
+    requests.push(JSON.parse(options.body))
+    return new Response(JSON.stringify({ message: { content: 'Site B is fully healthy. Severity: critical. wga-development has a critical failure.' } }), { status: 200 })
+  }
+  const overview = {
+    mode: 'live', sites: [], alerts: [],
+    services: [{ id: 'vm100-observer-1', name: 'wga-development', site: 'Site A', status: 'offline', updated: 'stopped' }],
+  }
+
+  await assert.rejects(
+    runLocalAgent({ agent, modelProfile, prompt: 'Summarize health.', overview, fetchImpl }),
+    (error) => error?.code === 'FRIDAY_AGENT_GROUNDING_INVALID',
+  )
+  assert.equal(requests.length, 2)
+  assert.match(requests[1].messages[1].content, /unsupported site label/)
+  assert.match(requests[1].messages[1].content, /overall-health claim contradicts non-online services/)
+  assert.match(requests[1].messages[1].content, /unsupported severity/)
+})
