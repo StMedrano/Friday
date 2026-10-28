@@ -21,6 +21,9 @@ vi.mock('../components/AgentsWorkspace', () => ({
 vi.mock('../components/RepositoriesWorkspace', () => ({
   default: () => <div>Repository view</div>,
 }))
+vi.mock('../components/AuditWorkspace', () => ({
+  default: () => <div>Action audit view</div>,
+}))
 vi.mock('../components/SettingsWorkspace', () => ({
   default: () => <div>Settings inspection view</div>,
 }))
@@ -57,6 +60,14 @@ describe('Dashboard operator integrity and honest feature status', () => {
       expect(screen.getByText(/No production task, memory or approval operation is available on this screen/i)).toBeInTheDocument()
     }
     expect(screen.queryByRole('button', { name: /approve|delete|restart|execute/i })).not.toBeInTheDocument()
+  })
+
+  it('routes Audit to the durable action audit view', async () => {
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    await user.click(screen.getByRole('button', { name: 'Audit' }))
+    expect(screen.getByText('Action audit view')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Audit is not connected' })).not.toBeInTheDocument()
   })
 
   it('routes Settings to the read-only settings inspection view', async () => {

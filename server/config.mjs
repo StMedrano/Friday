@@ -171,6 +171,12 @@ export function getConfig(env = process.env) {
       statePath: env.FRIDAY_MONITORING_STATE_PATH || '/data/monitoring-state.json',
       historyLimit: positiveNumber(env.FRIDAY_MONITORING_HISTORY_LIMIT, 2000),
     },
+    audit: {
+      // Durable operator action audit; opt-in so enabling it is a reviewed deployment step.
+      enabled: enabled(env.FRIDAY_AUDIT_ENABLED),
+      directory: env.FRIDAY_AUDIT_DIR || '/data/audit',
+      maxBytes: Math.floor(positiveNumber(env.FRIDAY_AUDIT_MAX_BYTES, 16 * 1024 * 1024)),
+    },
     repositories: { registryPath: env.FRIDAY_REPOSITORY_REGISTRY_PATH || './repositories.json' },
     diagnostics: {
       enabled: enabled(env.FRIDAY_DIAGNOSTICS_ENABLED),

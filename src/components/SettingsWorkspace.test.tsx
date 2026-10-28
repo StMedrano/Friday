@@ -19,6 +19,7 @@ const settings = {
   ] },
   monitoring: { enabled: true, pollSeconds: 30, offlineGraceSeconds: 300, historyLimit: 2000, diagnostics: false },
   automationApi: { enabled: false, port: 3011, serviceTokens: 0, readOnly: true },
+  audit: { enabled: true, integrity: 'verified', events: 12 },
   safety: { writableSettings: false, infrastructureActions: false, executor: false },
 }
 
@@ -37,6 +38,7 @@ describe('SettingsWorkspace', () => {
     expect(endpoints).toHaveTextContent('invalid-endpoint-configuration')
     expect(within(integrations).getByText('AdGuard Home').closest('li')).toHaveTextContent('Site A')
     expect(screen.getByText(/No operators configured/)).toBeInTheDocument()
+    expect(screen.getByText('Enabled · chain verified · 12 events')).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'AI providers' })).toHaveTextContent('1. groq')
     expect(screen.getByText(/change them in the server environment/i)).toBeInTheDocument()
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()

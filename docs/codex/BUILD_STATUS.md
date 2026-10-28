@@ -1,5 +1,26 @@
 # Friday Build Status
 
+## 2026-10-28 durable action audit (default off)
+
+`server/audit/action-audit.mjs` adds the P8 durable append-only action
+audit, separate from monitoring history. Each lifecycle event is one
+SHA-256 hash-chained JSON line in a private (0700/0600, no symlinks)
+`actions.jsonl`, fsynced before the caller continues. Writes are
+serialized with reads; the store verifies the entire chain on open,
+before every append and on every read, compares it with the last head it
+wrote, and refuses further writes after tampering, truncation, deletion
+or an unexpected writer. There is no update, delete, rotation or repair API;
+at the size cap (default 16 MiB) audited actions are refused.
+
+Registry sync and diagnostic rerun now record `requested` before running
+and `succeeded`/`failed` after, with the verified Access actor (hashed
+subject plus email or service label). When enabled, an action whose
+request cannot be audited does not run. `GET /api/audit/events` is an
+operator-only, bounded, paginated read. `FRIDAY_AUDIT_ENABLED=false`
+by default, so behaviour is unchanged until an operator enables it and
+adds an operator email; no infrastructure action or executor was added.
+Approval queue, RBAC and kill switch remain separate P8 items.
+
 ## 2026-10-28 read-only settings inspection
 
 `server/settings.mjs` and `GET /api/settings` replace the Settings

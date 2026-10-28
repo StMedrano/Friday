@@ -6,6 +6,12 @@ const CREDENTIALS: Record<FridayCredentialState, string> = {
   present: 'Credentials present', missing: 'Credentials missing', 'not-required': 'No credentials needed',
 }
 const onOff = (value: boolean) => value ? 'Enabled' : 'Disabled'
+const INTEGRITY: Record<string, string> = { verified: 'chain verified', broken: 'integrity check failed', unavailable: 'unavailable' }
+
+function auditSummary(audit: FridaySettings['audit'] | undefined) {
+  if (!audit?.enabled) return 'Disabled'
+  return ['Enabled', INTEGRITY[audit.integrity || 'unavailable'], audit.events !== null ? `${audit.events} events` : null].filter(Boolean).join(' · ')
+}
 
 export default function SettingsWorkspace() {
   const [settings, setSettings] = useState<FridaySettings | null>(null)
@@ -61,6 +67,7 @@ export default function SettingsWorkspace() {
               <dt>Operators</dt><dd>{settings.access.operators ? `${settings.access.operators} configured` : 'No operators configured (operator actions denied)'}</dd>
               <dt>Monitoring</dt><dd>{onOff(settings.monitoring.enabled)} · every {settings.monitoring.pollSeconds ?? '—'} s · grace {settings.monitoring.offlineGraceSeconds ?? '—'} s</dd>
               <dt>Diagnostics</dt><dd>{onOff(settings.monitoring.diagnostics)}</dd>
+              <dt>Action audit</dt><dd>{auditSummary(settings.audit)}</dd>
               <dt>Automation API</dt><dd>{onOff(settings.automationApi.enabled)} · port {settings.automationApi.port ?? '—'} · {settings.automationApi.serviceTokens} service tokens · read only</dd>
             </dl>
             <p className="v3-settings-safety"><ShieldCheck size={14} aria-hidden="true"/>Settings are not writable here. No infrastructure actions or executor exist in this build.</p>

@@ -85,6 +85,17 @@ test('reports access, monitoring, automation API and fixed safety posture', () =
   assert.equal(buildSettingsView(getConfig({})).access.originVerification, false)
 })
 
+test('reports action audit state without its location', () => {
+  assert.deepEqual(buildSettingsView(getConfig({})).audit, {enabled: false, integrity: null, events: null})
+  const config = getConfig({FRIDAY_AUDIT_ENABLED: 'true', FRIDAY_AUDIT_DIR: '/secret/audit/dir'})
+  const actionAudit = {status: () => ({integrity: 'verified', events: 4, bytes: 900, maxBytes: 1000})}
+  const view = buildSettingsView(config, {actionAudit})
+  assert.deepEqual(view.audit, {enabled: true, integrity: 'verified', events: 4})
+  assert.ok(!JSON.stringify(view).includes('/secret/audit'))
+  assert.deepEqual(buildSettingsView(config, {actionAudit: {status: () => ({integrity: 'unavailable'})}}).audit,
+    {enabled: true, integrity: 'unavailable', events: null})
+})
+
 async function withServer(options, fn) {
   const server = createFridayServer(options)
   server.listen(0, '127.0.0.1')

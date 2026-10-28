@@ -9,11 +9,21 @@ function credentials(...values) {
   return values.every(present) ? 'present' : 'missing'
 }
 
+function auditPosture(config, actionAudit) {
+  const enabled = config.audit?.enabled === true
+  const status = enabled && actionAudit ? actionAudit.status() : null
+  return {
+    enabled,
+    integrity: status ? status.integrity : (enabled ? 'unavailable' : null),
+    events: Number.isSafeInteger(status?.events) ? status.events : null,
+  }
+}
+
 function integration(id, name, section, {configured, credentials: creds, site = null, tls = null}) {
   return {id, name, enabled: section?.enabled === true, configured, credentials: creds, site: present(site) ? site : null, tls}
 }
 
-export function buildSettingsView(config) {
+export function buildSettingsView(config, {actionAudit = null} = {}) {
   const {proxmox = {}, vm100Observer = {}, docker = {}, endpoints = {}, omada = {}, adguard = {}, prometheus = {}, uptimeKuma = {}} = config
   const registry = config.agents?.registry || {}
   const endpointChecks = (endpoints.checks?.length || 0) + (endpoints.urls?.length || 0)
@@ -87,6 +97,7 @@ export function buildSettingsView(config) {
       serviceTokens: Array.isArray(config.automation?.access?.serviceTokenIds) ? config.automation.access.serviceTokenIds.length : 0,
       readOnly: true,
     },
+    audit: auditPosture(config, actionAudit),
     // Fixed facts about this build, not toggles.
     safety: {writableSettings: false, infrastructureActions: false, executor: false},
   }
