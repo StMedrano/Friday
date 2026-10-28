@@ -256,3 +256,47 @@ test('sends the local agent only open incidents with compact fields so the promp
   assert.ok(content.length < 4000, `agent prompt should stay compact, got ${content.length} characters`)
   assert.equal(overview.incidents.length, 3, 'the caller overview is not mutated')
 })
+
+async function askOnce(draft, overview) {
+  let calls = 0
+  const fetchImpl = async () => {
+    calls += 1
+    return new Response(JSON.stringify({ message: { content: draft } }), { status: 200 })
+  }
+  try {
+    const result = await runLocalAgent({ agent, modelProfile, prompt: 'Summarize health.', overview, fetchImpl })
+    return { accepted: true, calls, text: result.text }
+  } catch (error) {
+    return { accepted: false, calls, code: error?.code }
+  }
+}
+
+test('accepts complete multiword declared site labels and still rejects partial or unknown ones', async () => {
+  const overview = {
+    mode: 'live', alerts: [],
+    sites: [{ id: 'north', name: 'Site North Office', status: 'online' }],
+    services: [{ id: 'svc-1', name: 'gateway', site: 'Site North Office', status: 'online' }],
+  }
+  assert.deepEqual(await askOnce('Site North Office is online with one service.', overview), { accepted: true, calls: 1, text: 'Site North Office is online with one service.' })
+  assert.equal((await askOnce('Site South is online.', overview)).code, 'FRIDAY_AGENT_GROUNDING_INVALID')
+})
+
+test('treats a negated subject as negating a critical-severity claim', async () => {
+  const overview = { mode: 'live', sites: [], alerts: [], incidents: [], services: [{ id: 'svc-1', name: 'db', site: 'Site A', status: 'offline' }] }
+  assert.equal((await askOnce('No services are critical. db is offline.', overview)).accepted, true)
+  assert.equal((await askOnce('db is critical.', overview)).code, 'FRIDAY_AGENT_GROUNDING_INVALID')
+})
+
+test('scopes health claims to the site or service they describe', async () => {
+  const overview = {
+    mode: 'live', sites: [], alerts: [], incidents: [],
+    services: [
+      { id: 'a-1', name: 'db', site: 'Site A', status: 'offline' },
+      { id: 'b-1', name: 'web', site: 'Site B', status: 'online' },
+    ],
+  }
+  assert.equal((await askOnce('Site B is fully healthy. Site A has an offline service.', overview)).accepted, true)
+  assert.equal((await askOnce('web is fully operational. db is offline.', overview)).accepted, true)
+  assert.equal((await askOnce('Site A is fully healthy.', overview)).code, 'FRIDAY_AGENT_GROUNDING_INVALID')
+  assert.equal((await askOnce('The environment is fully healthy.', overview)).code, 'FRIDAY_AGENT_GROUNDING_INVALID')
+})

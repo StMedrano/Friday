@@ -11,17 +11,20 @@ const NON_ONLINE_HEALTH_CLAIMS = [
 ]
 const NEGATED_PREFIX = /\b(?:not|isn't|is not|aren't|never)\s+(?:\w+\s+)?$/i
 const SEVERITY_CLAIMS = [
-  /\bseverity\b[^.\n]{0,20}\bcritical\b/i,
+  /\bseverity\b[^.\n]{0,20}\bcritical\b/gi,
   /\bcritical\s+(?:\w+\s+){0,2}?(?:severity|alerts?|incidents?|issues?|failures?|state|status|outages?|errors?|services?|problems?|containers?|hosts?|nodes?|vms?)\b/gi,
-  /\b(?:is|are|was|were|marked|rated|considered)\s+critical\b/i,
+  /\b(?:is|are|was|were|marked|rated|considered)\s+critical\b/gi,
 ]
-const NEGATED_SEVERITY_PREFIX = /\b(?:no|not|without|zero)\s+$/i
+// A negation anywhere earlier in the same sentence covers its subject, e.g. "No services are critical."
+const SENTENCE_NEGATION = /\b(?:no|not|none|without|zero|neither|nor|never)\b/i
+
+const escapeRegExp = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+
+function sentencesOf(output) {
+  return output.split(/(?<=[.!?])\s+|\n+/).map((sentence) => sentence.trim()).filter(Boolean)
+}
 
 function affirmativeMatch(pattern, output, negatedPrefix) {
-  if (!pattern.global) {
-    const match = pattern.exec(output)
-    return Boolean(match) && !negatedPrefix.test(output.slice(Math.max(0, match.index - 20), match.index))
-  }
   pattern.lastIndex = 0
   for (const match of output.matchAll(pattern)) {
     if (!negatedPrefix.test(output.slice(Math.max(0, match.index - 20), match.index))) return true
@@ -30,10 +33,29 @@ function affirmativeMatch(pattern, output, negatedPrefix) {
 }
 
 function siteLabels(sites, services) {
-  return new Set([
+  return [...new Set([
     ...sites.flatMap((site) => [site?.name, site?.id]),
     ...services.map((service) => service?.site),
-  ].filter((label) => typeof label === 'string' && label.trim()).map((label) => label.trim().toLowerCase()))
+  ].filter((label) => typeof label === 'string' && label.trim()).map((label) => label.trim()))]
+    .sort((left, right) => right.length - left.length)
+}
+
+function mentions(sentence, label) {
+  return new RegExp(`(?<![\\w-])${escapeRegExp(label)}(?![\\w-])`, 'i').test(sentence)
+}
+
+// Services a sentence is about: named sites or services, otherwise the whole environment.
+function sentenceScope(sentence, labels, sites, services) {
+  const sitesNamed = labels.filter((label) => mentions(sentence, label)).map((label) => label.toLowerCase())
+  const siteNames = new Set(sitesNamed.flatMap((label) => [
+    label,
+    ...sites.filter((site) => [site?.id, site?.name].some((value) => String(value || '').toLowerCase() === label))
+      .map((site) => String(site?.name || '').toLowerCase()),
+  ]))
+  const scoped = services.filter((service) =>
+    siteNames.has(String(service?.site || '').toLowerCase()) ||
+    [service?.id, service?.name].some((value) => typeof value === 'string' && value.trim() && mentions(sentence, value)))
+  return scoped.length ? scoped : services
 }
 
 function groundingViolations(text, overview) {
@@ -44,14 +66,18 @@ function groundingViolations(text, overview) {
   const services = Array.isArray(state.services) ? state.services : []
   const incidents = Array.isArray(state.incidents) ? state.incidents : null
   const alerts = Array.isArray(state.alerts) ? state.alerts : []
+  const labels = siteLabels(sites, services)
+  const sentences = sentencesOf(output)
 
-  const knownSites = siteLabels(sites, services)
-  const mentionedSites = output.match(/\bSite\s+[A-Z0-9][\w-]*/g) || []
-  if (mentionedSites.some((label) => !knownSites.has(label.toLowerCase()))) {
+  // Remove complete known labels first so a multiword label is never split into an unknown one.
+  const unmatched = labels.reduce((remaining, label) =>
+    remaining.replace(new RegExp(`(?<![\\w-])${escapeRegExp(label)}(?![\\w-])`, 'gi'), ' '), output)
+  if (/\bSite\s+[A-Z0-9][\w-]*/.test(unmatched)) {
     violations.push('unsupported site label')
   }
-  if (services.some((service) => service?.status !== 'online') &&
-    NON_ONLINE_HEALTH_CLAIMS.some((pattern) => affirmativeMatch(pattern, output, NEGATED_PREFIX))) {
+  if (sentences.some((sentence) =>
+    NON_ONLINE_HEALTH_CLAIMS.some((pattern) => affirmativeMatch(pattern, sentence, NEGATED_PREFIX)) &&
+    sentenceScope(sentence, labels, sites, services).some((service) => service?.status !== 'online'))) {
     violations.push('overall-health claim contradicts non-online services')
   }
   if (!incidents && /\b(?:no|zero)\s+(?:(?:active|open|current)\s+)?(?:(?:alerts?|issues?)\s+(?:or|and|nor)\s+)?incidents?\b(?!\s+(?:count|data))/i.test(output)) {
@@ -61,8 +87,11 @@ function groundingViolations(text, overview) {
     ...alerts.map((alert) => String(alert?.severity || '').toLowerCase()),
     ...(incidents || []).map((incident) => String(incident?.severity || '').toLowerCase()),
   ].filter(Boolean))
-  if (!declaredSeverities.has('critical') &&
-    SEVERITY_CLAIMS.some((pattern) => affirmativeMatch(pattern, output, NEGATED_SEVERITY_PREFIX))) {
+  if (!declaredSeverities.has('critical') && sentences.some((sentence) =>
+    SEVERITY_CLAIMS.some((pattern) => {
+      pattern.lastIndex = 0
+      return [...sentence.matchAll(pattern)].some((match) => !SENTENCE_NEGATION.test(sentence.slice(0, match.index)))
+    }))) {
     violations.push('unsupported severity')
   }
   return violations
