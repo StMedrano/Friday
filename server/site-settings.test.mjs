@@ -109,3 +109,23 @@ test('site settings API reports unavailable when no store is configured', async 
     assert.equal((await fetch(base + '/api/settings/sites')).status, 503)
   })
 })
+
+test('declared site status follows member statuses instead of treating every non-online member as offline', () => {
+  const site = [{id: 'home', name: 'Home'}]
+  const status = statuses => deriveSites(site, statuses.map(value => ({site: 'Home', status: value})))[0].status
+  assert.equal(status(['degraded']), 'degraded')
+  assert.equal(status(['maintenance', 'maintenance']), 'maintenance')
+  assert.equal(status(['offline', 'offline']), 'offline')
+  assert.equal(status(['online', 'maintenance']), 'degraded')
+  assert.equal(status(['offline', 'degraded']), 'degraded')
+})
+
+test('concurrent saves are serialized so the persisted file matches the effective settings', async t => {
+  const root = await tempDir(t)
+  const path = join(root, 'site-settings.json')
+  const store = await createSiteSettingsStore({path})
+  const results = await Promise.allSettled(['Home', 'Remote', 'Lab', 'Office'].map(name => store.save({sites: [name], sources: {proxmox: name}})))
+  assert.ok(results.every(result => result.status === 'fulfilled'))
+  assert.deepEqual(JSON.parse(await readFile(path, 'utf8')), store.get())
+  assert.deepEqual(store.get().sources, {proxmox: 'Office'})
+})

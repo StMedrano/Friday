@@ -1,3 +1,4 @@
+import {randomUUID} from 'node:crypto'
 import {mkdir, readFile, rename, writeFile} from 'node:fs/promises'
 import {dirname} from 'node:path'
 
@@ -63,7 +64,9 @@ export function deriveSites(declared = [], services = []) {
   return declared.map(site => {
     const members = services.filter(service => service?.site === site.name || service?.site === site.id)
     const online = members.filter(service => service.status === 'online').length
-    const status = !members.length ? 'maintenance' : online === members.length ? 'online' : online ? 'degraded' : 'offline'
+    const states = new Set(members.map(service => service.status))
+    // A single shared state is reported as is; any mix of states is degraded.
+    const status = !members.length ? 'maintenance' : states.size === 1 ? [...states][0] : 'degraded'
     return {id: site.id, name: site.name, location: 'Declared in Friday settings', status, devicesOnline: online, devicesTotal: members.length}
   })
 }
@@ -89,17 +92,25 @@ export async function createSiteSettingsStore({path, fs = {mkdir, readFile, rena
       if (error?.code !== 'ENOENT') console.warn('Friday site settings could not be loaded; using environment defaults')
     }
   }
+  let queue = Promise.resolve()
   return {
     get() { return current },
-    async save(input) {
-      const next = validateSiteSettings(input)
-      if (!path) throw Object.assign(new Error('site-settings-unavailable'), {code: 'site-settings-unavailable'})
-      await fs.mkdir(dirname(path), {recursive: true})
-      const temporary = `${path}.tmp-${process.pid}-${Date.now()}`
-      await fs.writeFile(temporary, JSON.stringify(next, null, 2) + '\n', {mode: 0o600})
-      await fs.rename(temporary, path)
-      current = next
-      return next
+    save(input) {
+      // Serialize writes so the file on disk always matches the last applied settings.
+      const run = queue.then(() => persist(input))
+      queue = run.catch(() => {})
+      return run
     },
+  }
+
+  async function persist(input) {
+    const next = validateSiteSettings(input)
+    if (!path) throw Object.assign(new Error('site-settings-unavailable'), {code: 'site-settings-unavailable'})
+    await fs.mkdir(dirname(path), {recursive: true})
+    const temporary = `${path}.tmp-${randomUUID()}`
+    await fs.writeFile(temporary, JSON.stringify(next, null, 2) + '\n', {mode: 0o600})
+    await fs.rename(temporary, path)
+    current = next
+    return next
   }
 }
