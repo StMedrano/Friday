@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {readFile} from 'node:fs/promises'
 import {runInNewContext} from 'node:vm'
 const code=await readFile(new URL('../public/sw.js',import.meta.url),'utf8')
-function worker(fetchImpl){
+function worker(fetchImpl,cacheFailure={}){
  const handlers={},put=[],deleted=[],store=new Map(),requests=[]
  const scope={
   location:{origin:'https://friday.example'},
@@ -15,11 +15,18 @@ function worker(fetchImpl){
   keys:async()=>[...store.keys()],
   delete:async key=>{deleted.push(key);return store.delete(key)},
   open:async key=>{
+   if(cacheFailure.open)throw Error('cache open failed')
    if(!store.has(key))store.set(key,new Map())
    const bucket=store.get(key)
    return {
-    match:async req=>bucket.get(typeof req==='string'?req:req.url)||undefined,
-    put:async(req,response)=>{put.push(req.url);bucket.set(req.url,response)},
+    match:async req=>{
+     if(cacheFailure.match)throw Error('cache match failed')
+     return bucket.get(typeof req==='string'?req:req.url)||undefined
+    },
+    put:async(req,response)=>{
+     if(cacheFailure.put)throw Error('cache put failed')
+     put.push(req.url);bucket.set(req.url,response)
+    },
    }
   },
  }
@@ -85,4 +92,28 @@ test('only same-origin hashed CSS/JS assets with valid MIME and no auth redirect
  assert.equal(bad.status,200)
  await w.dispatch('fetch',{request:w.req('/assets/cookie-a1b2c3d4.js')})
  assert.equal(w.put.length,1)
+})
+test('cache storage open and lookup failures fall back to the online asset response',async()=>{
+ for(const failure of [{open:true},{match:true}]){
+  const w=worker(async()=>new Response('online asset',{
+   headers:{'content-type':'application/javascript'},
+  }),failure)
+  const result=await w.dispatch('fetch',{
+   request:w.req('/assets/index-a1b2c3d4.js'),
+  })
+  assert.equal(result.status,200)
+  assert.equal(await result.text(),'online asset')
+  assert.equal(w.requests.length,1)
+ }
+})
+test('cache storage write failure does not discard a successful online asset response',async()=>{
+ const w=worker(async()=>new Response('online asset',{
+  headers:{'content-type':'application/javascript'},
+ }),{put:true})
+ const result=await w.dispatch('fetch',{
+  request:w.req('/assets/index-a1b2c3d4.js'),
+ })
+ assert.equal(result.status,200)
+ assert.equal(await result.text(),'online asset')
+ assert.equal(w.requests.length,1)
 })

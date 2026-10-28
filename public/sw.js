@@ -62,9 +62,15 @@ self.addEventListener('fetch',event=>{
  if(!ASSET.test(url.pathname)||url.search||request.headers.has('authorization'))return
 
  event.respondWith((async()=>{
-  const cache=await caches.open(STATIC_CACHE)
-  const cached=await cache.match(request)
-  if(cached)return cached
+  let cache
+  try{
+   cache=await caches.open(STATIC_CACHE)
+   const cached=await cache.match(request)
+   if(cached)return cached
+  }catch{
+   // Cache Storage is an optional optimization. Keep online assets usable
+   // when storage is unavailable, denied or temporarily inconsistent.
+  }
   const response=await fetch(request)
   const contentType=response.headers.get('content-type')||''
   const expected=url.pathname.endsWith('.js')?
@@ -72,7 +78,12 @@ self.addEventListener('fetch',event=>{
    /^text\/css(?:\s*;|\s*$)/i
   if(response.ok&&response.type!=='opaqueredirect'&&!response.redirected&&
    !response.headers.has('set-cookie')&&expected.test(contentType)){
-   await cache.put(request,response.clone())
+   try{
+    cache??=await caches.open(STATIC_CACHE)
+    await cache.put(request,response.clone())
+   }catch{
+    // Never discard a valid network response because optional caching failed.
+   }
   }
   return response
  })())
