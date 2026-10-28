@@ -154,6 +154,34 @@ export type FridaySettings = {
   safety: { writableSettings: boolean; infrastructureActions: boolean; executor: boolean }
 }
 
+export type FridaySiteSettings = {
+  sites: Array<{ id: string; name: string }>
+  sources: Array<{ id: string; name: string; site: string | null; defaultSite: string; enabled: boolean }>
+}
+
+export class FridaySiteSettingsError extends Error {
+  constructor(readonly code: string, readonly status: number) { super(code) }
+}
+
+function siteSettingsBody(body: unknown, status: number): FridaySiteSettings {
+  const value = body as Partial<FridaySiteSettings> & { error?: string }
+  if (status >= 400 || !Array.isArray(value?.sites) || !Array.isArray(value?.sources))
+    throw new FridaySiteSettingsError(typeof value?.error === 'string' ? value.error : 'site-settings-unavailable', status)
+  return value as FridaySiteSettings
+}
+
+export async function fetchSiteSettings(signal?: AbortSignal): Promise<FridaySiteSettings> {
+  const response = await fetch('/api/settings/sites', { method: 'GET', signal })
+  return siteSettingsBody(await response.json().catch(() => ({})), response.status)
+}
+
+export async function saveSiteSettings(settings: { sites: string[]; sources: Record<string, string | null> }): Promise<FridaySiteSettings> {
+  const response = await fetch('/api/settings/sites', {
+    method: 'PUT', headers: { 'content-type': 'application/json' }, body: JSON.stringify(settings),
+  })
+  return siteSettingsBody(await response.json().catch(() => ({})), response.status)
+}
+
 export async function fetchFridaySettings(signal?: AbortSignal): Promise<FridaySettings> {
   const response = await fetch('/api/settings', { method: 'GET', signal })
   if (!response.ok) throw new Error('settings-unavailable')
