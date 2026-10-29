@@ -15,6 +15,7 @@ import { auditActor } from './audit/action-audit.mjs'
 import { buildSettingsView } from './settings.mjs'
 import { applySiteSettings, siteSettingsView } from './site-settings.mjs'
 import { applyEndpointChecks, endpointChecksView, environmentEndpointChecks } from './endpoint-checks.mjs'
+import { normalizeSubscription, vapidKeys } from './notifications/web-push.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -241,6 +242,7 @@ export function createFridayServer({
   siteSettings = null,
   endpointChecks = null,
   repositorySettings = null,
+  pushSubscriptions = null,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
   const labelledConfig = (effectiveConfig = config) =>
@@ -271,6 +273,7 @@ export function createFridayServer({
       const registrySync = request.method === 'POST' && url.pathname === '/api/agents/registry/sync'
       const siteSettingsWrite = request.method === 'PUT' && url.pathname === '/api/settings/sites'
       const collectionWrite = request.method !== 'GET' && request.method !== 'HEAD' && Boolean(settingsCollectionFor(url.pathname))
+      const pushWrite = (request.method === 'POST' || request.method === 'DELETE') && url.pathname === '/api/notifications/web-push'
       const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || url.pathname === '/api/audit/events'
       let verdict
       try { verdict = await accessGate(request, operatorOnly) }
@@ -284,7 +287,7 @@ export function createFridayServer({
       // for operational POST/PUT/DELETE handlers. Settings and registry writes with a body additionally require JSON.
       if (['POST', 'PUT', 'DELETE'].includes(request.method) && request.headers['sec-fetch-site'] === 'cross-site')
         return json(response, 403, {error:'access-denied'})
-      if ((registrySync || siteSettingsWrite || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
+      if ((registrySync || siteSettingsWrite || pushWrite || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
         return json(response, 415, {error:'json-required'})
     }
 
@@ -304,6 +307,22 @@ export function createFridayServer({
 
     if (request.method === 'GET' && url.pathname === '/api/settings') {
       return json(response, 200, buildSettingsView(endpointChecks ? applyEndpointChecks(labelledConfig(), endpointChecks.get()) : labelledConfig(), { actionAudit }))
+    }
+
+    // Any Access-verified user may subscribe the browser they are signed in on.
+    if (url.pathname === '/api/notifications/web-push' && ['GET', 'POST', 'DELETE'].includes(request.method)) {
+      const keys = vapidKeys(config.notifications?.webPush)
+      if (request.method === 'GET') return json(response, 200, { enabled: Boolean(keys && pushSubscriptions), publicKey: keys && pushSubscriptions ? keys.publicKey : null })
+      if (!keys || !pushSubscriptions) return json(response, 503, { error: 'web-push-unavailable' })
+      let body
+      try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid-json' }) }
+      const subscription = normalizeSubscription(body)
+      if (!subscription) return json(response, 400, { error: 'invalid-subscription' })
+      try {
+        if (request.method === 'POST') await pushSubscriptions.add(subscription)
+        else await pushSubscriptions.remove(subscription.id)
+      } catch { return json(response, 503, { error: 'web-push-unavailable' }) }
+      return json(response, 200, { subscribed: request.method === 'POST' })
     }
 
     if (url.pathname === '/api/settings/sites' && (request.method === 'GET' || request.method === 'PUT')) {

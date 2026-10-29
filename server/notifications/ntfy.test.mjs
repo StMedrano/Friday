@@ -46,8 +46,8 @@ test('detects only newly opened and newly resolved incidents', () => {
 })
 
 test('config reads the ntfy topic server-side', () => {
-  assert.deepEqual(getConfig({}).notifications, {ntfy: {url: '', token: ''}})
-  assert.deepEqual(getConfig({FRIDAY_NTFY_URL: 'https://ntfy.sh/x', FRIDAY_NTFY_TOKEN: 't'}).notifications, {ntfy: {url: 'https://ntfy.sh/x', token: 't'}})
+  assert.deepEqual(getConfig({}).notifications.ntfy, {url: '', token: ''})
+  assert.deepEqual(getConfig({FRIDAY_NTFY_URL: 'https://ntfy.sh/x', FRIDAY_NTFY_TOKEN: 't'}).notifications.ntfy, {url: 'https://ntfy.sh/x', token: 't'})
 })
 
 test('monitoring runtime notifies when a poll opens an incident and never fails the poll on notifier errors', async () => {

@@ -148,12 +148,32 @@ export type FridaySettings = {
   integrations: FridaySettingsIntegration[]
   ai: { enabled: boolean; providerOrder: string[]; cloudTimeoutMs: number | null; localTimeoutMs: number | null
     providers: Array<{ id: string; inOrder: boolean; credentials: FridayCredentialState; model: string | null; enabled?: boolean }> }
-  notifications?: { ntfy: boolean }
+  notifications?: { ntfy: boolean; webPush?: boolean }
   monitoring: { enabled: boolean; pollSeconds: number | null; offlineGraceSeconds: number | null; historyLimit: number | null; diagnostics: boolean }
   automationApi: { enabled: boolean; port: number | null; serviceTokens: number; readOnly: boolean }
   audit: { enabled: boolean; integrity: 'verified' | 'broken' | 'unavailable' | null; events: number | null }
   safety: { writableSettings: boolean; infrastructureActions: boolean; executor: boolean }
 }
+
+export type FridayWebPushStatus = { enabled: boolean; publicKey: string | null }
+
+export async function fetchWebPushStatus(signal?: AbortSignal): Promise<FridayWebPushStatus> {
+  const response = await fetch('/api/notifications/web-push', { method: 'GET', signal })
+  if (!response.ok) throw new Error('web-push-unavailable')
+  return await response.json() as FridayWebPushStatus
+}
+
+type PushSubscriptionPayload = { endpoint: string; keys: { p256dh: string; auth: string } }
+
+async function pushSubscription(method: 'POST' | 'DELETE', subscription: PushSubscriptionPayload) {
+  const response = await fetch('/api/notifications/web-push', {
+    method, headers: { 'content-type': 'application/json' }, body: JSON.stringify(subscription),
+  })
+  if (!response.ok) throw new Error('web-push-unavailable')
+}
+
+export const subscribeWebPush = (subscription: PushSubscriptionPayload) => pushSubscription('POST', subscription)
+export const unsubscribeWebPush = (subscription: PushSubscriptionPayload) => pushSubscription('DELETE', subscription)
 
 export type FridaySiteSettings = {
   sites: Array<{ id: string; name: string }>

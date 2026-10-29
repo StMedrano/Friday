@@ -88,3 +88,34 @@ self.addEventListener('fetch',event=>{
   return response
  })())
 })
+
+// Incident push from Friday's own server. The payload carries only the
+// sanitised incident fields already shown in the dashboard.
+self.addEventListener('push',event=>{
+ event.waitUntil((async()=>{
+  let data={}
+  try{data=event.data?.json()??{}}catch{data={}}
+  const title=typeof data.title==='string'&&data.title?data.title.slice(0,120):'Friday'
+  const detail=typeof data.body==='string'?data.body.slice(0,300):''
+  const where=[data.service,data.host].filter(part=>typeof part==='string'&&part).join(' · ')
+  await self.registration.showNotification(title,{
+   body:[detail,where].filter(Boolean).join('\n'),
+   tag:data.kind==='summary'?'friday-summary':`friday-${data.service||title}`,
+   renotify:data.kind==='opened',
+   requireInteraction:data.severity==='critical'||data.severity==='high',
+   icon:'/icons/friday-192.png',
+   badge:'/icons/friday-192.png',
+   data:{url:'/'},
+  })
+ })())
+})
+
+self.addEventListener('notificationclick',event=>{
+ event.notification.close()
+ event.waitUntil((async()=>{
+  const clients=await self.clients.matchAll({type:'window',includeUncontrolled:true})
+  const open=clients.find(client=>new URL(client.url).origin===self.location.origin)
+  if(open){await open.focus();return}
+  await self.clients.openWindow('/')
+ })())
+})
