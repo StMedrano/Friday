@@ -186,6 +186,9 @@ export function getConfig(env = process.env) {
       statePath: env.FRIDAY_MONITORING_STATE_PATH || '/data/monitoring-state.json',
       historyLimit: positiveNumber(env.FRIDAY_MONITORING_HISTORY_LIMIT, 2000),
     },
+    notifications: {
+      ntfy: { url: env.FRIDAY_NTFY_URL || '', token: env.FRIDAY_NTFY_TOKEN || '' },
+    },
     siteSettings: {
       path: env.FRIDAY_SITE_SETTINGS_PATH || '/data/site-settings.json',
     },

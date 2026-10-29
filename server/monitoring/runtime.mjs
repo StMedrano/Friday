@@ -1,5 +1,6 @@
 import { appendHistory, createEmptyMonitoringState, incidentList, monitoringSummary } from './state.mjs'
 import { evaluateMonitoring } from './incidents.mjs'
+import { incidentChanges } from '../notifications/ntfy.mjs'
 import { containerIdFromServiceId, getVm100ContainerDiagnostic, getVm100ContainerLogs } from '../adapters/vm100-observer-diagnostics.mjs'
 import { buildDiagnosticReport } from '../diagnostics/analyze.mjs'
 
@@ -66,6 +67,7 @@ export function createMonitoringRuntime({
   now = () => new Date(),
   setIntervalImpl = setInterval,
   clearIntervalImpl = clearInterval,
+  notifyIncidents = null,
 }) {
   const monitoringConfig = config.monitoring || { enabled: false }
   const diagnosticsConfig = config.diagnostics || { enabled: false }
@@ -158,6 +160,7 @@ export function createMonitoringRuntime({
       try {
         const overview = await collectOverview(config)
         const priorDiagnostics = structuredClone(monitoringState.diagnostics || {})
+        const priorIncidents = (monitoringState.incidents || []).map(({ id, status }) => ({ id, status }))
         const evaluated = evaluateMonitoring({
           state: monitoringState,
           overview,
@@ -171,6 +174,12 @@ export function createMonitoringRuntime({
         }
         latestOverview = overview
         meta.lastSuccessAt = timestamp
+        if (notifyIncidents) {
+          const changes = incidentChanges(priorIncidents, monitoringState.incidents || [])
+          // Delivery runs in the background and can never fail or delay a poll.
+          if (changes.opened.length || changes.resolved.length)
+            Promise.resolve().then(() => notifyIncidents(structuredClone(changes))).catch(() => {})
+        }
         meta.lastError = null
         meta.status = 'ok'
 

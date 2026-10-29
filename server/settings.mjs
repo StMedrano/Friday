@@ -1,3 +1,5 @@
+import {ntfyTopicUrl} from './notifications/ntfy.mjs'
+
 // Read-only projection of the server's effective configuration for operators.
 // Reports posture only: enabled flags, whether required fields are present and
 // whether credentials exist. Never secrets, identities, URLs or addresses.
@@ -88,6 +90,7 @@ export function buildSettingsView(config, {actionAudit = null} = {}) {
       cloudTimeoutMs: ai.cloudTimeoutMs ?? null,
       localTimeoutMs: ai.localTimeoutMs ?? null,
     },
+    notifications: {ntfy: Boolean(ntfyTopicUrl(config.notifications?.ntfy?.url))},
     monitoring: {
       enabled: config.monitoring?.enabled === true,
       pollSeconds: config.monitoring?.pollSeconds ?? null,
