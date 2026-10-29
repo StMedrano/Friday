@@ -52,13 +52,15 @@ export async function createPushSubscriptionStore({path, fs = {mkdir, readFile, 
     }
   }
 
+  // Memory changes only once the file is written, so a failed save can be retried.
   async function persist(next) {
+    if (path) {
+      await fs.mkdir(dirname(path), {recursive: true})
+      const temporary = `${path}.tmp-${digest(String(Date.now()) + Math.random())}`
+      await fs.writeFile(temporary, JSON.stringify(next, null, 2) + '\n', {mode: 0o600})
+      await fs.rename(temporary, path)
+    }
     current = next
-    if (!path) return
-    await fs.mkdir(dirname(path), {recursive: true})
-    const temporary = `${path}.tmp-${digest(String(Date.now()) + Math.random())}`
-    await fs.writeFile(temporary, JSON.stringify(current, null, 2) + '\n', {mode: 0o600})
-    await fs.rename(temporary, path)
   }
 
   let queue = Promise.resolve()

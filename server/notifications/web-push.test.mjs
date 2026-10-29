@@ -62,6 +62,23 @@ test('store persists subscriptions atomically, dedupes by endpoint and reloads',
   await assert.rejects(store.add({endpoint: 'http://push.test/x'}), {code: 'invalid-subscription'})
 })
 
+test('a failed save leaves memory unchanged so a retried removal is persisted', async t => {
+  const {path} = await tempStore(t)
+  const real = await import('node:fs/promises')
+  let failNext = false
+  const fs = {...real, writeFile: async (...args) => {
+    if (failNext) { failNext = false; throw Object.assign(new Error('no space'), {code: 'ENOSPC'}) }
+    return real.writeFile(...args)
+  }}
+  const store = await createPushSubscriptionStore({path, fs})
+  const added = await store.add(subscription())
+  failNext = true
+  await assert.rejects(store.remove(added.id), {code: 'ENOSPC'})
+  assert.ok(store.has(added.id))
+  await store.remove(added.id)
+  assert.equal((await createPushSubscriptionStore({path})).list().length, 0)
+})
+
 test('notifier pushes opened and resolved incidents and drops gone subscriptions', async t => {
   const {store} = await tempStore(t)
   const live = await store.add(subscription())
