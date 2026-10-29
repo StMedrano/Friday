@@ -1,4 +1,4 @@
-import type { FormEventHandler } from 'react'
+import type { FormEventHandler, ReactNode } from 'react'
 import { AlertTriangle, ChevronRight, Server, ShieldCheck } from 'lucide-react'
 import type { FridayIncident, FridayOverview } from '../lib/api'
 import type { FridaySessionMessage } from '../hooks/useFridaySession'
@@ -23,6 +23,7 @@ type MobileHomeProps = {
   onQueryChange: (value: string) => void
   onSubmit: FormEventHandler<HTMLFormElement>
   onNavigate: (destination: string) => void
+  activity?: ReactNode
   onSelectIncident: (incident: FridayIncident) => void
 }
 
@@ -35,6 +36,7 @@ export default function MobileHome({
   onQueryChange,
   onSubmit,
   onNavigate,
+  activity,
   onSelectIncident,
 }: MobileHomeProps) {
   const active = (overview.incidents ?? [])
@@ -97,6 +99,8 @@ export default function MobileHome({
       <div className="v3-mobile-section-head"><div><span className="v3-kicker">SYSTEM</span><h2>Infrastructure</h2></div><button onClick={() => onNavigate('Infrastructure')}>View topology</button></div>
       <div className="v3-mobile-infra-list">{infrastructure.map((service) => <article key={service.id}><Server size={16}/><span><b>{service.name}</b><small>{service.host} · {service.detail}</small></span><em className={service.status}>{service.status}</em></article>)}</div>
     </section>
+
+    {activity}
 
     <section className="v3-mobile-services" data-mobile-section="services" data-testid="mobile-service-preview">
       <div className="v3-mobile-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><button onClick={() => onNavigate('Applications')}>View all services</button></div>
