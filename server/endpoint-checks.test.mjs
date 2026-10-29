@@ -166,3 +166,16 @@ test('first write seeds legacy URL checks with the operator site label, and dele
   })
   assert.deepEqual(retired, [['endpoint-0', 'endpoint check deleted']])
 })
+
+test('settings posture reports the managed endpoint checks, not the environment ones', async t => {
+  const endpointChecks = await createEndpointCheckStore({path: join(await tempDir(t), 'endpoint-checks.json')})
+  const config = getConfig({FRIDAY_ENDPOINTS_ENABLED: 'true'})
+  await withServer({config, accessGateImpl: operatorGate, endpointChecks}, async base => {
+    const endpoints = async () => (await (await fetch(base + '/api/settings')).json()).integrations.find(item => item.id === 'endpoints')
+    assert.equal((await endpoints()).checks, 0)
+    await fetch(base + '/api/settings/endpoints', {method: 'POST', headers: json, body: JSON.stringify({name: 'Router', site: 'Home', url: 'http://10.0.0.1/'})})
+    const managed = await endpoints()
+    assert.equal(managed.checks, 1)
+    assert.equal(managed.configured, true)
+  })
+})

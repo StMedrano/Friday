@@ -303,7 +303,7 @@ export function createFridayServer({
     }
 
     if (request.method === 'GET' && url.pathname === '/api/settings') {
-      return json(response, 200, buildSettingsView(config, { actionAudit }))
+      return json(response, 200, buildSettingsView(endpointChecks ? applyEndpointChecks(labelledConfig(), endpointChecks.get()) : labelledConfig(), { actionAudit }))
     }
 
     if (url.pathname === '/api/settings/sites' && (request.method === 'GET' || request.method === 'PUT')) {
