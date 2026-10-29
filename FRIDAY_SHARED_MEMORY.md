@@ -72,7 +72,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Task | Owner | Status | Scope / files / resources | Started | Last update | Next action |
 | --- | --- | --- | --- | --- | --- | --- |
 | Install shared ledger in current Friday repo | Codex/ChatGPT | `complete` | Repository root, `AGENTS.md`, `CLAUDE.md`, `FRIDAY_SHARED_MEMORY.md` | 2026-10-29 | 2026-10-29 | Pull the tracked branch before each task and keep this ledger current. |
-| Publish shared ledger for `main` review | Codex/ChatGPT | `in_progress` | Docs-only branch `docs/shared-agent-memory-20261029`; repository-root coordination files only | 2026-10-29 | 2026-10-29 | Push the main-based branch and open a review PR; do not deploy or merge it directly. |
+| Publish shared ledger for `main` review | Codex/ChatGPT | `complete` | Docs-only branch `docs/shared-agent-memory-20261029`; repository-root coordination files only | 2026-10-29 | 2026-10-29 | Review and merge PR #105 through the normal repository workflow; then update VM102 only through a separately reviewed deployment. |
 | Verify VM102 port-3011 origin | Codex/ChatGPT | `complete` | Read-only VM102 container, listener, origin-health, and tracked-source inspection | 2026-10-29 | 2026-10-29 | Preserve the isolated listener and repeat origin checks after future reviewed deployments. |
 | Authenticated Cloudflare acceptance | unclaimed | `verification_needed` | Dedicated Access app and Friday read-only API; current managed-runtime rerun requires its existing hostname-scoped secret binding | 2026-10-29 | 2026-10-29 | Run `node scripts/check-cloud-connection.mjs` from the managed cloud runtime without copying credentials to VM102 or chat. |
 | Service-token renewal | unclaimed | `planned` | `friday-cloud-reader` | - | 2026-10-29 | Plan renewal before 2026-11-24 without disclosing or committing credentials. |
@@ -111,16 +111,16 @@ Copy this block into the Activity log and fill every field:
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
 
-### 2026-10-29 14:11 CDT — Codex/ChatGPT — Prepared shared ledger for main review
+### 2026-10-29 14:11 CDT — Codex/ChatGPT — Published shared ledger for main review
 
-- Status: `in_progress`
+- Status: `complete`
 - Scope claimed: Main-based documentation branch, automation route-boundary verification, existing controller-hardening ownership, and read-only managed-runtime task discovery.
-- Work performed: Created `docs/shared-agent-memory-20261029` from current `origin/main` at `fef9e01`, applied the four existing coordination-document commits, inspected the automation listener and focused tests, located the durable Friday cloud task, and confirmed draft PR #29 already owns controller hardening.
+- Work performed: Created `docs/shared-agent-memory-20261029` from current `origin/main` at `fef9e01`, applied the four existing coordination-document commits, inspected the automation listener and focused tests, located the durable Friday cloud task, confirmed draft PR #29 already owns controller hardening, and opened PR #105 for review.
 - Changes made: Documentation only on the isolated branch; no VM102, Cloudflare, deployment, credential, network, database, or runtime change.
 - Verification: `node --test server/automation.test.mjs scripts/check-cloud-connection.test.mjs` passed 12/12 on current `main`. The tests cover all four authenticated reads, write denial, unknown/query/encoded-route denial, snapshot validation, response bounds, credential-safe checking, and freshness checks. `git diff --check` passed.
 - Decisions: Mark the read-only route boundary complete. Keep controller hardening in draft PR #29 and keep the authenticated rerun in the existing managed runtime with its hostname-scoped credential binding.
 - Blockers/risks: The current authenticated checker has not been rerun after the 2026-10-29 restart because this task has no service-token secret. Do not copy or rotate that secret merely to rerun acceptance. Draft PR #29 is not release-ready.
-- Next action: Push the docs-only branch, open a PR to `main`, then update this entry with the review link and final branch state.
+- Next action: Review and merge `https://github.com/StMedrano/Friday/pull/105`; then rerun the authenticated checker from the existing managed runtime and record the result without exposing its secret binding.
 - Rollback/recovery: Revert the docs-only commits or close the review PR; no live system rollback is needed.
 
 ### 2026-10-29 — Codex/ChatGPT — Revalidated Friday cloud-API origin after restart
