@@ -210,7 +210,12 @@ export function getConfig(env = process.env) {
       directory: env.FRIDAY_AUDIT_DIR || '/data/audit',
       maxBytes: Math.floor(positiveNumber(env.FRIDAY_AUDIT_MAX_BYTES, 16 * 1024 * 1024)),
     },
-    repositories: { registryPath: env.FRIDAY_REPOSITORY_REGISTRY_PATH || './repositories.json' },
+    repositories: {
+      registryPath: env.FRIDAY_REPOSITORY_REGISTRY_PATH || './repositories.json',
+      // Operator-registered checkouts must live under one of these container paths.
+      allowedRoots: String(env.FRIDAY_REPOSITORY_ROOTS || '/repositories').split(',').map(item => item.trim()).filter(item => item.startsWith('/')),
+      settingsPath: env.FRIDAY_REPOSITORY_SETTINGS_PATH || '/data/repository-settings.json',
+    },
     diagnostics: {
       enabled: enabled(env.FRIDAY_DIAGNOSTICS_ENABLED),
     },

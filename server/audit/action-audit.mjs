@@ -7,7 +7,8 @@ import {isAbsolute, join} from 'node:path'
 // history: one hash-chained JSON line per lifecycle event, fsynced before
 // the caller continues. No update, delete, rotate or repair API exists.
 const ACTIONS = new Set(['agents.registry.sync', 'incidents.diagnostics.rerun', 'settings.sites.update',
-  'settings.endpoints.create', 'settings.endpoints.update', 'settings.endpoints.delete'])
+  'settings.endpoints.create', 'settings.endpoints.update', 'settings.endpoints.delete',
+  'settings.repositories.create', 'settings.repositories.update', 'settings.repositories.delete'])
 const PHASES = new Set(['requested', 'succeeded', 'failed', 'denied'])
 const ACTOR_KINDS = new Set(['human', 'service', 'unauthenticated'])
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/

@@ -9,17 +9,18 @@ const MAX_READ_BYTES = 64 * 1024
 const MAX_LIST_LIMIT = 200
 const MAX_DIRECTORY_ENTRIES = 1000
 
-const ID = /^[a-z0-9][a-z0-9._-]{0,63}$/
-const MODES = new Set(['read-only', 'development', 'pr-enabled'])
+export const REPOSITORY_ID = /^[a-z0-9][a-z0-9._-]{0,63}$/
+const ID = REPOSITORY_ID
+export const MODES = new Set(['read-only', 'development', 'pr-enabled'])
 const EXCLUDED_NAMES = new Set([
   '.git', '.aws', '.ssh', 'node_modules', 'dist', 'build', '.next', 'coverage', 'data', 'secrets', 'credentials', 'private-keys',
   '.envrc', '.npmrc', '.pypirc', '.netrc', '.git-credentials', 'credentials.json', 'credentials.yaml', 'credentials.yml', 'credentials.toml',
   'service-account.json', 'client-secret.json', 'private_key.json',
 ])
 const PRIVATE_KEYS = new Set(['id_rsa', 'id_ed25519', 'id_ecdsa', 'id_dsa'])
-const MAX_REGISTRY_BYTES = 1024 * 1024
+export const MAX_REGISTRY_BYTES = 1024 * 1024
 
-function publicRemote(value) {
+export function publicRemote(value) {
   if (!value) return undefined
   try {
     const url = new URL(value)
@@ -72,7 +73,7 @@ function isExcluded(pathname, extra = []) {
   })
 }
 
-function parseEntry(value, index) {
+export function parseEntry(value, index) {
   if (!value || typeof value !== 'object' || Array.isArray(value)
     || (value.enabled !== undefined && typeof value.enabled !== 'boolean')) {
     throw new Error(`Repository registry entry ${index} is invalid`)

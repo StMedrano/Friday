@@ -3,6 +3,7 @@ import { Lock, Settings, ShieldCheck } from 'lucide-react'
 import { fetchFridaySettings, type FridayCredentialState, type FridaySettings } from '../lib/api'
 import SiteSettingsPanel from './SiteSettingsPanel'
 import EndpointChecksPanel from './EndpointChecksPanel'
+import RepositorySettingsPanel from './RepositorySettingsPanel'
 
 const CREDENTIALS: Record<FridayCredentialState, string> = {
   present: 'Credentials present', missing: 'Credentials missing', 'not-required': 'No credentials needed',
@@ -30,7 +31,7 @@ export default function SettingsWorkspace() {
   return <section className="v3-settings-workspace" aria-label="Settings workspace">
     <div className="v3-detail-hero">
       <div className="v3-node-icon large"><Settings/></div>
-      <div><span className="v3-kicker">SERVER CONFIGURATION</span><h2>Settings</h2><p>Effective controller configuration. Operators can edit site labels and endpoint checks here. Secrets, addresses and identities are never sent to the browser; change everything else in the server environment and redeploy.</p></div>
+      <div><span className="v3-kicker">SERVER CONFIGURATION</span><h2>Settings</h2><p>Effective controller configuration. Operators can edit site labels, endpoint checks and repositories here. Secrets, addresses and identities are never sent to the browser; change everything else in the server environment and redeploy.</p></div>
     </div>
 
     {error ? <p role="alert" className="v3-settings-message">{error}</p>
@@ -51,6 +52,7 @@ export default function SettingsWorkspace() {
 
           <SiteSettingsPanel/>
           <EndpointChecksPanel/>
+          <RepositorySettingsPanel/>
 
           <section className="v3-panel" aria-label="AI providers">
             <div className="v3-section-head"><div><span className="v3-kicker">ASSISTANT</span><h2>AI {settings.ai.enabled ? 'enabled' : 'disabled'}</h2></div></div>
@@ -76,7 +78,7 @@ export default function SettingsWorkspace() {
               <dt>Notifications</dt><dd>{settings.notifications?.ntfy ? 'ntfy push on incident open and resolve' : 'Not configured'}</dd>
               <dt>Automation API</dt><dd>{onOff(settings.automationApi.enabled)} · port {settings.automationApi.port ?? '—'} · {settings.automationApi.serviceTokens} service tokens · read only</dd>
             </dl>
-            <p className="v3-settings-safety"><ShieldCheck size={14} aria-hidden="true"/>Only site labels and endpoint checks are writable here. No infrastructure actions or executor exist in this build.</p>
+            <p className="v3-settings-safety"><ShieldCheck size={14} aria-hidden="true"/>Only site labels, endpoint checks and repositories are writable here. No infrastructure actions or executor exist in this build.</p>
           </section>
         </div>}
   </section>

@@ -1,5 +1,6 @@
 import { createServer } from 'node:http'
-import { toPublicRepository } from './repositories/repository.mjs'
+import { REPOSITORY_ID, toPublicRepository } from './repositories/repository.mjs'
+import { readRegistryEntries, repositorySettingsView } from './repositories/managed-registry.mjs'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -144,31 +145,43 @@ function parseRepositoryToolRoute(pathname) {
 
 const AUDIT_DETAIL = /^[a-z0-9-]{1,64}$/
 
-// Writes `requested` before running and the outcome after. When an audit
-// store is configured but cannot persist the request, the action never runs.
-const ENDPOINT_CHECK_ROOT = '/api/settings/endpoints'
-const ENDPOINT_CHECK_ID = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/
-const ENDPOINT_CHECK_ERRORS = {
-  'invalid-endpoint-check': 400, 'endpoint-check-not-found': 404, 'endpoint-check-exists': 409, 'endpoint-check-limit': 409,
+// Operator-managed Friday settings collections: GET lists, POST creates,
+// PUT /:id edits and DELETE /:id deletes. Every write is operator-only and audited.
+const SETTINGS_COLLECTIONS = [
+  {
+    name: 'endpoints', root: '/api/settings/endpoints', id: /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/,
+    item: 'check', invalid: 'invalid-endpoint-check', unavailable: 'endpoint-checks-unavailable',
+    errors: { 'invalid-endpoint-check': 400, 'endpoint-check-not-found': 404, 'endpoint-check-exists': 409, 'endpoint-check-limit': 409 },
+  },
+  {
+    name: 'repositories', root: '/api/settings/repositories', id: REPOSITORY_ID,
+    item: 'repository', invalid: 'invalid-repository', unavailable: 'repository-settings-unavailable',
+    errors: {
+      'invalid-repository': 400, 'repository-path-not-allowed': 400, 'repository-not-git': 400,
+      'repository-not-found': 404, 'repository-exists': 409, 'repository-limit': 409,
+    },
+  },
+]
+
+function settingsCollectionFor(pathname) {
+  return SETTINGS_COLLECTIONS.find(collection => pathname === collection.root || pathname.startsWith(collection.root + '/')) || null
 }
 
-function isEndpointChecksPath(pathname) {
-  return pathname === ENDPOINT_CHECK_ROOT || pathname.startsWith(ENDPOINT_CHECK_ROOT + '/')
-}
-
-function parseEndpointChecksRoute(method, pathname) {
-  if (pathname === ENDPOINT_CHECK_ROOT) {
+function parseSettingsCollectionRoute(collection, method, pathname) {
+  if (pathname === collection.root) {
     if (method === 'GET') return { action: 'list', id: null }
     if (method === 'POST') return { action: 'create', id: null }
     return null
   }
-  const id = pathname.slice(ENDPOINT_CHECK_ROOT.length + 1)
-  if (!ENDPOINT_CHECK_ID.test(id)) return null
+  const id = pathname.slice(collection.root.length + 1)
+  if (!collection.id.test(id)) return null
   if (method === 'PUT') return { action: 'update', id }
   if (method === 'DELETE') return { action: 'delete', id }
   return null
 }
 
+// Writes `requested` before running and the outcome after. When an audit
+// store is configured but cannot persist the request, the action never runs.
 async function runAudited({ actionAudit, identity, action, target = null }, run) {
   if (!actionAudit) return run()
   const actor = auditActor(identity)
@@ -227,6 +240,7 @@ export function createFridayServer({
   actionAudit = null,
   siteSettings = null,
   endpointChecks = null,
+  repositorySettings = null,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
   const buildEffectiveOverview = (effectiveConfig) => {
@@ -254,8 +268,8 @@ export function createFridayServer({
     if (accessGate && url.pathname.startsWith('/api/')) {
       const registrySync = request.method === 'POST' && url.pathname === '/api/agents/registry/sync'
       const siteSettingsWrite = request.method === 'PUT' && url.pathname === '/api/settings/sites'
-      const endpointChecksWrite = request.method !== 'GET' && request.method !== 'HEAD' && isEndpointChecksPath(url.pathname)
-      const operatorOnly = registrySync || siteSettingsWrite || endpointChecksWrite || url.pathname === '/api/audit/events'
+      const collectionWrite = request.method !== 'GET' && request.method !== 'HEAD' && Boolean(settingsCollectionFor(url.pathname))
+      const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || url.pathname === '/api/audit/events'
       let verdict
       try { verdict = await accessGate(request, operatorOnly) }
       catch { verdict = {status:503,error:'access-verification-unavailable'} }
@@ -268,7 +282,7 @@ export function createFridayServer({
       // for operational POST/PUT/DELETE handlers. Settings and registry writes with a body additionally require JSON.
       if (['POST', 'PUT', 'DELETE'].includes(request.method) && request.headers['sec-fetch-site'] === 'cross-site')
         return json(response, 403, {error:'access-denied'})
-      if ((registrySync || siteSettingsWrite || (endpointChecksWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
+      if ((registrySync || siteSettingsWrite || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
         return json(response, 415, {error:'json-required'})
     }
 
@@ -306,33 +320,47 @@ export function createFridayServer({
       return json(response, result.status, result.body)
     }
 
-    if (isEndpointChecksPath(url.pathname)) {
-      const route = parseEndpointChecksRoute(request.method, url.pathname)
-      if (route && !endpointChecks) return json(response, 503, { error: 'endpoint-checks-unavailable' })
-      if (route?.action === 'list') return json(response, 200, endpointChecksView(config, endpointChecks.get()))
-      if (route) {
-        const result = await runAudited({ actionAudit, identity, action: `settings.endpoints.${route.action}`, target: route.id }, async () => {
-          let body = null
-          if (route.action !== 'delete') {
-            try { body = await readBody(request) } catch { return { status: 400, body: { error: 'invalid-json' } } }
-          }
-          const baseline = environmentEndpointChecks(config.endpoints)
-          let check
-          try {
-            if (route.action === 'create') check = await endpointChecks.create(body, baseline)
-            else if (route.action === 'update') check = await endpointChecks.update(route.id, body, baseline)
-            else await endpointChecks.remove(route.id, baseline)
-          } catch (error) {
-            const status = ENDPOINT_CHECK_ERRORS[error?.code]
-            return status
-              ? { status, body: { error: error.code === 'invalid-endpoint-check' ? error.message : error.code } }
-              : { status: 503, body: { error: 'endpoint-checks-unavailable' } }
-          }
-          const view = endpointChecksView(config, endpointChecks.get())
-          return { status: route.action === 'create' ? 201 : 200, body: check ? { ...view, check } : view }
-        })
-        return json(response, result.status, result.body)
+    const settingsCollection = settingsCollectionFor(url.pathname)
+    const settingsRoute = settingsCollection && parseSettingsCollectionRoute(settingsCollection, request.method, url.pathname)
+    if (settingsRoute) {
+      const binding = settingsCollection.name === 'endpoints'
+        ? endpointChecks && {
+          store: endpointChecks,
+          view: async () => endpointChecksView(config, endpointChecks.get()),
+          baseline: async () => environmentEndpointChecks(config.endpoints),
+        }
+        : repositorySettings && {
+          store: repositorySettings,
+          view: () => repositorySettingsView(config.repositories, repositorySettings.get()),
+          baseline: () => readRegistryEntries(config.repositories?.registryPath),
+        }
+      const unavailable = { status: 503, body: { error: settingsCollection.unavailable } }
+      if (!binding) return json(response, unavailable.status, unavailable.body)
+      if (settingsRoute.action === 'list') {
+        try { return json(response, 200, await binding.view()) }
+        catch { return json(response, unavailable.status, unavailable.body) }
       }
+      const result = await runAudited({ actionAudit, identity, action: `settings.${settingsCollection.name}.${settingsRoute.action}`, target: settingsRoute.id }, async () => {
+        let body = null
+        if (settingsRoute.action !== 'delete') {
+          try { body = await readBody(request) } catch { return { status: 400, body: { error: 'invalid-json' } } }
+        }
+        let item
+        try {
+          const baseline = await binding.baseline()
+          if (settingsRoute.action === 'create') item = await binding.store.create(body, baseline)
+          else if (settingsRoute.action === 'update') item = await binding.store.update(settingsRoute.id, body, baseline)
+          else await binding.store.remove(settingsRoute.id, baseline)
+        } catch (error) {
+          const status = settingsCollection.errors[error?.code]
+          if (!status) return unavailable
+          return { status, body: { error: error.code === settingsCollection.invalid ? error.message : error.code } }
+        }
+        let view
+        try { view = await binding.view() } catch { return unavailable }
+        return { status: settingsRoute.action === 'create' ? 201 : 200, body: item ? { ...view, [settingsCollection.item]: item } : view }
+      })
+      return json(response, result.status, result.body)
     }
 
     if (request.method === 'GET' && url.pathname === '/api/incidents') {

@@ -217,6 +217,42 @@ export async function deleteEndpointCheck(id: string): Promise<FridayEndpointChe
   return endpointChecksResponse(await fetch(`${ENDPOINT_CHECKS}/${encodeURIComponent(id)}`, { method: 'DELETE' }))
 }
 
+export type FridayRepositoryEntry = {
+  id: string; name: string; path: string; remote?: string; defaultBranch: string
+  mode: 'read-only' | 'development' | 'pr-enabled'; enabled: boolean; exclude: string[]
+}
+export type FridayRepositoryEntryInput = Omit<FridayRepositoryEntry, 'id' | 'mode' | 'remote'> & { remote?: string }
+export type FridayRepositorySettings = { managed: boolean; allowedRoots: string[]; limit: number; repositories: FridayRepositoryEntry[] }
+
+export class FridayRepositorySettingsError extends Error {
+  constructor(readonly code: string, readonly status: number) { super(code) }
+}
+
+async function repositorySettingsResponse(response: Response): Promise<FridayRepositorySettings> {
+  const value = await response.json().catch(() => ({})) as Partial<FridayRepositorySettings> & { error?: string }
+  if (response.status >= 400 || !Array.isArray(value?.repositories))
+    throw new FridayRepositorySettingsError(typeof value?.error === 'string' ? value.error : 'repository-settings-unavailable', response.status)
+  return value as FridayRepositorySettings
+}
+
+const REPOSITORY_SETTINGS = '/api/settings/repositories'
+
+export async function fetchRepositorySettings(signal?: AbortSignal): Promise<FridayRepositorySettings> {
+  return repositorySettingsResponse(await fetch(REPOSITORY_SETTINGS, { method: 'GET', signal }))
+}
+
+export async function createRepositoryEntry(entry: FridayRepositoryEntryInput): Promise<FridayRepositorySettings> {
+  return repositorySettingsResponse(await fetch(REPOSITORY_SETTINGS, jsonRequest('POST', entry)))
+}
+
+export async function updateRepositoryEntry(id: string, entry: FridayRepositoryEntryInput): Promise<FridayRepositorySettings> {
+  return repositorySettingsResponse(await fetch(`${REPOSITORY_SETTINGS}/${encodeURIComponent(id)}`, jsonRequest('PUT', entry)))
+}
+
+export async function deleteRepositoryEntry(id: string): Promise<FridayRepositorySettings> {
+  return repositorySettingsResponse(await fetch(`${REPOSITORY_SETTINGS}/${encodeURIComponent(id)}`, { method: 'DELETE' }))
+}
+
 export async function fetchFridaySettings(signal?: AbortSignal): Promise<FridaySettings> {
   const response = await fetch('/api/settings', { method: 'GET', signal })
   if (!response.ok) throw new Error('settings-unavailable')

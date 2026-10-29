@@ -9,6 +9,9 @@ const ACTION_LABELS: Record<string, string> = {
   'settings.endpoints.create': 'Endpoint check created',
   'settings.endpoints.update': 'Endpoint check edited',
   'settings.endpoints.delete': 'Endpoint check deleted',
+  'settings.repositories.create': 'Repository added',
+  'settings.repositories.update': 'Repository edited',
+  'settings.repositories.delete': 'Repository removed',
 }
 const PHASE_LABELS: Record<string, string> = { requested: 'Requested', succeeded: 'Succeeded', failed: 'Failed', denied: 'Denied' }
 

@@ -12,7 +12,7 @@ import { createSupabaseRegistryClient } from './agents/supabase-client.mjs'
 import { createAgentRegistryService } from './agents/registry-service.mjs'
 import { syncAgentRegistry } from './agents/registry-sync.mjs'
 import { createAgentService } from './agents/agent-service.mjs'
-import { LocalRepositoryRegistry } from './repositories/repository.mjs'
+import { createRepositorySettingsStore, ManagedRepositoryRegistry } from './repositories/managed-registry.mjs'
 import { createActionAudit } from './audit/action-audit.mjs'
 
 const config = getConfig()
@@ -76,8 +76,11 @@ if (config.audit.enabled) {
   }
 }
 
-const repositoryRegistry = new LocalRepositoryRegistry({ registryPath: config.repositories.registryPath })
-const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, endpointChecks })
+const repositorySettings = await createRepositorySettingsStore({
+  path: config.repositories.settingsPath, allowedRoots: config.repositories.allowedRoots,
+})
+const repositoryRegistry = new ManagedRepositoryRegistry({ registryPath: config.repositories.registryPath, store: repositorySettings })
+const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, endpointChecks, repositorySettings })
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`Friday listening on 0.0.0.0:${config.port} (${config.mode} mode)`)
 })
