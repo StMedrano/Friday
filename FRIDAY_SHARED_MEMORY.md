@@ -60,10 +60,10 @@ Last reconciled: **2026-10-29 America/Chicago**
 | Current Friday checkout | `complete` | Read-only SSH on 2026-10-29 confirmed `/srv/infrastructure/apps/friday` on host `friday-controller` is a clean Git checkout of `https://github.com/StMedrano/Friday.git`, on `main`, synchronized 0 ahead / 0 behind `origin/main`, at commit `fef9e01`. |
 | API service on port 3011 | `complete` | On 2026-10-29 the healthy Friday container had automation enabled on 3011, monitoring enabled, live mode, and Docker observation disabled. Direct container-network probes reached the listener and received 403 without identity. Port 3011 is not published on VM102. |
 | Origin JWT verification | `complete` | The live origin audience and service-client fingerprints exactly matched Cloudflare. Missing identity, invalid JWT, and raw Access client headers each failed closed with 403. |
-| Read-only route boundary | `verification_needed` | Confirm the exposed API contains only approved read routes and rejects or omits writes and privileged actions. |
+| Read-only route boundary | `complete` | Current `main` exposes exactly four automation GET routes. Focused tests on 2026-10-29 passed denial of writes, unknown routes, query strings, encoded aliases, unavailable snapshots, and oversized responses; the listener does not forward to UI, repository, AI, diagnostics, or action handlers. |
 | Authenticated live request | `verification_needed` | Four authenticated 200 reads, write rejection, excluded-route rejection, and query rejection passed from the managed runtime on 2026-10-26. The current image/source correspondence is verified, but the checker has not been rerun after the 2026-10-29 container restart because credentials are unavailable to this task. |
 | Operational documentation | `complete` | Current `main` contains `docs/cloud-connection.md`, the secret-safe acceptance checker, deployment overlays, rollback guidance, and the 2026-10-26 acceptance record. |
-| Controller hardening | `verification_needed` | Current `main` and the running Friday controller use root with a writable root filesystem and no capability drop or PID limit; this is source-aligned rather than runtime drift. The separate tunnel connector is non-root, read-only, capability-dropped, and uses a mode-0600 token file. |
+| Controller hardening | `verification_needed` | Current `main` and the running Friday controller use root with a writable root filesystem and no capability drop or PID limit; this is source-aligned rather than runtime drift. Draft PR #29 already owns the non-root/read-only/capability hardening path and retains explicit staging, backup, migration, and production-cutover holds. The separate tunnel connector is already non-root, read-only, capability-dropped, and uses a mode-0600 token file. |
 
 ## Active work
 
@@ -72,6 +72,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Task | Owner | Status | Scope / files / resources | Started | Last update | Next action |
 | --- | --- | --- | --- | --- | --- | --- |
 | Install shared ledger in current Friday repo | Codex/ChatGPT | `complete` | Repository root, `AGENTS.md`, `CLAUDE.md`, `FRIDAY_SHARED_MEMORY.md` | 2026-10-29 | 2026-10-29 | Pull the tracked branch before each task and keep this ledger current. |
+| Publish shared ledger for `main` review | Codex/ChatGPT | `in_progress` | Docs-only branch `docs/shared-agent-memory-20261029`; repository-root coordination files only | 2026-10-29 | 2026-10-29 | Push the main-based branch and open a review PR; do not deploy or merge it directly. |
 | Verify VM102 port-3011 origin | Codex/ChatGPT | `complete` | Read-only VM102 container, listener, origin-health, and tracked-source inspection | 2026-10-29 | 2026-10-29 | Preserve the isolated listener and repeat origin checks after future reviewed deployments. |
 | Authenticated Cloudflare acceptance | unclaimed | `verification_needed` | Dedicated Access app and Friday read-only API; current managed-runtime rerun requires its existing hostname-scoped secret binding | 2026-10-29 | 2026-10-29 | Run `node scripts/check-cloud-connection.mjs` from the managed cloud runtime without copying credentials to VM102 or chat. |
 | Service-token renewal | unclaimed | `planned` | `friday-cloud-reader` | - | 2026-10-29 | Plan renewal before 2026-11-24 without disclosing or committing credentials. |
@@ -109,6 +110,18 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-10-29 14:11 CDT — Codex/ChatGPT — Prepared shared ledger for main review
+
+- Status: `in_progress`
+- Scope claimed: Main-based documentation branch, automation route-boundary verification, existing controller-hardening ownership, and read-only managed-runtime task discovery.
+- Work performed: Created `docs/shared-agent-memory-20261029` from current `origin/main` at `fef9e01`, applied the four existing coordination-document commits, inspected the automation listener and focused tests, located the durable Friday cloud task, and confirmed draft PR #29 already owns controller hardening.
+- Changes made: Documentation only on the isolated branch; no VM102, Cloudflare, deployment, credential, network, database, or runtime change.
+- Verification: `node --test server/automation.test.mjs scripts/check-cloud-connection.test.mjs` passed 12/12 on current `main`. The tests cover all four authenticated reads, write denial, unknown/query/encoded-route denial, snapshot validation, response bounds, credential-safe checking, and freshness checks. `git diff --check` passed.
+- Decisions: Mark the read-only route boundary complete. Keep controller hardening in draft PR #29 and keep the authenticated rerun in the existing managed runtime with its hostname-scoped credential binding.
+- Blockers/risks: The current authenticated checker has not been rerun after the 2026-10-29 restart because this task has no service-token secret. Do not copy or rotate that secret merely to rerun acceptance. Draft PR #29 is not release-ready.
+- Next action: Push the docs-only branch, open a PR to `main`, then update this entry with the review link and final branch state.
+- Rollback/recovery: Revert the docs-only commits or close the review PR; no live system rollback is needed.
 
 ### 2026-10-29 — Codex/ChatGPT — Revalidated Friday cloud-API origin after restart
 
