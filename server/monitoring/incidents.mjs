@@ -193,7 +193,8 @@ function evaluateService(state, config, service, now) {
     changed ||= opened
   }
 
-  if (service.status === 'online') {
+  // A guest stopped on purpose is no longer an outage, so maintenance clears it too.
+  if (service.status === 'online' || service.status === 'maintenance') {
     changed = resolveFingerprint(state, config, offlineFingerprint, now) || changed
     changed = resolveFingerprint(state, config, degradedFingerprint, now) || changed
   }

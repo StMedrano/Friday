@@ -56,6 +56,17 @@ test('offline service opens once after grace, resolves, and can reoccur', () => 
   assert.equal(state.incidents.length, 2)
 })
 
+test('an open offline incident resolves when the service enters maintenance', () => {
+  let state = createEmptyMonitoringState()
+  state = evaluate(state, [offline], '2026-08-19T00:00:00.000Z')
+  state = evaluate(state, [offline], '2026-08-19T00:05:01.000Z')
+  assert.equal(state.incidents[0].status, 'open')
+
+  state = evaluate(state, [{ ...offline, status: 'maintenance', detail: 'VM 110 · maintenance tag' }], '2026-08-19T00:06:00.000Z')
+  assert.equal(state.incidents[0].status, 'resolved')
+  assert.equal(state.incidents.filter((incident) => incident.status === 'open').length, 0)
+})
+
 test('degraded service opens warning after grace and resolves online', () => {
   let state = createEmptyMonitoringState()
   state = evaluate(state, [degraded], '2026-08-19T01:00:00.000Z', [], { offlineGraceSeconds: 60 })

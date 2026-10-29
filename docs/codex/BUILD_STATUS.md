@@ -475,6 +475,10 @@ PR #41 merged and deployed to VM102 as `5cfeae3` on 2026-10-19. Exact-head GitHu
 
 This is the source-of-truth handoff ledger for coding agents. Update it when a major capability changes.
 
+## Intentionally stopped guests, 2026-10-29
+
+A Proxmox guest that is stopped is reported `maintenance` instead of `offline` when its config has `onboot: 0` or carries a `maintenance` or `friday-ignore` tag, so monitoring opens no incident and no notification is pushed for a planned shutdown (for example the Umbrel VM powered off on 2026-10-29). Only stopped guests are inspected, at most sixteen per collection, and a config read failure leaves the guest `offline`. A guest that should autostart but is stopped still reports offline.
+
 ## Incident push notifications (ntfy), 2026-10-29
 
 When `FRIDAY_NTFY_URL` is an https ntfy topic URL, the monitoring runtime pushes one message per newly opened incident and one per resolved incident, at most five per poll with a summary for larger bursts. Delivery runs in the background with a five-second timeout and never fails or delays a poll. Messages carry the already-sanitised incident title, service, host and severity only; the topic URL and optional `FRIDAY_NTFY_TOKEN` stay server-side. Settings shows whether notifications are configured.
