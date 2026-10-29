@@ -51,18 +51,19 @@ Last reconciled: **2026-10-29 America/Chicago**
 | Access policy | `complete` | `Friday cloud reader only` is scoped to the dedicated service token. No bypass or Everyone rule was added. |
 | Service identity | `verification_needed` | `friday-cloud-reader` is enabled and expires **2026-11-24**. Its secret was not retrieved or recorded. Plan renewal before expiry. |
 | Anonymous acceptance | `complete` | On 2026-10-29, `/`, `/index.html`, `/api/overview`, `/api/agents`, `/api/assistant`, and `/healthz` each returned HTTP 401. |
-| Authenticated acceptance | `blocked` | Requires the existing service-token credentials through approved secure handling and a known read-only endpoint. |
+| Authenticated acceptance | `verification_needed` | The complete managed-runtime checker passed on 2026-10-26. The current post-restart rerun is blocked because the credential was intentionally removed from VM102 and is not bound to this local task; do not retrieve or rotate it merely to repeat the test. |
 
 ### Friday / VM102 origin
 
 | Item | State | Evidence or blocker |
 | --- | --- | --- |
 | Current Friday checkout | `complete` | Read-only SSH on 2026-10-29 confirmed `/srv/infrastructure/apps/friday` on host `friday-controller` is a clean Git checkout of `https://github.com/StMedrano/Friday.git`, on `main`, synchronized 0 ahead / 0 behind `origin/main`, at commit `fef9e01`. |
-| API service on port 3011 | `verification_needed` | Cloudflare is configured for `http://friday:3011`; the process/container and internal health have not been independently verified. |
-| Origin JWT verification | `verification_needed` | Confirm the port-3011 service validates Cloudflare's signed Access JWT against the dedicated application audience and team issuer. |
+| API service on port 3011 | `complete` | On 2026-10-29 the healthy Friday container had automation enabled on 3011, monitoring enabled, live mode, and Docker observation disabled. Direct container-network probes reached the listener and received 403 without identity. Port 3011 is not published on VM102. |
+| Origin JWT verification | `complete` | The live origin audience and service-client fingerprints exactly matched Cloudflare. Missing identity, invalid JWT, and raw Access client headers each failed closed with 403. |
 | Read-only route boundary | `verification_needed` | Confirm the exposed API contains only approved read routes and rejects or omits writes and privileged actions. |
-| Authenticated live request | `verification_needed` | With securely supplied client credentials, confirm a known read endpoint returns the expected 2xx response through Cloudflare. |
-| Operational documentation | `verification_needed` | Install this ledger in the current repository and update `docs/cloud-connection.md` with deploy, test, renewal, and rollback procedures. |
+| Authenticated live request | `verification_needed` | Four authenticated 200 reads, write rejection, excluded-route rejection, and query rejection passed from the managed runtime on 2026-10-26. The current image/source correspondence is verified, but the checker has not been rerun after the 2026-10-29 container restart because credentials are unavailable to this task. |
+| Operational documentation | `complete` | Current `main` contains `docs/cloud-connection.md`, the secret-safe acceptance checker, deployment overlays, rollback guidance, and the 2026-10-26 acceptance record. |
+| Controller hardening | `verification_needed` | Current `main` and the running Friday controller use root with a writable root filesystem and no capability drop or PID limit; this is source-aligned rather than runtime drift. The separate tunnel connector is non-root, read-only, capability-dropped, and uses a mode-0600 token file. |
 
 ## Active work
 
@@ -71,8 +72,8 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Task | Owner | Status | Scope / files / resources | Started | Last update | Next action |
 | --- | --- | --- | --- | --- | --- | --- |
 | Install shared ledger in current Friday repo | Codex/ChatGPT | `complete` | Repository root, `AGENTS.md`, `CLAUDE.md`, `FRIDAY_SHARED_MEMORY.md` | 2026-10-29 | 2026-10-29 | Pull the tracked branch before each task and keep this ledger current. |
-| Verify VM102 port-3011 origin | Codex/ChatGPT | `in_progress` | Read-only VM102 container, listener, origin-health, and tracked-source inspection | 2026-10-29 | 2026-10-29 | Verify port 3011, JWT configuration, and read-only route behavior without printing secrets or changing runtime state. |
-| Authenticated Cloudflare acceptance | Codex/ChatGPT | `in_progress` | Dedicated Access app and Friday read-only API; use only credentials already installed in an approved secure location | 2026-10-29 | 2026-10-29 | Inspect credential availability by name only, then test valid, missing, invalid, and write-denial paths when safely possible. |
+| Verify VM102 port-3011 origin | Codex/ChatGPT | `complete` | Read-only VM102 container, listener, origin-health, and tracked-source inspection | 2026-10-29 | 2026-10-29 | Preserve the isolated listener and repeat origin checks after future reviewed deployments. |
+| Authenticated Cloudflare acceptance | unclaimed | `verification_needed` | Dedicated Access app and Friday read-only API; current managed-runtime rerun requires its existing hostname-scoped secret binding | 2026-10-29 | 2026-10-29 | Run `node scripts/check-cloud-connection.mjs` from the managed cloud runtime without copying credentials to VM102 or chat. |
 | Service-token renewal | unclaimed | `planned` | `friday-cloud-reader` | - | 2026-10-29 | Plan renewal before 2026-11-24 without disclosing or committing credentials. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
@@ -108,6 +109,18 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-10-29 — Codex/ChatGPT — Revalidated Friday cloud-API origin after restart
+
+- Status: `verification_needed`
+- Scope claimed: Read-only VM102 origin, dedicated tunnel, Cloudflare application/policy, public negative enforcement, and managed-credential availability.
+- Work performed: Inspected current `main`, live containers, isolated listener, safe runtime settings, application/source hashes, tunnel configuration, token-file metadata, controller health, and public/direct negative requests. Reconciled the existing 2026-10-26 acceptance record instead of repeating completed deployment work.
+- Changes made: none to VM102, Cloudflare, the deployment, credentials, network, or runtime. Shared ledger only.
+- Verification: Friday and tunnel containers are healthy with zero restarts/OOMs. Critical automation/config source hashes match the running image. Port 3011 is unexposed on the host and returns 403 without valid origin identity. Invalid JWT and raw Access headers also return 403. Origin audience and client-ID fingerprints exactly match the live Cloudflare application/token. The dedicated tunnel has four registered connections, loaded the exact remote ingress, and has no origin failures since its current start. `make health` and overlay Compose validation passed. Public anonymous/bogus identity requests return 401; the separate Friday website still returns its Access redirect.
+- Decisions: Treat VM102 origin readiness, isolation, and negative authentication as current. Do not rotate or recover the service secret solely to repeat acceptance; use the existing managed-runtime binding.
+- Blockers/risks: The managed authenticated checker cannot be rerun from this local task because neither local environment nor VM102 has the client credentials; this is intentional cleanup. The running controller remains root with a writable root filesystem under current `main`; the separate security-hardening release work remains outstanding.
+- Next action: From the managed cloud runtime, rerun `node scripts/check-cloud-connection.mjs`; then rotate or replace `friday-cloud-reader` before 2026-11-24. Keep controller hardening in its reviewed release path.
+- Rollback/recovery: not applicable; no live configuration changed.
 
 ### 2026-10-29 — Codex/ChatGPT — Claimed Friday cloud-API acceptance
 
