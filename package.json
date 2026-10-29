@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite --host 0.0.0.0",
     "dev:server": "node --watch server/index.mjs",
-    "build": "tsc -b && vite build",
+    "build": "tsc -b && vite build && node scripts/build-pwa-icons.mjs",
     "start": "node server/index.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run && node --test server/*.test.mjs server/security/*.test.mjs server/ai/*.test.mjs server/agents/*.test.mjs server/adapters/*.test.mjs server/diagnostics/*.test.mjs server/monitoring/*.test.mjs server/repositories/*.test.mjs server/work/*.test.mjs server/audit/*.test.mjs server/fabric/*.test.mjs observer/*.test.mjs scripts/*.test.mjs",

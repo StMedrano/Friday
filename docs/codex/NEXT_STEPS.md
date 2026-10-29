@@ -1,5 +1,19 @@
 # Friday — Ordered Finish Queue
 
+## Installable Friday PWA — test source, stage separately
+
+- New manifest, secure-origin registration, 180/192/512 launcher icons,
+  install prompt, SW and no-private-cache policy are implemented
+  in the draft PWA feature branch. `docs/pwa.md` details rollout.
+- Check exact-head CI, Lighthouse/DevTools installability over HTTPS,
+  iOS/Android standalone launch, Cloudflare Access login/logout and
+  offline/online read behavior. Cache Storage must never include private
+  HTML, Access identity pages, API/Memory/Tasks or credential material.
+- Preserve the owner's parallel production deployment. Do **not** mix
+  unreviewed PWA changes into live VM102. Staging browser acceptance
+  and owner-approved deployment remain separate.
+
+
 ## Next: activate signed private Tasks/Memory reads through reviewed staging
 
 - Source-only GET routes are now available via `createFridayServer({workReadBridge})`.
