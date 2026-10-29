@@ -55,3 +55,20 @@ test('maintenance services never open a monitoring incident', () => {
   const second = evaluateMonitoring({ state: first.state, overview, config: { offlineGraceSeconds: 0, historyLimit: 50 }, now: '2026-10-29T16:30:00.000Z' })
   assert.deepEqual(second.state.incidents.filter(incident => incident.status === 'open'), [])
 })
+
+test('stopped-guest config reads run concurrently so slow reads do not add up', async () => {
+  let inFlight = 0
+  let peak = 0
+  const vms = [vm(110, 'a', 'stopped'), vm(111, 'b', 'stopped'), vm(112, 'c', 'stopped')]
+  const services = await getProxmoxServices(config, async (_config, path) => {
+    if (path === '/cluster/resources?type=vm') return vms
+    if (path === '/cluster/resources?type=node') return []
+    inFlight += 1
+    peak = Math.max(peak, inFlight)
+    await new Promise(resolve => setTimeout(resolve, 10))
+    inFlight -= 1
+    return { onboot: 0 }
+  })
+  assert.equal(peak, 3)
+  assert.deepEqual(services.filter(service => service.category === 'virtualization').map(service => service.status), ['maintenance', 'maintenance', 'maintenance'])
+})

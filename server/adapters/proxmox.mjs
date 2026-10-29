@@ -73,14 +73,15 @@ const MAX_STOPPED_INSPECTIONS = 16
 async function stoppedIntent(config, requestImpl, resources) {
   const intent = new Map()
   const stopped = resources.filter((vm) => vm.status !== 'running').slice(0, MAX_STOPPED_INSPECTIONS)
-  for (const vm of stopped) {
+  // Read concurrently so slow or timed-out reads cost one request timeout, not one per guest.
+  await Promise.all(stopped.map(async (vm) => {
     const kind = vm.type === 'lxc' ? 'lxc' : 'qemu'
     let guest
-    try { guest = await requestImpl(config, `/nodes/${encodeURIComponent(vm.node || '')}/${kind}/${vm.vmid}/config`) } catch { continue }
+    try { guest = await requestImpl(config, `/nodes/${encodeURIComponent(vm.node || '')}/${kind}/${vm.vmid}/config`) } catch { return }
     const tags = String(guest?.tags || '').split(/[;,\s]+/).filter(Boolean).map((tag) => tag.toLowerCase())
     if (Number(guest?.onboot) === 0) intent.set(vm.vmid, 'autostart disabled')
     else if (tags.some((tag) => MAINTENANCE_TAGS.has(tag))) intent.set(vm.vmid, 'maintenance tag')
-  }
+  }))
   return intent
 }
 
