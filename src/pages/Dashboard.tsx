@@ -162,7 +162,7 @@ export default function Dashboard() {
             query={query}
             onQueryChange={setQuery}
             onSubmit={submitFriday}
-          /> : active === 'Agents' ? <AgentsWorkspace/> : active === 'Repositories' ? <RepositoriesWorkspace/> : active === 'Applications' ? <ApplicationsWorkspace overview={overview} connected={connected}/> : active === 'Infrastructure' ? <InfrastructureWorkspace overview={overview} connected={connected}/> : active === 'Incidents' ? <IncidentsWorkspace
+          /> : active === 'Agents' ? <AgentsWorkspace/> : active === 'Settings' ? <SettingsWorkspace/> : active === 'Audit' ? <AuditWorkspace/> : active === 'Repositories' ? <RepositoriesWorkspace/> : active === 'Applications' ? <ApplicationsWorkspace overview={overview} connected={connected}/> : active === 'Infrastructure' ? <InfrastructureWorkspace overview={overview} connected={connected}/> : active === 'Incidents' ? <IncidentsWorkspace
             incidents={incidents}
             services={overview.services}
             sites={overview.sites}
