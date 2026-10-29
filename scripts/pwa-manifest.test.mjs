@@ -17,6 +17,8 @@ test('PWA manifest has installable standalone root, themed launcher and raster f
    x.src===`/icons/friday-${size}.png`&&x.purpose.includes('maskable')))
  }
  assert.match(html,/rel="manifest" href="\/manifest\.webmanifest"/)
+ // Cloudflare Access only lets the manifest through with the session cookie.
+ assert.match(html,/rel="manifest" href="\/manifest\.webmanifest" crossorigin="use-credentials"/)
  assert.match(html,/rel="apple-touch-icon" href="\/icons\/friday-180\.png"/)
  assert.match(html,/name="apple-mobile-web-app-capable"/)
  assert.match(pkg.scripts.build,/build-pwa-icons\.mjs/)
