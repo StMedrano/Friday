@@ -65,9 +65,29 @@ async function getNodeServices(config, requestImpl) {
   return services
 }
 
+// Guests stopped on purpose (autostart off, or tagged for maintenance) are
+// reported as maintenance so monitoring does not open an incident for them.
+const MAINTENANCE_TAGS = new Set(['maintenance', 'friday-ignore'])
+const MAX_STOPPED_INSPECTIONS = 16
+
+async function stoppedIntent(config, requestImpl, resources) {
+  const intent = new Map()
+  const stopped = resources.filter((vm) => vm.status !== 'running').slice(0, MAX_STOPPED_INSPECTIONS)
+  for (const vm of stopped) {
+    const kind = vm.type === 'lxc' ? 'lxc' : 'qemu'
+    let guest
+    try { guest = await requestImpl(config, `/nodes/${encodeURIComponent(vm.node || '')}/${kind}/${vm.vmid}/config`) } catch { continue }
+    const tags = String(guest?.tags || '').split(/[;,\s]+/).filter(Boolean).map((tag) => tag.toLowerCase())
+    if (Number(guest?.onboot) === 0) intent.set(vm.vmid, 'autostart disabled')
+    else if (tags.some((tag) => MAINTENANCE_TAGS.has(tag))) intent.set(vm.vmid, 'maintenance tag')
+  }
+  return intent
+}
+
 export async function getProxmoxServices(config, requestImpl = getJson) {
   if (!config.enabled || !config.baseUrl || !config.tokenId || !config.tokenSecret) return []
   const resources = await requestImpl(config, '/cluster/resources?type=vm')
+  const maintenance = await stoppedIntent(config, requestImpl, resources)
   const nodes = await getNodeServices(config, requestImpl)
   return [...resources.map((vm) => ({
     id: `proxmox-${vm.type}-${vm.vmid}`,
@@ -75,8 +95,8 @@ export async function getProxmoxServices(config, requestImpl = getJson) {
     category: 'virtualization',
     host: vm.node || 'Proxmox',
     site: config.site || 'Site A',
-    status: vm.status === 'running' ? 'online' : 'offline',
-    detail: `${vm.type?.toUpperCase() || 'VM'} ${vm.vmid}`,
+    status: vm.status === 'running' ? 'online' : maintenance.has(vm.vmid) ? 'maintenance' : 'offline',
+    detail: [`${vm.type?.toUpperCase() || 'VM'} ${vm.vmid}`, maintenance.get(vm.vmid)].filter(Boolean).join(' · '),
     updated: 'live',
   })), ...nodes]
 }
