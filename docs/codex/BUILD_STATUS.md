@@ -475,6 +475,10 @@ PR #41 merged and deployed to VM102 as `5cfeae3` on 2026-10-19. Exact-head GitHu
 
 This is the source-of-truth handoff ledger for coding agents. Update it when a major capability changes.
 
+## Browser push for the installed PWA, 2026-10-29
+
+The installed Friday PWA can receive incident notifications directly. With `FRIDAY_VAPID_PUBLIC_KEY`, `FRIDAY_VAPID_PRIVATE_KEY` and `FRIDAY_VAPID_SUBJECT` set, `GET /api/notifications/web-push` returns the public key, and any Access-verified user may POST or DELETE their own browser subscription (JSON, same-site only). Subscriptions are validated, capped at 32 and stored at `/data/push-subscriptions.json`; the VAPID private key never reaches the browser. The monitoring runtime pushes the same incident open and resolve events as the ntfy channel, at most five per poll, and a subscription that returns 404 or 410 is removed. The service worker shows the notification and focuses Friday when it is tapped. Adds the `web-push` dependency.
+
 ## Incident push notifications (ntfy), 2026-10-29
 
 When `FRIDAY_NTFY_URL` is an https ntfy topic URL, the monitoring runtime pushes one message per newly opened incident and one per resolved incident, at most five per poll with a summary for larger bursts. Delivery runs in the background with a five-second timeout and never fails or delays a poll. Messages carry the already-sanitised incident title, service, host and severity only; the topic URL and optional `FRIDAY_NTFY_TOKEN` stay server-side. Settings shows whether notifications are configured.

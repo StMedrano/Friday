@@ -5,6 +5,7 @@ import { createAutomationServer } from './automation.mjs'
 import { buildOverview } from './overview.mjs'
 import { applySiteSettings, createSiteSettingsStore } from './site-settings.mjs'
 import { createNtfyNotifier } from './notifications/ntfy.mjs'
+import { createPushSubscriptionStore, createWebPushNotifier } from './notifications/web-push.mjs'
 import { createMonitoringRuntime } from './monitoring/runtime.mjs'
 import { createFileMonitoringStore } from './monitoring/store.mjs'
 import { createSupabaseRegistryClient } from './agents/supabase-client.mjs'
@@ -21,12 +22,17 @@ if (config.automation.enabled && (!Number.isInteger(config.automation.port) ||
 }
 const notifier = createNtfyNotifier(config.notifications.ntfy)
 if (config.notifications.ntfy.url && !notifier) console.warn('Friday notifications: FRIDAY_NTFY_URL must be an https topic URL; notifications disabled')
+const pushSubscriptions = await createPushSubscriptionStore({ path: config.pushSubscriptions.path })
+const webPush = createWebPushNotifier({ keys: config.notifications.webPush, store: pushSubscriptions })
+const notifiers = [notifier, webPush].filter(Boolean)
 const siteSettings = await createSiteSettingsStore({ path: config.siteSettings.path })
 const store = createFileMonitoringStore({ statePath: config.monitoring.statePath })
 const monitoringRuntime = createMonitoringRuntime({
   config,
   collectOverview: (effectiveConfig) => buildOverview(applySiteSettings(effectiveConfig, siteSettings.get())),
-  notifyIncidents: notifier ? (changes) => notifier.notify(changes) : null,
+  notifyIncidents: notifiers.length
+    ? (changes) => Promise.all(notifiers.map((channel) => channel.notify(changes).catch(() => {})))
+    : null,
   store,
 })
 
@@ -74,7 +80,7 @@ if (config.audit.enabled) {
 }
 
 const repositoryRegistry = new LocalRepositoryRegistry({ registryPath: config.repositories.registryPath })
-const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings })
+const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, pushSubscriptions })
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`Friday listening on 0.0.0.0:${config.port} (${config.mode} mode)`)
 })

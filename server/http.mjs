@@ -13,6 +13,7 @@ import { handleWorkReadHttp } from './work/http-reads.mjs'
 import { auditActor } from './audit/action-audit.mjs'
 import { buildSettingsView } from './settings.mjs'
 import { applySiteSettings, siteSettingsView } from './site-settings.mjs'
+import { normalizeSubscription, vapidKeys } from './notifications/web-push.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -202,6 +203,7 @@ export function createFridayServer({
   workReadBridge = null,
   actionAudit = null,
   siteSettings = null,
+  pushSubscriptions = null,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
   const buildEffectiveOverview = (effectiveConfig) =>
@@ -227,6 +229,7 @@ export function createFridayServer({
     if (accessGate && url.pathname.startsWith('/api/')) {
       const registrySync = request.method === 'POST' && url.pathname === '/api/agents/registry/sync'
       const siteSettingsWrite = request.method === 'PUT' && url.pathname === '/api/settings/sites'
+      const pushWrite = (request.method === 'POST' || request.method === 'DELETE') && url.pathname === '/api/notifications/web-push'
       const operatorOnly = registrySync || siteSettingsWrite || url.pathname === '/api/audit/events'
       let verdict
       try { verdict = await accessGate(request, operatorOnly) }
@@ -238,9 +241,9 @@ export function createFridayServer({
       identity = verdict.identity || null
       // Do not allow browser-origin cross-site requests to use a verified session
       // for operational POST/PUT handlers. Registry sync and site settings additionally require JSON.
-      if ((request.method === 'POST' || request.method === 'PUT') && request.headers['sec-fetch-site'] === 'cross-site')
+      if ((request.method === 'POST' || request.method === 'PUT' || request.method === 'DELETE') && request.headers['sec-fetch-site'] === 'cross-site')
         return json(response, 403, {error:'access-denied'})
-      if ((registrySync || siteSettingsWrite) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
+      if ((registrySync || siteSettingsWrite || pushWrite) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
         return json(response, 415, {error:'json-required'})
     }
 
@@ -260,6 +263,22 @@ export function createFridayServer({
 
     if (request.method === 'GET' && url.pathname === '/api/settings') {
       return json(response, 200, buildSettingsView(config, { actionAudit }))
+    }
+
+    // Any Access-verified user may subscribe the browser they are signed in on.
+    if (url.pathname === '/api/notifications/web-push' && ['GET', 'POST', 'DELETE'].includes(request.method)) {
+      const keys = vapidKeys(config.notifications?.webPush)
+      if (request.method === 'GET') return json(response, 200, { enabled: Boolean(keys && pushSubscriptions), publicKey: keys && pushSubscriptions ? keys.publicKey : null })
+      if (!keys || !pushSubscriptions) return json(response, 503, { error: 'web-push-unavailable' })
+      let body
+      try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid-json' }) }
+      const subscription = normalizeSubscription(body)
+      if (!subscription) return json(response, 400, { error: 'invalid-subscription' })
+      try {
+        if (request.method === 'POST') await pushSubscriptions.add(subscription)
+        else await pushSubscriptions.remove(subscription.id)
+      } catch { return json(response, 503, { error: 'web-push-unavailable' }) }
+      return json(response, 200, { subscribed: request.method === 'POST' })
     }
 
     if (url.pathname === '/api/settings/sites' && (request.method === 'GET' || request.method === 'PUT')) {
