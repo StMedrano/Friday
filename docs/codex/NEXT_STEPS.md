@@ -174,7 +174,7 @@ Completed behavior:
 
 The old “finish Friday Assistant experience” milestone is retired.
 
-## P5 — Local Agent Platform Phase 1 — merged; live acceptance blocked
+## P5 — Local Agent Platform Phase 1 — completed and production validated
 
 The Phase 1 implementation is in `main`. The old PR #19 head is stale relative to the merged security and cloud-API work and must not be used as a deployment source.
 
@@ -190,7 +190,10 @@ Implemented source behavior:
 8. Every Phase 1 response remains advisory with `execution.performed=false`.
 9. CI validates the exact two-table schema and rejects agent execution routes, shell/SSH paths, and browser-visible Supabase credentials.
 
-### Required live acceptance before rollout completion
+### Live acceptance — completed 2026-10-28
+
+All gates below passed. PR #92 merged to `main` as `407fd85`; VM102 now runs `main` via `make update` (`cd94dfc` at the time of writing). VM132 stability: three snapshots at 16:54:53Z, 17:00:20Z and 17:05:45Z each reported `supabase-db` running and healthy with restart count 1, `SELECT 1` = 1, and authenticated PostgREST 200 with exactly `proxmox-observer`. A production-path direct Ask with all monitoring incidents answered locally (`ollama`, `qwen3:4b-instruct`, `execution.performed=false`) with correct counts, offline services, site label and open incidents. Owner-run shared-composer and desktop/phone Agents checks passed, and the managed-cloud checker passed all eight gates. The original checklist is kept for reference.
+
 
 1. CT108 nic1 validation is complete: its running-container interface reports `10.1.10.12/24`, and authoritative VM102 passes TCP/11434, `/api/tags`, and `/api/chat` over vmbr1.
 2. Agent defaults now use `http://10.1.10.12:11434`; post-migration `make verify` passed on 2026-09-22.

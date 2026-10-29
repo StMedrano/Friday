@@ -5,10 +5,10 @@ export type Site = {
   name: string
   location: string
   status: InfrastructureStatus
-  gateway: string
-  network: string
-  latencyMs: number
-  vpn: InfrastructureStatus
+  gateway?: string
+  network?: string
+  latencyMs?: number
+  vpn?: InfrastructureStatus
   devicesOnline: number
   devicesTotal: number
 }
@@ -16,7 +16,7 @@ export type Site = {
 export type Service = {
   id: string
   name: string
-  category: 'virtualization' | 'network' | 'container' | 'dns' | 'media' | 'monitoring' | 'app'
+  category: 'virtualization' | 'host' | 'database' | 'network' | 'container' | 'dns' | 'media' | 'monitoring' | 'app'
   host: string
   site: string
   status: InfrastructureStatus

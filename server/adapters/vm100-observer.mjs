@@ -46,7 +46,7 @@ export async function getVm100ObserverServices(config, requestImpl = requestObse
     name: String(container.name || container.id || 'unknown'),
     category: 'container',
     host: String(config.hostName || container.host || payload.host || 'VM 100'),
-    site: 'Site A',
+    site: config.site || 'Site A',
     status: stateToStatus(container.state),
     detail: String(container.image || 'Docker container'),
     updated: String(container.status || container.observedAt || payload.observedAt || 'live'),

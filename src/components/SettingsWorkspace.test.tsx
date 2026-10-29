@@ -24,7 +24,7 @@ const settings = {
 }
 
 describe('SettingsWorkspace', () => {
-  it('shows server configuration posture read-only with no controls', async () => {
+  it('shows server configuration posture with no environment controls', async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, _options?: RequestInit) => new Response(JSON.stringify(settings), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
     render(<SettingsWorkspace />)
@@ -40,7 +40,7 @@ describe('SettingsWorkspace', () => {
     expect(screen.getByText(/No operators configured/)).toBeInTheDocument()
     expect(screen.getByText('Enabled · chain verified · 12 events')).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'AI providers' })).toHaveTextContent('1. groq')
-    expect(screen.getByText(/change them in the server environment/i)).toBeInTheDocument()
+    expect(screen.getByText(/change everything else in the server environment/i)).toBeInTheDocument()
     expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
     expect(screen.queryByRole('textbox')).not.toBeInTheDocument()
     expect(fetchMock.mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true)

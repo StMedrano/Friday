@@ -41,6 +41,11 @@ function endpointText(value) {
   return text && text.length <= 80 && !/[\u0000-\u001f\u007f]/.test(text) ? text : null
 }
 
+// Adapters without their own site data default to the original single-site label.
+function siteLabel(value) {
+  return String(value || '').trim() || 'Site A'
+}
+
 function endpointConfiguration(env) {
   const raw = String(env.FRIDAY_ENDPOINT_CHECKS_JSON || '').trim()
   const legacyRaw = String(env.FRIDAY_ENDPOINT_URLS || '').trim()
@@ -119,6 +124,7 @@ export function getConfig(env = process.env) {
       enabled: enabled(env.FRIDAY_DOCKER_ENABLED),
       socketPath: env.FRIDAY_DOCKER_SOCKET || '/var/run/docker.sock',
       hostName: env.FRIDAY_DOCKER_HOST_NAME || 'VM 102',
+      site: siteLabel(env.FRIDAY_DOCKER_SITE),
     },
     proxmox: {
       enabled: enabled(env.FRIDAY_PROXMOX_ENABLED),
@@ -126,15 +132,18 @@ export function getConfig(env = process.env) {
       tokenId: env.FRIDAY_PROXMOX_TOKEN_ID || '',
       tokenSecret: env.FRIDAY_PROXMOX_TOKEN_SECRET || '',
       rejectUnauthorized: !enabled(env.FRIDAY_PROXMOX_INSECURE),
+      site: siteLabel(env.FRIDAY_PROXMOX_SITE),
     },
     vm100Observer: {
       enabled: enabled(env.FRIDAY_VM100_OBSERVER_ENABLED),
       baseUrl: env.FRIDAY_VM100_OBSERVER_URL || '',
       token: env.FRIDAY_VM100_OBSERVER_TOKEN || '',
       hostName: env.FRIDAY_VM100_OBSERVER_HOST_NAME || 'VM 100',
+      site: siteLabel(env.FRIDAY_VM100_OBSERVER_SITE),
     },
     endpoints: {
       enabled: enabled(env.FRIDAY_ENDPOINTS_ENABLED),
+      site: siteLabel(env.FRIDAY_ENDPOINTS_SITE),
       ...endpoints,
     },
     omada: {
@@ -177,6 +186,9 @@ export function getConfig(env = process.env) {
       statePath: env.FRIDAY_MONITORING_STATE_PATH || '/data/monitoring-state.json',
       historyLimit: positiveNumber(env.FRIDAY_MONITORING_HISTORY_LIMIT, 2000),
     },
+    siteSettings: {
+      path: env.FRIDAY_SITE_SETTINGS_PATH || '/data/site-settings.json',
+    },
     audit: {
       // Durable operator action audit; opt-in so enabling it is a reviewed deployment step.
       enabled: enabled(env.FRIDAY_AUDIT_ENABLED),
@@ -186,6 +198,13 @@ export function getConfig(env = process.env) {
     repositories: { registryPath: env.FRIDAY_REPOSITORY_REGISTRY_PATH || './repositories.json' },
     diagnostics: {
       enabled: enabled(env.FRIDAY_DIAGNOSTICS_ENABLED),
+    },
+    supabaseHealth: {
+      // On with the agent registry unless explicitly disabled; reuses its server-side credentials.
+      enabled: agentRegistryEnabled && env.FRIDAY_SUPABASE_HEALTH_ENABLED !== 'false',
+      supabaseUrl: env.FRIDAY_SUPABASE_URL || '',
+      serviceKey: env.FRIDAY_SUPABASE_SERVICE_KEY || '',
+      site: siteLabel(env.FRIDAY_SUPABASE_SITE),
     },
     agents: {
       enabled: agentRegistryEnabled,

@@ -26,17 +26,57 @@ function getJson(config, path) {
   })
 }
 
-export async function getProxmoxServices(config) {
+// Host memory or swap above these shares marks the node degraded, which
+// opens a monitoring incident before the host's OOM killer has to act.
+const MEMORY_WARN = 0.85
+const SWAP_WARN = 0.8
+
+const share = (used, total) => Number.isFinite(used) && Number.isFinite(total) && total > 0 ? used / total : null
+const percent = (value) => `${Math.round(value * 100)}%`
+
+async function getNodeServices(config, requestImpl) {
+  let nodes
+  try { nodes = await requestImpl(config, '/cluster/resources?type=node') } catch { return [] }
+  if (!Array.isArray(nodes)) return []
+  const services = []
+  for (const node of nodes.filter((item) => item?.type === 'node' && typeof item.node === 'string' && item.node)) {
+    const service = {
+      id: `proxmox-node-${node.node}`, name: `Proxmox host ${node.node}`, category: 'host', host: node.node,
+      site: config.site || 'Site A', status: 'online', detail: '', updated: 'live',
+    }
+    if (node.status !== 'online') {
+      services.push({ ...service, status: 'offline', detail: 'Node offline' })
+      continue
+    }
+    let status = null
+    try { status = await requestImpl(config, `/nodes/${encodeURIComponent(node.node)}/status`) } catch { status = null }
+    const memory = status?.memory
+    const memoryShare = memory
+      ? share(Number.isFinite(memory.available) ? memory.total - memory.available : memory.used, memory.total)
+      : share(node.mem, node.maxmem)
+    const swapShare = status?.swap ? share(status.swap.used, status.swap.total) : null
+    const pressured = (memoryShare !== null && memoryShare >= MEMORY_WARN) || (swapShare !== null && swapShare >= SWAP_WARN)
+    services.push({
+      ...service,
+      status: pressured ? 'degraded' : 'online',
+      detail: `Memory ${memoryShare === null ? 'unknown' : `${percent(memoryShare)} used`} · swap ${swapShare === null ? 'unknown' : `${percent(swapShare)} used`}`,
+    })
+  }
+  return services
+}
+
+export async function getProxmoxServices(config, requestImpl = getJson) {
   if (!config.enabled || !config.baseUrl || !config.tokenId || !config.tokenSecret) return []
-  const resources = await getJson(config, '/cluster/resources?type=vm')
-  return resources.map((vm) => ({
+  const resources = await requestImpl(config, '/cluster/resources?type=vm')
+  const nodes = await getNodeServices(config, requestImpl)
+  return [...resources.map((vm) => ({
     id: `proxmox-${vm.type}-${vm.vmid}`,
     name: vm.name || `${vm.type?.toUpperCase() || 'VM'} ${vm.vmid}`,
     category: 'virtualization',
     host: vm.node || 'Proxmox',
-    site: 'Site A',
+    site: config.site || 'Site A',
     status: vm.status === 'running' ? 'online' : 'offline',
     detail: `${vm.type?.toUpperCase() || 'VM'} ${vm.vmid}`,
     updated: 'live',
-  }))
+  })), ...nodes]
 }
