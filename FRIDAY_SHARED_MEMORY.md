@@ -77,6 +77,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Authenticated Cloudflare acceptance | unclaimed | `verification_needed` | Dedicated Access app and Friday read-only API; current managed-runtime rerun requires its existing hostname-scoped secret binding | 2026-10-29 | 2026-10-29 | Run `node scripts/check-cloud-connection.mjs` from the managed cloud runtime without copying credentials to VM102 or chat. |
 | Service-token renewal | Codex/ChatGPT | `planned` | `friday-cloud-reader`; coordinated Cloudflare rotation and managed-runtime binding update | 2026-10-29 | 2026-10-29 | After the exact production merge target is identified, rotate with a bounded overlap, update the secure caller binding without exposing the secret, rerun acceptance, then retire the prior secret. |
 | Production deployment after development merge | unclaimed | `planned` | Merged `main` revision and authoritative VM102 checkout | 2026-10-29 | 2026-10-29 | Identify the exact development PR/branch, require its merge and green exact-head verification, then inventory VM102, preserve `.env`, run preflight, deploy the merged `main`, and run health plus cloud acceptance. |
+| Integrate development branch into current `main` | Codex/ChatGPT | `in_progress` | `integration/friday-development-main-20261029`; merge `feat/friday-operator-auth-20261011` into current `main`, preserving current-main behavior and safety boundaries | 2026-10-29 | 2026-10-29 | Merge in the isolated worktree, resolve conflicts against current `main`, run full verification, and open a replacement PR targeting `main`. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -112,6 +113,18 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-10-29 16:31 CDT — Codex/ChatGPT — Claimed development-to-main integration
+
+- Status: `in_progress`
+- Scope claimed: Isolated branch `integration/friday-development-main-20261029`, based on current `main` at `52193d1`, integrating the combined development/security branch `feat/friday-operator-auth-20261011` at `dc64d49`.
+- Work performed: Reconciled the historical PR graph, confirmed PR #33 was squash-merged into the security branch rather than `main`, and created a separate current-main worktree without modifying the original development checkout.
+- Changes made: Shared ledger claim only so far; no application conflict resolution, remote branch, PR, VM102, Cloudflare, credential, or production change yet.
+- Verification: Current `main` and both source branch heads were fetched explicitly. The original PR #33 head and the combined security branch are not ancestors of current `main`; PRs #103, #104, and #105 are already in current `main`.
+- Decisions: Use the combined `feat/friday-operator-auth-20261011` head as the development payload because it contains the squash merge of PR #33. Do not separately merge the stale `feat/friday-group-workspace-20261013` history.
+- Blockers/risks: The combined branch is 46 commits behind current `main` and 28 commits ahead, so conflict resolution and full exact-result verification are required before any PR or deployment.
+- Next action: Establish the clean current-main baseline, merge the combined branch locally, inspect every conflict and resulting diff, then run `make verify` before publishing.
+- Rollback/recovery: The integration work is isolated; abandon the integration branch/worktree without changing `main` or either source branch if reconciliation proves unsafe.
 
 ### 2026-10-29 14:15 CDT — Codex/ChatGPT — Recorded conditional production authority
 
