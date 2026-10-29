@@ -14,6 +14,7 @@ import FridayConversation from '../components/FridayConversation'
 import FridayWorkspace from '../components/FridayWorkspace'
 import IncidentsWorkspace from '../components/IncidentsWorkspace'
 import InfrastructureWorkspace from '../components/InfrastructureWorkspace'
+import ActivityTimeline from '../components/ActivityTimeline'
 import MobileHome from '../components/MobileHome'
 import MobileNavigation from '../components/MobileNavigation'
 import PwaControls from '../components/PwaControls'
@@ -55,6 +56,8 @@ export default function Dashboard() {
   const [query, setQuery] = useState('')
   const [history, setHistory] = useState<MonitoringEvent[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
+  const [historyLoading, setHistoryLoading] = useState(false)
+  const [historyRefresh, setHistoryRefresh] = useState(0)
   const [selectedIncidentId, setSelectedIncidentId] = useState<string | null>(null)
   const [paletteOpen, setPaletteOpen] = useState(false)
   const incidents = overview.incidents ?? []
@@ -64,20 +67,22 @@ export default function Dashboard() {
   const live = connected && overview.mode === 'live'
   const metrics = useMemo(() => overview.resources.slice(0, 3), [overview.resources])
 
+  // One read serves both the home timeline and the Incidents history.
   useEffect(() => {
-    if (active !== 'Incidents') return
     const controller = new AbortController()
     setHistoryError(null)
+    setHistoryLoading(true)
     fetchMonitoringHistory(controller.signal)
-      .then(setHistory)
+      .then((events) => { setHistory(events); setHistoryLoading(false) })
       .catch((error) => {
         if (error?.name !== 'AbortError') {
           setHistory([])
           setHistoryError('History unavailable')
+          setHistoryLoading(false)
         }
       })
     return () => controller.abort()
-  }, [active])
+  }, [historyRefresh])
 
   useEffect(() => {
     document.title = activeIncidents > 0 ? `(${activeIncidents}) ${baseTitle}` : baseTitle
@@ -157,6 +162,16 @@ export default function Dashboard() {
             onSubmit={submitFriday}
             onNavigate={navigate}
             onSelectIncident={viewDiagnosis}
+            activity={<ActivityTimeline
+              connected={connected}
+              mode={overview.mode}
+              events={history}
+              examples={overview.activities}
+              loading={historyLoading}
+              error={historyError}
+              onOpenIncidents={() => navigate('Incidents')}
+              onRefresh={() => setHistoryRefresh((value) => value + 1)}
+            />}
           /> : active === 'FRIDAY' ? <FridayWorkspace
             session={friday}
             query={query}
@@ -240,6 +255,17 @@ export default function Dashboard() {
               <div className="v3-panel"><div className="v3-section-head"><div><span className="v3-kicker">TELEMETRY</span><h2>VM 100 · Infrastructure</h2></div>{live ? <span className="v3-live"><i/> LIVE</span> : <span className="v3-live sample"><i/> SAMPLE</span>}</div><div className="v3-metrics">{metrics.map((m, i) => <div key={m.label}><span>{i === 0 ? <Cpu/> : i === 1 ? <MemoryStick/> : <HardDrive/>}{m.label}</span><strong>{m.value}%</strong><div><i style={{width:`${m.value}%`}}/></div><small>{m.helper}</small></div>)}</div></div>
               <section className="v3-panel" aria-labelledby="v3-needs-attention"><div className="v3-section-head"><div><span className="v3-kicker">SERVICES</span><h2 id="v3-needs-attention">Needs attention</h2></div><button onClick={() => navigate('Infrastructure')}>View all services <ChevronRight size={15}/></button></div><div className="v3-agents">{health.attention.length ? health.attention.slice(0, 4).map((service) => <div key={service.id}><i className={service.status}/><span><b>{service.name}</b><small>{service.host} · {service.detail}</small></span><em className={service.status}>{statusLabel(service.status)}</em></div>) : <div><i className="on"/><span><b>No service issues</b><small>{!health.total ? 'No services observed yet.' : health.online === health.total ? 'Every observed service reports online.' : `${health.total - health.online} in maintenance · the rest report online.`}</small></span></div>}</div></section>
             </section>
+
+            <ActivityTimeline
+              connected={connected}
+              mode={overview.mode}
+              events={history}
+              examples={overview.activities}
+              loading={historyLoading}
+              error={historyError}
+              onOpenIncidents={() => navigate('Incidents')}
+              onRefresh={() => setHistoryRefresh((value) => value + 1)}
+            />
 
             <section className="v3-section" aria-labelledby="v3-service-health"><div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2 id="v3-service-health">Service health</h2></div><span>{health.online} online</span></div><div className="v3-services">{orderedServices.map(s => <button key={s.id} onClick={() => navigate('Infrastructure')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span>{s.status === 'online' ? <em>{s.updated}</em> : <em className={`v3-service-state ${s.status}`}>{statusLabel(s.status)}</em>}</button>)}</div></section>
           </> : active === 'FRIDAY' ? <FridayWorkspace session={friday} query={query} onQueryChange={setQuery} onSubmit={submitFriday}/>

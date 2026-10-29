@@ -478,6 +478,10 @@ This is the source-of-truth handoff ledger for coding agents. Update it when a m
 ## Intentionally stopped guests, 2026-10-29
 
 A Proxmox guest that is stopped is reported `maintenance` instead of `offline` when its config has `onboot: 0` or carries a `maintenance` or `friday-ignore` tag, so monitoring opens no incident and no notification is pushed for a planned shutdown (for example the Umbrel VM powered off on 2026-10-29). Only stopped guests are inspected, at most sixteen per collection, and a config read failure leaves the guest `offline`. A guest that should autostart but is stopped still reports offline.
+## Recent activity timeline, 2026-10-29
+
+The home screen shows the monitoring history it already reads: a "Recent activity" panel with the five most recent observed events, newest first, on desktop and phone. It states its provenance (observed data, demo examples, or not connected) and reports an unavailable history rather than an empty one. One history read now serves both the home panel and the Incidents workspace, with an explicit refresh. Ported from `feat/friday-group-workspace-20261013`, which is being split rather than merged whole.
+
 ## Phone layout reached Settings and Audit, 2026-10-29
 
 The phone shell routed only Overview, FRIDAY, Agents, Repositories, Applications, Infrastructure and Incidents, so Settings and Audit fell through to the "not connected" release-status card even though both are production-backed. That hid the Sites panel and the per-device notification toggle from phones. Both now render their real workspaces on phones; Tasks, Memory and Approvals still report honestly as not connected.
