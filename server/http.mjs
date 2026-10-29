@@ -1,5 +1,6 @@
 import { createServer } from 'node:http'
-import { toPublicRepository } from './repositories/repository.mjs'
+import { REPOSITORY_ID, toPublicRepository } from './repositories/repository.mjs'
+import { readRegistryEntries, repositorySettingsView } from './repositories/managed-registry.mjs'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { extname, join, normalize, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -13,6 +14,8 @@ import { handleWorkReadHttp } from './work/http-reads.mjs'
 import { auditActor } from './audit/action-audit.mjs'
 import { buildSettingsView } from './settings.mjs'
 import { applySiteSettings, siteSettingsView } from './site-settings.mjs'
+import { applyEndpointChecks, endpointChecksView, environmentEndpointChecks } from './endpoint-checks.mjs'
+import { normalizeSubscription, vapidKeys } from './notifications/web-push.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -143,6 +146,41 @@ function parseRepositoryToolRoute(pathname) {
 
 const AUDIT_DETAIL = /^[a-z0-9-]{1,64}$/
 
+// Operator-managed Friday settings collections: GET lists, POST creates,
+// PUT /:id edits and DELETE /:id deletes. Every write is operator-only and audited.
+const SETTINGS_COLLECTIONS = [
+  {
+    name: 'endpoints', root: '/api/settings/endpoints', id: /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/,
+    item: 'check', invalid: 'invalid-endpoint-check', unavailable: 'endpoint-checks-unavailable',
+    errors: { 'invalid-endpoint-check': 400, 'endpoint-check-not-found': 404, 'endpoint-check-exists': 409, 'endpoint-check-limit': 409 },
+  },
+  {
+    name: 'repositories', root: '/api/settings/repositories', id: REPOSITORY_ID,
+    item: 'repository', invalid: 'invalid-repository', unavailable: 'repository-settings-unavailable',
+    errors: {
+      'invalid-repository': 400, 'repository-path-not-allowed': 400, 'repository-not-git': 400,
+      'repository-not-found': 404, 'repository-exists': 409, 'repository-limit': 409,
+    },
+  },
+]
+
+function settingsCollectionFor(pathname) {
+  return SETTINGS_COLLECTIONS.find(collection => pathname === collection.root || pathname.startsWith(collection.root + '/')) || null
+}
+
+function parseSettingsCollectionRoute(collection, method, pathname) {
+  if (pathname === collection.root) {
+    if (method === 'GET') return { action: 'list', id: null }
+    if (method === 'POST') return { action: 'create', id: null }
+    return null
+  }
+  const id = pathname.slice(collection.root.length + 1)
+  if (!collection.id.test(id)) return null
+  if (method === 'PUT') return { action: 'update', id }
+  if (method === 'DELETE') return { action: 'delete', id }
+  return null
+}
+
 // Writes `requested` before running and the outcome after. When an audit
 // store is configured but cannot persist the request, the action never runs.
 async function runAudited({ actionAudit, identity, action, target = null }, run) {
@@ -202,10 +240,17 @@ export function createFridayServer({
   workReadBridge = null,
   actionAudit = null,
   siteSettings = null,
+  endpointChecks = null,
+  repositorySettings = null,
+  pushSubscriptions = null,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
-  const buildEffectiveOverview = (effectiveConfig) =>
-    buildOverviewImpl(siteSettings ? applySiteSettings(effectiveConfig, siteSettings.get()) : effectiveConfig)
+  const labelledConfig = (effectiveConfig = config) =>
+    siteSettings ? applySiteSettings(effectiveConfig, siteSettings.get()) : effectiveConfig
+  const buildEffectiveOverview = (effectiveConfig) => {
+    const labelled = labelledConfig(effectiveConfig)
+    return buildOverviewImpl(endpointChecks ? applyEndpointChecks(labelled, endpointChecks.get()) : labelled)
+  }
   const securityRequired = config.access?.enabled === true ||
     (config.mode === 'live' && config.access?.enabled !== false)
   const accessGate = securityRequired ? (accessGateImpl || createAccessGate(config.access)) : null
@@ -227,7 +272,9 @@ export function createFridayServer({
     if (accessGate && url.pathname.startsWith('/api/')) {
       const registrySync = request.method === 'POST' && url.pathname === '/api/agents/registry/sync'
       const siteSettingsWrite = request.method === 'PUT' && url.pathname === '/api/settings/sites'
-      const operatorOnly = registrySync || siteSettingsWrite || url.pathname === '/api/audit/events'
+      const collectionWrite = request.method !== 'GET' && request.method !== 'HEAD' && Boolean(settingsCollectionFor(url.pathname))
+      const pushWrite = (request.method === 'POST' || request.method === 'DELETE') && url.pathname === '/api/notifications/web-push'
+      const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || url.pathname === '/api/audit/events'
       let verdict
       try { verdict = await accessGate(request, operatorOnly) }
       catch { verdict = {status:503,error:'access-verification-unavailable'} }
@@ -237,10 +284,10 @@ export function createFridayServer({
       }
       identity = verdict.identity || null
       // Do not allow browser-origin cross-site requests to use a verified session
-      // for operational POST/PUT handlers. Registry sync and site settings additionally require JSON.
-      if ((request.method === 'POST' || request.method === 'PUT') && request.headers['sec-fetch-site'] === 'cross-site')
+      // for operational POST/PUT/DELETE handlers. Settings and registry writes with a body additionally require JSON.
+      if (['POST', 'PUT', 'DELETE'].includes(request.method) && request.headers['sec-fetch-site'] === 'cross-site')
         return json(response, 403, {error:'access-denied'})
-      if ((registrySync || siteSettingsWrite) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
+      if ((registrySync || siteSettingsWrite || pushWrite || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
         return json(response, 415, {error:'json-required'})
     }
 
@@ -259,7 +306,23 @@ export function createFridayServer({
     }
 
     if (request.method === 'GET' && url.pathname === '/api/settings') {
-      return json(response, 200, buildSettingsView(config, { actionAudit }))
+      return json(response, 200, buildSettingsView(endpointChecks ? applyEndpointChecks(labelledConfig(), endpointChecks.get()) : labelledConfig(), { actionAudit }))
+    }
+
+    // Any Access-verified user may subscribe the browser they are signed in on.
+    if (url.pathname === '/api/notifications/web-push' && ['GET', 'POST', 'DELETE'].includes(request.method)) {
+      const keys = vapidKeys(config.notifications?.webPush)
+      if (request.method === 'GET') return json(response, 200, { enabled: Boolean(keys && pushSubscriptions), publicKey: keys && pushSubscriptions ? keys.publicKey : null })
+      if (!keys || !pushSubscriptions) return json(response, 503, { error: 'web-push-unavailable' })
+      let body
+      try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid-json' }) }
+      const subscription = normalizeSubscription(body)
+      if (!subscription) return json(response, 400, { error: 'invalid-subscription' })
+      try {
+        if (request.method === 'POST') await pushSubscriptions.add(subscription)
+        else await pushSubscriptions.remove(subscription.id)
+      } catch { return json(response, 503, { error: 'web-push-unavailable' }) }
+      return json(response, 200, { subscribed: request.method === 'POST' })
     }
 
     if (url.pathname === '/api/settings/sites' && (request.method === 'GET' || request.method === 'PUT')) {
@@ -274,6 +337,57 @@ export function createFridayServer({
             : { status: 503, body: { error: 'site-settings-unavailable' } }
         }
         return { status: 200, body: siteSettingsView(config, siteSettings.get()) }
+      })
+      return json(response, result.status, result.body)
+    }
+
+    const settingsCollection = settingsCollectionFor(url.pathname)
+    const settingsRoute = settingsCollection && parseSettingsCollectionRoute(settingsCollection, request.method, url.pathname)
+    if (settingsRoute) {
+      const binding = settingsCollection.name === 'endpoints'
+        ? endpointChecks && {
+          store: endpointChecks,
+          // Seed and list from the site-labelled config so operator site labels carry over.
+          view: async () => endpointChecksView(labelledConfig(), endpointChecks.get()),
+          baseline: async () => environmentEndpointChecks(labelledConfig().endpoints),
+          // A deleted check is never polled again, so retire its open incidents explicitly.
+          afterDelete: id => monitoringRuntime?.retireService?.(`endpoint-${id}`, 'endpoint check deleted'),
+        }
+        : repositorySettings && {
+          store: repositorySettings,
+          view: () => repositorySettingsView(config.repositories, repositorySettings.get()),
+          baseline: () => readRegistryEntries(config.repositories?.registryPath),
+        }
+      const unavailable = { status: 503, body: { error: settingsCollection.unavailable } }
+      if (!binding) return json(response, unavailable.status, unavailable.body)
+      if (settingsRoute.action === 'list') {
+        try { return json(response, 200, await binding.view()) }
+        catch { return json(response, unavailable.status, unavailable.body) }
+      }
+      const result = await runAudited({ actionAudit, identity, action: `settings.${settingsCollection.name}.${settingsRoute.action}`, target: settingsRoute.id }, async () => {
+        let body = null
+        if (settingsRoute.action !== 'delete') {
+          try { body = await readBody(request) } catch { return { status: 400, body: { error: 'invalid-json' } } }
+        }
+        let item
+        try {
+          // The env/file baseline only seeds the first write; once managed it is ignored.
+          const baseline = binding.store.get() ? null : await binding.baseline()
+          if (settingsRoute.action === 'create') item = await binding.store.create(body, baseline)
+          else if (settingsRoute.action === 'update') item = await binding.store.update(settingsRoute.id, body, baseline)
+          else await binding.store.remove(settingsRoute.id, baseline)
+        } catch (error) {
+          const status = settingsCollection.errors[error?.code]
+          if (!status) return unavailable
+          return { status, body: { error: error.code === settingsCollection.invalid ? error.message : error.code } }
+        }
+        if (settingsRoute.action === 'delete' && binding.afterDelete) {
+          try { await binding.afterDelete(settingsRoute.id) }
+          catch { console.warn(`Friday could not retire monitoring state for deleted ${settingsCollection.name} entry`) }
+        }
+        let view
+        try { view = await binding.view() } catch { return unavailable }
+        return { status: settingsRoute.action === 'create' ? 201 : 200, body: item ? { ...view, [settingsCollection.item]: item } : view }
       })
       return json(response, result.status, result.body)
     }

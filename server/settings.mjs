@@ -1,4 +1,5 @@
 import {ntfyTopicUrl} from './notifications/ntfy.mjs'
+import {vapidKeys} from './notifications/web-push.mjs'
 
 // Read-only projection of the server's effective configuration for operators.
 // Reports posture only: enabled flags, whether required fields are present and
@@ -90,7 +91,10 @@ export function buildSettingsView(config, {actionAudit = null} = {}) {
       cloudTimeoutMs: ai.cloudTimeoutMs ?? null,
       localTimeoutMs: ai.localTimeoutMs ?? null,
     },
-    notifications: {ntfy: Boolean(ntfyTopicUrl(config.notifications?.ntfy?.url))},
+    notifications: {
+      ntfy: Boolean(ntfyTopicUrl(config.notifications?.ntfy?.url)),
+      webPush: Boolean(vapidKeys(config.notifications?.webPush)),
+    },
     monitoring: {
       enabled: config.monitoring?.enabled === true,
       pollSeconds: config.monitoring?.pollSeconds ?? null,

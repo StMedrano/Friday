@@ -27,9 +27,14 @@ test('Omada defaults off with server-only client credentials', () => {
 })
 
 test('repository registry defaults to a server-side path and accepts explicit configuration', () => {
-  assert.deepEqual(getConfig({}).repositories, { registryPath: './repositories.json' })
-  assert.deepEqual(getConfig({ FRIDAY_REPOSITORY_REGISTRY_PATH: '/data/repositories.json' }).repositories, {
-    registryPath: '/data/repositories.json',
+  assert.deepEqual(getConfig({}).repositories, {
+    registryPath: './repositories.json', allowedRoots: ['/repositories'], settingsPath: '/data/repository-settings.json',
+  })
+  assert.deepEqual(getConfig({
+    FRIDAY_REPOSITORY_REGISTRY_PATH: '/data/repositories.json', FRIDAY_REPOSITORY_ROOTS: '/repositories, /srv/git, relative',
+    FRIDAY_REPOSITORY_SETTINGS_PATH: '/data/repo-settings.json',
+  }).repositories, {
+    registryPath: '/data/repositories.json', allowedRoots: ['/repositories', '/srv/git'], settingsPath: '/data/repo-settings.json',
   })
 })
 
