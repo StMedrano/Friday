@@ -16,6 +16,7 @@ import IncidentsWorkspace from '../components/IncidentsWorkspace'
 import InfrastructureWorkspace from '../components/InfrastructureWorkspace'
 import MobileHome from '../components/MobileHome'
 import MobileNavigation from '../components/MobileNavigation'
+import PwaControls from '../components/PwaControls'
 import RepositoriesWorkspace from '../components/RepositoriesWorkspace'
 import AuditWorkspace from '../components/AuditWorkspace'
 import SettingsWorkspace from '../components/SettingsWorkspace'
@@ -142,6 +143,7 @@ export default function Dashboard() {
         <header className="v3-mobile-header">
           <div className="v3-mobile-brand"><span className="v3-live-dot"/><strong>FRIDAY</strong><small>AI OPERATIONS</small></div>
           <div className={`v3-mobile-status ${connected ? 'online' : 'warning'}`}><i/>{connected ? 'LIVE' : 'SAFE'}</div>
+          <PwaControls/>
         </header>
         <main className="v3-main">
           {preview && <PreviewBanner/>}
@@ -193,7 +195,10 @@ export default function Dashboard() {
         <header className="v3-topbar">
           <div><strong>FRIDAY</strong><span>AI OPERATIONS CONTROL</span></div>
           <button type="button" className="v3-search" onClick={() => setPaletteOpen(true)} aria-label="Search or command"><Search size={16}/><span>Search or command</span><kbd>Ctrl K</kbd></button>
-          <div className={`v3-system ${live ? 'live' : 'unavailable'}`} role="status" aria-label="Live data status"><i /> {live ? 'READ-ONLY MONITORING' : 'LIVE STATUS UNAVAILABLE'}</div>
+          <div className="v3-topbar-actions">
+            <div className={`v3-system ${live ? 'live' : 'unavailable'}`} role="status" aria-label="Live data status"><i /> {live ? 'READ-ONLY MONITORING' : 'LIVE STATUS UNAVAILABLE'}</div>
+            <PwaControls/>
+          </div>
         </header>
 
         <main className="v3-main">
