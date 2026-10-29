@@ -41,6 +41,23 @@ function endpointText(value) {
   return text && text.length <= 80 && !/[\u0000-\u001f\u007f]/.test(text) ? text : null
 }
 
+export const MAX_ENDPOINT_CHECKS = 16
+
+/** One structured endpoint check, normalised; null when any field is unsafe or unknown. */
+export function normalizeEndpointCheck(item) {
+  if (!item || typeof item !== 'object' || Array.isArray(item) || Object.keys(item).some(key => !ENDPOINT_FIELDS.has(key))) return null
+  const id = typeof item.id === 'string' ? item.id.trim() : ''
+  const name = endpointText(item.name)
+  const site = endpointText(item.site)
+  const url = endpointUrl(item.url)
+  const expectedStatuses = item.expectedStatuses === undefined ? [200] : item.expectedStatuses
+  if (!ENDPOINT_ID.test(id) || !name || !site || !url || !Array.isArray(expectedStatuses) ||
+    expectedStatuses.length < 1 || expectedStatuses.length > 10 ||
+    expectedStatuses.some(status => !Number.isInteger(status) || status < 100 || status > 599) ||
+    new Set(expectedStatuses).size !== expectedStatuses.length) return null
+  return { id, name, site, url, expectedStatuses: [...expectedStatuses] }
+}
+
 // Adapters without their own site data default to the original single-site label.
 function siteLabel(value) {
   return String(value || '').trim() || 'Site A'
@@ -53,27 +70,19 @@ function endpointConfiguration(env) {
   if (raw && legacyRaw) return invalid()
   if (!raw) {
     const urls = legacyRaw ? legacyRaw.split(',').map(item => item.trim()).filter(Boolean) : []
-    if (urls.length > 16 || urls.some(value => !endpointUrl(value))) return invalid()
+    if (urls.length > MAX_ENDPOINT_CHECKS || urls.some(value => !endpointUrl(value))) return invalid()
     return { checks: [], urls, configurationError: null }
   }
   if (raw.length > 16384) return invalid()
   try {
     const parsed = JSON.parse(raw)
-    if (!Array.isArray(parsed) || parsed.length > 16) return invalid()
+    if (!Array.isArray(parsed) || parsed.length > MAX_ENDPOINT_CHECKS) return invalid()
     const ids = new Set()
     const checks = parsed.map(item => {
-      if (!item || typeof item !== 'object' || Array.isArray(item) || Object.keys(item).some(key => !ENDPOINT_FIELDS.has(key))) throw Error('invalid')
-      const id = typeof item.id === 'string' ? item.id.trim() : ''
-      const name = endpointText(item.name)
-      const site = endpointText(item.site)
-      const url = endpointUrl(item.url)
-      const expectedStatuses = item.expectedStatuses === undefined ? [200] : item.expectedStatuses
-      if (!ENDPOINT_ID.test(id) || ids.has(id) || !name || !site || !url || !Array.isArray(expectedStatuses) ||
-        expectedStatuses.length < 1 || expectedStatuses.length > 10 ||
-        expectedStatuses.some(status => !Number.isInteger(status) || status < 100 || status > 599) ||
-        new Set(expectedStatuses).size !== expectedStatuses.length) throw Error('invalid')
-      ids.add(id)
-      return { id, name, site, url, expectedStatuses: [...expectedStatuses] }
+      const check = normalizeEndpointCheck(item)
+      if (!check || ids.has(check.id)) throw Error('invalid')
+      ids.add(check.id)
+      return check
     })
     return { checks, urls: [], configurationError: null }
   } catch { return invalid() }
@@ -200,13 +209,21 @@ export function getConfig(env = process.env) {
     siteSettings: {
       path: env.FRIDAY_SITE_SETTINGS_PATH || '/data/site-settings.json',
     },
+    endpointChecks: {
+      path: env.FRIDAY_ENDPOINT_CHECKS_PATH || '/data/endpoint-checks.json',
+    },
     audit: {
       // Durable operator action audit; opt-in so enabling it is a reviewed deployment step.
       enabled: enabled(env.FRIDAY_AUDIT_ENABLED),
       directory: env.FRIDAY_AUDIT_DIR || '/data/audit',
       maxBytes: Math.floor(positiveNumber(env.FRIDAY_AUDIT_MAX_BYTES, 16 * 1024 * 1024)),
     },
-    repositories: { registryPath: env.FRIDAY_REPOSITORY_REGISTRY_PATH || './repositories.json' },
+    repositories: {
+      registryPath: env.FRIDAY_REPOSITORY_REGISTRY_PATH || './repositories.json',
+      // Operator-registered checkouts must live under one of these container paths.
+      allowedRoots: String(env.FRIDAY_REPOSITORY_ROOTS || '/repositories').split(',').map(item => item.trim()).filter(item => item.startsWith('/')),
+      settingsPath: env.FRIDAY_REPOSITORY_SETTINGS_PATH || '/data/repository-settings.json',
+    },
     diagnostics: {
       enabled: enabled(env.FRIDAY_DIAGNOSTICS_ENABLED),
     },

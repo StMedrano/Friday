@@ -295,3 +295,38 @@ export function evaluateMonitoring({ state, overview = {}, config = {}, now = ne
   changed = evaluateIntegrations(next, config, overview, timestamp) || changed
   return { state: next, changed }
 }
+
+/**
+ * Close the open incidents of a service that was removed from monitoring (for
+ * example a deleted endpoint check). It never comes back to be re-evaluated, so
+ * its incidents are marked retired rather than recovered, and its observation is
+ * dropped so a later service with the same ID starts fresh.
+ */
+export function retireService({ state, serviceId, config = {}, now = new Date(), reason = 'removed from monitoring' }) {
+  const next = cloneState(state)
+  const timestamp = iso(now)
+  const id = String(serviceId || '')
+  let changed = false
+  for (const incident of next.incidents.filter((item) => item.status === 'open' && item.serviceId === id)) {
+    incident.status = 'resolved'
+    incident.resolution = 'retired'
+    incident.resolvedAt = timestamp
+    incident.lastSeen = timestamp
+    addHistory(next, config, {
+      id: eventId('incident-retired', incident.id, timestamp),
+      type: 'incident-retired',
+      at: timestamp,
+      source: incident.source,
+      host: incident.host || undefined,
+      serviceId: incident.serviceId,
+      serviceName: incident.serviceName,
+      detail: sanitizeDetail(`Retired ${incident.title}: ${reason}`),
+    })
+    changed = true
+  }
+  if (Object.hasOwn(next.observations, id)) {
+    delete next.observations[id]
+    changed = true
+  }
+  return { state: next, changed }
+}
