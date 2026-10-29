@@ -478,6 +478,9 @@ This is the source-of-truth handoff ledger for coding agents. Update it when a m
 ## Intentionally stopped guests, 2026-10-29
 
 A Proxmox guest that is stopped is reported `maintenance` instead of `offline` when its config has `onboot: 0` or carries a `maintenance` or `friday-ignore` tag, so monitoring opens no incident and no notification is pushed for a planned shutdown (for example the Umbrel VM powered off on 2026-10-29). Only stopped guests are inspected, at most sixteen per collection, and a config read failure leaves the guest `offline`. A guest that should autostart but is stopped still reports offline.
+## Browser push for the installed PWA, 2026-10-29
+
+The installed Friday PWA can receive incident notifications directly. With `FRIDAY_VAPID_PUBLIC_KEY`, `FRIDAY_VAPID_PRIVATE_KEY` and `FRIDAY_VAPID_SUBJECT` set, `GET /api/notifications/web-push` returns the public key, and any Access-verified user may POST or DELETE their own browser subscription (JSON, same-site only). Subscriptions are validated, capped at 32 and stored at `/data/push-subscriptions.json`; the VAPID private key never reaches the browser. The monitoring runtime pushes the same incident open and resolve events as the ntfy channel, at most five per poll, and a subscription that returns 404 or 410 is removed. The service worker shows the notification and focuses Friday when it is tapped. Adds the `web-push` dependency.
 
 ## Incident push notifications (ntfy), 2026-10-29
 

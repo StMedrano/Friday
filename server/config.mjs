@@ -188,6 +188,14 @@ export function getConfig(env = process.env) {
     },
     notifications: {
       ntfy: { url: env.FRIDAY_NTFY_URL || '', token: env.FRIDAY_NTFY_TOKEN || '' },
+      webPush: {
+        publicKey: env.FRIDAY_VAPID_PUBLIC_KEY || '',
+        privateKey: env.FRIDAY_VAPID_PRIVATE_KEY || '',
+        subject: env.FRIDAY_VAPID_SUBJECT || '',
+      },
+    },
+    pushSubscriptions: {
+      path: env.FRIDAY_PUSH_SUBSCRIPTIONS_PATH || '/data/push-subscriptions.json',
     },
     siteSettings: {
       path: env.FRIDAY_SITE_SETTINGS_PATH || '/data/site-settings.json',
