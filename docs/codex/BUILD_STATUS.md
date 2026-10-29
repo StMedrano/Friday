@@ -454,6 +454,12 @@ PR #41 merged and deployed to VM102 as `5cfeae3` on 2026-10-19. Exact-head GitHu
 
 This is the source-of-truth handoff ledger for coding agents. Update it when a major capability changes.
 
+## Proxmox host memory pressure — root cause and alerting, 2026-10-29
+
+VM102's hard stop at 2026-10-28 18:34:26 UTC was the Proxmox host `home` out-of-memory killer: the host has 30.6 GiB RAM and 8 GiB swap while guests were allocated about 53 GiB, and the kernel killed VM102's QEMU process (largest RSS, 6.5 GiB). With owner approval the Umbrel VM (110) was powered off with autostart disabled and its allocation lowered to 2 GiB, and VM102 was resized to 4 GiB with a 2 GiB balloon; the host then had about 11 GiB available.
+
+The Proxmox adapter now also reports each node as a `proxmox-node-<name>` host service using the existing read-only token (`/cluster/resources?type=node` and `/nodes/<name>/status`). Memory at or above 85% or swap at or above 80% marks the host degraded, which opens a monitoring incident after the grace period; an offline node is reported offline. Host status failures never break VM inventory.
+
 ## VM132 database ownership incident — root cause and alerting, 2026-10-28
 
 Root cause of the 2026-09-22 `supabase-db` restart: on 2026-09-19 17:34 UTC a host-side `sudo chown -R stalin:stalin /srv/production` re-owned the bind-mounted PostgreSQL data directory `/srv/production/supabase/supabase-project/volumes/db/data`. PostgreSQL (container uid 100) then rejected about 114,000 connections with `could not open file "global/pg_filenode.map": Permission denied` for three days, until a PANIC on `global/pg_control` at 2026-09-22 12:36:47 UTC restarted the container, whose entrypoint restored ownership. No manual repair occurred. Never run recursive ownership changes over `/srv/production` on VM132; scope them to a single project directory.

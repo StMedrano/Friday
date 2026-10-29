@@ -16,7 +16,7 @@ export type Site = {
 export type Service = {
   id: string
   name: string
-  category: 'virtualization' | 'network' | 'container' | 'dns' | 'media' | 'monitoring' | 'app'
+  category: 'virtualization' | 'host' | 'database' | 'network' | 'container' | 'dns' | 'media' | 'monitoring' | 'app'
   host: string
   site: string
   status: InfrastructureStatus
