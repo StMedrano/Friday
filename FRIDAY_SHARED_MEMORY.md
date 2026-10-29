@@ -71,8 +71,8 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Task | Owner | Status | Scope / files / resources | Started | Last update | Next action |
 | --- | --- | --- | --- | --- | --- | --- |
 | Install shared ledger in current Friday repo | Codex/ChatGPT | `complete` | Repository root, `AGENTS.md`, `CLAUDE.md`, `FRIDAY_SHARED_MEMORY.md` | 2026-10-29 | 2026-10-29 | Pull the tracked branch before each task and keep this ledger current. |
-| Verify VM102 port-3011 origin | Codex/ChatGPT | `verification_needed` | VM102 checkout verified read-only; port 3011 and origin behavior remain uninspected | 2026-10-29 | 2026-10-29 | Inspect the deployed service/container and internal health without printing secrets or changing runtime state. |
-| Authenticated Cloudflare acceptance | unclaimed | `planned` | Dedicated Access app and Friday read-only API | - | 2026-10-29 | Use credentials already installed in an approved secret location; test valid, missing, and invalid authentication plus write denial. |
+| Verify VM102 port-3011 origin | Codex/ChatGPT | `in_progress` | Read-only VM102 container, listener, origin-health, and tracked-source inspection | 2026-10-29 | 2026-10-29 | Verify port 3011, JWT configuration, and read-only route behavior without printing secrets or changing runtime state. |
+| Authenticated Cloudflare acceptance | Codex/ChatGPT | `in_progress` | Dedicated Access app and Friday read-only API; use only credentials already installed in an approved secure location | 2026-10-29 | 2026-10-29 | Inspect credential availability by name only, then test valid, missing, invalid, and write-denial paths when safely possible. |
 | Service-token renewal | unclaimed | `planned` | `friday-cloud-reader` | - | 2026-10-29 | Plan renewal before 2026-11-24 without disclosing or committing credentials. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
@@ -108,6 +108,18 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-10-29 — Codex/ChatGPT — Claimed Friday cloud-API acceptance
+
+- Status: `in_progress`
+- Scope claimed: Read-only VM102 origin inspection and dedicated Cloudflare Access acceptance for `friday-api.mytechtactics.com`.
+- Work performed: Loaded the current repository instructions, VM102 deployment workflow, Cloudflare workflow, environment contract, and shared ledger.
+- Changes made: Shared ledger claim only; no VM102, Cloudflare, deployment, network, or credential change.
+- Verification: Authoritative checkout and SSH access were previously confirmed; live service and authenticated acceptance checks are beginning now.
+- Decisions: Use only sanitized metadata and credentials already installed through approved secure handling.
+- Blockers/risks: Service-token secret availability is unknown; never retrieve or print it merely to complete a test.
+- Next action: Inventory the deployed containers and tracked port-3011 implementation, then run bounded GET-only origin checks.
+- Rollback/recovery: Release or update the ledger claim when this acceptance pass ends.
 
 ### 2026-10-29 — Codex/ChatGPT — Verified authoritative VM102 checkout
 
