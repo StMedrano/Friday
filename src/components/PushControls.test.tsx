@@ -18,7 +18,6 @@ function stubBrowser({ existing = null, granted = true } = {}) {
   vi.stubGlobal('isSecureContext', true)
   vi.stubGlobal('PushManager', function PushManagerStub() {})
   vi.stubGlobal('Notification', { requestPermission: vi.fn(async () => granted ? 'granted' : 'denied') })
-  vi.stubGlobal('atob', (value: string) => Buffer.from(value, 'base64').toString('binary'))
   return pushManager
 }
 
