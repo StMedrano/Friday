@@ -1,7 +1,6 @@
 import {createHash} from 'node:crypto'
 import {mkdir, readFile, rename, writeFile} from 'node:fs/promises'
 import {dirname} from 'node:path'
-import webpush from 'web-push'
 
 // Browser push for the installed Friday PWA. Subscriptions are per device and
 // stored server-side; the VAPID private key never reaches the browser. Payloads
@@ -90,14 +89,29 @@ export async function createPushSubscriptionStore({path, fs = {mkdir, readFile, 
   }
 }
 
-export function createWebPushNotifier({keys, store, sendImpl = webpush.sendNotification, timeoutMs = 5000} = {}) {
+/** Load the optional web-push library; a missing library must never stop Friday from starting. */
+async function loadWebPush() {
+  try {
+    const module = await import('web-push')
+    return (module.default ?? module).sendNotification
+  } catch {
+    console.warn('Friday notifications: the web-push library is unavailable; browser push is disabled')
+    return null
+  }
+}
+
+export function createWebPushNotifier({keys, store, sendImpl = null, loadSendImpl = loadWebPush, timeoutMs = 5000} = {}) {
   const vapid = vapidKeys(keys)
   if (!vapid || !store) return null
   const options = {vapidDetails: vapid, TTL: 900, timeout: timeoutMs}
+  let sender = sendImpl ? Promise.resolve(sendImpl) : null
+  const send = () => (sender ??= loadSendImpl())
 
   async function deliver(subscription, payload) {
     try {
-      await sendImpl({endpoint: subscription.endpoint, keys: subscription.keys}, JSON.stringify(payload), options)
+      const sendNotification = await send()
+      if (typeof sendNotification !== 'function') return false
+      await sendNotification({endpoint: subscription.endpoint, keys: subscription.keys}, JSON.stringify(payload), options)
       return true
     } catch (error) {
       // A browser that unsubscribed or expired is removed rather than retried.

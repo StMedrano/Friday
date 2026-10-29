@@ -146,3 +146,25 @@ test('subscription API reports disabled without VAPID keys and refuses writes', 
     assert.equal((await fetch(base + '/api/notifications/web-push', {method: 'POST', headers: json, body: JSON.stringify(subscription())})).status, 503)
   })
 })
+
+test('a missing web-push library degrades to failed deliveries instead of crashing the controller', async t => {
+  const {store} = await tempStore(t)
+  await store.add(subscription())
+  const notifier = createWebPushNotifier({keys, store, loadSendImpl: async () => null})
+  assert.ok(notifier, 'the notifier still exists so the server can start')
+  assert.deepEqual(await notifier.notify({opened: [incident('a', 'open')]}), {sent: 0, failed: 1})
+  await assert.rejects(notifier.test())
+})
+
+test('the web-push library is loaded once, lazily, and used for delivery', async t => {
+  const {store} = await tempStore(t)
+  await store.add(subscription())
+  let loads = 0
+  const sent = []
+  const notifier = createWebPushNotifier({keys, store, loadSendImpl: async () => { loads += 1; return async (_target, payload) => { sent.push(JSON.parse(payload)) } }})
+  assert.equal(loads, 0, 'nothing is loaded until a notification is sent')
+  await notifier.notify({opened: [incident('a', 'open')]})
+  await notifier.notify({resolved: [incident('a', 'resolved')]})
+  assert.equal(loads, 1)
+  assert.deepEqual(sent.map(event => event.kind), ['opened', 'resolved'])
+})
