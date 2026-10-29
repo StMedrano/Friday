@@ -94,3 +94,7 @@ To disable PWA behavior in a future reviewed release, remove the
 registration, publish a deliberate safe uninstalling service worker
 and clear only `friday-immutable-v*` caches. Merely deleting `sw.js`
 does not unregister service workers that a browser already installed.
+
+## Cloudflare Access and the manifest
+
+Browsers fetch the web app manifest without cookies unless the link sets `crossorigin="use-credentials"`. Behind Cloudflare Access an uncredentialed manifest request is redirected to the Access login page, so Edge and Chrome report the app as not installable. `index.html` therefore requests the manifest with credentials.
