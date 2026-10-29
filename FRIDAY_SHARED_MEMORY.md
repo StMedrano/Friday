@@ -57,7 +57,7 @@ Last reconciled: **2026-10-29 America/Chicago**
 
 | Item | State | Evidence or blocker |
 | --- | --- | --- |
-| Current Friday checkout | `blocked` | The current repository or VM102 session has not been made available to this task. An older checkout does not contain the port-3011 service and must not be treated as current deployment evidence. |
+| Current Friday checkout | `complete` | Read-only SSH on 2026-10-29 confirmed `/srv/infrastructure/apps/friday` on host `friday-controller` is a clean Git checkout of `https://github.com/StMedrano/Friday.git`, on `main`, synchronized 0 ahead / 0 behind `origin/main`, at commit `fef9e01`. |
 | API service on port 3011 | `verification_needed` | Cloudflare is configured for `http://friday:3011`; the process/container and internal health have not been independently verified. |
 | Origin JWT verification | `verification_needed` | Confirm the port-3011 service validates Cloudflare's signed Access JWT against the dedicated application audience and team issuer. |
 | Read-only route boundary | `verification_needed` | Confirm the exposed API contains only approved read routes and rejects or omits writes and privileged actions. |
@@ -71,7 +71,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Task | Owner | Status | Scope / files / resources | Started | Last update | Next action |
 | --- | --- | --- | --- | --- | --- | --- |
 | Install shared ledger in current Friday repo | Codex/ChatGPT | `complete` | Repository root, `AGENTS.md`, `CLAUDE.md`, `FRIDAY_SHARED_MEMORY.md` | 2026-10-29 | 2026-10-29 | Pull the tracked branch before each task and keep this ledger current. |
-| Verify VM102 port-3011 origin | unclaimed | `planned` | VM102 and current Friday deployment; read-only first | - | 2026-10-29 | Use existing key-based SSH access, inspect deployment state, and run internal health checks without printing secrets. |
+| Verify VM102 port-3011 origin | Codex/ChatGPT | `verification_needed` | VM102 checkout verified read-only; port 3011 and origin behavior remain uninspected | 2026-10-29 | 2026-10-29 | Inspect the deployed service/container and internal health without printing secrets or changing runtime state. |
 | Authenticated Cloudflare acceptance | unclaimed | `planned` | Dedicated Access app and Friday read-only API | - | 2026-10-29 | Use credentials already installed in an approved secret location; test valid, missing, and invalid authentication plus write denial. |
 | Service-token renewal | unclaimed | `planned` | `friday-cloud-reader` | - | 2026-10-29 | Plan renewal before 2026-11-24 without disclosing or committing credentials. |
 
@@ -108,6 +108,18 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-10-29 — Codex/ChatGPT — Verified authoritative VM102 checkout
+
+- Status: `complete`
+- Scope claimed: Read-only SSH verification of the Friday Git checkout on VM102; no deployment or runtime inspection.
+- Work performed: Connected with existing key-based SSH to `stalin@10.1.10.11` and verified the host, checkout path, Git identity, branch, synchronization, and working-tree state.
+- Changes made: none on VM102.
+- Verification: Host `friday-controller`; repository root `/srv/infrastructure/apps/friday`; remote `https://github.com/StMedrano/Friday.git`; branch `main`; commit `fef9e01fa6366603b8b72f64aefe84cd2eac16a2`; clean working tree; 0 ahead / 0 behind `origin/main`.
+- Decisions: Treat this VM102 checkout as the authoritative live repository evidence for subsequent read-only origin inspection.
+- Blockers/risks: `FRIDAY_SHARED_MEMORY.md` and `CLAUDE.md` are not yet on VM102's `main`; they currently exist on `feat/friday-group-workspace-20261013`. Port 3011 and authenticated origin behavior remain unverified.
+- Next action: Merge the coordination documentation through the normal reviewed path, then inspect the deployed port-3011 service read-only.
+- Rollback/recovery: not applicable; VM102 was not changed.
 
 ### 2026-10-29 — Codex/ChatGPT — Installed repository-wide shared ledger
 
