@@ -39,11 +39,20 @@ test('accepts only https subscriptions with base64url keys', () => {
   assert.equal(createWebPushNotifier({keys: {...keys, privateKey: ''}, store: {}}), null)
 })
 
+test('only known browser push services are accepted as endpoints', () => {
+  for (const ok of ['https://fcm.googleapis.com/fcm/send/abc', 'https://updates.push.services.mozilla.com/wpush/v2/abc',
+    'https://web.push.apple.com/abc', 'https://wns2-by3p.notify.windows.com/w/?token=abc', 'https://android.googleapis.com/gcm/send/abc'])
+    assert.ok(normalizeSubscription(subscription(ok)), ok)
+  for (const bad of ['https://push.example.test/abc', 'https://10.1.10.11/abc', 'https://localhost/abc', 'https://fcm.googleapis.com:8443/abc',
+    'https://fcm.googleapis.com.evil.test/abc', 'https://evilnotify.windows.com/abc', 'https://[::1]/abc'])
+    assert.equal(normalizeSubscription(subscription(bad)), null, bad)
+})
+
 test('store persists subscriptions atomically, dedupes by endpoint and reloads', async t => {
   const {path, store} = await tempStore(t)
   const added = await store.add(subscription())
   await store.add(subscription())
-  await store.add(subscription('https://push.example.test/other'))
+  await store.add(subscription('https://updates.push.services.mozilla.com/wpush/v2/other'))
   assert.equal(store.list().length, 2)
   assert.ok(store.has(added.id))
   assert.equal((await createPushSubscriptionStore({path})).list().length, 2)
@@ -56,7 +65,7 @@ test('store persists subscriptions atomically, dedupes by endpoint and reloads',
 test('notifier pushes opened and resolved incidents and drops gone subscriptions', async t => {
   const {store} = await tempStore(t)
   const live = await store.add(subscription())
-  await store.add(subscription('https://push.example.test/expired'))
+  await store.add(subscription('https://web.push.apple.com/expired'))
   const sent = []
   const notifier = createWebPushNotifier({keys, store, sendImpl: async (target, payload) => {
     if (target.endpoint.endsWith('/expired')) throw Object.assign(new Error('gone'), {statusCode: 410})

@@ -39,6 +39,38 @@ describe('PushControls', () => {
     expect(JSON.parse(String(options?.body))).toEqual(serializeSubscription(subscription as unknown as PushSubscription))
   })
 
+  it('re-registers an existing browser subscription before showing notifications as on', async () => {
+    stubBrowser({ existing: subscription as never })
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, options?: RequestInit) => options?.method === 'POST'
+      ? new Response(JSON.stringify({ subscribed: true }), { status: 200 })
+      : new Response(JSON.stringify({ enabled: true, publicKey: key }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<PushControls />)
+    expect(await screen.findByRole('button', { name: /Turn off notifications/ })).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([, options]) => options?.method === 'POST')).toBe(true)
+  })
+
+  it('shows notifications as off when an existing subscription cannot be registered', async () => {
+    stubBrowser({ existing: subscription as never })
+    vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, options?: RequestInit) => options?.method === 'POST'
+      ? new Response(JSON.stringify({ error: 'web-push-unavailable' }), { status: 503 })
+      : new Response(JSON.stringify({ enabled: true, publicKey: key }), { status: 200 })))
+    render(<PushControls />)
+    expect(await screen.findByRole('button', { name: /Notify this device/ })).toBeInTheDocument()
+  })
+
+  it('rolls back the browser subscription when Friday cannot store it', async () => {
+    subscription.unsubscribe.mockClear()
+    stubBrowser()
+    vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, options?: RequestInit) => options?.method === 'POST'
+      ? new Response(JSON.stringify({ error: 'web-push-unavailable' }), { status: 503 })
+      : new Response(JSON.stringify({ enabled: true, publicKey: key }), { status: 200 })))
+    render(<PushControls />)
+    fireEvent.click(await screen.findByRole('button', { name: /Notify this device/ }))
+    expect(await screen.findByText(/could not be subscribed/)).toBeInTheDocument()
+    expect(subscription.unsubscribe).toHaveBeenCalled()
+  })
+
   it('explains a blocked permission without subscribing', async () => {
     const pushManager = stubBrowser({ granted: false })
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ enabled: true, publicKey: key }), { status: 200 })))

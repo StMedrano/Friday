@@ -11,7 +11,13 @@ const MAX_SUBSCRIPTIONS = 32
 const MAX_PER_BATCH = 5
 const GONE = new Set([404, 410])
 
+// Endpoints are only ever browser push services, so the controller never POSTs
+// to an arbitrary (possibly internal) host a signed-in user supplies.
+const PUSH_HOSTS = new Set(['fcm.googleapis.com', 'android.googleapis.com', 'updates.push.services.mozilla.com', 'web.push.apple.com'])
+const PUSH_HOST_SUFFIXES = ['.notify.windows.com', '.push.apple.com']
+
 const digest = endpoint => createHash('sha256').update(endpoint).digest('hex').slice(0, 32)
+const knownPushService = url => !url.port && (PUSH_HOSTS.has(url.hostname) || PUSH_HOST_SUFFIXES.some(suffix => url.hostname.endsWith(suffix)))
 
 /** Validate a browser PushSubscription; returns null when unusable. */
 export function normalizeSubscription(input) {
@@ -19,7 +25,7 @@ export function normalizeSubscription(input) {
   if (endpoint.length > 1024) return null
   let url
   try { url = new URL(endpoint) } catch { return null }
-  if (url.protocol !== 'https:' || url.username || url.password) return null
+  if (url.protocol !== 'https:' || url.username || url.password || !knownPushService(url)) return null
   const p256dh = String(input?.keys?.p256dh || '')
   const auth = String(input?.keys?.auth || '')
   if (!BASE64URL.test(p256dh) || !BASE64URL.test(auth)) return null

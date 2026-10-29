@@ -30,7 +30,11 @@ export default function PushControls() {
         setPublicKey(status.publicKey)
         const registration = await navigator.serviceWorker.getRegistration()
         const existing = await registration?.pushManager.getSubscription()
-        setState(existing ? 'on' : 'off')
+        if (!existing) { setState('off'); return }
+        // The browser can hold a subscription Friday never stored (a failed save, a lost
+        // subscriptions file), so register it again before reporting this device as on.
+        try { await subscribeWebPush(serializeSubscription(existing)); setState('on') }
+        catch { setState('off') }
       })
       .catch((reason) => { if (reason?.name !== 'AbortError') setState('unavailable') })
     return () => controller.abort()
@@ -48,7 +52,12 @@ export default function PushControls() {
       }
       const registration = await navigator.serviceWorker.ready
       const subscription = await registration.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: base64UrlToBytes(publicKey) })
-      await subscribeWebPush(serializeSubscription(subscription))
+      try { await subscribeWebPush(serializeSubscription(subscription)) }
+      catch (error) {
+        // Do not leave a browser subscription Friday will never send to.
+        await subscription.unsubscribe().catch(() => false)
+        throw error
+      }
       setMessage('This device will receive Friday incident notifications.')
       setState('on')
     } catch {
