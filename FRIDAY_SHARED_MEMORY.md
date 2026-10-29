@@ -75,7 +75,8 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Publish shared ledger for `main` review | Codex/ChatGPT | `complete` | Docs-only branch `docs/shared-agent-memory-20261029`; repository-root coordination files only | 2026-10-29 | 2026-10-29 | Review and merge PR #105 through the normal repository workflow; then update VM102 only through a separately reviewed deployment. |
 | Verify VM102 port-3011 origin | Codex/ChatGPT | `complete` | Read-only VM102 container, listener, origin-health, and tracked-source inspection | 2026-10-29 | 2026-10-29 | Preserve the isolated listener and repeat origin checks after future reviewed deployments. |
 | Authenticated Cloudflare acceptance | unclaimed | `verification_needed` | Dedicated Access app and Friday read-only API; current managed-runtime rerun requires its existing hostname-scoped secret binding | 2026-10-29 | 2026-10-29 | Run `node scripts/check-cloud-connection.mjs` from the managed cloud runtime without copying credentials to VM102 or chat. |
-| Service-token renewal | unclaimed | `planned` | `friday-cloud-reader` | - | 2026-10-29 | Plan renewal before 2026-11-24 without disclosing or committing credentials. |
+| Service-token renewal | Codex/ChatGPT | `planned` | `friday-cloud-reader`; coordinated Cloudflare rotation and managed-runtime binding update | 2026-10-29 | 2026-10-29 | After the exact production merge target is identified, rotate with a bounded overlap, update the secure caller binding without exposing the secret, rerun acceptance, then retire the prior secret. |
+| Production deployment after development merge | unclaimed | `planned` | Merged `main` revision and authoritative VM102 checkout | 2026-10-29 | 2026-10-29 | Identify the exact development PR/branch, require its merge and green exact-head verification, then inventory VM102, preserve `.env`, run preflight, deploy the merged `main`, and run health plus cloud acceptance. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -88,6 +89,7 @@ When claiming a task, replace `unclaimed`, set `in_progress`, record the exact s
 | 2026-10-26 | Protect the full hostname with a dedicated Access service identity. | Prevents path gaps and keeps automation authorization separate from human login. | active |
 | 2026-10-26 | Remove the stale `friday-api` ingress from the main production website tunnel. | Prevents the API hostname from falling back to the website service on port 3010. | active |
 | 2026-10-29 | Keep authenticated acceptance open until both Cloudflare authorization and Friday origin verification pass. | Edge configuration alone does not prove that Friday is reachable or securely validating JWTs. | active |
+| 2026-10-29 | Credential rotation and VM102 changes are authorized; production deployment must wait for the intended development branch to merge. | Explicit user instruction. This does not authorize deploying an unmerged head, bypassing review, exposing credentials, or guessing which branch is intended. | active |
 
 ## Handoff template
 
@@ -110,6 +112,18 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-10-29 14:15 CDT — Codex/ChatGPT — Recorded conditional production authority
+
+- Status: `planned`
+- Scope claimed: Authorization boundary for Cloudflare credential rotation, VM102 changes, and the future production rollout.
+- Work performed: Verified the authenticated Cloudflare profile, inspected only non-secret metadata for `friday-cloud-reader`, and reconciled the relevant GitHub branch/PR states before any rotation or deployment.
+- Changes made: Shared ledger only. No credential was rotated, retrieved, printed, or copied; no VM102, Cloudflare, managed-runtime, deployment, network, database, or production change occurred.
+- Verification: Exactly one enabled `friday-cloud-reader` token exists and expires 2026-11-24. PR #33 for `feat/friday-group-workspace-20261013` was merged into PR #29's branch, while PR #29 was later closed without merging to `main`. Current open PRs are #103, #104, and docs-only PR #105, so the phrase "development branch" does not identify one safe production revision.
+- Decisions: Treat credential rotation and VM102 modification as authorized, but enforce the user's condition that production deployment happens only after the intended development branch is merged. Use a coordinated, secret-safe rotation with acceptance before invalidating the previous credential.
+- Blockers/risks: The exact production merge target must be identified. This task has no supported secret-injection path into the existing managed runtime; rotating through a model-visible API response before that path is ready could expose or lose the new secret.
+- Next action: Confirm the intended development PR/branch. After it merges to `main`, verify the exact merged SHA and CI, arrange a secure managed-runtime credential update, rotate with bounded overlap, run VM102 inventory/preflight/deployment/health, then rerun the eight-gate cloud checker.
+- Rollback/recovery: During rotation retain the previous secret only for the bounded migration window; if deployment health fails, restore the prior reviewed VM102 revision and preserve the existing `.env` and tunnel connector.
 
 ### 2026-10-29 14:11 CDT — Codex/ChatGPT — Published shared ledger for main review
 
