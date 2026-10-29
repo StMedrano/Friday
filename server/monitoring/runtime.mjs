@@ -1,5 +1,5 @@
 import { appendHistory, createEmptyMonitoringState, incidentList, monitoringSummary } from './state.mjs'
-import { evaluateMonitoring } from './incidents.mjs'
+import { evaluateMonitoring, retireService as retireServiceState } from './incidents.mjs'
 import { incidentChanges } from '../notifications/ntfy.mjs'
 import { containerIdFromServiceId, getVm100ContainerDiagnostic, getVm100ContainerLogs } from '../adapters/vm100-observer-diagnostics.mjs'
 import { buildDiagnosticReport } from '../diagnostics/analyze.mjs'
@@ -362,10 +362,25 @@ export function createMonitoringRuntime({
     }
   }
 
+  // Close a removed service's open incidents. Waits for an in-flight poll so its
+  // result cannot overwrite the retirement.
+  async function retireService(serviceId, reason) {
+    if (!monitoringConfig.enabled) return false
+    if (inFlight) await inFlight.catch(() => {})
+    const retired = retireServiceState({
+      state: monitoringState, serviceId, config: monitoringConfig, now: now().toISOString(), reason,
+    })
+    if (!retired.changed) return false
+    monitoringState = { ...retired.state, schemaVersion: monitoringState.schemaVersion || 2, diagnostics: monitoringState.diagnostics || {} }
+    await persistState()
+    return true
+  }
+
   return {
     start,
     stop,
     poll,
+    retireService,
     getOverview() { return latestOverview },
     getIncidents() { return { summary: incidentSummary(monitoringState), incidents: incidentList(monitoringState) } },
     getHistory() { return { events: [...(monitoringState.history || [])].reverse().map((event) => ({ ...event })) } },

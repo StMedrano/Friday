@@ -148,3 +148,21 @@ test('endpoint checks API reports unavailable without a store and overview uses 
   })
   assert.deepEqual(seen.endpoints.checks.map(check => check.id), ['b'])
 })
+
+test('first write seeds legacy URL checks with the operator site label, and delete retires the check incidents', async t => {
+  const root = await tempDir(t)
+  const endpointChecks = await createEndpointCheckStore({path: join(root, 'endpoint-checks.json')})
+  const siteSettings = {get: () => ({sites: [{id: 'remote', name: 'Remote'}], sources: {endpoints: 'Remote'}})}
+  const retired = []
+  const monitoringRuntime = {getOverview: () => null, retireService: async (id, reason) => { retired.push([id, reason]); return true }}
+  const config = getConfig({FRIDAY_ENDPOINT_URLS: 'https://a.example/,https://b.example/'})
+
+  await withServer({config, accessGateImpl: operatorGate, endpointChecks, siteSettings, monitoringRuntime}, async base => {
+    const initial = await (await fetch(base + '/api/settings/endpoints')).json()
+    assert.deepEqual(initial.checks.map(check => check.site), ['Remote', 'Remote'])
+    const removed = await fetch(base + '/api/settings/endpoints/0', {method: 'DELETE'})
+    assert.equal(removed.status, 200)
+    assert.deepEqual((await removed.json()).checks.map(check => [check.id, check.site]), [['1', 'Remote']])
+  })
+  assert.deepEqual(retired, [['endpoint-0', 'endpoint check deleted']])
+})

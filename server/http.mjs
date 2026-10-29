@@ -243,8 +243,10 @@ export function createFridayServer({
   repositorySettings = null,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
+  const labelledConfig = (effectiveConfig = config) =>
+    siteSettings ? applySiteSettings(effectiveConfig, siteSettings.get()) : effectiveConfig
   const buildEffectiveOverview = (effectiveConfig) => {
-    const labelled = siteSettings ? applySiteSettings(effectiveConfig, siteSettings.get()) : effectiveConfig
+    const labelled = labelledConfig(effectiveConfig)
     return buildOverviewImpl(endpointChecks ? applyEndpointChecks(labelled, endpointChecks.get()) : labelled)
   }
   const securityRequired = config.access?.enabled === true ||
@@ -326,8 +328,11 @@ export function createFridayServer({
       const binding = settingsCollection.name === 'endpoints'
         ? endpointChecks && {
           store: endpointChecks,
-          view: async () => endpointChecksView(config, endpointChecks.get()),
-          baseline: async () => environmentEndpointChecks(config.endpoints),
+          // Seed and list from the site-labelled config so operator site labels carry over.
+          view: async () => endpointChecksView(labelledConfig(), endpointChecks.get()),
+          baseline: async () => environmentEndpointChecks(labelledConfig().endpoints),
+          // A deleted check is never polled again, so retire its open incidents explicitly.
+          afterDelete: id => monitoringRuntime?.retireService?.(`endpoint-${id}`, 'endpoint check deleted'),
         }
         : repositorySettings && {
           store: repositorySettings,
@@ -355,6 +360,10 @@ export function createFridayServer({
           const status = settingsCollection.errors[error?.code]
           if (!status) return unavailable
           return { status, body: { error: error.code === settingsCollection.invalid ? error.message : error.code } }
+        }
+        if (settingsRoute.action === 'delete' && binding.afterDelete) {
+          try { await binding.afterDelete(settingsRoute.id) }
+          catch { console.warn(`Friday could not retire monitoring state for deleted ${settingsCollection.name} entry`) }
         }
         let view
         try { view = await binding.view() } catch { return unavailable }
