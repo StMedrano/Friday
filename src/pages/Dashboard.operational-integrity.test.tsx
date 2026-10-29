@@ -51,10 +51,13 @@ describe('Dashboard operator integrity and honest feature status', () => {
     expect(screen.getByText('Cloud Portal')).toBeInTheDocument()
   })
 
-  it('clearly labels disconnected Tasks, Memory and Approvals as not activated', async () => {
+  it('connects project Tasks while clearly labeling Memory and Approvals as not activated', async () => {
     const user = userEvent.setup()
     render(<Dashboard />)
-    for (const name of ['Tasks', 'Memory', 'Approvals']) {
+    await user.click(screen.getByRole('button', { name: 'Tasks' }))
+    expect(screen.getByRole('heading', { name: 'Project tasks' })).toBeInTheDocument()
+    expect(screen.getByText(/Creating a task does not run an agent/i)).toBeInTheDocument()
+    for (const name of ['Memory', 'Approvals']) {
       await user.click(screen.getByRole('button', { name }))
       expect(screen.getByRole('heading', { name: name + ' is not connected' })).toBeInTheDocument()
       expect(screen.getByText(/No production task, memory or approval operation is available on this screen/i)).toBeInTheDocument()

@@ -191,10 +191,43 @@ test('diagnostics are disabled by default and require explicit opt-in', () => {
   assert.deepEqual(getConfig({ FRIDAY_DIAGNOSTICS_ENABLED: 'true' }).diagnostics, { enabled: true })
   assert.deepEqual(getConfig({ FRIDAY_DIAGNOSTICS_ENABLED: 'false' }).diagnostics, { enabled: false })
 })
-
 test('live Friday always requires Access JWT verification with server-only settings',()=>{
  const live=getConfig({FRIDAY_MODE:'live',FRIDAY_ACCESS_TEAM_DOMAIN:'https://team.cloudflareaccess.com',FRIDAY_ACCESS_AUD:'aud-123',FRIDAY_ACCESS_OPERATOR_EMAILS:'operator@example.test'})
  assert.deepEqual(live.access,{enabled:true,teamDomain:'https://team.cloudflareaccess.com',audience:'aud-123',operatorEmails:['operator@example.test']})
  assert.equal(getConfig({FRIDAY_MODE:'live',FRIDAY_ACCESS_REQUIRED:'false'}).access.enabled,true)
  assert.equal(getConfig({FRIDAY_MODE:'mock'}).access.enabled,false)
+})
+
+test('operator registry sync token is absent by default and never appears in browser-facing config', () => {
+  const empty = getConfig({})
+  assert.equal(empty.operator.registrySyncToken, '')
+  const secret = 'a'.repeat(64)
+  const configured = getConfig({ FRIDAY_REGISTRY_SYNC_OPERATOR_TOKEN: secret })
+  assert.equal(configured.operator.registrySyncToken, secret)
+  assert.equal(JSON.stringify(configured.ai).includes(secret), false)
+  assert.equal(JSON.stringify(configured.agents).includes(secret), false)
+})
+
+test('model fabric is opt-in, permanently free-only, and server-side', () => {
+  const defaults = getConfig({}).modelFabric
+  assert.equal(defaults.enabled, false)
+  assert.equal(defaults.nvidia.enabled, false)
+  assert.equal(defaults.nvidia.localEnabled, false)
+  assert.equal(defaults.nvidia.baseUrl, 'https://integrate.api.nvidia.com/v1')
+  assert.equal(defaults.nvidia.localBaseUrl, 'http://nvidia-nim:8000/v1')
+  const model = { id:'free', model:'vendor/model', billingClass:'free', capabilities:['general'],
+    supportsTools:false, supportsVision:false }
+  const config = getConfig({
+    FRIDAY_MODEL_FABRIC_ENABLED: 'true', FRIDAY_NVIDIA_ENABLED:'true',
+    NVIDIA_API_KEY:'server-secret', FRIDAY_NVIDIA_MODELS_JSON: JSON.stringify([model]),
+    FRIDAY_NVIDIA_LOCAL_MODELS_JSON: 'oops',
+    FRIDAY_ALLOW_PAID_FALLBACK: 'true',
+  }).modelFabric
+  assert.equal(config.enabled, true)
+  assert.deepEqual(config.policy, { freeOnly:true, allowPaidFallback:false, maxPaidSpendPerDay:0,
+    preferLocal:true, preferNvidiaFree:true })
+  assert.equal(config.nvidia.apiKey, 'server-secret')
+  assert.deepEqual(config.nvidia.models, [model])
+  assert.deepEqual(config.nvidia.localModels, [])
+  assert.deepEqual(getConfig({ FRIDAY_NVIDIA_MODELS_JSON:'{}' }).modelFabric.nvidia.models, [])
 })

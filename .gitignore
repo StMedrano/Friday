@@ -9,5 +9,7 @@ dist/
 .idea/
 coverage/
 *.tsbuildinfo
+test-results/
+playwright-report/
 .superdesign/cache/
 repositories.json

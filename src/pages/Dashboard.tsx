@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, FolderGit2, HardDrive, Home, MemoryStick, Network, Search, Server, Settings, ShieldCheck, Sparkles } from 'lucide-react'
-import { fetchMonitoringHistory, useFridayOverview, type FridayIncident, type MonitoringEvent } from '../lib/api'
+import { fetchFridayAgentGroups, fetchMonitoringHistory, useFridayOverview, type FridayIncident, type GroupWorkspace, type MonitoringEvent } from '../lib/api'
 import { useFridaySession } from '../hooks/useFridaySession'
 import { statusLabel, statusPriority, summarizeHealth } from '../lib/status'
 import { greeting } from '../lib/greeting'
@@ -18,6 +18,7 @@ import ActivityTimeline from '../components/ActivityTimeline'
 import MobileHome from '../components/MobileHome'
 import MobileNavigation from '../components/MobileNavigation'
 import PwaControls from '../components/PwaControls'
+import ProjectTasksWorkspace from '../components/ProjectTasksWorkspace'
 import RepositoriesWorkspace from '../components/RepositoriesWorkspace'
 import AuditWorkspace from '../components/AuditWorkspace'
 import SettingsWorkspace from '../components/SettingsWorkspace'
@@ -32,11 +33,11 @@ import '../settings.css'
 
 const nav = [
   ['Overview', Home], ['FRIDAY', Sparkles], ['Infrastructure', Server], ['Applications', AppWindow],
-  ['Incidents', AlertTriangle], ['Agents', Bot], ['Repositories', FolderGit2],
+  ['Incidents', AlertTriangle], ['Agents', Bot], ['Repositories', FolderGit2], ['Tasks', CheckCircle2],
 ] as const
 
 const pendingNav = [
-  ['Tasks', CheckCircle2], ['Approvals', ShieldCheck], ['Memory', Database], ['Audit', Activity], ['Settings', Settings],
+  ['Approvals', ShieldCheck], ['Memory', Database], ['Audit', Activity], ['Settings', Settings],
 ] as const
 
 // Workspaces that render their own titled hero; the page h1 stays for assistive tech only.
@@ -46,13 +47,15 @@ function PreviewBanner() {
   return <div className="v3-preview-banner" role="note" aria-label="Preview data"><b>Preview data</b><span>The Friday API isn't connected, so the numbers on this screen are sample data.</span></div>
 }
 
-const selfTitled = new Set(['Infrastructure', 'Applications', 'Incidents', 'Repositories', 'Agents'])
+const selfTitled = new Set(['Infrastructure', 'Applications', 'Incidents', 'Repositories', 'Agents', 'Tasks'])
 
 export default function Dashboard() {
   const { overview, connected } = useFridayOverview()
   const friday = useFridaySession()
   const isPhone = usePhoneLayout()
   const [active, setActive] = useState('Overview')
+  const [groups, setGroups] = useState<GroupWorkspace | null>(null)
+  const [groupsUnavailable, setGroupsUnavailable] = useState(false)
   const [query, setQuery] = useState('')
   const [history, setHistory] = useState<MonitoringEvent[]>([])
   const [historyError, setHistoryError] = useState<string | null>(null)
@@ -69,24 +72,47 @@ export default function Dashboard() {
 
   // One read serves both the home timeline and the Incidents history.
   useEffect(() => {
+    if (!connected || overview.mode !== 'live') {
+      setHistory([])
+      setHistoryLoading(false)
+      setHistoryError(connected ? 'Demo mode — live monitoring history is not connected' : 'Monitoring history unavailable')
+      return
+    }
     const controller = new AbortController()
+    setHistory([])
     setHistoryError(null)
     setHistoryLoading(true)
     fetchMonitoringHistory(controller.signal)
-      .then((events) => { setHistory(events); setHistoryLoading(false) })
+      .then((events) => { if (!controller.signal.aborted) setHistory(events) })
       .catch((error) => {
-        if (error?.name !== 'AbortError') {
+        if (error?.name !== 'AbortError' && !controller.signal.aborted) {
           setHistory([])
-          setHistoryError('History unavailable')
-          setHistoryLoading(false)
+          setHistoryError(['Monitoring disabled', 'Monitoring history response invalid'].includes(error?.message)
+            ? error.message : 'Monitoring history unavailable')
         }
       })
+      .finally(() => { if (!controller.signal.aborted) setHistoryLoading(false) })
     return () => controller.abort()
-  }, [historyRefresh])
+  }, [connected, overview.mode, historyRefresh])
+
+  const refreshHistory = connected && overview.mode === 'live'
+    ? () => setHistoryRefresh((value) => value + 1)
+    : undefined
 
   useEffect(() => {
     document.title = activeIncidents > 0 ? `(${activeIncidents}) ${baseTitle}` : baseTitle
   }, [activeIncidents])
+
+  useEffect(() => {
+    if (active !== 'Overview') return
+    const controller = new AbortController()
+    setGroups(null)
+    setGroupsUnavailable(false)
+    Promise.resolve().then(() => fetchFridayAgentGroups(controller.signal))
+      .then((data) => { if (!controller.signal.aborted) setGroups(data) })
+      .catch(() => { if (!controller.signal.aborted) setGroupsUnavailable(true) })
+    return () => controller.abort()
+  }, [active])
 
   const orderedServices = useMemo(() => overview.services.slice().sort((a, b) => statusPriority(b.status) - statusPriority(a.status)), [overview.services])
   const preview = overview.mode === 'mock'
@@ -147,6 +173,7 @@ export default function Dashboard() {
       <div className="v3-workspace">
         <header className="v3-mobile-header">
           <div className="v3-mobile-brand"><span className="v3-live-dot"/><strong>FRIDAY</strong><small>AI OPERATIONS</small></div>
+          <button type="button" className="v3-mobile-search-button" aria-label="Search Friday views" onClick={() => setPaletteOpen(true)}><Search size={18}/></button>
           <div className={`v3-mobile-status ${connected ? 'online' : 'warning'}`}><i/>{connected ? 'LIVE' : 'SAFE'}</div>
           <PwaControls/>
         </header>
@@ -170,27 +197,31 @@ export default function Dashboard() {
               loading={historyLoading}
               error={historyError}
               onOpenIncidents={() => navigate('Incidents')}
-              onRefresh={() => setHistoryRefresh((value) => value + 1)}
+              onRefresh={refreshHistory}
             />}
           /> : active === 'FRIDAY' ? <FridayWorkspace
             session={friday}
             query={query}
             onQueryChange={setQuery}
             onSubmit={submitFriday}
-          /> : active === 'Agents' ? <AgentsWorkspace/> : active === 'Settings' ? <SettingsWorkspace/> : active === 'Audit' ? <AuditWorkspace/> : active === 'Repositories' ? <RepositoriesWorkspace/> : active === 'Applications' ? <ApplicationsWorkspace overview={overview} connected={connected}/> : active === 'Infrastructure' ? <InfrastructureWorkspace overview={overview} connected={connected}/> : active === 'Incidents' ? <IncidentsWorkspace
+          /> : active === 'Agents' ? <AgentsWorkspace/> : active === 'Tasks' ? <ProjectTasksWorkspace/> : active === 'Settings' ? <SettingsWorkspace/> : active === 'Audit' ? <AuditWorkspace/> : active === 'Repositories' ? <RepositoriesWorkspace/> : active === 'Applications' ? <ApplicationsWorkspace overview={overview} connected={connected}/> : active === 'Infrastructure' ? <InfrastructureWorkspace overview={overview} connected={connected}/> : active === 'Incidents' ? <IncidentsWorkspace
             incidents={incidents}
             services={overview.services}
             sites={overview.sites}
             monitoring={overview.monitoring}
             history={history}
             historyError={historyError}
+            historyLoading={historyLoading}
+            onRefreshHistory={refreshHistory}
             selectedIncident={selectedIncident}
             onSelectIncident={viewDiagnosis}
             onClearSelection={() => setSelectedIncidentId(null)}
           /> : <PendingCapabilityView name={active}/>} 
+          {active === 'Overview' && <AgentConfiguration groups={groups} unavailable={groupsUnavailable} onNavigate={() => navigate('Agents')}/>}
         </main>
       </div>
       <MobileNavigation active={active} activeIncidents={activeIncidents} onNavigate={navigate}/>
+      <CommandPalette open={paletteOpen} items={paletteItems} onAsk={askFromPalette} onClose={() => setPaletteOpen(false)}/>
     </div>
   }
 
@@ -256,6 +287,8 @@ export default function Dashboard() {
               <section className="v3-panel" aria-labelledby="v3-needs-attention"><div className="v3-section-head"><div><span className="v3-kicker">SERVICES</span><h2 id="v3-needs-attention">Needs attention</h2></div><button onClick={() => navigate('Infrastructure')}>View all services <ChevronRight size={15}/></button></div><div className="v3-agents">{health.attention.length ? health.attention.slice(0, 4).map((service) => <div key={service.id}><i className={service.status}/><span><b>{service.name}</b><small>{service.host} · {service.detail}</small></span><em className={service.status}>{statusLabel(service.status)}</em></div>) : <div><i className="on"/><span><b>No service issues</b><small>{!health.total ? 'No services observed yet.' : health.online === health.total ? 'Every observed service reports online.' : `${health.total - health.online} in maintenance · the rest report online.`}</small></span></div>}</div></section>
             </section>
 
+            <AgentConfiguration groups={groups} unavailable={groupsUnavailable} onNavigate={() => navigate('Agents')}/>
+
             <ActivityTimeline
               connected={connected}
               mode={overview.mode}
@@ -264,7 +297,7 @@ export default function Dashboard() {
               loading={historyLoading}
               error={historyError}
               onOpenIncidents={() => navigate('Incidents')}
-              onRefresh={() => setHistoryRefresh((value) => value + 1)}
+              onRefresh={refreshHistory}
             />
 
             <section className="v3-section" aria-labelledby="v3-service-health"><div className="v3-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2 id="v3-service-health">Service health</h2></div><span>{health.online} online</span></div><div className="v3-services">{orderedServices.map(s => <button key={s.id} onClick={() => navigate('Infrastructure')}><i className={s.status}/><span><b>{s.name}</b><small>{s.host}</small></span>{s.status === 'online' ? <em>{s.updated}</em> : <em className={`v3-service-state ${s.status}`}>{statusLabel(s.status)}</em>}</button>)}</div></section>
@@ -272,10 +305,11 @@ export default function Dashboard() {
             : active === 'Agents' ? <AgentsWorkspace/>
             : active === 'Applications' ? <ApplicationsWorkspace overview={overview} connected={connected}/>
             : active === 'Repositories' ? <RepositoriesWorkspace/>
+            : active === 'Tasks' ? <ProjectTasksWorkspace/>
             : active === 'Audit' ? <AuditWorkspace/>
             : active === 'Settings' ? <SettingsWorkspace/>
             : active === 'Infrastructure' ? <InfrastructureWorkspace overview={overview} connected={connected}/>
-            : active === 'Incidents' ? <IncidentsWorkspace incidents={incidents} services={overview.services} sites={overview.sites} monitoring={overview.monitoring} history={history} historyError={historyError} selectedIncident={selectedIncident} onSelectIncident={viewDiagnosis} onClearSelection={() => setSelectedIncidentId(null)}/>
+            : active === 'Incidents' ? <IncidentsWorkspace incidents={incidents} services={overview.services} sites={overview.sites} monitoring={overview.monitoring} history={history} historyError={historyError} historyLoading={historyLoading} onRefreshHistory={refreshHistory} selectedIncident={selectedIncident} onSelectIncident={viewDiagnosis} onClearSelection={() => setSelectedIncidentId(null)}/>
                         : <PendingCapabilityView name={active} />}
         </main>
       </div>
@@ -296,5 +330,37 @@ function PendingCapabilityView({ name }: { name: string }) {
     <p>{details[name] || 'This workspace has no production-backed service yet.'}</p>
     <p>No production task, memory or approval operation is available on this screen.</p>
     <div role="status">Not activated · read only · no action controls</div>
+  </section>
+}
+
+function AgentConfiguration({ groups, unavailable, onNavigate }: {
+  groups: GroupWorkspace | null
+  unavailable: boolean
+  onNavigate: () => void
+}) {
+  const configured = new Set(groups?.groups.flatMap(group => group.members
+    .filter(member => member.state === 'configured' && member.agentId !== null)
+    .map(member => member.agentId))).size
+  return <section className="v3-panel v3-group-overview" aria-label="Agent configuration">
+    <div className="v3-section-head"><div><span className="v3-kicker">GROUP WORKSPACE</span><h2>Agent configuration</h2></div><Bot size={18}/></div>
+    <div className="v3-agents">
+      <div><span><b>{unavailable || groups?.registryStatus === 'unavailable'
+        ? 'Agent configuration unavailable' : groups
+          ? `${configured} configured member${configured === 1 ? '' : 's'}`
+          : 'Loading agent configuration…'}</b><small>Configured does not mean running.</small></span></div>
+      <div><span><b>Work integration not connected.</b></span></div>
+    </div>
+    {groups && groups.registryStatus !== 'unavailable' && <div className="v3-group-quick-links" aria-label="Agent groups">
+      {groups.groups.map(group => {
+        const configuredCount = new Set(group.members.filter(member => member.state === 'configured' && member.agentId).map(member => member.agentId)).size
+        const plannedCount = group.members.filter(member => member.implementation === 'planned').length
+        return <button type="button" key={group.id} aria-label={`Open ${group.name} group`} onClick={onNavigate}>
+          <span className="v3-group-letter" aria-hidden="true">{group.name.slice(0, 1)}</span>
+          <span className="v3-group-summary"><strong>{group.name}</strong><small>{configuredCount} configured · {plannedCount} planned</small></span>
+          <ChevronRight size={16} aria-hidden="true"/>
+        </button>
+      })}
+    </div>}
+    <div className="v3-section-head"><button type="button" onClick={onNavigate}>View Agents configuration <ChevronRight size={15}/></button></div>
   </section>
 }

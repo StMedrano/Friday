@@ -11,6 +11,15 @@ container="friday-phase2b-isolated-$$"
 cleanup() { docker rm -f "$container" >/dev/null 2>&1 || true; }
 trap cleanup EXIT HUP INT TERM
 docker run --rm -d --name "$container" --network none --tmpfs /var/lib/postgresql/data:rw,noexec,nosuid,size=128m -e POSTGRES_PASSWORD=temporary-test-only postgres:16-alpine >/dev/null
+# PostgreSQL's official entrypoint starts a TEMPORARY server during initdb,
+# shuts it down, then launches the final server. pg_isready can succeed during
+# that temporary window; wait for the explicit initialization-complete marker
+# before checking final server readiness. The container is always fresh.
+i=0
+until docker logs "$container" 2>&1 | grep -Fq 'PostgreSQL init process complete; ready for start up.'; do
+ i=$((i+1)); [ "$i" -lt 45 ] || { echo 'Temporary database initialization did not complete' >&2; exit 1; }
+ sleep 1
+done
 i=0
 until docker exec "$container" pg_isready -U postgres >/dev/null 2>&1; do
  i=$((i+1)); [ "$i" -lt 45 ] || { echo 'Temporary database did not start' >&2; exit 1; }
@@ -25,6 +34,8 @@ docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < supabase/migra
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work.sql >/dev/null
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work-claims.sql >/dev/null
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work-service-role.sql >/dev/null
+docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/project-task-access.sql >/dev/null
+docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/task-pagination.sql >/dev/null
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work-handoffs.sql >/dev/null
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work-decisions.sql >/dev/null
 FRIDAY_TEST_PG_CONTAINER="$container" sh tests/sql/shared-work-concurrency.sh
@@ -35,4 +46,4 @@ docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/publ
 # Offline acceptance for shared, encrypted OAuth state; NEVER touch live DB.
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < supabase/migrations/20261027010000_friday_identity_oidc_transactions.sql >/dev/null
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/public-oidc-transactions.sql >/dev/null
-printf 'PASS: shared-work transactions and private Authentik login sessions on disposable Postgres\n'
+printf 'PASS: shared-work, project-task, lease, and private Authentik login tests on disposable Postgres\n'

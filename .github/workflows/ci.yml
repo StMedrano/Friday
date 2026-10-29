@@ -30,12 +30,24 @@ jobs:
       - name: Verify repository
         run: make verify
 
+      - name: Install isolated browser test runtime
+        run: npx playwright install --with-deps chromium
+
+      - name: Test trusted project tasks in synthetic local browser fixture
+        run: npm run test:e2e
+
+      - name: Verify signed Access identity can load built UI
+        run: node --test server/security/access-staging.test.mjs
+
       - name: Validate shell scripts
         run: |
           for file in scripts/*.sh; do
             echo "checking $file"
             sh -n "$file"
           done
+
+      - name: Verify isolated Friday staging Compose without starting services
+        run: sh scripts/verify-friday-staging.sh
 
       - name: Verify observer security boundary
         run: |
@@ -151,6 +163,25 @@ jobs:
       - name: Test shared-work Postgres transactions
         run: npm run test:shared-work-db
 
+      - name: Verify model-fabric read-only and credential boundary
+        run: |
+          if grep -RniE 'NVIDIA_API_KEY|VITE_.*NVIDIA|VITE_.*(API_KEY|TOKEN|SECRET|SERVICE_KEY)' src; then
+            echo 'Model credential or frontend secret detected.' >&2
+            exit 1
+          fi
+          if grep -RniE 'VITE_.*(NVIDIA|API_KEY|TOKEN|SECRET|SERVICE_KEY)' .env.example compose.yaml server/ai server/config.mjs; then
+            echo 'Browser-visible model secret detected.' >&2
+            exit 1
+          fi
+          if grep -niE 'child_process|execFile\(|spawn\(|ssh ' server/ai/model-*.mjs server/ai/nvidia.mjs; then
+            echo 'Model-fabric infrastructure execution path detected.' >&2
+            exit 1
+          fi
+          if grep -niE "request\.method === '(POST|PUT|PATCH|DELETE)'.*(model-fabric|infrastructure)" server/http.mjs; then
+            echo 'Model fabric or infrastructure mutation route detected.' >&2
+            exit 1
+          fi
+
       - name: Validate agent registry schema
         run: npm run validate:agent-registry-schema
 
@@ -176,10 +207,36 @@ jobs:
         run: docker compose -f compose.yaml -f compose.live.yaml config >/dev/null
 
       - name: Validate VM100 observer Compose
-        run: FRIDAY_OBSERVER_TOKEN=ci-test FRIDAY_OBSERVER_BIND_ADDRESS=127.0.0.1 docker compose -f observer/compose.yaml config >/dev/null
+        run: FRIDAY_OBSERVER_TOKEN=ci-test FRIDAY_OBSERVER_BIND_ADDRESS=127.0.0.1 FRIDAY_DOCKER_SOCKET_GID="$(stat -c %g /var/run/docker.sock)" docker compose -f observer/compose.yaml config >/dev/null
 
       - name: Build controller container
         run: docker build -t friday-ci .
 
+      - name: Smoke test private Friday staging image without tunnel or host ports
+        run: sh scripts/test-friday-staging-isolation.sh
+
+      - name: Scan controller image for OS and Node vulnerabilities
+        run: sh scripts/scan-controller-image.sh friday-ci
+
+      - name: Smoke test isolated non-root controller
+        run: sh scripts/test-controller-container-hardening.sh friday-ci
+
+      - name: Verify real live-mode image fails closed without Access configuration
+        run: sh scripts/test-access-live-failclosed.sh friday-ci
+
+      - name: Rehearse read-only root-to-nonroot data volume migration
+        run: sh scripts/test-friday-volume-migration.sh friday-ci
+
       - name: Build VM100 observer container
         run: docker build -t friday-observer-ci observer
+
+      - name: Build restricted Docker socket proxy
+        run: docker build -f observer/Dockerfile.proxy -t friday-observer-proxy-ci observer
+
+      - name: Scan observer and proxy runtime images
+        run: |
+          sh scripts/scan-controller-image.sh friday-observer-ci
+          sh scripts/scan-controller-image.sh friday-observer-proxy-ci
+
+      - name: Verify isolated Docker API read-only boundary
+        run: sh scripts/test-observer-proxy-isolation.sh friday-observer-proxy-ci friday-observer-ci

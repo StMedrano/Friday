@@ -1,6 +1,7 @@
 import type { FormEventHandler, ReactNode } from 'react'
 import { AlertTriangle, ChevronRight, Server, ShieldCheck } from 'lucide-react'
-import type { FridayIncident, FridayOverview } from '../lib/api'
+import type { FridayIncident, FridayOverview, MonitoringEvent } from '../lib/api'
+import ActivityTimeline from './ActivityTimeline'
 import type { FridaySessionMessage } from '../hooks/useFridaySession'
 import FridayComposer from './FridayComposer'
 import FridayConversation from './FridayConversation'
@@ -25,6 +26,10 @@ type MobileHomeProps = {
   onNavigate: (destination: string) => void
   activity?: ReactNode
   onSelectIncident: (incident: FridayIncident) => void
+  activityEvents?: MonitoringEvent[]
+  activityLoading?: boolean
+  activityError?: string | null
+  onRefreshHistory?: () => void
 }
 
 export default function MobileHome({
@@ -38,6 +43,10 @@ export default function MobileHome({
   onNavigate,
   activity,
   onSelectIncident,
+  activityEvents = [],
+  activityLoading = false,
+  activityError = null,
+  onRefreshHistory,
 }: MobileHomeProps) {
   const active = (overview.incidents ?? [])
     .filter((incident) => incident.status === 'open')
@@ -106,5 +115,6 @@ export default function MobileHome({
       <div className="v3-mobile-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><button onClick={() => onNavigate('Applications')}>View all services</button></div>
       <div className="v3-mobile-service-list">{prioritizedServices.map((service) => <div className="v3-mobile-service-row" data-testid="mobile-service-row" key={service.id}><i className={service.status}/><span><b>{service.name}</b><small>{service.host}</small></span><em>{service.status}</em></div>)}</div>
     </section>
+    <ActivityTimeline connected={connected} mode={overview.mode} events={activityEvents} examples={overview.activities} loading={activityLoading} error={activityError} onRefresh={onRefreshHistory} onOpenIncidents={() => onNavigate('Incidents')}/>
   </div>
 }

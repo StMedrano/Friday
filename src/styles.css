@@ -1129,6 +1129,113 @@ em.v3-service-state.offline {
   background: var(--amber);
   box-shadow: none;
 }
+
+.v3-group-overview {
+  margin-top: 14px;
+}
+
+.v3-mobile-search-button {
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, .015);
+  display: grid;
+  place-items: center;
+  color: #a4bdcf;
+}
+
+.v3-mobile-search-button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.v3-group-quick-links {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin: 13px 0 16px;
+}
+
+.v3-group-quick-links button {
+  min-height: 66px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 10px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: #101923;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color .18s ease, transform .18s ease;
+}
+
+.v3-group-quick-links button:hover,
+.v3-group-quick-links button:focus-visible {
+  border-color: rgba(103, 217, 255, .38);
+  background: #142130;
+}
+
+.v3-group-quick-links button:focus-visible {
+  outline: 2px solid var(--cyan);
+  outline-offset: 2px;
+}
+
+.v3-group-letter {
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  border: 1px solid rgba(103, 217, 255, .22);
+  border-radius: 10px;
+  color: var(--cyan);
+  background: rgba(103, 217, 255, .07);
+  display: grid;
+  place-items: center;
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.v3-group-summary {
+  min-width: 0;
+  flex: 1;
+  display: grid;
+  gap: 5px;
+}
+
+.v3-group-summary strong {
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
+.v3-group-summary small {
+  color: var(--muted);
+  font-size: 9px;
+  overflow-wrap: anywhere;
+}
+
+.v3-group-quick-links button > svg {
+  flex: 0 0 auto;
+  color: #73899d;
+}
+
+@media (max-width: 700px) {
+  .v3-group-quick-links {
+    grid-template-columns: 1fr;
+  }
+
+  .v3-group-quick-links button {
+    min-height: 56px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .v3-group-quick-links button {
+    transition: none;
+  }
+}
 .v3-activity-panel{margin-top:26px;padding:18px 20px;border:1px solid var(--line);border-radius:17px;background:#0e131b;min-width:0}
 .v3-activity-heading{display:flex;align-items:center;justify-content:space-between;gap:14px}
 .v3-activity-heading h2{margin:6px 0 0;font-size:17px;letter-spacing:-.02em}

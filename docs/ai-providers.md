@@ -72,3 +72,7 @@ The Compose `local-ai` Ollama service remains available as an optional private d
 ## Safety boundary
 
 AI remains advisory and read-only. All providers receive normalized Friday state only. The shared AI policy requires providers to preserve exact service IDs, VM/LXC numbers, host names, and service-name mappings from normalized state rather than infer, renumber, merge, or substitute identifiers. This change does not add infrastructure execution tools, mutation routes, Docker socket access, Proxmox write access, remediation actions, or approval bypasses.
+
+## Internal Phase 2A model fabric (separate path)
+
+The general Friday Assistant still uses the existing Groq/Gemini/Ollama/OpenAI/Anthropic provider chain configured via `FRIDAY_AI_PROVIDER_ORDER`. Phase 1 matched agents remain **local Ollama only**; no cloud fallback is inserted. Phase 2A introduces a separate, opt-in NVIDIA-hosted/local-NIM model registry/router/failover module, not an Assistant provider or Agent Spec change. It is internal-only, has no new public execution endpoint, and cannot run paid/unknown billing models. See [model-fabric.md](model-fabric.md).

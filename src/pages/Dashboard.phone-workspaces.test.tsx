@@ -30,12 +30,12 @@ describe('Dashboard phone layout', () => {
     expect(screen.queryByRole('heading', { name: 'Audit is not connected' })).not.toBeInTheDocument()
   })
 
-  it('still marks genuinely unconnected workspaces on a phone', async () => {
+  it('routes the connected project Tasks workspace on a phone', async () => {
     const { default: Dashboard } = await import('./Dashboard')
     const user = userEvent.setup()
     render(<Dashboard />)
     await user.click(screen.getByRole('button', { name: 'More' }))
     await user.click(screen.getByRole('button', { name: 'Tasks' }))
-    expect(screen.getByRole('heading', { name: 'Tasks is not connected' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { name: 'Project tasks' })).toBeInTheDocument()
   })
 })
