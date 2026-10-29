@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { createEmptyMonitoringState } from './state.mjs'
-import { evaluateMonitoring } from './incidents.mjs'
+import { evaluateMonitoring, retireService } from './incidents.mjs'
 
 const config = { offlineGraceSeconds: 300, historyLimit: 2000 }
 const offline = {
@@ -150,4 +150,26 @@ test('history records status changes and incident lifecycle events', () => {
   assert.ok(types.includes('incident-opened'))
   assert.ok(types.includes('service-status-changed'))
   assert.ok(types.includes('incident-resolved'))
+})
+
+test('retiring a removed service closes its open incidents as retired, not recovered, and forgets its observation', () => {
+  const config = { offlineGraceSeconds: 0, historyLimit: 50 }
+  const offline = { id: 'endpoint-nas', name: 'NAS', host: '10.0.0.5', status: 'offline', detail: 'Timeout', updated: 'now' }
+  let { state } = evaluateMonitoring({ state: createEmptyMonitoringState(), overview: { services: [offline] }, config, now: '2026-10-29T00:00:00.000Z' })
+  ;({ state } = evaluateMonitoring({ state, overview: { services: [offline] }, config, now: '2026-10-29T00:01:00.000Z' }))
+  assert.equal(state.incidents.filter(incident => incident.status === 'open').length, 1)
+
+  const retired = retireService({ state, serviceId: 'endpoint-nas', config, now: '2026-10-29T00:02:00.000Z', reason: 'endpoint check deleted' })
+  assert.equal(retired.changed, true)
+  const [incident] = retired.state.incidents
+  assert.equal(incident.status, 'resolved')
+  assert.equal(incident.resolution, 'retired')
+  assert.equal(incident.resolvedAt, '2026-10-29T00:02:00.000Z')
+  assert.equal(retired.state.observations['endpoint-nas'], undefined)
+  const last = retired.state.history.at(-1)
+  assert.equal(last.type, 'incident-retired')
+  assert.match(last.detail, /endpoint check deleted/)
+  assert.ok(!retired.state.history.some(event => event.type === 'incident-resolved'))
+  assert.equal(state.incidents[0].status, 'open', 'input state is not mutated')
+  assert.equal(retireService({ state: retired.state, serviceId: 'endpoint-nas', config }).changed, false)
 })

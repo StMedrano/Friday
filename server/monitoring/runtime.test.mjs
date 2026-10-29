@@ -358,3 +358,29 @@ test('a resolved incident diagnostic remains while a later recurrence receives a
   assert.equal(runtime.getDiagnostic('old-incident').body.status, 'available')
   assert.equal(runtime.getDiagnostic(current.id).body.status, 'available')
 })
+
+test('retireService closes a removed service incident after any in-flight poll and persists it', async () => {
+  const saved = []
+  let release
+  const runtime = createMonitoringRuntime({
+    config: config(true),
+    collectOverview: async () => { await new Promise(resolve => { release = resolve }); return overview('offline') },
+    store: { async load() { return createEmptyMonitoringState() }, async save(state) { saved.push(structuredClone(state)) } },
+    now: () => new Date('2026-10-29T00:00:00.000Z'),
+  })
+  const polling = runtime.poll()
+  const retiring = runtime.retireService('svc', 'endpoint check deleted')
+  await new Promise(resolve => setImmediate(resolve))
+  release()
+  await polling
+  assert.equal(await retiring, true)
+  assert.equal(runtime.getIncidents().summary.active, 0)
+  assert.equal(runtime.getIncidents().incidents[0].resolution, 'retired')
+  assert.equal(saved.at(-1).incidents[0].status, 'resolved')
+  assert.equal(await runtime.retireService('svc', 'again'), false)
+})
+
+test('retireService is inert when monitoring is disabled', async () => {
+  const runtime = createMonitoringRuntime({ config: config(false), collectOverview: async () => overview(), store: { async load() {}, async save() { throw Error('no') } } })
+  assert.equal(await runtime.retireService('svc', 'x'), false)
+})
