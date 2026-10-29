@@ -1,5 +1,28 @@
 # Friday — Ordered Finish Queue
 
+## First: merge the combined development candidate to `main`
+
+1. Finish the exact-result checks on
+   `integration/friday-development-main-20261029`, whose payload is
+   `feat/friday-operator-auth-20261011` at `dc64d49` reconciled onto
+   current `main` at `52193d1`.
+2. Push a replacement PR to `main` and require green Linux exact-head CI.
+   Do not merge `feat/friday-group-workspace-20261013` separately; its
+   squash payload is already present in the combined development head.
+3. Merge the replacement PR to `main`, fetch the resulting merge commit,
+   and verify the merge ancestry and required checks.
+4. Only then begin the separately authorized production checkpoint:
+   inventory VM102, preserve and back up its private `.env` and current
+   data mapping, run preflight, deploy the merged `main`, and run health,
+   Access, API, UI, monitoring and rollback acceptance.
+5. Rotate `friday-cloud-reader` with bounded overlap after the merged
+   deployment target is known; update the managed caller binding without
+   exposing the secret, prove authenticated reads, then retire the prior
+   credential.
+
+No source verification, PR creation, or CI result by itself authorizes
+an unmerged production deployment.
+
 ## Installable Friday PWA — test source, stage separately
 
 - New manifest, secure-origin registration, 180/192/512 launcher icons,

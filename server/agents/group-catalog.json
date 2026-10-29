@@ -1,0 +1,137 @@
+{
+  "schemaVersion": "1",
+  "groups": [
+    {
+      "id": "techtactics",
+      "name": "TechTactics",
+      "members": [
+        {
+          "id": "techtactics-manager",
+          "name": "Manager",
+          "agentId": null,
+          "implementation": "planned"
+        },
+        {
+          "id": "techtactics-scout",
+          "name": "Scout",
+          "agentId": null,
+          "implementation": "planned"
+        },
+        {
+          "id": "techtactics-auditor",
+          "name": "Auditor",
+          "agentId": null,
+          "implementation": "planned"
+        },
+        {
+          "id": "techtactics-designer",
+          "name": "Designer",
+          "agentId": null,
+          "implementation": "planned"
+        },
+        {
+          "id": "techtactics-sales",
+          "name": "Sales",
+          "agentId": null,
+          "implementation": "planned"
+        },
+        {
+          "id": "techtactics-accounting-tax",
+          "name": "Accounting/Tax",
+          "agentId": null,
+          "implementation": "planned"
+        },
+        {
+          "id": "techtactics-legal",
+          "name": "Legal",
+          "agentId": null,
+          "implementation": "planned"
+        }
+      ]
+    },
+    {
+      "id": "app-builder",
+      "name": "App Builder",
+      "members": [
+        {
+          "id": "app-builder-coordinator",
+          "name": "Coordinator",
+          "agentId": null,
+          "implementation": "planned"
+        },
+        {
+          "id": "app-builder-planner",
+          "name": "Planner",
+          "agentId": null,
+          "implementation": "planned"
+        },
+        {
+          "id": "app-builder-developer",
+          "name": "Developer",
+          "agentId": null,
+          "implementation": "planned"
+        },
+        {
+          "id": "app-builder-reviewer",
+          "name": "Reviewer",
+          "agentId": null,
+          "implementation": "planned"
+        },
+        {
+          "id": "app-builder-qa",
+          "name": "QA",
+          "agentId": null,
+          "implementation": "planned"
+        }
+      ]
+    },
+    {
+      "id": "homelab",
+      "name": "HomeLab",
+      "members": [
+        {
+          "id": "homelab-coordinator",
+          "name": "Coordinator",
+          "agentId": null,
+          "implementation": "planned"
+        },
+        {
+          "id": "homelab-proxmox-observer",
+          "name": "Proxmox Observer",
+          "agentId": "proxmox-observer",
+          "implementation": "existing"
+        },
+        {
+          "id": "homelab-container-operations",
+          "name": "Container Operations",
+          "agentId": null,
+          "implementation": "planned"
+        },
+        {
+          "id": "homelab-network-observer",
+          "name": "Network Observer",
+          "agentId": null,
+          "implementation": "planned"
+        },
+        {
+          "id": "homelab-backup-storage",
+          "name": "Backup/Storage",
+          "agentId": null,
+          "implementation": "planned"
+        },
+        {
+          "id": "homelab-security",
+          "name": "Security",
+          "agentId": null,
+          "implementation": "planned"
+        },
+        {
+          "id": "homelab-service-health",
+          "name": "Service Health",
+          "agentId": null,
+          "implementation": "planned"
+        }
+      ]
+    }
+  ]
+}

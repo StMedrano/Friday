@@ -100,20 +100,41 @@ test('route and ask POST endpoints validate inputs and pass fresh overview to lo
   })
 })
 
-test('registry sync endpoint accepts only empty object and touches registry service only', async () => {
+test('registry synchronization is operator-token protected and fails closed before side effects', async () => {
+  const validToken = 'a'.repeat(64)
   let syncCalls = 0
   const registryService = registry()
-  registryService.sync = async () => { syncCalls += 1; return { status: 'ok', agentsSeen: 1, agentsSynced: 1, agentsRejected: 0, errors: [] } }
-
-  await withServer({ config: config(), agentRegistryService: registryService, buildOverviewImpl: async () => overview() }, async (base) => {
-    const ok = await post(base, '/api/agents/registry/sync', {})
-    assert.equal(ok.status, 200)
-    assert.equal(syncCalls, 1)
-
-    const rejected = await post(base, '/api/agents/registry/sync', { force: true })
-    assert.equal(rejected.status, 400)
-    assert.equal(syncCalls, 1)
-  })
+  registryService.sync = async () => { syncCalls += 1; return { status: 'ok', agentsSynced: 1 } }
+  for (const [configuredToken, authHeader, expected] of [
+    [undefined, undefined, 503],
+    [validToken, undefined, 401],
+    [validToken, 'Bearer ' + 'b'.repeat(64), 401],
+    [validToken, 'Basic ' + validToken, 401],
+    [validToken, 'Bearer ' + validToken, 200],
+  ]) {
+    await withServer({
+      config: { ...config(), operator: { registrySyncToken: configuredToken } },
+      agentRegistryService: registryService,
+      buildOverviewImpl: async () => overview(),
+    }, async (base) => {
+      const res = await fetch(base + '/api/agents/registry/sync', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...(authHeader ? { authorization: authHeader } : {}) },
+        body: '{}',
+      })
+      assert.equal(res.status, expected, 'expected status ' + expected)
+      assert.equal(syncCalls, expected === 200 ? 1 : 0, 'only authenticated sync executes')
+      if (expected === 200) {
+        const invalid = await fetch(base + '/api/agents/registry/sync', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', authorization: authHeader },
+          body: '{"force":true}',
+        })
+        assert.equal(invalid.status, 400)
+        assert.equal(syncCalls, 1)
+      }
+    })
+  }
 })
 
 test('agent endpoints fail closed when registry/service is unavailable and sanitize faults', async () => {

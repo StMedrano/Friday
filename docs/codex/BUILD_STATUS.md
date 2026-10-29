@@ -1,5 +1,44 @@
 # Friday Build Status
 
+## 2026-10-29 combined development-to-main integration candidate
+
+The closed development/security line `feat/friday-operator-auth-20261011`
+at `dc64d49` contains the squash merge of the later group-workspace work.
+It has been reconciled onto current `main` (`52193d1`) in the isolated
+`integration/friday-development-main-20261029` branch. Current-main
+behavior wins where the histories conflicted: the production Access
+contract remains `FRIDAY_ACCESS_TEAM_DOMAIN`, `FRIDAY_ACCESS_AUD`, and
+`FRIDAY_ACCESS_OPERATOR_EMAILS`; health probes remain public, the Access
+edge protects static UI, and the origin verifies operational APIs.
+
+The candidate adds the group/advisory workspace, private Web Growth
+reader, local project-task slice and pagination, free-only model fabric
+and NVIDIA readiness, hardened observer proxy/staging artifacts, and the
+responsive Tasks/group UI while retaining current monitoring, settings,
+audit, repository, notification, command-palette, and compact-navigation
+behavior. The stale `feat/friday-group-workspace-20261013` history must
+not be merged separately because its payload is already in the combined
+development head.
+
+Local acceptance on Windows with Node 22.23.4 and the merged lockfile:
+
+- `npm ci`: passed; 0 vulnerabilities;
+- Vitest: 43 files, 256 tests passed;
+- changed server/observer/script surface: 175 passed, 1 skipped because
+  this host has no POSIX `sh` for the disposable PostgreSQL harness;
+- focused Cloudflare staging acceptance: 7/7 passed;
+- production TypeScript/Vite build: passed on the final reconciled working
+  tree (1,614 modules);
+- the complete 886-test Node suite has 811 passes, 74 failures and one
+  skip locally; all 74 failures require Docker or POSIX ownership,
+  permission/symlink semantics unavailable on this Windows host. Linux
+  exact-head CI remains the authoritative merge gate.
+
+No VM102, Cloudflare credential, database, tunnel, or production change
+was made by this integration. Production deployment and credential
+rotation remain blocked until the replacement PR is green and merged to
+`main`.
+
 ## 2026-10-28 Grafana health and alert rule state (default off)
 
 `server/adapters/grafana.mjs` adds the last planned monitoring adapter. It
@@ -480,7 +519,7 @@ This is the source-of-truth handoff ledger for coding agents. Update it when a m
 A Proxmox guest that is stopped is reported `maintenance` instead of `offline` when its config has `onboot: 0` or carries a `maintenance` or `friday-ignore` tag, so monitoring opens no incident and no notification is pushed for a planned shutdown (for example the Umbrel VM powered off on 2026-10-29). Only stopped guests are inspected, at most sixteen per collection, and a config read failure leaves the guest `offline`. A guest that should autostart but is stopped still reports offline.
 ## Recent activity timeline, 2026-10-29
 
-The home screen shows the monitoring history it already reads: a "Recent activity" panel with the five most recent observed events, newest first, on desktop and phone. It states its provenance (observed data, demo examples, or not connected) and reports an unavailable history rather than an empty one. One history read now serves both the home panel and the Incidents workspace, with an explicit refresh. Ported from `feat/friday-group-workspace-20261013`, which is being split rather than merged whole.
+The home screen shows the monitoring history it already reads: a "Recent activity" panel with the five most recent observed events, newest first, on desktop and phone. It states its provenance (observed data, demo examples, or not connected) and reports an unavailable history rather than an empty one. One history read now serves both the home panel and the Incidents workspace, with an explicit refresh. This slice was first ported independently; the combined development payload is now being reconciled through the 2026-10-29 integration candidate above.
 
 ## Phone layout reached Settings and Audit, 2026-10-29
 

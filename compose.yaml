@@ -5,6 +5,14 @@ services:
       dockerfile: Dockerfile
     container_name: friday
     restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    cap_drop:
+      - ALL
+    pids_limit: 128
+    # Only /data is persistent; root filesystem and build tree are immutable.
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,size=16m
     ports:
       - "${FRIDAY_UI_PORT:-3010}:3010"
     environment:
@@ -30,6 +38,10 @@ services:
       FRIDAY_PROXMOX_TOKEN_SECRET: ${FRIDAY_PROXMOX_TOKEN_SECRET:-}
       FRIDAY_PROXMOX_INSECURE: ${FRIDAY_PROXMOX_INSECURE:-false}
       FRIDAY_PROXMOX_SITE: ${FRIDAY_PROXMOX_SITE:-}
+      FRIDAY_WEB_GROWTH_ENABLED: ${FRIDAY_WEB_GROWTH_ENABLED:-false}
+      FRIDAY_WEB_GROWTH_READER_URL: ${FRIDAY_WEB_GROWTH_READER_URL:-}
+      FRIDAY_WEB_GROWTH_READER_TOKEN: ${FRIDAY_WEB_GROWTH_READER_TOKEN:-}
+      FRIDAY_WEB_GROWTH_READER_EMAILS: ${FRIDAY_WEB_GROWTH_READER_EMAILS:-}
       FRIDAY_VM100_OBSERVER_ENABLED: ${FRIDAY_VM100_OBSERVER_ENABLED:-false}
       FRIDAY_VM100_OBSERVER_URL: ${FRIDAY_VM100_OBSERVER_URL:-}
       FRIDAY_VM100_OBSERVER_TOKEN: ${FRIDAY_VM100_OBSERVER_TOKEN:-}
@@ -81,6 +93,8 @@ services:
       FRIDAY_GRAFANA_TOKEN: ${FRIDAY_GRAFANA_TOKEN:-}
       FRIDAY_GRAFANA_SITE: ${FRIDAY_GRAFANA_SITE:-}
       FRIDAY_AGENT_REGISTRY_ENABLED: ${FRIDAY_AGENT_REGISTRY_ENABLED:-false}
+      # Server-only operator mutation token; never expose to browser code.
+      FRIDAY_REGISTRY_SYNC_OPERATOR_TOKEN: ${FRIDAY_REGISTRY_SYNC_OPERATOR_TOKEN:-}
       FRIDAY_SUPABASE_URL: ${FRIDAY_SUPABASE_URL:-}
       FRIDAY_SUPABASE_SERVICE_KEY: ${FRIDAY_SUPABASE_SERVICE_KEY:-}
       FRIDAY_SUPABASE_HEALTH_ENABLED: ${FRIDAY_SUPABASE_HEALTH_ENABLED:-}
@@ -97,6 +111,14 @@ services:
       FRIDAY_AGENT_LOCAL_CODER_TIMEOUT_MS: ${FRIDAY_AGENT_LOCAL_CODER_TIMEOUT_MS:-90000}
       FRIDAY_AGENT_MODEL_CONTEXT: ${FRIDAY_AGENT_MODEL_CONTEXT:-8192}
       FRIDAY_AGENT_MODEL_MAX_TOKENS: ${FRIDAY_AGENT_MODEL_MAX_TOKENS:-768}
+      FRIDAY_MODEL_FABRIC_ENABLED: ${FRIDAY_MODEL_FABRIC_ENABLED:-false}
+      FRIDAY_NVIDIA_ENABLED: ${FRIDAY_NVIDIA_ENABLED:-false}
+      FRIDAY_NVIDIA_BASE_URL: ${FRIDAY_NVIDIA_BASE_URL:-https://integrate.api.nvidia.com/v1}
+      NVIDIA_API_KEY: ${NVIDIA_API_KEY:-}
+      FRIDAY_NVIDIA_MODELS_JSON: '${FRIDAY_NVIDIA_MODELS_JSON:-[]}'
+      FRIDAY_NVIDIA_LOCAL_ENABLED: ${FRIDAY_NVIDIA_LOCAL_ENABLED:-false}
+      FRIDAY_NVIDIA_LOCAL_BASE_URL: ${FRIDAY_NVIDIA_LOCAL_BASE_URL:-http://nvidia-nim:8000/v1}
+      FRIDAY_NVIDIA_LOCAL_MODELS_JSON: '${FRIDAY_NVIDIA_LOCAL_MODELS_JSON:-[]}'
       FRIDAY_AI_ENABLED: ${FRIDAY_AI_ENABLED:-false}
       FRIDAY_AI_PROVIDER_ORDER: ${FRIDAY_AI_PROVIDER_ORDER:-groq,gemini,ollama}
       FRIDAY_AI_REQUEST_TIMEOUT_MS: ${FRIDAY_AI_REQUEST_TIMEOUT_MS:-}
@@ -146,6 +168,8 @@ networks:
 
 volumes:
   friday_data:
-    name: friday_data
+    # For a separately approved, non-destructive data migration, select a
+    # newly prepared UID 10001-owned volume without modifying the old volume.
+    name: ${FRIDAY_DATA_VOLUME:-friday_data}
   friday_ollama:
     name: friday_ollama

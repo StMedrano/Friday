@@ -495,6 +495,23 @@
   }
 }
 
+.v3-activity-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.v3-activity-actions button {
+  min-height: 44px;
+}
+
+@media (max-width: 600px) {
+  .v3-activity-heading {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
+}
+
 /* Site-aware, read-only inventory topology. Never implies an unverified link. */
 .v3-topology-panel {
   padding: 17px;

@@ -1,4 +1,8 @@
+import { projectMonitoringHistory } from './monitoring/history.mjs'
+import { readWebGrowth } from './adapters/web-growth.mjs'
+import { validateWebGrowthSnapshot } from './adapters/web-growth-schema.mjs'
 import { createServer } from 'node:http'
+import { createHash, timingSafeEqual } from 'node:crypto'
 import { REPOSITORY_ID, toPublicRepository } from './repositories/repository.mjs'
 import { readRegistryEntries, repositorySettingsView } from './repositories/managed-registry.mjs'
 import { createReadStream, existsSync, statSync } from 'node:fs'
@@ -16,6 +20,8 @@ import { buildSettingsView } from './settings.mjs'
 import { applySiteSettings, siteSettingsView } from './site-settings.mjs'
 import { applyEndpointChecks, endpointChecksView, environmentEndpointChecks } from './endpoint-checks.mjs'
 import { normalizeSubscription, vapidKeys } from './notifications/web-push.mjs'
+import { getGroupWorkspace } from './agents/group-workspace.mjs'
+import { groupAdvisoryPolicy } from './agents/group-advisory.mjs'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -55,6 +61,20 @@ const mime = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
+}
+
+// Operator-only mutation boundary. A 32-byte random token, encoded as 64 hex
+// characters, must be supplied by a trusted server-side environment variable.
+// A browser-facing token or user-supplied identity header is never trusted.
+function authorizedOperator(request, token) {
+  if (typeof token !== 'string' || !/^[a-fA-F0-9]{64}$/.test(token)) return { status: 503, error: 'operator-auth-unconfigured' }
+  const auth = request.headers.authorization
+  const bearer = typeof auth === 'string' ? /^Bearer ([a-fA-F0-9]{64})$/.exec(auth) : null
+  if (!bearer) return { status: 401, error: 'operator-auth-required' }
+  const expected = createHash('sha256').update(token, 'utf8').digest()
+  const provided = createHash('sha256').update(bearer[1], 'utf8').digest()
+  if (!timingSafeEqual(expected, provided)) return { status: 401, error: 'operator-auth-required' }
+  return null
 }
 
 function json(response, statusCode, body) {
@@ -233,6 +253,7 @@ export function createFridayServer({
   monitoringRuntime = null,
   agentRegistryService = null,
   agentService = null,
+  projectTasks = null,
   repositoryRegistry = null,
   buildOverviewImpl = buildOverview,
   answerAssistantImpl = answerAssistant,
@@ -243,6 +264,8 @@ export function createFridayServer({
   endpointChecks = null,
   repositorySettings = null,
   pushSubscriptions = null,
+  readWebGrowthImpl = readWebGrowth,
+  verifyAccessImpl = null,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
   const labelledConfig = (effectiveConfig = config) =>
@@ -253,10 +276,28 @@ export function createFridayServer({
   }
   const securityRequired = config.access?.enabled === true ||
     (config.mode === 'live' && config.access?.enabled !== false)
-  const accessGate = securityRequired ? (accessGateImpl || createAccessGate(config.access)) : null
+  const compatibilityGate = verifyAccessImpl ? async (request, operatorOnly) => {
+    const verified = await verifyAccessImpl(request, config.access)
+    if (!verified?.ok) return { status: verified?.status || 403, error: verified?.error || 'access-denied' }
+    if (operatorOnly && !verified.operator) return { status: 403, error: 'access-denied' }
+    return { status: 200, identity: {
+      subject: verified.subject || verified.sub || verified.email,
+      principalId: verified.principalId || verified.subject || verified.sub || verified.email,
+      email: verified.email,
+      operator: verified.operator === true,
+    } }
+  } : null
+  const accessGate = securityRequired ? (accessGateImpl || compatibilityGate || createAccessGate(config.access)) : null
+  const accessUsage=new Map()
+  const MAX_ACCESS_OPERATIONS_PER_MINUTE=20
 
   return createServer(async (request, response) => {
-    const url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
+    let url
+    try {
+      url = new URL(request.url || '/', `http://${request.headers.host || 'localhost'}`)
+    } catch {
+      return json(response, 400, { error: 'invalid-request-url' })
+    }
 
     if (request.method === 'GET' && url.pathname === '/healthz') {
       return json(response, 200, { status: 'ok', service: 'friday', mode: config.mode })
@@ -274,20 +315,27 @@ export function createFridayServer({
       const siteSettingsWrite = request.method === 'PUT' && url.pathname === '/api/settings/sites'
       const collectionWrite = request.method !== 'GET' && request.method !== 'HEAD' && Boolean(settingsCollectionFor(url.pathname))
       const pushWrite = (request.method === 'POST' || request.method === 'DELETE') && url.pathname === '/api/notifications/web-push'
-      const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || url.pathname === '/api/audit/events'
+      const projectTaskWrite = request.method === 'POST' && /^\/api\/projects\/[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\/tasks$/.test(url.pathname)
+      const diagnosticsRerun = request.method === 'POST' && /^\/api\/incidents\/[^/]+\/diagnostics\/rerun$/.test(url.pathname)
+      const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || diagnosticsRerun || url.pathname === '/api/audit/events'
       let verdict
       try { verdict = await accessGate(request, operatorOnly) }
       catch { verdict = {status:503,error:'access-verification-unavailable'} }
       if (verdict?.status !== 200) {
         const denied = verdict?.status === 503
-        return json(response, denied ? 503 : 403, {error:denied?'access-verification-unavailable':'access-denied'})
+        return json(response, denied ? 503 : verdict?.status === 401 ? 401 : 403, {error:denied?'access-verification-unavailable':'access-denied'})
       }
-      identity = verdict.identity || null
+      identity = verdict.identity ? { ok: true, ...verdict.identity } : null
       // Do not allow browser-origin cross-site requests to use a verified session
       // for operational POST/PUT/DELETE handlers. Settings and registry writes with a body additionally require JSON.
       if (['POST', 'PUT', 'DELETE'].includes(request.method) && request.headers['sec-fetch-site'] === 'cross-site')
         return json(response, 403, {error:'access-denied'})
-      if ((registrySync || siteSettingsWrite || pushWrite || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
+      if (['POST', 'PUT', 'DELETE'].includes(request.method) && config.access?.publicOrigin &&
+        request.headers.origin && request.headers.origin !== config.access.publicOrigin)
+        return json(response, 403, {error:'access-denied'})
+      if (projectTaskWrite && config.access?.publicOrigin && request.headers.origin !== config.access.publicOrigin)
+        return json(response, 403, {error:'access-denied'})
+      if ((registrySync || siteSettingsWrite || pushWrite || projectTaskWrite || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
         return json(response, 415, {error:'json-required'})
     }
 
@@ -296,6 +344,71 @@ export function createFridayServer({
     // resolves private grants on every request; no browser-supplied roles.
     const workRead = await handleWorkReadHttp({request,url,bridge:workReadBridge})
     if (workRead) return json(response, workRead.status, workRead.body)
+
+    // Small process-local resource guard; deployed ingress must also apply
+    // distributed request quotas and abusive-client controls.
+    const isExpensive=request.method==='POST'&&(
+      /^\/api\/projects\/[A-Za-z0-9][A-Za-z0-9_.-]{0,127}\/tasks$/.test(url.pathname)||
+      url.pathname==='/api/assistant'||url.pathname==='/api/group-advisory'||url.pathname==='/api/agents/route'||
+      /^\/api\/agents\/[^/]+\/ask$/.test(url.pathname)||
+      url.pathname==='/api/agents/registry/sync'||
+      /^\/api\/incidents\/[^/]+\/diagnostics\/rerun$/.test(url.pathname))
+    if (isExpensive && identity?.email) {
+      const time=Date.now()
+      const key=identity.email
+      const prior=accessUsage.get(key)
+      const state=!prior||prior.until<=time?{count:0,until:time+60000}:prior
+      if(state.count>=MAX_ACCESS_OPERATIONS_PER_MINUTE) return json(response,429,{error:'rate-limit-exceeded'})
+      state.count+=1
+      if(accessUsage.size>=2000&&!accessUsage.has(key)){
+        for(const [id,entry] of accessUsage)if(entry.until<=time)accessUsage.delete(id)
+        if(accessUsage.size>=2000)accessUsage.clear()
+      }
+      accessUsage.set(key,state)
+    }
+
+    const projectTaskRoute=/^\/api\/projects\/([A-Za-z0-9][A-Za-z0-9_.-]{0,127})\/tasks$/.exec(url.pathname)
+    if (url.pathname === '/api/projects' || projectTaskRoute) {
+      // Explicit local-development injection only; bootstrap never creates this service.
+      if (!identity || config.mode !== 'live' || !projectTasks) return json(response,503,{error:'project-tasks-unavailable'})
+      if (url.search && (!projectTaskRoute || request.method!=='GET' || [...url.searchParams.keys()].some(key=>key!=='cursor') || url.searchParams.getAll('cursor').length!==1)) return json(response,400,{error:'unexpected-query'})
+      if (request.method!=='GET' && !(projectTaskRoute && request.method==='POST')) return json(response,405,{error:'method-not-allowed'})
+      try {
+        if (!projectTaskRoute) return json(response,200,{projects:await projectTasks.projects(identity)})
+        const projectId=projectTaskRoute[1]
+        if (request.method==='GET') return json(response,200,await projectTasks.page(identity,projectId,url.searchParams.has('cursor')?url.searchParams.get('cursor'):undefined))
+        let body
+        try {body=await readBody(request)}catch{return json(response,400,{error:'invalid-input'})}
+        return json(response,201,{task:await projectTasks.create(identity,projectId,body)})
+      } catch(error) {
+        const status={ 'not-authorized':403,'invalid-input':400,'idempotency-conflict':409 }[error?.kind]||503
+        return json(response,status,{error:status===503?'project-tasks-unavailable':error.kind})
+      }
+    }
+
+    if (url.pathname === '/api/web-growth') {
+      // A fixed private project grant is separate from group membership/operator role.
+      // Never connect private business data in the unauthenticated demo mode.
+      if (!identity || config.mode !== 'live') return json(response,503,{error:'web-growth-authentication-required'})
+      if (!config.webGrowth?.readerEmails?.includes(identity.email)) return json(response,403,{error:'web-growth-reader-required'})
+      if (request.method !== 'GET') return json(response,405,{error:'read-only-endpoint'})
+      if (url.search) return json(response,400,{error:'unexpected-query'})
+      if (config.webGrowth.enabled !== true) return json(response,503,{error:'web-growth-unavailable'})
+      try {
+        return json(response,200,validateWebGrowthSnapshot(await readWebGrowthImpl(config.webGrowth)))
+      } catch { return json(response,503,{error:'web-growth-unavailable'}) }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/agent-groups') {
+      if (config.mode !== 'mock' && !identity) {
+        return json(response, 503, { error: 'access-unconfigured' })
+      }
+      try {
+        return json(response, 200, await getGroupWorkspace({ registryService: agentRegistryService }))
+      } catch {
+        return json(response, 503, { error: 'group-workspace-unavailable' })
+      }
+    }
 
     if (request.method === 'GET' && url.pathname === '/api/overview') {
       try {
@@ -397,7 +510,13 @@ export function createFridayServer({
     }
 
     if (request.method === 'GET' && url.pathname === '/api/monitoring/history') {
-      return json(response, 200, monitoringRuntime?.getHistory?.() || { events: [] })
+      if (config.monitoring?.enabled === false) return json(response,503,{error:'monitoring-disabled'})
+      if (typeof monitoringRuntime?.getHistory !== 'function') return json(response,503,{error:'monitoring-history-unavailable'})
+      let history
+      try { history=await monitoringRuntime.getHistory() }
+      catch { return json(response,503,{error:'monitoring-history-unavailable'}) }
+      try { return json(response,200,projectMonitoringHistory(history)) }
+      catch { return json(response,502,{error:'monitoring-history-invalid'}) }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/audit/events') {
@@ -462,6 +581,8 @@ export function createFridayServer({
     }
 
     if (request.method === 'POST' && url.pathname === '/api/agents/registry/sync') {
+      const denial = authorizedOperator(request, config.operator?.registrySyncToken)
+      if (denial) return json(response, denial.status, { error: denial.error })
       if (!agentRegistryService) return json(response, 503, { error: 'agent-registry-unavailable' })
       try {
         const body = await readBody(request)
@@ -561,6 +682,45 @@ export function createFridayServer({
         return json(response, result.accepted ? 200 : 400, result)
       } catch (error) {
         return json(response, 400, { accepted: false, mode: 'preview', reason: error.message })
+      }
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/group-advisory') {
+      const execution = { performed: false, reason: 'Friday group assistance is advisory only.' }
+      if (config.mode !== 'mock' && !identity) {
+        return json(response, 503, { available: false, error: 'access-unconfigured', execution })
+      }
+      let body
+      try { body = await readBody(request) } catch {
+        return json(response, 400, { available: false, error: 'invalid-brief', execution })
+      }
+      if (!body || typeof body !== 'object' || Array.isArray(body) ||
+          Object.keys(body).length !== 2 || typeof body.groupId !== 'string' || typeof body.prompt !== 'string' ||
+          !Object.hasOwn(body, 'groupId') || !Object.hasOwn(body, 'prompt')) {
+        return json(response, 400, { available: false, error: 'invalid-brief', execution })
+      }
+      const systemPrompt = groupAdvisoryPolicy(body.groupId)
+      const validated = validateAssistantPrompt(body.prompt)
+      if (!systemPrompt || !validated.ok) {
+        return json(response, 400, { available: false, error: 'invalid-brief', execution })
+      }
+      try {
+        const overview = body.groupId === 'homelab'
+          ? await currentOverview({ config, monitoringRuntime, buildOverviewImpl }) : {}
+        const result = await answerAssistantImpl({ config, prompt: validated.prompt, overview, systemPrompt })
+        if (!result.available || result.mode === 'local-analysis') {
+          return json(response, 503, { available: false, groupId: body.groupId,
+            reason: 'Group advice requires an available AI provider. No plan was generated.', execution })
+        }
+        if (typeof result.text !== 'string' || !result.text.trim() ||
+            !['cloud-ai', 'local-ai'].includes(result.mode)) {
+          return json(response, 502, { available: false, error: 'group-advice-unavailable', execution })
+        }
+        return json(response, 200, { available: true, groupId: body.groupId,
+          text: result.text, mode: result.mode, provider: result.provider, model: result.model,
+          fallbackUsed: result.fallbackUsed, attempts: result.attempts, execution })
+      } catch {
+        return json(response, 502, { available: false, error: 'group-advice-unavailable', execution })
       }
     }
 
