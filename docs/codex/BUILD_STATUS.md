@@ -475,6 +475,10 @@ PR #41 merged and deployed to VM102 as `5cfeae3` on 2026-10-19. Exact-head GitHu
 
 This is the source-of-truth handoff ledger for coding agents. Update it when a major capability changes.
 
+## Incident push notifications (ntfy), 2026-10-29
+
+When `FRIDAY_NTFY_URL` is an https ntfy topic URL, the monitoring runtime pushes one message per newly opened incident and one per resolved incident, at most five per poll with a summary for larger bursts. Delivery runs in the background with a five-second timeout and never fails or delays a poll. Messages carry the already-sanitised incident title, service, host and severity only; the topic URL and optional `FRIDAY_NTFY_TOKEN` stay server-side. Settings shows whether notifications are configured.
+
 ## Proxmox host memory pressure — root cause and alerting, 2026-10-29
 
 VM102's hard stop at 2026-10-28 18:34:26 UTC was the Proxmox host `home` out-of-memory killer: the host has 30.6 GiB RAM and 8 GiB swap while guests were allocated about 53 GiB, and the kernel killed VM102's QEMU process (largest RSS, 6.5 GiB). With owner approval the Umbrel VM (110) was powered off with autostart disabled and its allocation lowered to 2 GiB, and VM102 was resized to 4 GiB with a 2 GiB balloon; the host then had about 11 GiB available.
@@ -680,7 +684,7 @@ Docker's native TCP API must never be exposed. Inventory/diagnostic IDs come fro
 - Human approval queue and global automation kill switch.
 - Agent tool executor or infrastructure mutation endpoints.
 - Durable agent memory/task orchestration.
-- Notification delivery.
+- Notification delivery beyond ntfy push (email, chat, escalation, per-user routing).
 - Voice input pipeline.
 
 ## Next product milestone

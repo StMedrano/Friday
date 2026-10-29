@@ -148,6 +148,7 @@ export type FridaySettings = {
   integrations: FridaySettingsIntegration[]
   ai: { enabled: boolean; providerOrder: string[]; cloudTimeoutMs: number | null; localTimeoutMs: number | null
     providers: Array<{ id: string; inOrder: boolean; credentials: FridayCredentialState; model: string | null; enabled?: boolean }> }
+  notifications?: { ntfy: boolean }
   monitoring: { enabled: boolean; pollSeconds: number | null; offlineGraceSeconds: number | null; historyLimit: number | null; diagnostics: boolean }
   automationApi: { enabled: boolean; port: number | null; serviceTokens: number; readOnly: boolean }
   audit: { enabled: boolean; integrity: 'verified' | 'broken' | 'unavailable' | null; events: number | null }
