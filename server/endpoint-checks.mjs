@@ -27,7 +27,8 @@ export function environmentEndpointChecks(endpoints = {}) {
   return (endpoints.urls || []).map((url, index) => {
     let name = url
     try { name = new URL(url).hostname } catch {}
-    return {id: String(index), name, site: endpoints.site || 'Site A', url, expectedStatuses: null}
+    // Managed names are capped at 80 characters; a long legacy hostname must not block the first write.
+    return {id: String(index), name: name.slice(0, 80), site: endpoints.site || 'Site A', url, expectedStatuses: null}
   })
 }
 

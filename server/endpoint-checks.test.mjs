@@ -179,3 +179,13 @@ test('settings posture reports the managed endpoint checks, not the environment 
     assert.equal(managed.configured, true)
   })
 })
+
+test('a legacy URL with a hostname over 80 characters does not block the first managed write', async t => {
+  const host = 'a'.repeat(60) + '.' + 'b'.repeat(40) + '.example'
+  const config = getConfig({FRIDAY_ENDPOINT_URLS: `https://${host}/`})
+  const baseline = environmentEndpointChecks(config.endpoints)
+  assert.equal(baseline[0].name.length, 80)
+  const store = await createEndpointCheckStore({path: join(await tempDir(t), 'checks.json')})
+  await store.create({name: 'Router', site: 'Home', url: 'http://10.0.0.1/'}, baseline)
+  assert.deepEqual(store.get().map(check => check.url), [`https://${host}/`, 'http://10.0.0.1/'])
+})
