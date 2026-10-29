@@ -352,7 +352,8 @@ export function createFridayServer({
         }
         let item
         try {
-          const baseline = await binding.baseline()
+          // The env/file baseline only seeds the first write; once managed it is ignored.
+          const baseline = binding.store.get() ? null : await binding.baseline()
           if (settingsRoute.action === 'create') item = await binding.store.create(body, baseline)
           else if (settingsRoute.action === 'update') item = await binding.store.update(settingsRoute.id, body, baseline)
           else await binding.store.remove(settingsRoute.id, baseline)

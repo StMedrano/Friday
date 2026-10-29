@@ -169,3 +169,16 @@ test('repository settings API: viewers read, operators create/edit/delete with a
     assert.equal((await fetch(base + '/api/settings/repositories')).status, 503)
   })
 })
+
+test('once managed, repository writes no longer depend on the original registry file', async t => {
+  const {allowed, registryPath, storePath} = await fixture(t)
+  const docs = await checkout(allowed, 'docs')
+  const repositorySettings = await createRepositorySettingsStore({path: storePath, allowedRoots: [allowed]})
+  const config = {...getConfig({}), repositories: {registryPath, allowedRoots: [allowed]}}
+  await withServer({config, accessGateImpl: operatorGate, repositorySettings}, async base => {
+    assert.equal((await fetch(base + '/api/settings/repositories', {method: 'POST', headers: json, body: JSON.stringify({name: 'Docs', path: docs})})).status, 201)
+    await writeFile(registryPath, '{not json')
+    assert.equal((await fetch(base + '/api/settings/repositories/docs', {method: 'DELETE'})).status, 200)
+    assert.equal((await fetch(base + '/api/settings/repositories')).status, 200)
+  })
+})
