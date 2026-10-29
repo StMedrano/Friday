@@ -3,10 +3,13 @@
 This file is the entry point for Codex and other coding agents working in this repository.
 
 ## Start every task
-1. Read `CODEX.md`.
-2. Read `docs/codex/BUILD_STATUS.md` and `docs/codex/NEXT_STEPS.md`.
-3. Inspect the affected code before editing.
-4. Load the relevant repo-local skill below.
+1. Read `FRIDAY_SHARED_MEMORY.md` completely, check **Active work**, and claim the task before editing.
+2. Read `CODEX.md`.
+3. Read `docs/codex/BUILD_STATUS.md` and `docs/codex/NEXT_STEPS.md`.
+4. Inspect the affected code before editing.
+5. Load the relevant repo-local skill below.
+
+Before stopping, update `FRIDAY_SHARED_MEMORY.md` and append an Activity log entry with the work performed, verification, blockers, and next action. Never store secrets in the ledger.
 
 ## Skill routing
 - VM102 Friday controller install/update/deployment: `skills/deploying-friday-vm102/SKILL.md`
