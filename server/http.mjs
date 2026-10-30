@@ -14,6 +14,7 @@ import { handleWorkReadHttp } from './work/http-reads.mjs'
 import { auditActor } from './audit/action-audit.mjs'
 import { buildSettingsView } from './settings.mjs'
 import { getGroupWorkspace } from './agents/group-workspace.mjs'
+import { groupAdvisoryPolicy } from './agents/group-advisory.mjs'
 import { applySiteSettings, siteSettingsView } from './site-settings.mjs'
 import { applyEndpointChecks, endpointChecksView, environmentEndpointChecks } from './endpoint-checks.mjs'
 import { normalizeSubscription, vapidKeys } from './notifications/web-push.mjs'
@@ -275,6 +276,7 @@ export function createFridayServer({
       const siteSettingsWrite = request.method === 'PUT' && url.pathname === '/api/settings/sites'
       const collectionWrite = request.method !== 'GET' && request.method !== 'HEAD' && Boolean(settingsCollectionFor(url.pathname))
       const pushWrite = (request.method === 'POST' || request.method === 'DELETE') && url.pathname === '/api/notifications/web-push'
+      const groupAdvisory = request.method === 'POST' && url.pathname === '/api/group-advisory'
       const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || url.pathname === '/api/audit/events'
       let verdict
       try { verdict = await accessGate(request, operatorOnly) }
@@ -288,7 +290,7 @@ export function createFridayServer({
       // for operational POST/PUT/DELETE handlers. Settings and registry writes with a body additionally require JSON.
       if (['POST', 'PUT', 'DELETE'].includes(request.method) && request.headers['sec-fetch-site'] === 'cross-site')
         return json(response, 403, {error:'access-denied'})
-      if ((registrySync || siteSettingsWrite || pushWrite || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
+      if ((registrySync || siteSettingsWrite || pushWrite || groupAdvisory || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
         return json(response, 415, {error:'json-required'})
     }
 
@@ -409,6 +411,40 @@ export function createFridayServer({
         return error?.message === 'audit-rejected'
           ? json(response, 400, { error: 'invalid-audit-query' })
           : json(response, 503, { error: 'audit-unavailable' })
+      }
+    }
+
+    // Advisory only: Friday drafts a plan for a declared group and performs nothing.
+    if (request.method === 'POST' && url.pathname === '/api/group-advisory') {
+      const execution = { performed: false, reason: 'Friday group assistance is advisory only.' }
+      const invalid = () => json(response, 400, { available: false, error: 'invalid-brief', execution })
+      let body
+      try { body = await readBody(request) } catch { return invalid() }
+      if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 2 ||
+        typeof body.groupId !== 'string' || typeof body.prompt !== 'string') return invalid()
+      const systemPrompt = groupAdvisoryPolicy(body.groupId)
+      const validated = validateAssistantPrompt(body.prompt)
+      if (!systemPrompt || !validated.ok) return invalid()
+      try {
+        const overview = body.groupId === 'homelab'
+          ? await currentOverview({ config, monitoringRuntime, buildOverviewImpl: buildEffectiveOverview })
+          : {}
+        const result = await answerAssistantImpl({ config, prompt: validated.prompt, overview, systemPrompt })
+        // Friday's offline summariser cannot honour a group policy, so it is not advice.
+        if (!result?.available || result.mode === 'local-analysis') {
+          return json(response, 503, { available: false, groupId: body.groupId, execution,
+            reason: 'Group advice requires an available AI provider. No plan was generated.' })
+        }
+        if (typeof result.text !== 'string' || !result.text.trim() || !['cloud-ai', 'local-ai'].includes(result.mode)) {
+          return json(response, 502, { available: false, error: 'group-advice-unavailable', execution })
+        }
+        return json(response, 200, {
+          available: true, groupId: body.groupId, text: result.text, mode: result.mode,
+          provider: result.provider, model: result.model, fallbackUsed: result.fallbackUsed,
+          attempts: result.attempts, execution,
+        })
+      } catch {
+        return json(response, 502, { available: false, error: 'group-advice-unavailable', execution })
       }
     }
 

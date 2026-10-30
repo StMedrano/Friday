@@ -155,6 +155,29 @@ export type FridaySettings = {
   safety: { writableSettings: boolean; infrastructureActions: boolean; executor: boolean }
 }
 
+export type FridayGroupAdvice = {
+  available: true; groupId: string; text: string
+  mode: FridayAssistantMode; provider?: string; model?: string | null
+  fallbackUsed?: boolean; attempts?: FridayAssistantAttempt[]
+  execution: { performed: false; reason?: string }
+}
+
+/** Ask a declared group for advice. Advisory only: Friday executes nothing. */
+export async function askFridayGroup(groupId: string, prompt: string, signal?: AbortSignal): Promise<FridayGroupAdvice> {
+  const response = await fetch('/api/group-advisory', {
+    method: 'POST', headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ groupId, prompt }), signal,
+  })
+  const body = await response.json().catch(() => null) as (FridayGroupAdvice & { reason?: string; error?: string }) | null
+  if (!response.ok || !body?.available) {
+    throw new Error(body?.reason || 'Group advice is unavailable.')
+  }
+  if (typeof body.text !== 'string' || !body.text.trim() || body.execution?.performed !== false) {
+    throw new Error('Group advice is unavailable.')
+  }
+  return body
+}
+
 export type FridayGroupMemberState = 'configured' | 'disabled' | 'unavailable' | 'catalogued'
 export type FridayGroupMember = {
   id: string; name: string; agentId: string | null

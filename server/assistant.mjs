@@ -31,6 +31,7 @@ export async function answerAssistant({
   overview,
   providers = defaultProviders,
   previewImpl = previewCommand,
+  systemPrompt: systemPromptOverride = null,
   signalFactory = timeoutSignal,
 } = {}) {
   const text = String(prompt || '').trim()
@@ -44,7 +45,10 @@ export async function answerAssistant({
   if (ai.enabled) {
     const order = Array.isArray(ai.providerOrder) ? ai.providerOrder : []
     const providerConfigs = ai.providers || {}
-    const systemPrompt = fridaySystemPrompt()
+    // A group advisory supplies its own boundaries; everything else uses Friday's.
+    const systemPrompt = typeof systemPromptOverride === 'string' && systemPromptOverride.trim()
+      ? systemPromptOverride
+      : fridaySystemPrompt()
 
     for (const providerId of order) {
       const provider = providers?.[providerId]
