@@ -43,7 +43,7 @@ function encode(value){return encodeURIComponent(value)}
  * The private human/JWT/project-grant bridge performs *additional* checks.
  */
 export function createSupabaseWorkReadRepository({
- baseUrl,readKey,fetchImpl=globalThis.fetch,timeoutMs=5000,
+ baseUrl,readKey,gatewayKey='',fetchImpl=globalThis.fetch,timeoutMs=5000,
 }={}){
  const ready=validBaseUrl(baseUrl)&&typeof readKey==='string'&&
   readKey.length>0&&typeof fetchImpl==='function'&&
@@ -54,7 +54,11 @@ export function createSupabaseWorkReadRepository({
   try{
    response=await fetchImpl(ORIGIN+path,{
     method:'GET',redirect:'error',headers:{
-     accept:'application/json',apikey:readKey,authorization:'Bearer '+readKey,
+     accept:'application/json',
+     // The gateway only accepts its own allowlisted key; the bearer token
+     // selects the SELECT-only database role behind it.
+     apikey:typeof gatewayKey==='string'&&gatewayKey?gatewayKey:readKey,
+     authorization:'Bearer '+readKey,
     },
     signal:AbortSignal.timeout(timeoutMs),
    })
@@ -89,7 +93,11 @@ export function createSupabaseWorkReadRepository({
   try{
    response=await fetchImpl(ORIGIN+path,{
     method:'GET',redirect:'error',headers:{
-     accept:'application/json',apikey:readKey,authorization:'Bearer '+readKey,
+     accept:'application/json',
+     // The gateway only accepts its own allowlisted key; the bearer token
+     // selects the SELECT-only database role behind it.
+     apikey:typeof gatewayKey==='string'&&gatewayKey?gatewayKey:readKey,
+     authorization:'Bearer '+readKey,
     },signal:AbortSignal.timeout(timeoutMs),
    })
    if(!response?.ok||response.redirected===true)DENY()

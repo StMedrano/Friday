@@ -54,7 +54,8 @@ describe('Dashboard operator integrity and honest feature status', () => {
   it('clearly labels disconnected Tasks, Memory and Approvals as not activated', async () => {
     const user = userEvent.setup()
     render(<Dashboard />)
-    for (const name of ['Tasks', 'Memory', 'Approvals']) {
+    // Tasks is connected now; Memory and Approvals are still honestly unavailable.
+    for (const name of ['Memory', 'Approvals']) {
       await user.click(screen.getByRole('button', { name }))
       expect(screen.getByRole('heading', { name: name + ' is not connected' })).toBeInTheDocument()
       expect(screen.getByText(/No production task, memory or approval operation is available on this screen/i)).toBeInTheDocument()
