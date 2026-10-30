@@ -13,6 +13,7 @@ import { createAccessGate } from './security/access.mjs'
 import { handleWorkReadHttp } from './work/http-reads.mjs'
 import { auditActor } from './audit/action-audit.mjs'
 import { buildSettingsView } from './settings.mjs'
+import { getGroupWorkspace } from './agents/group-workspace.mjs'
 import { applySiteSettings, siteSettingsView } from './site-settings.mjs'
 import { applyEndpointChecks, endpointChecksView, environmentEndpointChecks } from './endpoint-checks.mjs'
 import { normalizeSubscription, vapidKeys } from './notifications/web-push.mjs'
@@ -408,6 +409,16 @@ export function createFridayServer({
         return error?.message === 'audit-rejected'
           ? json(response, 400, { error: 'invalid-audit-query' })
           : json(response, 503, { error: 'audit-unavailable' })
+      }
+    }
+
+    // Read-only catalogue of agent groups and their role readiness.
+    if (request.method === 'GET' && url.pathname === '/api/agent-groups') {
+      if (!agentRegistryService) return json(response, 503, { error: 'agent-registry-unavailable' })
+      try {
+        return json(response, 200, await getGroupWorkspace({ registryService: agentRegistryService }))
+      } catch {
+        return json(response, 503, { error: 'group-workspace-unavailable' })
       }
     }
 

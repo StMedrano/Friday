@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import AgentGroupsPanel from './AgentGroupsPanel'
 import {
   askFridayAgent,
   fetchFridayAgentRegistryStatus,
@@ -106,6 +107,8 @@ export default function AgentsWorkspace() {
     <div className="v3-agent-authority">
       <strong>Git is authoritative.</strong> Sync copies validated definitions into Friday-owned registry state only; it cannot edit policy or managed infrastructure.
     </div>
+
+    <AgentGroupsPanel/>
 
     {unavailable && !agents.length ? <div className="v3-agent-empty" role="status">
       <h3>Agent registry unavailable</h3>

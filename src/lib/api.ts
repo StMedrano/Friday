@@ -155,6 +155,47 @@ export type FridaySettings = {
   safety: { writableSettings: boolean; infrastructureActions: boolean; executor: boolean }
 }
 
+export type FridayGroupMemberState = 'configured' | 'disabled' | 'unavailable' | 'catalogued'
+export type FridayGroupMember = {
+  id: string; name: string; agentId: string | null
+  implementation: 'existing' | 'planned'; state: FridayGroupMemberState; reason: string
+}
+export type FridayAgentGroups = {
+  registryStatus: 'ok' | 'unavailable'
+  groups: Array<{ id: string; name: string; members: FridayGroupMember[] }>
+}
+
+const MEMBER_STATES = new Set(['configured', 'disabled', 'unavailable', 'catalogued'])
+const groupsUnavailable = () => new Error('agent-groups-unavailable')
+const groupText = (value: unknown) => typeof value === 'string' && value.length > 0 && value.length <= 120
+
+/** Reject a malformed catalogue rather than showing invented or partial groups. */
+function parseAgentGroups(value: unknown): FridayAgentGroups {
+  const body = value as Partial<FridayAgentGroups> & { schemaVersion?: string; executionEnabled?: boolean }
+  if (!body || typeof body !== 'object' || Array.isArray(body)) throw groupsUnavailable()
+  if (body.schemaVersion !== '1' || body.executionEnabled !== false) throw groupsUnavailable()
+  if (body.registryStatus !== 'ok' && body.registryStatus !== 'unavailable') throw groupsUnavailable()
+  if (!Array.isArray(body.groups) || body.groups.length > 8) throw groupsUnavailable()
+  const groups = body.groups.map((group) => {
+    if (!group || typeof group !== 'object' || !groupText(group.id) || !groupText(group.name) || !Array.isArray(group.members)) throw groupsUnavailable()
+    const members = group.members.map((member) => {
+      if (!member || typeof member !== 'object' || !groupText(member.id) || !groupText(member.name) || !groupText(member.reason)) throw groupsUnavailable()
+      if (!MEMBER_STATES.has(member.state as string)) throw groupsUnavailable()
+      if (member.agentId !== null && !groupText(member.agentId)) throw groupsUnavailable()
+      if (member.implementation !== 'existing' && member.implementation !== 'planned') throw groupsUnavailable()
+      return member as FridayGroupMember
+    })
+    return { id: group.id, name: group.name, members }
+  })
+  return { registryStatus: body.registryStatus, groups }
+}
+
+export async function fetchFridayAgentGroups(signal?: AbortSignal): Promise<FridayAgentGroups> {
+  const response = await fetch('/api/agent-groups', { method: 'GET', signal })
+  if (!response.ok) throw groupsUnavailable()
+  return parseAgentGroups(await response.json().catch(() => null))
+}
+
 export type FridayWebPushStatus = { enabled: boolean; publicKey: string | null }
 
 export async function fetchWebPushStatus(signal?: AbortSignal): Promise<FridayWebPushStatus> {
