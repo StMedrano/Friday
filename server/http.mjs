@@ -15,6 +15,7 @@ import { auditActor } from './audit/action-audit.mjs'
 import { buildSettingsView } from './settings.mjs'
 import { getGroupWorkspace } from './agents/group-workspace.mjs'
 import { groupAdvisoryPolicy } from './agents/group-advisory.mjs'
+import { workSubjectHash } from './work/file-subject-grants.mjs'
 import { applySiteSettings, siteSettingsView } from './site-settings.mjs'
 import { applyEndpointChecks, endpointChecksView, environmentEndpointChecks } from './endpoint-checks.mjs'
 import { normalizeSubscription, vapidKeys } from './notifications/web-push.mjs'
@@ -306,6 +307,22 @@ export function createFridayServer({
       } catch (error) {
         return json(response, 500, { error: 'overview-failed', detail: error.message })
       }
+    }
+
+    // A person's own one-way work identity hash, so an operator can grant them
+    // project access without anyone copying a raw identity or a token.
+    if (request.method === 'GET' && url.pathname === '/api/settings/work-identity') {
+      if (identity?.kind === 'service') return json(response, 403, { error: 'access-denied' })
+      const subjectHash = workSubjectHash(identity?.subject)
+      if (!subjectHash) return json(response, 403, { error: 'access-denied' })
+      let granted = false
+      if (workReadBridge?.enabled) {
+        try {
+          await workReadBridge.listTasks(request, { projectId: 'friday-ai-os', limit: 1 })
+          granted = true
+        } catch { granted = false }
+      }
+      return json(response, 200, { subjectHash, granted })
     }
 
     if (request.method === 'GET' && url.pathname === '/api/settings') {
