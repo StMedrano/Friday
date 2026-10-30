@@ -26,7 +26,8 @@ describe('AgentGroupsPanel', () => {
     expect(within(roles).getByText('Planner').closest('li')).toHaveTextContent('Planned')
     expect(screen.getByText('1 configured of 2 roles')).toBeInTheDocument()
     expect(screen.getByText(/runs no group workers/)).toBeInTheDocument()
-    expect(screen.queryByRole('button')).not.toBeInTheDocument()
+    // Advisory controls are allowed here; infrastructure actions are not.
+    expect(screen.queryByRole('button', { name: /restart|delete|approve|execute|deploy/i })).not.toBeInTheDocument()
   })
 
   it('warns when the registry is unavailable', async () => {

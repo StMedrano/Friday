@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { Users } from 'lucide-react'
 import { fetchFridayAgentGroups, type FridayAgentGroups, type FridayGroupMemberState } from '../lib/api'
+import GroupAdvisory from './GroupAdvisory'
 
 const STATE_LABELS: Record<FridayGroupMemberState, string> = {
   configured: 'Configured',
@@ -39,6 +40,7 @@ export default function AgentGroupsPanel() {
           <span className={`v3-settings-pill ${member.state === 'configured' ? 'on' : member.state === 'catalogued' ? 'off' : 'warn'}`}>{STATE_LABELS[member.state]}</span>
         </li>)}
       </ul>
+      <GroupAdvisory groupId={group.id} groupName={group.name}/>
     </div>)}
     <p className="v3-settings-message">Read only. Friday runs no group workers and performs no group actions.</p>
   </section>
