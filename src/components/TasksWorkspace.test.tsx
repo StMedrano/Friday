@@ -21,7 +21,7 @@ describe('TasksWorkspace', () => {
   })
 
   it('requests the selected project', async () => {
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ tasks: [] }), { status: 200 }))
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _options?: RequestInit) => new Response(JSON.stringify({ tasks: [] }), { status: 200 }))
     vi.stubGlobal('fetch', fetchMock)
     render(<TasksWorkspace />)
     expect(await screen.findByText(/No tasks recorded for Friday AI OS yet/)).toBeInTheDocument()
