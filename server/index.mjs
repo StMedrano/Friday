@@ -10,8 +10,7 @@ import { createPushSubscriptionStore, createWebPushNotifier } from './notificati
 import { createSupabaseWorkReadRepository } from './work/read-only-repository.mjs'
 import { createWorkService } from './work/work-service.mjs'
 import { createMemoryService } from './work/memory-service.mjs'
-import { createPrivateWorkReadBridge } from './work/private-read-bridge.mjs'
-import { createWorkGrants } from './work/subject-grants.mjs'
+import { createTrustedWorkReadBridge } from './work/file-subject-grants.mjs'
 import { createMonitoringRuntime } from './monitoring/runtime.mjs'
 import { createFileMonitoringStore } from './monitoring/store.mjs'
 import { createSupabaseRegistryClient } from './agents/supabase-client.mjs'
@@ -94,21 +93,22 @@ const repositoryRegistry = new ManagedRepositoryRegistry({ registryPath: config.
 // Default off. Reads use a SELECT-only database role and per-person project grants.
 let workReadBridge = null
 if (config.work.enabled) {
-  const grants = await createWorkGrants({ path: config.work.grantsPath })
   const repository = createSupabaseWorkReadRepository({
     baseUrl: config.agents.registry.supabaseUrl,
     readKey: config.work.readKey,
     gatewayKey: config.work.gatewayKey,
   })
-  workReadBridge = createPrivateWorkReadBridge({
+  // Grants are re-read, re-validated and expiry-checked on every request, so a
+  // revoked person or project stops being readable without restarting Friday.
+  workReadBridge = createTrustedWorkReadBridge({
     enabled: true,
+    grantFilePath: config.work.grantsPath,
     access: config.access,
     workService: createWorkService({ repository }),
     memoryService: createMemoryService({ repository }),
-    grantsForSubject: (subject) => grants.forSubject(subject),
   })
-  if (!workReadBridge?.enabled) console.warn('Friday work reads stayed disabled; check Access configuration and the work read key')
-  else console.log(`Friday work reads enabled for ${grants.subjects()} signed-in subject(s)`)
+  if (!workReadBridge?.enabled) console.warn('Friday work reads stayed disabled; check Access configuration, the work read key and the grant file')
+  else console.log('Friday work reads enabled')
 }
 
 const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, endpointChecks, repositorySettings, pushSubscriptions, workReadBridge })
