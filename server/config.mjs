@@ -203,6 +203,12 @@ export function getConfig(env = process.env) {
         subject: env.FRIDAY_VAPID_SUBJECT || '',
       },
     },
+    work: {
+      enabled: enabled(env.FRIDAY_WORK_READ_ENABLED),
+      readKey: env.FRIDAY_WORK_READ_KEY || '',
+      gatewayKey: env.FRIDAY_WORK_READ_GATEWAY_KEY || '',
+      grantsPath: env.FRIDAY_WORK_GRANTS_PATH || '/data/work-grants.json',
+    },
     pushSubscriptions: {
       path: env.FRIDAY_PUSH_SUBSCRIPTIONS_PATH || '/data/push-subscriptions.json',
     },

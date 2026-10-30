@@ -7,6 +7,10 @@ import { applySiteSettings, createSiteSettingsStore } from './site-settings.mjs'
 import { createNtfyNotifier } from './notifications/ntfy.mjs'
 import { applyEndpointChecks, createEndpointCheckStore } from './endpoint-checks.mjs'
 import { createPushSubscriptionStore, createWebPushNotifier } from './notifications/web-push.mjs'
+import { createSupabaseWorkReadRepository } from './work/read-only-repository.mjs'
+import { createWorkService } from './work/work-service.mjs'
+import { createMemoryService } from './work/memory-service.mjs'
+import { createTrustedWorkReadBridge } from './work/file-subject-grants.mjs'
 import { createMonitoringRuntime } from './monitoring/runtime.mjs'
 import { createFileMonitoringStore } from './monitoring/store.mjs'
 import { createSupabaseRegistryClient } from './agents/supabase-client.mjs'
@@ -86,7 +90,28 @@ const repositorySettings = await createRepositorySettingsStore({
   path: config.repositories.settingsPath, allowedRoots: config.repositories.allowedRoots,
 })
 const repositoryRegistry = new ManagedRepositoryRegistry({ registryPath: config.repositories.registryPath, store: repositorySettings })
-const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, endpointChecks, repositorySettings, pushSubscriptions })
+// Default off. Reads use a SELECT-only database role and per-person project grants.
+let workReadBridge = null
+if (config.work.enabled) {
+  const repository = createSupabaseWorkReadRepository({
+    baseUrl: config.agents.registry.supabaseUrl,
+    readKey: config.work.readKey,
+    gatewayKey: config.work.gatewayKey,
+  })
+  // Grants are re-read, re-validated and expiry-checked on every request, so a
+  // revoked person or project stops being readable without restarting Friday.
+  workReadBridge = createTrustedWorkReadBridge({
+    enabled: true,
+    grantFilePath: config.work.grantsPath,
+    access: config.access,
+    workService: createWorkService({ repository }),
+    memoryService: createMemoryService({ repository }),
+  })
+  if (!workReadBridge?.enabled) console.warn('Friday work reads stayed disabled; check Access configuration, the work read key and the grant file')
+  else console.log('Friday work reads enabled')
+}
+
+const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, endpointChecks, repositorySettings, pushSubscriptions, workReadBridge })
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`Friday listening on 0.0.0.0:${config.port} (${config.mode} mode)`)
 })
