@@ -5,6 +5,7 @@ import SiteSettingsPanel from './SiteSettingsPanel'
 import EndpointChecksPanel from './EndpointChecksPanel'
 import RepositorySettingsPanel from './RepositorySettingsPanel'
 import PushControls from './PushControls'
+import WorkIdentityPanel from './WorkIdentityPanel'
 
 const CREDENTIALS: Record<FridayCredentialState, string> = {
   present: 'Credentials present', missing: 'Credentials missing', 'not-required': 'No credentials needed',
@@ -80,6 +81,7 @@ export default function SettingsWorkspace() {
               <dt>Automation API</dt><dd>{onOff(settings.automationApi.enabled)} · port {settings.automationApi.port ?? '—'} · {settings.automationApi.serviceTokens} service tokens · read only</dd>
             </dl>
             <PushControls/>
+            <WorkIdentityPanel/>
             <p className="v3-settings-safety"><ShieldCheck size={14} aria-hidden="true"/>Only site labels, endpoint checks and repositories are writable here. No infrastructure actions or executor exist in this build.</p>
           </section>
         </div>}

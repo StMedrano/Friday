@@ -155,6 +155,18 @@ export type FridaySettings = {
   safety: { writableSettings: boolean; infrastructureActions: boolean; executor: boolean }
 }
 
+export type FridayWorkIdentity = { subjectHash: string; granted: boolean }
+
+export async function fetchWorkIdentity(signal?: AbortSignal): Promise<FridayWorkIdentity> {
+  const response = await fetch('/api/settings/work-identity', { method: 'GET', signal })
+  if (!response.ok) throw new Error('work-identity-unavailable')
+  const body = await response.json().catch(() => null) as FridayWorkIdentity | null
+  if (!body || typeof body.subjectHash !== 'string' || !/^[a-f0-9]{64}$/.test(body.subjectHash)) {
+    throw new Error('work-identity-unavailable')
+  }
+  return body
+}
+
 export type FridayTask = {
   id: string; projectId: string; title: string
   status: 'ready' | 'in_progress' | 'blocked' | 'review' | 'completed' | 'cancelled'
