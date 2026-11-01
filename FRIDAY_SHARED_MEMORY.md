@@ -77,6 +77,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Authenticated Cloudflare acceptance | unclaimed | `verification_needed` | Dedicated Access app and Friday read-only API; current managed-runtime rerun requires its existing hostname-scoped secret binding | 2026-10-29 | 2026-10-29 | Run `node scripts/check-cloud-connection.mjs` from the managed cloud runtime without copying credentials to VM102 or chat. |
 | Service-token renewal | Codex/ChatGPT | `planned` | `friday-cloud-reader`; coordinated Cloudflare rotation and managed-runtime binding update | 2026-10-29 | 2026-10-29 | After the exact production merge target is identified, rotate with a bounded overlap, update the secure caller binding without exposing the secret, rerun acceptance, then retire the prior secret. |
 | Production deployment after development merge | unclaimed | `planned` | Merged `main` revision and authoritative VM102 checkout | 2026-10-29 | 2026-10-29 | Identify the exact development PR/branch, require its merge and green exact-head verification, then inventory VM102, preserve `.env`, run preflight, deploy the merged `main`, and run health plus cloud acceptance. |
+| Web Growth reader slice | Claude | `verification_needed` | Branch `claude/friday-web-growth`: `server/adapters/web-growth*.mjs`, `/api/web-growth`, `integrations/web-growth-reader/`, Web Growth panel under the TechTactics group | 2026-10-31 | 2026-10-31 | Merge after green CI and Codex review; stays disabled until an operator deploys the isolated reader and sets the reader URL, token and emails. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -112,6 +113,16 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-10-31 22:10 CDT — Claude — Ported the Web Growth reader onto main
+
+- Status: `verification_needed`
+- Scope claimed: Slice 5 of the group-workspace split, the private TechTactics Web Growth pipeline.
+- Work performed: Ported the isolated reader (`integrations/web-growth-reader/`), its schema and adapter, and the Web Growth panel from `feat/friday-group-workspace-20261013`, and adapted `/api/web-growth` to main's Access gate identity.
+- Changes made: Code only, default off (`FRIDAY_WEB_GROWTH_ENABLED=false`, no reader emails). No reader was deployed and no lead data was connected.
+- Verification: `make verify` passed locally (192 frontend, 770 server tests, build and Compose config checks).
+- Decisions: Only signed-in people listed in `FRIDAY_WEB_GROWTH_READER_EMAILS` can read; service tokens and demo mode are refused before the reader is contacted. The reader forwards no contact details, notes or outreach text.
+- Blockers/risks: Going live needs the owner to deploy the reader next to the lead store, pick a private HTTPS transport, and set the URL, token and reader emails.
 
 ### 2026-10-29 14:15 CDT — Codex/ChatGPT — Recorded conditional production authority
 

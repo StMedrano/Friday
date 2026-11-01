@@ -16,6 +16,8 @@ import { buildSettingsView } from './settings.mjs'
 import { getGroupWorkspace } from './agents/group-workspace.mjs'
 import { groupAdvisoryPolicy } from './agents/group-advisory.mjs'
 import { workSubjectHash } from './work/file-subject-grants.mjs'
+import { readWebGrowth } from './adapters/web-growth.mjs'
+import { validateWebGrowthSnapshot } from './adapters/web-growth-schema.mjs'
 import { applySiteSettings, siteSettingsView } from './site-settings.mjs'
 import { applyEndpointChecks, endpointChecksView, environmentEndpointChecks } from './endpoint-checks.mjs'
 import { normalizeSubscription, vapidKeys } from './notifications/web-push.mjs'
@@ -246,6 +248,7 @@ export function createFridayServer({
   endpointChecks = null,
   repositorySettings = null,
   pushSubscriptions = null,
+  readWebGrowthImpl = readWebGrowth,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
   const labelledConfig = (effectiveConfig = config) =>
@@ -306,6 +309,22 @@ export function createFridayServer({
         return json(response, 200, await currentOverview({ config, monitoringRuntime, buildOverviewImpl: buildEffectiveOverview }))
       } catch (error) {
         return json(response, 500, { error: 'overview-failed', detail: error.message })
+      }
+    }
+
+    // Private project data: a signed-in person named in the reader list only,
+    // never in demo mode or for service tokens. Read only, nothing is forwarded.
+    if (url.pathname === '/api/web-growth') {
+      const email = identity?.kind === 'service' ? '' : String(identity?.email || '')
+      if (!email || config.mode !== 'live') return json(response, 503, { error: 'web-growth-authentication-required' })
+      if (!config.webGrowth?.readerEmails?.includes(email)) return json(response, 403, { error: 'web-growth-reader-required' })
+      if (request.method !== 'GET') return json(response, 405, { error: 'read-only-endpoint' })
+      if (url.search) return json(response, 400, { error: 'unexpected-query' })
+      if (config.webGrowth.enabled !== true) return json(response, 503, { error: 'web-growth-unavailable' })
+      try {
+        return json(response, 200, validateWebGrowthSnapshot(await readWebGrowthImpl(config.webGrowth)))
+      } catch {
+        return json(response, 503, { error: 'web-growth-unavailable' })
       }
     }
 

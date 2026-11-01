@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { Users } from 'lucide-react'
 import { fetchFridayAgentGroups, type FridayAgentGroups, type FridayGroupMemberState } from '../lib/api'
 import GroupAdvisory from './GroupAdvisory'
+import WebGrowthWorkspace from './WebGrowthWorkspace'
 
 const STATE_LABELS: Record<FridayGroupMemberState, string> = {
   configured: 'Configured',
@@ -41,6 +42,7 @@ export default function AgentGroupsPanel() {
         </li>)}
       </ul>
       <GroupAdvisory groupId={group.id} groupName={group.name}/>
+      {group.id === 'techtactics' ? <WebGrowthWorkspace/> : null}
     </div>)}
     <p className="v3-settings-message">Read only. Friday runs no group workers and performs no group actions.</p>
   </section>

@@ -478,6 +478,10 @@ This is the source-of-truth handoff ledger for coding agents. Update it when a m
 ## Intentionally stopped guests, 2026-10-29
 
 A Proxmox guest that is stopped is reported `maintenance` instead of `offline` when its config has `onboot: 0` or carries a `maintenance` or `friday-ignore` tag, so monitoring opens no incident and no notification is pushed for a planned shutdown (for example the Umbrel VM powered off on 2026-10-29). Only stopped guests are inspected, at most sixteen per collection, and a config read failure leaves the guest `offline`. A guest that should autostart but is stopped still reports offline.
+## Web Growth reader, 2026-10-31
+
+The private TechTactics Web Growth pipeline is ported from the group-workspace branch. `GET /api/web-growth` is read only, default off (`FRIDAY_WEB_GROWTH_ENABLED`), and answers only signed-in people listed in `FRIDAY_WEB_GROWTH_READER_EMAILS`; service tokens, demo mode, queries and writes are refused before the reader is contacted, and invalid or unavailable data returns a sanitized 503 rather than an empty pipeline. Friday reads from the separate isolated reader in `integrations/web-growth-reader/` over HTTPS with a bearer token; the reader mounts one lead file read only and forwards only business name, stage, dates, approval and send flags, score and proposal/demo availability, never contact details, notes or outreach text. The Agents workspace shows the pipeline under the TechTactics group. Nothing is deployed or connected by this change.
+
 ## Work identity visibility, 2026-10-30
 
 `GET /api/settings/work-identity` returns the signed-in person's own one-way work subject hash and whether they currently hold a project grant, so an operator can provision `work-grants.json` without anyone copying a raw Cloudflare Access subject or a token. Service tokens get 403, the raw subject and email are never echoed, and the route is read-only. Settings shows the hash and the current grant state.
