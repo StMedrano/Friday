@@ -77,7 +77,8 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Authenticated Cloudflare acceptance | unclaimed | `verification_needed` | Dedicated Access app and Friday read-only API; current managed-runtime rerun requires its existing hostname-scoped secret binding | 2026-10-29 | 2026-10-29 | Run `node scripts/check-cloud-connection.mjs` from the managed cloud runtime without copying credentials to VM102 or chat. |
 | Service-token renewal | Codex/ChatGPT | `planned` | `friday-cloud-reader`; coordinated Cloudflare rotation and managed-runtime binding update | 2026-10-29 | 2026-10-29 | After the exact production merge target is identified, rotate with a bounded overlap, update the secure caller binding without exposing the secret, rerun acceptance, then retire the prior secret. |
 | Production deployment after development merge | unclaimed | `planned` | Merged `main` revision and authoritative VM102 checkout | 2026-10-29 | 2026-10-29 | Identify the exact development PR/branch, require its merge and green exact-head verification, then inventory VM102, preserve `.env`, run preflight, deploy the merged `main`, and run health plus cloud acceptance. |
-| Web Growth reader slice | Claude | `verification_needed` | Branch `claude/friday-web-growth`: `server/adapters/web-growth*.mjs`, `/api/web-growth`, `integrations/web-growth-reader/`, Web Growth panel under the TechTactics group | 2026-10-31 | 2026-10-31 | Merge after green CI and Codex review; stays disabled until an operator deploys the isolated reader and sets the reader URL, token and emails. |
+| Web Growth reader slice | Claude | `complete` | Branch `claude/friday-web-growth`: `server/adapters/web-growth*.mjs`, `/api/web-growth`, `integrations/web-growth-reader/`, Web Growth panel under the TechTactics group | 2026-10-31 | 2026-11-01 | Merged as #114. Stays disabled until an operator deploys the isolated reader and sets the reader URL, token and emails. |
+| Free model routing and NVIDIA readiness slice | Claude | `verification_needed` | Branch `claude/friday-model-fabric`: `server/ai/model-{fabric,registry,router}.mjs`, `server/ai/nvidia.mjs`, `scripts/check-nvidia-catalog.mjs`, `modelFabric` config, docs | 2026-11-01 | 2026-11-01 | Merge after green CI and Codex review. Internal only and default off; not wired into chat or agents. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -113,6 +114,16 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-11-01 09:51 CST — Claude — Ported free model routing and NVIDIA readiness onto main
+
+- Status: `verification_needed`
+- Scope claimed: Slice 6 of the group-workspace split, the free-only model fabric and NVIDIA readiness checks.
+- Work performed: Ported the model registry, router, fabric and NVIDIA provider, the NVIDIA catalog/readiness scripts and their docs from `feat/friday-group-workspace-20261013`; added the `modelFabric` config block, Compose variables, `.env.example` entries and `npm run check:nvidia-catalog`.
+- Changes made: Code only, default off (`FRIDAY_MODEL_FABRIC_ENABLED=false`, `FRIDAY_NVIDIA_ENABLED=false`). The fabric is not called by chat, agents or any route. No NVIDIA key was created, stored or used.
+- Verification: `make verify` passed locally (192 frontend, 801 server tests, build and Compose config checks).
+- Decisions: The policy is frozen free-only (no paid fallback, zero paid spend), prefers local models, pins hosted NVIDIA calls to `integrate.api.nvidia.com/v1`, refuses redirects and keeps credentials server-side.
+- Blockers/risks: Using it needs a later reviewed change that wires the fabric into chat or agents, plus an operator-held NVIDIA key in an owner-private file. The Radeon 780M host cannot run a local NIM, so local NVIDIA stays off.
 
 ### 2026-10-31 22:10 CDT — Claude — Ported the Web Growth reader onto main
 

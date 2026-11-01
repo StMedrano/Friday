@@ -12,6 +12,15 @@ function positiveNumber(value, fallback) {
   return Number.isFinite(parsed) && parsed > 0 ? parsed : fallback
 }
 
+function configuredModels(raw) {
+  try {
+    const parsed = JSON.parse(String(raw ?? '[]'))
+    return Array.isArray(parsed) ? parsed : []
+  } catch {
+    return []
+  }
+}
+
 function providerOrder(value) {
   const seen = new Set()
   const parsed = String(value || DEFAULT_AI_PROVIDER_ORDER.join(','))
@@ -208,6 +217,26 @@ export function getConfig(env = process.env) {
       readKey: env.FRIDAY_WORK_READ_KEY || '',
       gatewayKey: env.FRIDAY_WORK_READ_GATEWAY_KEY || '',
       grantsPath: env.FRIDAY_WORK_GRANTS_PATH || '/data/work-grants.json',
+    },
+    // Internal free-only model fabric. Opt-in, never wired to a paid fallback.
+    modelFabric: {
+      enabled: enabled(env.FRIDAY_MODEL_FABRIC_ENABLED),
+      policy: Object.freeze({
+        freeOnly: true,
+        allowPaidFallback: false,
+        maxPaidSpendPerDay: 0,
+        preferLocal: true,
+        preferNvidiaFree: true,
+      }),
+      nvidia: {
+        enabled: enabled(env.FRIDAY_NVIDIA_ENABLED),
+        baseUrl: env.FRIDAY_NVIDIA_BASE_URL || 'https://integrate.api.nvidia.com/v1',
+        apiKey: env.NVIDIA_API_KEY || '',
+        models: configuredModels(env.FRIDAY_NVIDIA_MODELS_JSON),
+        localEnabled: enabled(env.FRIDAY_NVIDIA_LOCAL_ENABLED),
+        localBaseUrl: env.FRIDAY_NVIDIA_LOCAL_BASE_URL || 'http://nvidia-nim:8000/v1',
+        localModels: configuredModels(env.FRIDAY_NVIDIA_LOCAL_MODELS_JSON),
+      },
     },
     // Private TechTactics lead pipeline, read through the isolated reader.
     webGrowth: {
