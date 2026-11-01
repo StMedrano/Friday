@@ -209,6 +209,13 @@ export function getConfig(env = process.env) {
       gatewayKey: env.FRIDAY_WORK_READ_GATEWAY_KEY || '',
       grantsPath: env.FRIDAY_WORK_GRANTS_PATH || '/data/work-grants.json',
     },
+    // Private TechTactics lead pipeline, read through the isolated reader.
+    webGrowth: {
+      enabled: enabled(env.FRIDAY_WEB_GROWTH_ENABLED),
+      baseUrl: env.FRIDAY_WEB_GROWTH_READER_URL || '',
+      token: env.FRIDAY_WEB_GROWTH_READER_TOKEN || '',
+      readerEmails: [...new Set(String(env.FRIDAY_WEB_GROWTH_READER_EMAILS || '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean))],
+    },
     pushSubscriptions: {
       path: env.FRIDAY_PUSH_SUBSCRIPTIONS_PATH || '/data/push-subscriptions.json',
     },

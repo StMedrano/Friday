@@ -1,0 +1,23 @@
+services:
+  web-growth-reader:
+    build:
+      context: ../..
+      dockerfile: integrations/web-growth-reader/Dockerfile
+    user: "10001:10001"
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    environment:
+      WEB_GROWTH_READER_TOKEN: ${WEB_GROWTH_READER_TOKEN:?Owner-configured reader token required}
+      WEB_GROWTH_READER_REVISION: ${WEB_GROWTH_READER_REVISION:?Verified source revision required}
+    ports:
+      - "127.0.0.1:4318:4318"
+    volumes:
+      - type: bind
+        source: ${WEB_GROWTH_READER_SOURCE_FILE:?Explicit absolute lead JSON file required}
+        target: /data/leads.json
+        read_only: true
+        bind:
+          create_host_path: false
