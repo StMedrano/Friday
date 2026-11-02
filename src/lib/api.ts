@@ -573,18 +573,19 @@ export async function fetchHomeLabEvidence(signal?: AbortSignal): Promise<HomeLa
     })
     const body = await response.json()
     const text = (value: unknown, max = 2000) => typeof value === 'string' && value.length <= max
-    if (!response.ok || !['mock', 'live'].includes(body?.mode) || !Array.isArray(body.services) || body.services.length > 1000 ||
-        (body.incidents !== undefined && (!Array.isArray(body.incidents) || body.incidents.length > 1000)) ||
+    if (!response.ok || !['mock', 'live'].includes(body?.mode) || !Array.isArray(body.services) ||
+        (body.incidents !== undefined && !Array.isArray(body.incidents)) ||
         (body.generatedAt !== undefined && (!text(body.generatedAt, 64) || !Number.isFinite(Date.parse(body.generatedAt))))) throw failure()
     const ids = new Set<string>()
-    const services = body.services.map((item: Record<string, unknown>) => {
+    // Bounded views: lifetime counts (for example resolved incidents) never hide the panel.
+    const services = body.services.slice(0, 1000).map((item: Record<string, unknown>) => {
       if (!item || !text(item.id, 256) || !item.id || ids.has(item.id as string) || !text(item.name, 256) || !item.name ||
           !text(item.host, 256) || !text(item.detail) || !['online', 'degraded', 'offline', 'maintenance'].includes(item.status as string)) throw failure()
       ids.add(item.id as string)
       return { id: item.id as string, name: item.name as string, host: item.host as string, detail: item.detail as string, status: item.status as string }
     })
     ids.clear()
-    const incidents = (body.incidents || []).map((item: Record<string, unknown>) => {
+    const incidents = (body.incidents || []).filter((item: Record<string, unknown>) => item?.status === 'open').slice(0, 200).map((item: Record<string, unknown>) => {
       if (!item || !text(item.id, 256) || !item.id || ids.has(item.id as string) || !text(item.title, 256) ||
           !text(item.detail) || !['open', 'resolved'].includes(item.status as string) || !['high', 'warning', 'info'].includes(item.severity as string)) throw failure()
       ids.add(item.id as string)

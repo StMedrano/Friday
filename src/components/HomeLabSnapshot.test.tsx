@@ -39,3 +39,11 @@ it('aborts the HomeLab read when leaving the group',async()=>{
  expect(signal?.aborted).toBe(true)
 })
 
+
+it('keeps showing observations when the overview carries a long history of resolved incidents',async()=>{
+ const resolved=Array.from({length:1500},(_,i)=>({id:'r'+i,title:'Old',detail:'Recovered',status:'resolved',severity:'info'}))
+ vi.stubGlobal('fetch',vi.fn(async()=>json({...snapshot,incidents:[...resolved,...snapshot.incidents]})))
+ render(<HomeLabSnapshot/>)
+ expect(await screen.findByText('VM 100')).toBeInTheDocument()
+ expect(screen.getByText('Service warning')).toBeInTheDocument()
+})
