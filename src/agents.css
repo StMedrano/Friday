@@ -413,3 +413,19 @@
 .v3-web-growth .v3-group-evidence-list { display: grid; gap: 6px; max-height: 24rem; overflow: auto; scrollbar-gutter: stable; }
 .v3-web-growth .v3-group-evidence-list:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
 .v3-web-growth .v3-group-tools-note { margin: 12px 0 0; color: var(--muted); font-size: 12px; }
+
+/* HomeLab observations (read only) */
+.v3-homelab-evidence { margin-top: 16px; }
+.v3-homelab-evidence h4 { margin: 20px 0 8px; font-size: 14px; }
+.v3-homelab-evidence .v3-agent-detail-head { flex-wrap: wrap; }
+.v3-homelab-evidence .v3-group-evidence-list { display: grid; gap: 6px; max-height: 24rem; overflow: auto; scrollbar-gutter: stable; }
+.v3-homelab-evidence .v3-group-evidence-list:focus-visible { outline: 2px solid var(--cyan); outline-offset: 3px; }
+.v3-homelab-evidence .v3-group-evidence-list article { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; padding: 10px 0; border-top: 1px solid var(--line); }
+.v3-homelab-evidence .v3-group-evidence-list small { display: block; color: var(--muted); font-size: 12px; overflow-wrap: anywhere; }
+.v3-homelab-evidence .v3-group-evidence-list p { grid-column: 1 / -1; margin: 0; color: var(--muted); font-size: 13px; }
+.v3-agent-state { justify-self: start; padding: 2px 7px; border: 1px solid var(--line); border-radius: 5px; font-size: 11px; color: var(--muted); line-height: 1.5; }
+.v3-agent-state.configured { color: var(--green); }
+.v3-agent-state.unavailable { color: var(--amber); }
+.v3-group-incident { padding: 12px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
+.v3-group-incident span { margin-left: 8px; color: var(--amber); font-size: 12px; }
+.v3-group-incident p { color: var(--muted); font-size: 13px; }

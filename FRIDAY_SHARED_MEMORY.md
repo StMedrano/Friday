@@ -79,7 +79,8 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Production deployment after development merge | unclaimed | `planned` | Merged `main` revision and authoritative VM102 checkout | 2026-10-29 | 2026-10-29 | Identify the exact development PR/branch, require its merge and green exact-head verification, then inventory VM102, preserve `.env`, run preflight, deploy the merged `main`, and run health plus cloud acceptance. |
 | Web Growth reader slice | Claude | `complete` | Branch `claude/friday-web-growth`: `server/adapters/web-growth*.mjs`, `/api/web-growth`, `integrations/web-growth-reader/`, Web Growth panel under the TechTactics group | 2026-10-31 | 2026-11-01 | Merged as #114. Stays disabled until an operator deploys the isolated reader and sets the reader URL, token and emails. |
 | Free model routing and NVIDIA readiness slice | Claude | `complete` | Branch `claude/friday-model-fabric`: `server/ai/model-{fabric,registry,router}.mjs`, `server/ai/nvidia.mjs`, `scripts/check-nvidia-catalog.mjs`, `modelFabric` config, docs | 2026-11-01 | 2026-11-01 | Merged as #115. Internal only and default off; not wired into chat or agents. |
-| Container and observer hardening slice | Claude | `verification_needed` | Branch `claude/friday-container-hardening`: `observer/docker-proxy.mjs`, `observer/Dockerfile*`, `observer/compose.yaml`, controller `Dockerfile`, CI observer steps | 2026-11-01 | 2026-11-01 | Merge after green CI and Codex review. VM100 observer rollout and the controller non-root data migration each need a separate operator-approved window. |
+| Container and observer hardening slice | Claude | `complete` | Branch `claude/friday-container-hardening`: `observer/docker-proxy.mjs`, `observer/Dockerfile*`, `observer/compose.yaml`, controller `Dockerfile`, CI observer steps | 2026-11-01 | 2026-11-02 | Merged as #116. VM100 observer rollout and the controller non-root data migration each need a separate operator-approved window. |
+| #109 leftovers, slice A (history validation, HomeLab observations, phone sheet focus) | Claude | `verification_needed` | Branch `claude/friday-109-ui-slice`: `server/monitoring/history.mjs`, `/api/monitoring/history`, `src/components/HomeLabSnapshot.tsx`, `src/hooks/useModalFocus.ts`, `MobileNavigation.tsx` | 2026-11-02 | 2026-11-02 | Merge after green CI and Codex review; then plan the remaining #109 slices. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -115,6 +116,16 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-11-01 20:05 CST — Claude — Ported #109 leftovers slice A onto main
+
+- Status: `verification_needed`
+- Scope claimed: First slice of the work that remains only in PR #109 (`integration/friday-development-main-20261029`).
+- Work performed: `/api/monitoring/history` now projects events through `server/monitoring/history.mjs` and answers 503 (`monitoring-disabled`, `monitoring-history-unavailable`) or 502 (`monitoring-history-invalid`) instead of an empty list; the client validates the response and the home timeline says when monitoring is off. Added the read-only HomeLab observations panel under the HomeLab group, and a focus trap for the phone "More" sheet.
+- Changes made: Code only. Legacy events with null optional fields are kept with those fields dropped. Nothing deployed.
+- Verification: `make verify` passed locally.
+- Decisions: #109's alternative project-task implementation (task pagination, actor bindings, project access) conflicts with main's Tasks design and is not ported here; its Cloudflare Access verifier duplicates `server/security/access.mjs`.
+- Blockers/risks: None for this slice.
 
 ### 2026-11-01 19:49 CST — Claude — Ported container and observer hardening onto main
 

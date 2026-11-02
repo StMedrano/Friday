@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import MobileNavigation from './MobileNavigation'
@@ -51,5 +51,23 @@ describe('MobileNavigation', () => {
     await user.keyboard('{Escape}')
     expect(screen.queryByRole('dialog', { name: /more friday views/i })).not.toBeInTheDocument()
     expect(onNavigate).not.toHaveBeenCalled()
+  })
+})
+
+describe('More sheet focus', () => {
+  it('moves focus into the sheet, keeps Tab inside it, and returns focus to More on Escape', () => {
+    render(<MobileNavigation active="Overview" activeIncidents={0} onNavigate={() => {}}/>)
+    const more = screen.getByRole('button', { name: 'More' })
+    more.focus()
+    fireEvent.click(more)
+    const sheet = screen.getByRole('dialog', { name: 'More FRIDAY views' })
+    const buttons = within(sheet).getAllByRole('button')
+    expect(document.activeElement).toBe(buttons[0])
+    buttons.at(-1)!.focus()
+    fireEvent.keyDown(document, { key: 'Tab' })
+    expect(document.activeElement).toBe(buttons[0])
+    fireEvent.keyDown(document, { key: 'Escape' })
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(document.activeElement).toBe(more)
   })
 })

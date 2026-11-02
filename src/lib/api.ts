@@ -472,11 +472,33 @@ export async function askFridayAgent(agentId: string, prompt: string, signal?: A
   return body
 }
 
-export async function fetchMonitoringHistory(signal?: AbortSignal) {
-  const response = await fetch('/api/monitoring/history', { signal })
-  if (!response.ok) throw new Error(`Friday monitoring history ${response.status}`)
-  const body = await response.json() as { events?: MonitoringEvent[] }
-  return Array.isArray(body.events) ? body.events : []
+export async function fetchMonitoringHistory(signal?: AbortSignal): Promise<MonitoringEvent[]> {
+  const response = await fetch('/api/monitoring/history', { method:'GET', signal:signal?AbortSignal.any([signal,AbortSignal.timeout(15000)]):AbortSignal.timeout(15000) })
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null)
+    const message = response.status === 503 && failure?.error === 'monitoring-disabled' ? 'Monitoring disabled'
+      : response.status === 502 && failure?.error === 'monitoring-history-invalid' ? 'Monitoring history response invalid'
+      : 'Monitoring history unavailable'
+    throw new Error(message)
+  }
+  const body: unknown = await response.json().catch(() => { throw new Error('Monitoring history response invalid') })
+  const events = body && typeof body === 'object' && !Array.isArray(body)
+    ? (body as { events?: unknown }).events : undefined
+  const validText = (value: unknown): value is string => typeof value === 'string' && value.length <= 2000
+  const validEvent = (value: unknown): value is MonitoringEvent => {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return false
+    const event = value as Record<string, unknown>
+    return validText(event.id) && event.id.length > 0 &&
+      validText(event.type) && event.type.length > 0 &&
+      validText(event.at) && Number.isFinite(Date.parse(event.at)) &&
+      validText(event.source) && event.source.length > 0 &&
+      validText(event.detail) &&
+      ['host', 'serviceId', 'serviceName'].every(key => event[key] === undefined || validText(event[key]))
+  }
+  if (!Array.isArray(events) || events.length > 5000 || !events.every(validEvent)) {
+    throw new Error('Monitoring history response invalid')
+  }
+  return events
 }
 
 function incidentPath(id: string, suffix: 'diagnostics' | 'logs') { return `/api/incidents/${encodeURIComponent(id)}/${suffix}` }
@@ -534,4 +556,41 @@ export async function fetchWebGrowthSnapshot(signal?: AbortSignal): Promise<WebG
   return {id:lead.id,businessName:lead.businessName,stage:lead.stage,discoveredAt:lead.discoveredAt,updatedAt:lead.updatedAt,approvedForOutreach:lead.approvedForOutreach,approvedOutreachGeneratedAt:lead.approvedOutreachGeneratedAt,outreachStatus:lead.outreachStatus,outreachSentAt:lead.outreachSentAt,score:lead.score,auditCheckedAt:lead.auditCheckedAt,proposalAvailable:lead.proposalAvailable,demoAvailable:lead.demoAvailable}
  })
  return {schemaVersion:'1',projectId:'techtactics-web-growth',generatedAt:body.generatedAt,sourceRevision:body.sourceRevision,sourceChecksum:body.sourceChecksum,leads}
+}
+
+export type HomeLabEvidence = {
+  mode: 'mock' | 'live'
+  generatedAt?: string
+  services: Array<{ id: string; name: string; host: string; status: string; detail: string }>
+  incidents: Array<{ id: string; title: string; detail: string; status: string; severity: string }>
+}
+
+export async function fetchHomeLabEvidence(signal?: AbortSignal): Promise<HomeLabEvidence> {
+  const failure = () => new Error('HomeLab observations unavailable')
+  try {
+    const response = await fetch('/api/overview', {
+      method: 'GET', signal: signal ? AbortSignal.any([signal, AbortSignal.timeout(15000)]) : AbortSignal.timeout(15000),
+    })
+    const body = await response.json()
+    const text = (value: unknown, max = 2000) => typeof value === 'string' && value.length <= max
+    if (!response.ok || !['mock', 'live'].includes(body?.mode) || !Array.isArray(body.services) ||
+        (body.incidents !== undefined && !Array.isArray(body.incidents)) ||
+        (body.generatedAt !== undefined && (!text(body.generatedAt, 64) || !Number.isFinite(Date.parse(body.generatedAt))))) throw failure()
+    const ids = new Set<string>()
+    // Bounded views: lifetime counts (for example resolved incidents) never hide the panel.
+    const services = body.services.slice(0, 1000).map((item: Record<string, unknown>) => {
+      if (!item || !text(item.id, 256) || !item.id || ids.has(item.id as string) || !text(item.name, 256) || !item.name ||
+          !text(item.host, 256) || !text(item.detail) || !['online', 'degraded', 'offline', 'maintenance'].includes(item.status as string)) throw failure()
+      ids.add(item.id as string)
+      return { id: item.id as string, name: item.name as string, host: item.host as string, detail: item.detail as string, status: item.status as string }
+    })
+    ids.clear()
+    const incidents = (body.incidents || []).filter((item: Record<string, unknown>) => item?.status === 'open').slice(0, 200).map((item: Record<string, unknown>) => {
+      if (!item || !text(item.id, 256) || !item.id || ids.has(item.id as string) || !text(item.title, 256) ||
+          !text(item.detail) || !['open', 'resolved'].includes(item.status as string) || !['high', 'warning', 'info'].includes(item.severity as string)) throw failure()
+      ids.add(item.id as string)
+      return { id: item.id as string, title: item.title as string, detail: item.detail as string, status: item.status as string, severity: item.severity as string }
+    })
+    return { mode: body.mode, generatedAt: body.generatedAt, services, incidents }
+  } catch { throw failure() }
 }
