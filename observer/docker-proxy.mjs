@@ -14,6 +14,8 @@ const MAX_LOG_BYTES=256*1024
 const COMPOSE_LABEL_KEYS=['com.docker.compose.project','com.docker.compose.service']
 const safeText=(x,max=256)=>typeof x==='string'?x.slice(0,max):''
 const safeNumber=(x)=>Number.isSafeInteger(x)&&x>=0?x:null
+// Exit codes are signed: Docker records -1 when a health check times out or cannot run.
+const safeExitCode=(x)=>Number.isSafeInteger(x)?x:null
 function composeLabels(value){
  const result={}
  for(const key of COMPOSE_LABEL_KEYS){
@@ -58,7 +60,7 @@ function projectedInspect(x){
   Image:safeText(x.Image),
   Config:{Image:safeText(x.Config?.Image),Labels:composeLabels(x.Config?.Labels)},
   State:{
-   Status:safeText(x.State?.Status,32),ExitCode:safeNumber(x.State?.ExitCode),
+   Status:safeText(x.State?.Status,32),ExitCode:safeExitCode(x.State?.ExitCode),
    OOMKilled:x.State?.OOMKilled===true,
    StartedAt:safeText(x.State?.StartedAt,64),
    FinishedAt:safeText(x.State?.FinishedAt,64),
@@ -66,7 +68,7 @@ function projectedInspect(x){
     Status:safeText(health.Status,32),
     Log:Array.isArray(health.Log)?health.Log.slice(-3).map(h=>({
      Start:safeText(h?.Start,64),End:safeText(h?.End,64),
-     ExitCode:safeNumber(h?.ExitCode),
+     ExitCode:safeExitCode(h?.ExitCode),
     })):[]
    }:null,
   },

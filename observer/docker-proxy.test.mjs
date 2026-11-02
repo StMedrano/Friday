@@ -234,3 +234,21 @@ test('a failed upstream log read returns a sanitized 503 without the Docker erro
   await new Promise(resolve=>upstream.close(resolve))
  }
 })
+
+test('failed health-check attempts keep their negative exit code through the projection',async()=>{
+ const upstream=http.createServer((_req,res)=>{
+  res.writeHead(200,{'content-type':'application/json'})
+  res.end(JSON.stringify({Id:'a'.repeat(64),State:{Status:'running',ExitCode:0,Health:{Status:'unhealthy',Log:[{Start:'s',End:'e',ExitCode:-1,Output:'timeout'}]}}}))
+ })
+ await new Promise(resolve=>upstream.listen(0,'127.0.0.1',resolve))
+ const proxy=createDockerReadOnlyProxyServer({dockerRequestOptions:()=>({hostname:'127.0.0.1',port:upstream.address().port})})
+ await new Promise(resolve=>proxy.listen(0,'127.0.0.1',resolve))
+ try{
+  const body=await (await fetch('http://127.0.0.1:'+proxy.address().port+'/containers/'+'a'.repeat(64)+'/json')).json()
+  assert.equal(body.State.Health.Log[0].ExitCode,-1)
+  assert.equal(body.State.Health.Log[0].Output,undefined)
+ }finally{
+  await new Promise(resolve=>proxy.close(resolve))
+  await new Promise(resolve=>upstream.close(resolve))
+ }
+})
