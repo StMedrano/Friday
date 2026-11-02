@@ -78,7 +78,8 @@ export default function Dashboard() {
       .catch((error) => {
         if (error?.name !== 'AbortError') {
           setHistory([])
-          setHistoryError(error?.message === 'Monitoring disabled' ? 'Monitoring is turned off' : 'History unavailable')
+          // The timeline recognizes these two messages; everything else is a generic failure.
+          setHistoryError(['Monitoring disabled', 'Monitoring history response invalid'].includes(error?.message) ? error.message : 'History unavailable')
           setHistoryLoading(false)
         }
       })

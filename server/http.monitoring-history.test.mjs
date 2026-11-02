@@ -31,7 +31,7 @@ test('empty history and recorded events succeed only after a validated runtime r
  })
 })
 test('malformed history is invalid and cannot leak an unprojected record',async()=>{
- for(const body of [null,{}, {events:null},{events:[{...event,at:'bad'}]},{events:[event,event]}])await run({runtime:{getHistory:()=>body}},async base=>{
+ for(const body of [null,{}, {events:null},{events:'x'}])await run({runtime:{getHistory:()=>body}},async base=>{
   const response=await fetch(base+'/api/monitoring/history')
   assert.equal(response.status,502);assert.deepEqual(await response.json(),{error:'monitoring-history-invalid'})
  })
@@ -68,5 +68,13 @@ test('history longer than the client cap is served as the newest 5000 events, no
   assert.equal(response.status,200)
   const body=await response.json()
   assert.equal(body.events.length,5000);assert.equal(body.events[0].id,'e0');assert.equal(body.events.at(-1).id,'e4999')
+ })
+})
+test('a malformed event is dropped and repeated IDs collapse to the first, without hiding the rest',async()=>{
+ const other={...event,id:'e2',detail:'Second'}
+ await run({runtime:{getHistory:()=>({events:[event,{...event,detail:'duplicate'},{...event,id:'bad',at:'not a date'},{...other,host:7},other]})}},async base=>{
+  const response=await fetch(base+'/api/monitoring/history')
+  assert.equal(response.status,200)
+  assert.deepEqual(await response.json(),{events:[event,other]})
  })
 })
