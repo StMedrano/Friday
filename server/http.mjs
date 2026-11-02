@@ -1,3 +1,4 @@
+import { projectMonitoringHistory } from './monitoring/history.mjs'
 import { createServer } from 'node:http'
 import { REPOSITORY_ID, toPublicRepository } from './repositories/repository.mjs'
 import { readRegistryEntries, repositorySettingsView } from './repositories/managed-registry.mjs'
@@ -436,7 +437,14 @@ export function createFridayServer({
     }
 
     if (request.method === 'GET' && url.pathname === '/api/monitoring/history') {
-      return json(response, 200, monitoringRuntime?.getHistory?.() || { events: [] })
+      // Never report an unavailable or malformed history as an empty one.
+      if (config.monitoring?.enabled === false) return json(response, 503, { error: 'monitoring-disabled' })
+      if (typeof monitoringRuntime?.getHistory !== 'function') return json(response, 503, { error: 'monitoring-history-unavailable' })
+      let history
+      try { history = await monitoringRuntime.getHistory() }
+      catch { return json(response, 503, { error: 'monitoring-history-unavailable' }) }
+      try { return json(response, 200, projectMonitoringHistory(history)) }
+      catch { return json(response, 502, { error: 'monitoring-history-invalid' }) }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/audit/events') {

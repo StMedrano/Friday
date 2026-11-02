@@ -78,7 +78,7 @@ export default function Dashboard() {
       .catch((error) => {
         if (error?.name !== 'AbortError') {
           setHistory([])
-          setHistoryError('History unavailable')
+          setHistoryError(error?.message === 'Monitoring disabled' ? 'Monitoring is turned off' : 'History unavailable')
           setHistoryLoading(false)
         }
       })
