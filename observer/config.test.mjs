@@ -15,7 +15,7 @@ test('observer config is explicit and server-side', () => {
   assert.equal(config.bindAddress, '192.168.1.74')
   assert.equal(config.token, 'observer-secret')
   assert.equal(config.hostName, 'VM 100')
-  assert.equal(config.dockerSocketPath, '/var/run/docker.sock')
+  assert.equal(config.dockerSocketPath, '/proxy/docker.sock')
   assert.deepEqual(config.allowedLabelKeys, ['com.docker.compose.project', 'com.docker.compose.service'])
 })
 
