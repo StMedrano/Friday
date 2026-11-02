@@ -61,3 +61,12 @@ test('legacy events with null optional fields are kept without the null fields',
   assert.deepEqual(await (await fetch(base+'/api/monitoring/history')).json(),{events:[{...event,serviceId:'svc'}]})
  })
 })
+test('history longer than the client cap is served as the newest 5000 events, not an error',async()=>{
+ const events=Array.from({length:5002},(_,i)=>({...event,id:'e'+i}))
+ await run({runtime:{getHistory:()=>({events})}},async base=>{
+  const response=await fetch(base+'/api/monitoring/history')
+  assert.equal(response.status,200)
+  const body=await response.json()
+  assert.equal(body.events.length,5000);assert.equal(body.events[0].id,'e0');assert.equal(body.events.at(-1).id,'e4999')
+ })
+})
