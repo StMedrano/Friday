@@ -478,6 +478,10 @@ This is the source-of-truth handoff ledger for coding agents. Update it when a m
 ## Intentionally stopped guests, 2026-10-29
 
 A Proxmox guest that is stopped is reported `maintenance` instead of `offline` when its config has `onboot: 0` or carries a `maintenance` or `friday-ignore` tag, so monitoring opens no incident and no notification is pushed for a planned shutdown (for example the Umbrel VM powered off on 2026-10-29). Only stopped guests are inspected, at most sixteen per collection, and a config read failure leaves the guest `offline`. A guest that should autostart but is stopped still reports offline.
+## Non-root controller rehearsal and image scanning, 2026-11-02
+
+The Dockerfile now has a `runtime-nonroot` stage (UID/GID 10001, `HOME=/tmp`, `/data` owned by 10001). The default `runtime` stage is still root and still what Compose builds, because VM102's `friday_data` is root-owned. CI builds the candidate, smoke-tests it read-only with no capabilities, rehearses the root-owned to 10001 volume copy on disposable fixture volumes, and runs a digest-pinned Trivy scan that fails on HIGH or CRITICAL findings in the controller, observer and proxy images. `scripts/check-friday-volume-readiness.sh` is a read-only VM102 preflight. The cutover outline is in `docs/controller-nonroot-migration.md`.
+
 ## Honest monitoring history, HomeLab observations, phone sheet focus, 2026-11-02
 
 From the #109 leftovers: `GET /api/monitoring/history` projects every event to its public fields and never reports an unavailable runtime, disabled monitoring or a non-list history as an empty timeline (503 `monitoring-disabled` / `monitoring-history-unavailable`, 502 `monitoring-history-invalid`). Single malformed events are dropped, repeated IDs keep the newest entry and at most the newest 5000 events are served. The client validates the response and the home timeline says when monitoring is disabled. The HomeLab group shows read-only service and open-incident observations from `/api/overview`, marking demo data and refusing malformed responses. The phone "More" sheet traps focus, closes on Escape and returns focus to the More button.

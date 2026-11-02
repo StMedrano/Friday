@@ -80,7 +80,8 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Web Growth reader slice | Claude | `complete` | Branch `claude/friday-web-growth`: `server/adapters/web-growth*.mjs`, `/api/web-growth`, `integrations/web-growth-reader/`, Web Growth panel under the TechTactics group | 2026-10-31 | 2026-11-01 | Merged as #114. Stays disabled until an operator deploys the isolated reader and sets the reader URL, token and emails. |
 | Free model routing and NVIDIA readiness slice | Claude | `complete` | Branch `claude/friday-model-fabric`: `server/ai/model-{fabric,registry,router}.mjs`, `server/ai/nvidia.mjs`, `scripts/check-nvidia-catalog.mjs`, `modelFabric` config, docs | 2026-11-01 | 2026-11-01 | Merged as #115. Internal only and default off; not wired into chat or agents. |
 | Container and observer hardening slice | Claude | `complete` | Branch `claude/friday-container-hardening`: `observer/docker-proxy.mjs`, `observer/Dockerfile*`, `observer/compose.yaml`, controller `Dockerfile`, CI observer steps | 2026-11-01 | 2026-11-02 | Merged as #116. VM100 observer rollout and the controller non-root data migration each need a separate operator-approved window. |
-| #109 leftovers, slice A (history validation, HomeLab observations, phone sheet focus) | Claude | `verification_needed` | Branch `claude/friday-109-ui-slice`: `server/monitoring/history.mjs`, `/api/monitoring/history`, `src/components/HomeLabSnapshot.tsx`, `src/hooks/useModalFocus.ts`, `MobileNavigation.tsx` | 2026-11-02 | 2026-11-02 | Merge after green CI and Codex review; then plan the remaining #109 slices. |
+| #109 leftovers, slice A (history validation, HomeLab observations, phone sheet focus) | Claude | `complete` | Branch `claude/friday-109-ui-slice`: `server/monitoring/history.mjs`, `/api/monitoring/history`, `src/components/HomeLabSnapshot.tsx`, `src/hooks/useModalFocus.ts`, `MobileNavigation.tsx` | 2026-11-02 | 2026-11-02 | Merged as #117. |
+| Non-root controller rehearsal (#109 leftovers, slice B) | Claude | `verification_needed` | Branch `claude/friday-nonroot-rehearsal`: `Dockerfile` `runtime-nonroot` stage, `scripts/test-friday-volume-migration.sh`, `scripts/check-friday-volume-readiness.sh`, `scripts/test-controller-container-hardening.sh`, `scripts/scan-controller-image.sh`, CI | 2026-11-02 | 2026-11-02 | Merge after green CI and Codex review. Production cutover needs an approved VM102 window (see `docs/controller-nonroot-migration.md`). |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -126,6 +127,16 @@ Append new entries at the top of this section. Do not rewrite or delete prior en
 - Verification: `make verify` passed locally.
 - Decisions: #109's alternative project-task implementation (task pagination, actor bindings, project access) conflicts with main's Tasks design and is not ported here; its Cloudflare Access verifier duplicates `server/security/access.mjs`.
 - Blockers/risks: None for this slice.
+
+### 2026-11-01 20:42 CST — Claude — Prepared the non-root controller and CI image scanning
+
+- Status: `verification_needed`
+- Scope claimed: Slice B of the #109 leftovers, chosen by the owner on 2026-11-02.
+- Work performed: Added a `runtime-nonroot` Dockerfile stage (UID/GID 10001) next to the default root `runtime` stage, which stays last and is still what Compose builds. Ported the read-only VM102 volume readiness check, the disposable data-migration rehearsal, the non-root smoke test and the digest-pinned Trivy scan, and wired the rehearsal, smoke test and scans of the controller, observer and proxy images into CI. Wrote `docs/controller-nonroot-migration.md`.
+- Changes made: Code and CI only. Nothing deployed; `friday_data` untouched.
+- Verification: `make verify` passed locally; Docker steps run in CI (no local Docker daemon).
+- Decisions: The grants timer on VM102 writes `work-grants.json` as root, so the cutover must also change that timer.
+- Blockers/risks: The Trivy step fails CI on any new HIGH/CRITICAL advisory in the base images.
 
 ### 2026-11-01 19:49 CST — Claude — Ported container and observer hardening onto main
 
