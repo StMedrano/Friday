@@ -132,3 +132,21 @@ For the current validation case, Nginx Proxy Manager must remain in its pre-vali
 ## Security boundary
 
 Mounting `/var/run/docker.sock` read-only does not make Docker API access inherently safe; the code-level fixed-request allowlist is the observer's primary boundary. Keep the observer bearer token server-side, do not publish Docker TCP `2375/2376`, and do not add mutation routes or generic Docker path forwarding.
+
+## Read-only Docker proxy (2026-11-02)
+
+The observer no longer mounts `/var/run/docker.sock`. A separate sidecar, `friday-docker-readonly` (`Dockerfile.proxy`, `docker-proxy.mjs`), is the only container that mounts the socket. It has no network, runs as UID 10001 with a read-only root filesystem and no capabilities, and listens only on a mode-0600 UNIX socket in the `friday_docker_proxy_socket` volume, which the observer mounts read only.
+
+The proxy forwards exactly these GET requests and answers 403 to everything else without contacting Docker:
+
+```text
+GET /containers/json?all=1                                               projected inventory
+GET /containers/<64-hex-id>/json                                         projected inspect
+GET /containers/<64-hex-id>/logs?stdout=1&stderr=1&timestamps=1&tail=N   N 1-200, only when FRIDAY_DOCKER_PROXY_ALLOW_LOGS=true
+```
+
+Inventory and inspect are projected at the proxy, so environment variables, commands, mounts and arbitrary labels never reach the observer. Logs are forwarded raw but capped at 256 KiB; the observer still sanitizes and caps them at 64 KiB before they leave VM100. Set `FRIDAY_DOCKER_PROXY_ALLOW_LOGS=false` to refuse logs at the proxy; incident log diagnostics then report the provider unavailable. Upstream error bodies are never echoed and every request has a five-second wall-clock deadline.
+
+Both images pin the Node/Alpine patch release, run `apk upgrade`, remove the bundled npm/Yarn tooling and run as UID 10001.
+
+To roll out on VM100 (operator-approved maintenance window only): set `FRIDAY_DOCKER_SOCKET_GID=$(stat -c %g /var/run/docker.sock)` in the observer's private `.env` (Compose refuses to start without it), keep the current image and Compose file for rollback, then `docker compose up -d --build` and verify health, authenticated inventory, inspect and logs. Residual risk: the socket group is root-equivalent, so it is granted to the proxy alone; never add it to the observer or publish a Docker TCP port.

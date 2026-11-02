@@ -78,7 +78,8 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Service-token renewal | Codex/ChatGPT | `planned` | `friday-cloud-reader`; coordinated Cloudflare rotation and managed-runtime binding update | 2026-10-29 | 2026-10-29 | After the exact production merge target is identified, rotate with a bounded overlap, update the secure caller binding without exposing the secret, rerun acceptance, then retire the prior secret. |
 | Production deployment after development merge | unclaimed | `planned` | Merged `main` revision and authoritative VM102 checkout | 2026-10-29 | 2026-10-29 | Identify the exact development PR/branch, require its merge and green exact-head verification, then inventory VM102, preserve `.env`, run preflight, deploy the merged `main`, and run health plus cloud acceptance. |
 | Web Growth reader slice | Claude | `complete` | Branch `claude/friday-web-growth`: `server/adapters/web-growth*.mjs`, `/api/web-growth`, `integrations/web-growth-reader/`, Web Growth panel under the TechTactics group | 2026-10-31 | 2026-11-01 | Merged as #114. Stays disabled until an operator deploys the isolated reader and sets the reader URL, token and emails. |
-| Free model routing and NVIDIA readiness slice | Claude | `verification_needed` | Branch `claude/friday-model-fabric`: `server/ai/model-{fabric,registry,router}.mjs`, `server/ai/nvidia.mjs`, `scripts/check-nvidia-catalog.mjs`, `modelFabric` config, docs | 2026-11-01 | 2026-11-01 | Merge after green CI and Codex review. Internal only and default off; not wired into chat or agents. |
+| Free model routing and NVIDIA readiness slice | Claude | `complete` | Branch `claude/friday-model-fabric`: `server/ai/model-{fabric,registry,router}.mjs`, `server/ai/nvidia.mjs`, `scripts/check-nvidia-catalog.mjs`, `modelFabric` config, docs | 2026-11-01 | 2026-11-01 | Merged as #115. Internal only and default off; not wired into chat or agents. |
+| Container and observer hardening slice | Claude | `verification_needed` | Branch `claude/friday-container-hardening`: `observer/docker-proxy.mjs`, `observer/Dockerfile*`, `observer/compose.yaml`, controller `Dockerfile`, CI observer steps | 2026-11-01 | 2026-11-01 | Merge after green CI and Codex review. VM100 observer rollout and the controller non-root data migration each need a separate operator-approved window. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -114,6 +115,16 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-11-01 19:49 CST — Claude — Ported container and observer hardening onto main
+
+- Status: `verification_needed`
+- Scope claimed: Slice 7 of the group-workspace split, the restricted Docker proxy for the VM100 observer and controller image hardening.
+- Work performed: Ported the read-only Docker proxy sidecar, rootless pinned observer and proxy images, and the observer Compose split from `feat/friday-group-workspace-20261013`. Added a bounded log route to the proxy (exact observer request, tail 1-200, 256 KiB cap, `FRIDAY_DOCKER_PROXY_ALLOW_LOGS`) so incident log diagnostics keep working. Pinned the controller Node/Alpine image, moved runtime dependency install into its own stage and removed npm/Yarn from the runtime.
+- Changes made: Code only. Nothing deployed. The controller still runs as root on purpose.
+- Verification: `make verify` passed locally; observer suite 26/26. Docker images are built in CI (no local Docker daemon).
+- Decisions: Kept the controller as root because VM102's `friday_data` volume and the root-written `work-grants.json` are root-owned; the group branch's UID 10001 switch would break them without a migration. Not ported: the VM100 staging stack (it uses the old `FRIDAY_CF_ACCESS_*` names) and the controller read-only/non-root Compose settings.
+- Blockers/risks: VM100 observer redeploy needs `FRIDAY_DOCKER_SOCKET_GID` in its private `.env`; Compose refuses to start without it.
 
 ### 2026-11-01 09:51 CST — Claude — Ported free model routing and NVIDIA readiness onto main
 
