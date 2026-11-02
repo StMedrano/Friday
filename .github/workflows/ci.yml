@@ -185,3 +185,18 @@ jobs:
         run: docker build -t friday-observer-ci observer
       - name: Build VM100 Docker read-only proxy container
         run: docker build -f observer/Dockerfile.proxy -t friday-docker-proxy-ci observer
+
+      - name: Build non-root controller candidate
+        run: docker build --target runtime-nonroot -t friday-ci-nonroot .
+
+      - name: Smoke-test the non-root controller candidate
+        run: sh scripts/test-controller-container-hardening.sh friday-ci-nonroot
+
+      - name: Rehearse the root-owned to non-root data volume copy
+        run: sh scripts/test-friday-volume-migration.sh friday-ci-nonroot
+
+      - name: Scan images for HIGH/CRITICAL vulnerabilities
+        run: |
+          sh scripts/scan-controller-image.sh friday-ci
+          sh scripts/scan-controller-image.sh friday-observer-ci
+          sh scripts/scan-controller-image.sh friday-docker-proxy-ci
