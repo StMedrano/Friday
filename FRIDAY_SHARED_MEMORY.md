@@ -118,6 +118,13 @@ Copy this block into the Activity log and fill every field:
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
 
+### 2026-11-03 05:41 CST — Claude — Added the nightly builder backlog and rules
+
+- Owner approved a nightly scheduled session that builds Friday work from a backlog.
+- Added `docs/automation/BACKLOG.md` (five `ready` items, three `needs-approval`) and `docs/automation/nightly-builder.md` (one PR per night, at most two open, never merges, deploys, or enables flags).
+- Verification: docs only; referenced files and env vars checked with grep.
+- Next: the scheduled session starts from this backlog once this PR merges.
+
 ### 2026-11-01 20:05 CST — Claude — Ported #109 leftovers slice A onto main
 
 - Status: `verification_needed`
