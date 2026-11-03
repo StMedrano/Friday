@@ -30,6 +30,9 @@ jobs:
       - name: Verify repository
         run: make verify
 
+      - name: Re-run staging Access tests against the built UI
+        run: node --test server/security/access-staging.test.mjs
+
       - name: Validate shell scripts
         run: |
           for file in scripts/*.sh; do

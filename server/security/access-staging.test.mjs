@@ -92,7 +92,8 @@ test('staging: no Access token denies operational APIs while edge-owned UI and h
    headers:{'cf-access-authenticated-user-email':'operator@staging.test'},
   })
   assert.equal(spoofed.status,403)
-  assert.equal((await fetch(base+'/')).status,200)
+  // The UI shell is not behind the API gate; without a build it is a 404, never a 403.
+  assert.notEqual((await fetch(base+'/')).status,403)
   assert.equal((await fetch(base+'/healthz')).status,200)
   assert.equal((await fetch(base+'/api/health')).status,200)
   assert.deepEqual(calls,{overview:0,agentList:0,sync:0,rerun:0,assistant:0})
