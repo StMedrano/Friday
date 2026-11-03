@@ -478,6 +478,10 @@ This is the source-of-truth handoff ledger for coding agents. Update it when a m
 ## Intentionally stopped guests, 2026-10-29
 
 A Proxmox guest that is stopped is reported `maintenance` instead of `offline` when its config has `onboot: 0` or carries a `maintenance` or `friday-ignore` tag, so monitoring opens no incident and no notification is pushed for a planned shutdown (for example the Umbrel VM powered off on 2026-10-29). Only stopped guests are inspected, at most sixteen per collection, and a config read failure leaves the guest `offline`. A guest that should autostart but is stopped still reports offline.
+## VM100 staging stack on main, 2026-11-03
+
+`deploy/staging/compose.yaml` runs a private Friday staging copy: the non-root image, no host ports, no volumes (tmpfs `/data`), its own Cloudflare Access audience, every integration and feature flag off, and an opt-in digest-pinned tunnel that reads its token from a file secret. `scripts/verify-friday-staging.sh` validates the resolved Compose offline (also in `make verify`); CI starts the staging container without a tunnel and checks it is non-root, read-only, has no ports or mounts, and refuses anonymous API reads. `scripts/check-friday-edge-readiness.mjs` is a GET-only probe that anonymous requests to the public origin are denied at the edge. Nothing is deployed.
+
 ## Non-root controller rehearsal and image scanning, 2026-11-02
 
 The Dockerfile now has a `runtime-nonroot` stage (UID/GID 10001, `HOME=/tmp`, `/data` owned by 10001). The default `runtime` stage is still root and still what Compose builds, because VM102's `friday_data` is root-owned. CI builds the candidate, smoke-tests it read-only with no capabilities, rehearses the root-owned to 10001 volume copy on disposable fixture volumes, and runs a digest-pinned Trivy scan that fails on HIGH or CRITICAL findings in the controller, observer and proxy images. `scripts/check-friday-volume-readiness.sh` is a read-only VM102 preflight. The cutover outline is in `docs/controller-nonroot-migration.md`.

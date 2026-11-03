@@ -200,3 +200,9 @@ jobs:
           sh scripts/scan-controller-image.sh friday-ci
           sh scripts/scan-controller-image.sh friday-observer-ci
           sh scripts/scan-controller-image.sh friday-docker-proxy-ci
+
+      - name: Verify isolated Friday staging Compose without starting services
+        run: sh scripts/verify-friday-staging.sh
+
+      - name: Smoke-test the private staging stack without a tunnel or host ports
+        run: sh scripts/test-friday-staging-isolation.sh
