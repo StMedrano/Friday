@@ -20,6 +20,13 @@ const token=(claims={},header={})=>{
  const signed=b64({alg:'RS256',kid:'ak-fixture',typ:'JWT',...header})+'.'+b64(payload)
  return signed+'.'+sign('RSA-SHA256',Buffer.from(signed),privateKey).toString('base64url')
 }
+// Replace the JWT signature with one that differs from it in decoded bytes.
+const tamperSignature=jwt=>{
+ const parts=jwt.split('.')
+ const bytes=Buffer.from(parts[2],'base64url')
+ bytes[0]^=0x01
+ return parts[0]+'.'+parts[1]+'.'+bytes.toString('base64url')
+}
 function fixture(overrides={}){
  const seen=[]
  let current=TIME
@@ -90,10 +97,19 @@ test('invalid issuer, wrong audience, wrong signature, expired, future nbf, miss
   token({}, {alg:'HS256'}),
   token({}, {kid:'wrong'}),
   token({}, {typ:'dpop+id_token'}),
-  token().slice(0,-2)+'xx',
+  tamperSignature(token()),
  ]
  for(const badJwt of bad){assert.equal((await f.gate(request(badJwt))).status,403)}
  assert.equal((await f.gate(request(token({aud:['friday-private-client','other-client'],azp:clientId})))).status,200)
+})
+
+test('tampered signature fixture always changes the decoded signature bytes',()=>{
+ // base64url ignores a final character's padding bits, so editing trailing
+ // characters can decode back to the original signature and let it verify.
+ for(const signature of ['A'.repeat(340)+'xw','A'.repeat(340)+'xx','A'.repeat(341)+'B']){
+  const tampered=tamperSignature('header.payload.'+signature).split('.')[2]
+  assert.notDeepEqual(Buffer.from(tampered,'base64url'),Buffer.from(signature,'base64url'))
+ }
 })
 
 test('discovery and signing key must be pinned to one exact issuer, no redirects or remote JWKS',async()=>{

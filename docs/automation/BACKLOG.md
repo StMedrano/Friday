@@ -9,7 +9,7 @@ Keep each item small enough for one pull request.
 
 ---
 
-## fix-authentik-flaky-test — `ready`
+## fix-authentik-flaky-test — `in-review`
 
 **Scope:** `server/security/authentik.test.mjs` and, only if the root cause
 is there, `server/security/authentik*.mjs`.

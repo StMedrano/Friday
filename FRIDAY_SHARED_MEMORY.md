@@ -83,6 +83,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | #109 leftovers, slice A (history validation, HomeLab observations, phone sheet focus) | Claude | `complete` | Branch `claude/friday-109-ui-slice`: `server/monitoring/history.mjs`, `/api/monitoring/history`, `src/components/HomeLabSnapshot.tsx`, `src/hooks/useModalFocus.ts`, `MobileNavigation.tsx` | 2026-11-02 | 2026-11-02 | Merged as #117. |
 | Non-root controller rehearsal (#109 leftovers, slice B) | Claude | `complete` | Branch `claude/friday-nonroot-rehearsal`: `Dockerfile` `runtime-nonroot` stage, `scripts/test-friday-volume-migration.sh`, `scripts/check-friday-volume-readiness.sh`, `scripts/test-controller-container-hardening.sh`, `scripts/scan-controller-image.sh`, CI | 2026-11-02 | 2026-11-02 | Merged as #118. Production cutover needs an approved VM102 window (see `docs/controller-nonroot-migration.md`). |
 | VM100 staging stack (#109 leftovers, slice C) | Claude | `complete` | Branch `claude/friday-staging-stack`: `deploy/staging/`, `scripts/verify-friday-staging*`, `scripts/test-friday-staging-isolation.sh`, `scripts/check-friday-edge-readiness*`, `server/security/access-staging.test.mjs`, CI, Makefile | 2026-11-03 | 2026-11-03 | Merged as #119. Redeploying staging on VM100 from main is an operator step. |
+| Fix flaky Authentik "invalid issuer…deny" test (backlog `fix-authentik-flaky-test`) | Claude nightly builder | `verification_needed` | Branch `bot/nightly-fix-authentik-flaky-test`: `server/security/authentik.test.mjs`, `docs/automation/BACKLOG.md` | 2026-11-04 | 2026-11-04 | Owner reviews the pull request. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -118,6 +119,18 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-11-04 01:55 CST — Claude nightly builder — Fixed the flaky Authentik signature test
+
+- Status: `verification_needed`
+- Scope claimed: backlog item `fix-authentik-flaky-test`; `server/security/authentik.test.mjs` only. `server/security/authentik.mjs` unchanged (root cause was in the test).
+- Work performed: The "invalid issuer…deny" test forged a bad signature with `token().slice(0,-2)+'xx'`. A 2048-bit RS256 signature is 342 base64url characters and the last one carries only 2 bits, so the edit decodes back to the original signature about 1 in 256 runs (scratch repro: 90 of 20,000 fresh signatures), the token verifies and the test sees 200. It was random per run because the key pair is generated per run, not caused by parallel load. The test now flips a bit in the decoded signature bytes, and a new test pins that the tamper helper always changes the decoded bytes, including the `…xw` case the old edit missed.
+- Changes made: test file, backlog status `in-review`, this ledger.
+- Verification: new test failed against the old tamper and passes with the fix; `node --test --test-concurrency=8 'server/**/*.test.mjs'` passed 50 of 50 consecutive runs (738 pass, 1 skipped). The backlog's literal `node --test server/` does not run on Node 22 (it treats the directory as a module), so the glob form was used. `make verify` passed.
+- Decisions: none.
+- Blockers/risks: `server/security/access.test.mjs` uses the same pattern with five characters (`slice(0,-5)+'xxxxx'`); the collision odds there are about 1 in 67 million, so it was left out of scope.
+- Next action: owner reviews the pull request.
+- Rollback/recovery: revert the pull request.
 
 ### 2026-11-03 05:41 CST — Claude — Added the nightly builder backlog and rules
 
