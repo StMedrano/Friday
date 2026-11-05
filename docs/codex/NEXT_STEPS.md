@@ -1,5 +1,15 @@
 # Friday — Ordered Finish Queue
 
+## Authentication references
+
+- `docs/phase2c-operator-auth-hardening.md` describes the origin Access
+  check, operator-only routes and Docker isolation as they work on `main`,
+  and lists what #109 described that `main` does not have (second operator
+  bearer token, request rate limiting).
+- `docs/friday-authentication-failover.md` is the Authentik-primary login and
+  One-time PIN break-glass runbook. It is a proposal pending the owner's
+  `authentik-primary-login` decision in `docs/automation/BACKLOG.md`.
+
 ## Installable Friday PWA — test source, stage separately
 
 - New manifest, secure-origin registration, 180/192/512 launcher icons,

@@ -83,6 +83,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | #109 leftovers, slice A (history validation, HomeLab observations, phone sheet focus) | Claude | `complete` | Branch `claude/friday-109-ui-slice`: `server/monitoring/history.mjs`, `/api/monitoring/history`, `src/components/HomeLabSnapshot.tsx`, `src/hooks/useModalFocus.ts`, `MobileNavigation.tsx` | 2026-11-02 | 2026-11-02 | Merged as #117. |
 | Non-root controller rehearsal (#109 leftovers, slice B) | Claude | `complete` | Branch `claude/friday-nonroot-rehearsal`: `Dockerfile` `runtime-nonroot` stage, `scripts/test-friday-volume-migration.sh`, `scripts/check-friday-volume-readiness.sh`, `scripts/test-controller-container-hardening.sh`, `scripts/scan-controller-image.sh`, CI | 2026-11-02 | 2026-11-02 | Merged as #118. Production cutover needs an approved VM102 window (see `docs/controller-nonroot-migration.md`). |
 | VM100 staging stack (#109 leftovers, slice C) | Claude | `complete` | Branch `claude/friday-staging-stack`: `deploy/staging/`, `scripts/verify-friday-staging*`, `scripts/test-friday-staging-isolation.sh`, `scripts/check-friday-edge-readiness*`, `server/security/access-staging.test.mjs`, CI, Makefile | 2026-11-03 | 2026-11-03 | Merged as #119. Redeploying staging on VM100 from main is an operator step. |
+| Port auth failover docs (backlog `port-auth-failover-docs`) | Claude nightly builder | `verification_needed` | Branch `bot/nightly-port-auth-failover-docs`: `docs/friday-authentication-failover.md`, `docs/phase2c-operator-auth-hardening.md`, `docs/codex/NEXT_STEPS.md`, `docs/automation/BACKLOG.md` | 2026-11-05 | 2026-11-05 | Owner reviews the PR. Docs only; no code, flags or hosts changed. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -118,6 +119,18 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-11-05 01:49 CST — Claude nightly builder — Port auth failover docs
+
+- Status: verification_needed
+- Scope claimed: `docs/friday-authentication-failover.md`, `docs/phase2c-operator-auth-hardening.md` (new), `docs/codex/NEXT_STEPS.md`, `docs/automation/BACKLOG.md`.
+- Work performed: Ported both documents from #109's branch and rewrote them against `main`'s `server/security/access.mjs`, `server/config.mjs` and `server/http.mjs`. Corrected: no `FRIDAY_REGISTRY_SYNC_OPERATOR_TOKEN`, no rate limiter, diagnostic reruns are open to any verified identity, JWKS failure returns 403 not 503, operator-only routes listed exactly. Authentik-primary login is marked as a proposal pending the `needs-approval` backlog item. Linked both from NEXT_STEPS; backlog item set to `in-review`. Open PR #121 (authentik flaky test) tended first: CI green, Codex had no findings.
+- Changes made: docs only.
+- Verification: grep check that every env var, route and file named in both docs exists on `main` (the only absent name is the token explicitly listed as "Not on main"); `make verify`.
+- Decisions: none.
+- Blockers/risks: none.
+- Next action: owner reviews the PR.
+- Rollback/recovery: revert the PR.
 
 ### 2026-11-03 05:41 CST — Claude — Added the nightly builder backlog and rules
 

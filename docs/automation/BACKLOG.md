@@ -22,7 +22,7 @@ deterministic without loosening what it asserts.
 `node --test --test-concurrency=8 server/`, its assertions are unchanged or
 stricter, and `make verify` passes.
 
-## port-auth-failover-docs — `ready`
+## port-auth-failover-docs — `in-review`
 
 **Scope:** docs only. Source: `docs/friday-authentication-failover.md` and
 `docs/phase2c-operator-auth-hardening.md` on branch
