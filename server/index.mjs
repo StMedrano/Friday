@@ -1,4 +1,5 @@
 import { createAgentActivityLog } from './agents/activity-log.mjs'
+import { createApprovalQueue } from './approvals/queue.mjs'
 import { fileURLToPath } from 'node:url'
 import { getConfig } from './config.mjs'
 import { createFridayServer } from './http.mjs'
@@ -117,7 +118,11 @@ const agentActivity = config.agentActivity.enabled
   ? await createAgentActivityLog({ path: config.agentActivity.path, limit: config.agentActivity.limit })
   : null
 
-const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, endpointChecks, repositorySettings, pushSubscriptions, workReadBridge, agentActivity })
+const approvalQueue = config.approvals.enabled
+  ? await createApprovalQueue({ path: config.approvals.path, limit: config.approvals.limit })
+  : null
+
+const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, endpointChecks, repositorySettings, pushSubscriptions, workReadBridge, agentActivity, approvalQueue })
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`Friday listening on 0.0.0.0:${config.port} (${config.mode} mode)`)
 })

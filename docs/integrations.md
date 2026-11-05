@@ -88,6 +88,13 @@ Registry sync is explicit and Git-owned. It is not an agent editor and cannot cr
 - Prompts, answers, error text and the asking identity are never stored. A failed write never fails the answer.
 - `GET /api/agents/activity` returns the entries newest first; queries and other methods are refused, and it answers 503 `agent-activity-disabled` when off. The Agents page shows them under Live agent events.
 
+### Approvals queue
+
+- `FRIDAY_APPROVALS_ENABLED=false` by default. When on, each open monitoring incident that carries a recommended action is a pending proposal. An operator approves or denies it on the Approvals page or in the Agents action center.
+- Decisions go to `FRIDAY_APPROVALS_PATH` (default `/data/approvals.json`, mode 0600, newest `FRIDAY_APPROVALS_LIMIT` decisions, 50 to 2000, default 500) with the incident's title, service, severity and recommended action, the time, and the operator's email. Each decision is also written to the action audit as `approvals.decide` when the audit is on.
+- A decision is a record only. Nothing is executed: every response carries `execution.performed: false`. Automated fixes are a separate, approval-gated change.
+- `GET /api/approvals` returns `pending` (oldest first) and the 20 most recent decisions. `POST /api/approvals/:incidentId/decision` with `{"decision":"approve"|"deny"}` is operator-only, JSON-only and refused cross-site. Errors: 503 `approvals-disabled` or `monitoring-disabled`, 400 `invalid-approval-decision`, 404 `approval-not-found` (the incident is no longer open), 409 `approval-already-decided`. Decisions on one proposal are serialized, so only the first wins.
+
 ### CT108 local Ollama agent inference
 
 Agent profiles are server-side and Ollama-only:

@@ -13,6 +13,9 @@ vi.mock('../lib/api', () => ({
   } }),
   fetchMonitoringHistory: vi.fn(async () => []),
   fetchFridayUptime: vi.fn(async () => ({ state: 'disabled' })),
+  fetchFridayApprovals: vi.fn(async () => ({ state: 'disabled' })),
+  decideFridayApproval: vi.fn(),
+  FridayApprovalError: class extends Error {},
   askFridayAssistant: vi.fn(async () => ({ available: false, execution: { performed: false } })),
 }))
 vi.mock('../hooks/usePhoneLayout', () => ({ usePhoneLayout: () => false }))
@@ -52,16 +55,24 @@ describe('Dashboard operator integrity and honest feature status', () => {
     expect(screen.getByText('Cloud Portal')).toBeInTheDocument()
   })
 
-  it('clearly labels disconnected Tasks, Memory and Approvals as not activated', async () => {
+  it('clearly labels disconnected Memory as not activated', async () => {
     const user = userEvent.setup()
     render(<Dashboard />)
-    // Tasks is connected now; Memory and Approvals are still honestly unavailable.
-    for (const name of ['Memory', 'Approvals']) {
+    // Tasks and Approvals are connected now; Memory is still honestly unavailable.
+    for (const name of ['Memory']) {
       await user.click(screen.getByRole('button', { name }))
       expect(screen.getByRole('heading', { name: name + ' is not connected' })).toBeInTheDocument()
       expect(screen.getByText(/No production task, memory or approval operation is available on this screen/i)).toBeInTheDocument()
     }
     expect(screen.queryByRole('button', { name: /approve|delete|restart|execute/i })).not.toBeInTheDocument()
+  })
+
+  it('routes Approvals to the approvals queue', async () => {
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    await user.click(screen.getByRole('button', { name: 'Approvals' }))
+    expect(screen.getByLabelText('Approvals workspace')).toBeInTheDocument()
+    expect(screen.queryByRole('heading', { name: 'Approvals is not connected' })).not.toBeInTheDocument()
   })
 
   it('routes Audit to the durable action audit view', async () => {
