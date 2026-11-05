@@ -9,7 +9,7 @@ Keep each item small enough for one pull request.
 
 ---
 
-## fix-authentik-flaky-test — `ready`
+## fix-authentik-flaky-test — `in-review`
 
 **Scope:** `server/security/authentik.test.mjs` and, only if the root cause
 is there, `server/security/authentik*.mjs`.
@@ -63,7 +63,7 @@ source; do not invent status.
 
 **Done when:** every item references a real PR, file, or ledger entry.
 
-## wire-model-routing-into-chat — `in-review`
+## wire-model-routing-into-chat — `done`
 
 **Scope:** `server/ai/` and the assistant route. Off by default.
 
