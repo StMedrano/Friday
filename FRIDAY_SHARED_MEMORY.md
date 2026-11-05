@@ -82,7 +82,8 @@ Only one agent should own a task or overlapping files/resources at a time.
 | GitHub-only repositories | Claude | `complete` | `server/repositories/`, `RepositorySettingsPanel.tsx`, `RepositoriesWorkspace.tsx`, `src/lib/api.ts`, docs | 2026-11-05 | 2026-11-05 | Merged as #132. Owner redeploys VM102 and adds repos by GitHub URL in Settings. |
 | Approvals queue | Claude | `complete` | `server/approvals/`, `server/http.mjs` approvals routes, `server/index.mjs`, `server/config.mjs`, `server/audit/action-audit.mjs`, compose/staging/.env.example, `ApprovalsQueue.tsx`, `AgentsWorkspace.tsx`, `Dashboard.tsx`, docs | 2026-11-05 | 2026-11-05 | Merged as #133. Owner sets `FRIDAY_APPROVALS_ENABLED=true` in an approved deploy. |
 | Fix flaky Authentik test | Claude | `complete` | `server/security/authentik.test.mjs`, backlog | 2026-11-05 | 2026-11-05 | Merged as #134. |
-| Port e2e smoke test | Claude | `verification_needed` | `playwright.config.mjs`, `tests/e2e/`, CI `e2e` job, `package.json`, README | 2026-11-05 | 2026-11-05 | Merge after CI. |
+| Port e2e smoke test | Claude | `complete` | `playwright.config.mjs`, `tests/e2e/`, CI `e2e` job, `package.json`, README | 2026-11-05 | 2026-11-05 | Merged as #135. |
+| Refresh NEXT_STEPS | Claude | `verification_needed` | `docs/codex/NEXT_STEPS.md`, backlog | 2026-11-05 | 2026-11-05 | Merge after CI. |
 | Free model routing and NVIDIA readiness slice | Claude | `complete` | Branch `claude/friday-model-fabric`: `server/ai/model-{fabric,registry,router}.mjs`, `server/ai/nvidia.mjs`, `scripts/check-nvidia-catalog.mjs`, `modelFabric` config, docs | 2026-11-01 | 2026-11-01 | Merged as #115. Internal only and default off; not wired into chat or agents. |
 | Container and observer hardening slice | Claude | `complete` | Branch `claude/friday-container-hardening`: `observer/docker-proxy.mjs`, `observer/Dockerfile*`, `observer/compose.yaml`, controller `Dockerfile`, CI observer steps | 2026-11-01 | 2026-11-02 | Merged as #116. VM100 observer rollout and the controller non-root data migration each need a separate operator-approved window. |
 | #109 leftovers, slice A (history validation, HomeLab observations, phone sheet focus) | Claude | `complete` | Branch `claude/friday-109-ui-slice`: `server/monitoring/history.mjs`, `/api/monitoring/history`, `src/components/HomeLabSnapshot.tsx`, `src/hooks/useModalFocus.ts`, `MobileNavigation.tsx` | 2026-11-02 | 2026-11-02 | Merged as #117. |
@@ -386,3 +387,8 @@ The ledger should normally be committed with the repository so every agent sees 
 - Work performed: Playwright (`@playwright/test` 1.63.0, pinned) smoke test against a loopback mock-mode Friday server serving the built UI. Covers desktop load, overview nav and Read-only badge, Settings navigation, and the phone More sheet (opens, keeps focus inside over 12 Tabs, closes on Escape and returns focus, navigates to Settings). Wrote a fresh fixture instead of porting #109's task fixture; no task write tests. Runs as its own CI job (`e2e`), not inside `make verify`.
 - Verification: `npm run test:e2e` passed locally (2 tests, about 3 s); `make verify` (see PR).
 - Next action: merge after CI. Next backlog item: refresh-next-steps.
+
+### 2026-11-05 — Claude — Refresh NEXT_STEPS (refresh-next-steps)
+- Status: verification_needed (PR open). Browser smoke test merged as #135; its CI `e2e` job passed.
+- Work performed: rewrote `docs/codex/NEXT_STEPS.md` as an ordered queue: merged-not-deployed (#131 to #135, with the flag to set for each), owner decisions, owner operations (service token expires 2026-11-24), and next agent work. Every item references a PR, file or ledger entry.
+- Next action: merge after CI. Next backlog item: port-auth-failover-docs.
