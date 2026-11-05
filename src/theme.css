@@ -637,6 +637,16 @@ code, kbd, pre, samp,
 .fx-page-head h2 { display: flex; align-items: center; }
 
 /* Repositories: table + side panel */
+.fx-repo-table td small.fx-commit-line { display: block; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 11px; color: var(--faint); margin-top: 2px; }
+.fx-pr-panel { display: grid; gap: 10px; }
+.fx-pr-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.fx-pr-list li { display: flex; gap: 10px; align-items: baseline; min-width: 0; }
+.fx-pr-number { font-family: var(--font-mono); font-size: 12px; color: var(--faint); flex: none; }
+.fx-pr-body { display: grid; gap: 2px; min-width: 0; }
+.fx-pr-body a, .fx-pr-body b { font-size: 13px; font-weight: 500; color: var(--text); text-decoration: none; overflow-wrap: anywhere; }
+.fx-pr-body a:hover { color: var(--accent-2); text-decoration: underline; }
+.fx-pr-body small, .fx-pr-note { font-size: 12px; color: var(--muted); }
+.fx-pr-note { margin: 0; color: var(--faint); }
 .fx-shell .v3-repository-grid { grid-template-columns: minmax(0, 1fr) 300px; }
 .fx-shell .v3-repository-grid > [aria-label="Repository files"] { grid-column: 1 / -1; }
 .fx-repo-table { padding: 16px 0 0; overflow-x: auto; }

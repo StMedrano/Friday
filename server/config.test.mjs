@@ -222,3 +222,11 @@ test('model fabric is opt-in, permanently free-only, and server-side', () => {
   assert.deepEqual(config.nvidia.localModels, [])
   assert.deepEqual(getConfig({ FRIDAY_NVIDIA_MODELS_JSON:'{}' }).modelFabric.nvidia.models, [])
 })
+
+test('GitHub read integration defaults off with a server-only token and a bounded cache', () => {
+  assert.deepEqual(getConfig({}).github, { enabled: false, token: '', apiUrl: 'https://api.github.com', cacheSeconds: 120 })
+  assert.deepEqual(getConfig({ FRIDAY_GITHUB_ENABLED: 'true', FRIDAY_GITHUB_TOKEN: 'read-token', FRIDAY_GITHUB_API_URL: 'https://ghe.test/api/v3', FRIDAY_GITHUB_CACHE_SECONDS: '30' }).github,
+    { enabled: true, token: 'read-token', apiUrl: 'https://ghe.test/api/v3', cacheSeconds: 30 })
+  assert.equal(getConfig({ FRIDAY_GITHUB_CACHE_SECONDS: '5' }).github.cacheSeconds, 30)
+  assert.equal(getConfig({ FRIDAY_GITHUB_CACHE_SECONDS: '99999' }).github.cacheSeconds, 3600)
+})

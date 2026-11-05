@@ -245,6 +245,13 @@ export function getConfig(env = process.env) {
       token: env.FRIDAY_WEB_GROWTH_READER_TOKEN || '',
       readerEmails: [...new Set(String(env.FRIDAY_WEB_GROWTH_READER_EMAILS || '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean))],
     },
+    // Read-only GitHub summary for registered repositories (open PRs, CI, last commit).
+    github: {
+      enabled: enabled(env.FRIDAY_GITHUB_ENABLED),
+      token: env.FRIDAY_GITHUB_TOKEN || '',
+      apiUrl: env.FRIDAY_GITHUB_API_URL || 'https://api.github.com',
+      cacheSeconds: Math.min(3600, Math.max(30, Math.floor(positiveNumber(env.FRIDAY_GITHUB_CACHE_SECONDS, 120)))),
+    },
     pushSubscriptions: {
       path: env.FRIDAY_PUSH_SUBSCRIPTIONS_PATH || '/data/push-subscriptions.json',
     },

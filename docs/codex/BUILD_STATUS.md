@@ -757,3 +757,8 @@ Local Agent Platform Phase 1 is live-accepted. Next, fix site normalization, con
 ## Safety gate
 
 Do not implement infrastructure-changing agent or assistant actions until authentication, role policy, explicit approval, durable action audit logging, and the global automation kill switch exist and are tested.
+
+## GitHub read integration for Repositories, 2026-11-05
+
+The Repositories page fills Open PRs, CI status and Last commit from GitHub when `FRIDAY_GITHUB_ENABLED=true`. `GET /api/repositories/:id/github` is read only, cached, and returns stable error codes; with the flag off (the default) the page keeps its "Not connected" state. Details in `docs/integrations.md`. Not deployed by this change.
+

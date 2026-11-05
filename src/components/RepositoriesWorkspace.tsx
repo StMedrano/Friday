@@ -1,14 +1,64 @@
 import NotConnected from './NotConnected'
 import { useEffect, useState } from 'react'
-import { FileCode2, FolderGit2, GitBranch, ShieldCheck } from 'lucide-react'
+import { FileCode2, FolderGit2, GitBranch, GitPullRequest, ShieldCheck } from 'lucide-react'
 import {
   fetchFridayRepositories,
+  fetchFridayRepositoryGitHub,
   fetchFridayRepositoryFile,
   fetchFridayRepositoryFiles,
   fetchFridayRepositoryStatus,
+  type FridayGitHubResult,
+  type FridayGitHubSummary,
   type FridayRepository,
   type FridayRepositoryStatus,
 } from '../lib/api'
+
+const CI_LABEL: Record<FridayGitHubSummary['ci']['state'], string> = { success: 'Passing', failure: 'Failing', pending: 'Running', none: 'No checks' }
+const CI_CLASS: Record<FridayGitHubSummary['ci']['state'], string> = { success: '', failure: 'critical', pending: 'warning', none: '' }
+
+function shortDate(value?: string) {
+  if (!value) return ''
+  const date = new Date(value)
+  return Number.isNaN(date.getTime()) ? '' : date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+}
+
+function GitHubCells({ result }: { result?: FridayGitHubResult }) {
+  if (!result) return <><td className="fx-na">…</td><td className="fx-na">…</td><td className="fx-na">…</td></>
+  if (result.state === 'disabled') return <>
+    <td className="fx-na" title="Pull request data is not connected">—</td>
+    <td className="fx-na" title="CI status is not connected">Not connected</td>
+    <td className="fx-na" title="Commit history is not connected">—</td>
+  </>
+  if (result.state !== 'ok') {
+    const label = result.state === 'unsupported' ? 'Not on GitHub' : 'Unavailable'
+    const title = result.state === 'unsupported' ? 'This repository has no GitHub remote' : 'GitHub could not be reached'
+    return <><td className="fx-na" title={title}>—</td><td className="fx-na" title={title}>{label}</td><td className="fx-na" title={title}>—</td></>
+  }
+  const { pullRequests, ci, lastCommit } = result.summary
+  const ciText = ci.state === 'failure' ? `${ci.failed} failing` : ci.state === 'pending' ? `${ci.pending} running` : CI_LABEL[ci.state]
+  return <>
+    <td>{pullRequests.open}{pullRequests.more ? '+' : ''}</td>
+    <td>{ci.state === 'none' ? <span className="fx-na">{ciText}</span>
+      : <span className={`fx-status ${CI_CLASS[ci.state]}`} title={`${CI_LABEL[ci.state]}: ${ci.total} checks`}>{ciText}</span>}</td>
+    <td><code>{lastCommit.sha}</code><small className="fx-commit-line" title={lastCommit.message}>{lastCommit.message}{lastCommit.date ? ` · ${shortDate(lastCommit.date)}` : ''}</small></td>
+  </>
+}
+
+function PullRequestPanel({ summary }: { summary: FridayGitHubSummary }) {
+  const { pullRequests } = summary
+  return <section className="v3-panel fx-pr-panel" aria-label="Open pull requests">
+    <div className="v3-section-head"><div><span className="v3-kicker">{summary.repository.toUpperCase()}</span><h2>{pullRequests.open}{pullRequests.more ? '+' : ''} open pull requests</h2></div><GitPullRequest size={16} aria-hidden="true"/></div>
+    {pullRequests.items.length === 0 ? <p className="v3-repository-message">No open pull requests.</p>
+      : <ul className="fx-pr-list">{pullRequests.items.map((pull) => <li key={pull.number}>
+        <span className="fx-pr-number">#{pull.number}</span>
+        <span className="fx-pr-body">
+          {pull.url ? <a href={pull.url} target="_blank" rel="noopener noreferrer">{pull.title}</a> : <b>{pull.title}</b>}
+          <small>{pull.author}{pull.updatedAt ? ` · updated ${shortDate(pull.updatedAt)}` : ''}{pull.draft ? ' · Draft' : ''}</small>
+        </span>
+      </li>)}</ul>}
+    <p className="fx-pr-note">Read from GitHub {shortDate(summary.fetchedAt)} {new Date(summary.fetchedAt).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })}. Read only.</p>
+  </section>
+}
 
 export default function RepositoriesWorkspace() {
   const [repositories, setRepositories] = useState<FridayRepository[]>([])
@@ -20,6 +70,7 @@ export default function RepositoriesWorkspace() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [fileError, setFileError] = useState('')
+  const [github, setGitHub] = useState<Record<string, FridayGitHubResult>>({})
 
   useEffect(() => {
     const controller = new AbortController()
@@ -32,6 +83,17 @@ export default function RepositoriesWorkspace() {
       .finally(() => { if (!controller.signal.aborted) setLoading(false) })
     return () => controller.abort()
   }, [])
+
+  useEffect(() => {
+    if (repositories.length === 0) return
+    const controller = new AbortController()
+    for (const repository of repositories) {
+      fetchFridayRepositoryGitHub(repository.id, controller.signal)
+        .catch((reason): FridayGitHubResult | null => reason?.name === 'AbortError' ? null : { state: 'unavailable' })
+        .then((result) => { if (result && !controller.signal.aborted) setGitHub((current) => ({ ...current, [repository.id]: result })) })
+    }
+    return () => controller.abort()
+  }, [repositories])
 
   useEffect(() => {
     if (!selectedId) return
@@ -66,6 +128,7 @@ export default function RepositoriesWorkspace() {
   }, [selectedId, selectedFile])
 
   const selected = repositories.find((repository) => repository.id === selectedId)
+  const selectedGitHub = selected ? github[selected.id] : undefined
 
   return <section className="v3-repositories-workspace" aria-label="Repositories workspace">
     <div className="v3-detail-hero">
@@ -88,16 +151,17 @@ export default function RepositoriesWorkspace() {
                     onClick={() => setSelectedId(repository.id)}
                   ><FolderGit2 size={16}/><span><b>{repository.name}</b><small>{repository.remote || repository.id}</small></span></button></td>
                   <td><code>{repository.defaultBranch}</code></td>
-                  <td className="fx-na" title="Pull request data is not connected">—</td>
-                  <td className="fx-na" title="CI status is not connected">Not connected</td>
-                  <td className="fx-na" title="Commit history is not connected">—</td>
+                  <GitHubCells result={github[repository.id]}/>
                   <td><em>{repository.mode}</em></td>
                 </tr>)}</tbody>
               </table>
             </section>
 
             <aside className="fx-repo-side" aria-label="Repository activity">
-              <NotConnected title="Pull requests and CI" detail="Open PRs, check runs and recent PR activity need a GitHub read integration on the server." action="Connect GitHub"/>
+              {selectedGitHub?.state === 'ok' ? <PullRequestPanel summary={selectedGitHub.summary}/>
+                : selectedGitHub?.state === 'unsupported' ? <p className="v3-panel v3-repository-message">{selected?.name} has no GitHub remote, so there are no pull requests or checks to show.</p>
+                  : selectedGitHub?.state === 'unavailable' ? <p className="v3-panel v3-repository-message" role="status">GitHub could not be reached for {selected?.name}. Try again later.</p>
+                    : <NotConnected title="Pull requests and CI" detail="Open PRs, check runs and recent PR activity need the GitHub read integration (FRIDAY_GITHUB_ENABLED) on the server." action="Connect GitHub"/>}
               <NotConnected title="Repository configuration" detail="Sync strategy, auto-merge and required approvals are managed on GitHub, not in Friday." action="Edit configuration"/>
             </aside>
 

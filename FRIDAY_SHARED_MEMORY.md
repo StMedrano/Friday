@@ -84,6 +84,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Non-root controller rehearsal (#109 leftovers, slice B) | Claude | `complete` | Branch `claude/friday-nonroot-rehearsal`: `Dockerfile` `runtime-nonroot` stage, `scripts/test-friday-volume-migration.sh`, `scripts/check-friday-volume-readiness.sh`, `scripts/test-controller-container-hardening.sh`, `scripts/scan-controller-image.sh`, CI | 2026-11-02 | 2026-11-02 | Merged as #118. Production cutover needs an approved VM102 window (see `docs/controller-nonroot-migration.md`). |
 | VM100 staging stack (#109 leftovers, slice C) | Claude | `complete` | Branch `claude/friday-staging-stack`: `deploy/staging/`, `scripts/verify-friday-staging*`, `scripts/test-friday-staging-isolation.sh`, `scripts/check-friday-edge-readiness*`, `server/security/access-staging.test.mjs`, CI, Makefile | 2026-11-03 | 2026-11-03 | Merged as #119. Redeploying staging on VM100 from main is an operator step. |
 | Friday UI redesign from AIDesigner | Claude | `complete` | Branch `claude/project-thread-dnda8o`: `src/theme.css`, `src/pages/Dashboard.tsx` shell/Home, CSS palette in `src/*.css`, Geist fonts, `server/http.mjs` font MIME, audit API shape guard | 2026-11-05 | 2026-11-05 | Owner reviews PR; phone layout and per-workspace structure can follow the generated AIDesigner canvases. |
+| GitHub read integration for Repositories (PRs, CI, last commit) | Claude | `verification_needed` | Branch `claude/project-thread-2sw5y6`: `server/adapters/github.mjs`, `/api/repositories/:id/github`, `server/config.mjs` `github`, `compose.yaml`, `.env.example`, `src/components/RepositoriesWorkspace.tsx`, `src/lib/api.ts`, docs | 2026-11-05 | 2026-11-05 | Open PR; stays off until an operator sets `FRIDAY_GITHUB_ENABLED` and a read-only token. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -306,3 +307,13 @@ The ledger should normally be committed with the repository so every agent sees 
 - Work: Owner asked for the AIDesigner layouts on every page even where the backend lacks the feature. Added `NotConnected` (inert, text-labelled placeholder; disabled button at most). Incidents list+detail split; Repositories table + PR/CI side panel; Settings tabs incl. Audit log; Audit search, result filter and client-side CSV export of loaded events; Applications card metrics; Agents filters + action center; Infrastructure stat cards + services table; Tasks new-task placeholder. Existing safety tests (no create/approve/execute buttons) kept.
 - Verification: `make verify` passed (vitest 219, node 849); all screens driven against the real server in mock mode with no page errors.
 - Next: owner review of the PR.
+
+### 2026-11-05 — Claude — GitHub read integration for Repositories
+- Status: verification_needed (PR open; live GitHub read not run).
+- Scope claimed: `server/adapters/github.mjs`, `GET /api/repositories/:id/github`, `github` config, `compose.yaml`, `.env.example`, staging flag, `RepositoriesWorkspace.tsx`, `src/lib/api.ts`, docs.
+- Work performed: Server-side, GET-only GitHub reader (open PRs, default-branch CI from check runs plus commit statuses, last commit), cached per repo/branch, 4 MiB/8 s bounds, stable error codes, token never returned. Repositories page fills Open PRs / CI / Last commit and a PR side panel; keeps "Not connected" when the flag is off.
+- Verification: `make verify` passed (vitest 223, node 860, build, Compose, staging validator). The cloud container gets 403 from api.github.com, so no live read was made.
+- Decisions: off by default (`FRIDAY_GITHUB_ENABLED=false`); staging pins it false.
+- Blockers/risks: needs a fine-grained read-only token in VM102 `.env` and a deploy.
+- Next action: owner review/merge; then set `FRIDAY_GITHUB_ENABLED=true` and `FRIDAY_GITHUB_TOKEN` on VM102 in an approved deploy.
+- Rollback/recovery: set `FRIDAY_GITHUB_ENABLED=false` or revert the PR.

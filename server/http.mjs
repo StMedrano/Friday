@@ -18,6 +18,7 @@ import { getGroupWorkspace } from './agents/group-workspace.mjs'
 import { groupAdvisoryPolicy } from './agents/group-advisory.mjs'
 import { workSubjectHash } from './work/file-subject-grants.mjs'
 import { readWebGrowth } from './adapters/web-growth.mjs'
+import { createGitHubReader } from './adapters/github.mjs'
 import { validateWebGrowthSnapshot } from './adapters/web-growth-schema.mjs'
 import { applySiteSettings, siteSettingsView } from './site-settings.mjs'
 import { applyEndpointChecks, endpointChecksView, environmentEndpointChecks } from './endpoint-checks.mjs'
@@ -149,12 +150,14 @@ function parseAgentAskRoute(pathname) {
 }
 
 function parseRepositoryToolRoute(pathname) {
-  const match = String(pathname || '').match(/^\/api\/repositories\/([^/]+)\/(status|files|file)$/)
+  const match = String(pathname || '').match(/^\/api\/repositories\/([^/]+)\/(status|files|file|github)$/)
   if (!match) return null
   let id
   try { id = decodeURIComponent(match[1]) } catch { return { invalid: true } }
   return SAFE_REPOSITORY_ID.test(id) ? { id, tool: match[2] } : { invalid: true }
 }
+
+const GITHUB_ERRORS = { 'github-disabled': 503, 'github-remote-unsupported': 404, 'github-unavailable': 502 }
 
 const AUDIT_DETAIL = /^[a-z0-9-]{1,64}$/
 
@@ -256,8 +259,10 @@ export function createFridayServer({
   repositorySettings = null,
   pushSubscriptions = null,
   readWebGrowthImpl = readWebGrowth,
+  githubReader = null,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
+  const github = githubReader || createGitHubReader(config.github)
   const labelledConfig = (effectiveConfig = config) =>
     siteSettings ? applySiteSettings(effectiveConfig, siteSettings.get()) : effectiveConfig
   const buildEffectiveOverview = (effectiveConfig) => {
@@ -531,6 +536,20 @@ export function createFridayServer({
     if (request.method === 'GET' && repositoryToolRoute) {
       if (repositoryToolRoute.invalid) return json(response, 400, { error: 'invalid-repository-id' })
       if (!repositoryRegistry) return json(response, 503, { error: 'repository-registry-unavailable' })
+      // Read-only GitHub summary (open PRs, CI, last commit); off unless FRIDAY_GITHUB_ENABLED.
+      if (repositoryToolRoute.tool === 'github') {
+        if (url.search) return json(response, 400, { error: 'unexpected-query' })
+        let repository
+        try { repository = (await repositoryRegistry.list()).find((item) => item.id === repositoryToolRoute.id) }
+        catch { return json(response, 503, { error: 'repository-registry-unavailable' }) }
+        if (!repository) return json(response, 404, { error: 'repository-not-found' })
+        try {
+          return json(response, 200, await github.summary(repository))
+        } catch (error) {
+          const code = GITHUB_ERRORS[error?.code] ? error.code : 'github-unavailable'
+          return json(response, GITHUB_ERRORS[code], { error: code })
+        }
+      }
       try {
         if (repositoryToolRoute.tool === 'status') return json(response, 200, await repositoryRegistry.status(repositoryToolRoute.id))
         if (repositoryToolRoute.tool === 'files') {
