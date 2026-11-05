@@ -49,8 +49,10 @@ const suggestions = ["What's degraded right now?", 'Summarize the last 24h of in
 // Workspaces that render their own titled hero; the page h1 stays for assistive tech only.
 const baseTitle = typeof document === 'undefined' ? 'Friday · Control Plane' : document.title || 'Friday · Control Plane'
 
-function PreviewBanner() {
-  return <div className="v3-preview-banner" role="note" aria-label="Preview data"><b>Preview data</b><span>The Friday API isn't connected, so the numbers on this screen are sample data.</span></div>
+function PreviewBanner({ connected }: { connected: boolean }) {
+  return <div className="v3-preview-banner" role="note" aria-label="Preview data"><b>Preview data</b><span>{connected
+    ? 'Friday is running in mock mode, so the numbers on this screen are sample data.'
+    : "The Friday API isn't connected, so the numbers on this screen are sample data."}</span></div>
 }
 
 const selfTitled = new Set(['Infrastructure', 'Applications', 'Incidents', 'Repositories', 'Agents', 'Tasks', 'Audit', 'Settings'])
@@ -159,7 +161,7 @@ export default function Dashboard() {
           <PwaControls/>
         </header>
         <main className="v3-main">
-          {preview && <PreviewBanner/>}
+          {preview && <PreviewBanner connected={connected}/>}
           {active === 'Overview' ? <MobileHome
             overview={overview}
             connected={connected}
@@ -247,7 +249,7 @@ export default function Dashboard() {
         </header>
 
         <main className={`v3-main${active === 'Overview' ? ' fx-home' : ''}`}>
-          {preview && <PreviewBanner/>}
+          {preview && <PreviewBanner connected={connected}/>}
           {active === 'Overview' ? <div className="fx-home-grid">
             <div className="fx-home-main">
               <section className="fx-hero">
@@ -308,7 +310,7 @@ export default function Dashboard() {
             {selfTitled.has(active) ? <h1 className="v3-visually-hidden">{labelFor(active)}</h1> : <section className="v3-intro">
               <div><span className="v3-kicker">FRIDAY / {labelFor(active).toUpperCase()}</span><h1>{labelFor(active)}</h1><p>{connected ? `API connected · ${overview.mode} mode` : 'Local preview data · safe read-only interface'}</p></div>
             </section>}
-            {active === 'FRIDAY' ? <FridayWorkspace session={friday} query={query} onQueryChange={setQuery} onSubmit={submitFriday}/>
+            {active === 'FRIDAY' ? <FridayWorkspace session={friday} query={query} onQueryChange={setQuery} onSubmit={submitFriday} context={{ live, incidents, services: overview.services }}/>
             : active === 'Agents' ? <AgentsWorkspace/>
             : active === 'Applications' ? <ApplicationsWorkspace overview={overview} connected={connected}/>
             : active === 'Repositories' ? <RepositoriesWorkspace/>

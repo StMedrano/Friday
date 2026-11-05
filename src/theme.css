@@ -496,3 +496,82 @@ code, kbd, pre, samp,
   .v3-phone-shell .v3-mobile-attention.warning { border-color: rgba(251, 191, 36, 0.3); }
   .v3-phone-shell .v3-mobile-header strong { font-weight: 600; letter-spacing: 0.04em; }
 }
+
+/* ---------- Chat (AIDesigner "Friday Chat Interface") ---------- */
+.fx-chat-layout { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 20px; align-items: start; }
+.fx-chat-context {
+  position: sticky;
+  top: 80px;
+  display: grid;
+  gap: 18px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface);
+}
+.fx-chat-context-head { display: flex; justify-content: space-between; align-items: center; }
+.fx-chat-context-head h2 { margin: 0; font-size: 15px; font-weight: 600; }
+.fx-chat-context-head span {
+  font-family: var(--font-mono); font-size: 11px; padding: 2px 7px; border-radius: 6px;
+  color: #fde68a; border: 1px solid rgba(251, 191, 36, 0.3);
+}
+.fx-chat-context-head span.live { color: #6ee7b7; border-color: rgba(52, 211, 153, 0.3); }
+.fx-chat-context section { display: grid; gap: 8px; }
+.fx-chat-context h3 {
+  margin: 0; display: flex; justify-content: space-between;
+  font-family: var(--font-mono); font-size: 11px; font-weight: 500; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint);
+}
+.fx-chat-context h3 b { font-weight: 500; }
+.fx-chat-context p { margin: 0; font-size: 13px; color: var(--muted); }
+.fx-chat-incident { display: grid; gap: 3px; padding: 10px 12px; border-radius: 10px; border: 1px solid rgba(251, 113, 133, 0.3); background: rgba(251, 113, 133, 0.06); }
+.fx-chat-incident.warning { border-color: rgba(251, 191, 36, 0.3); background: rgba(251, 191, 36, 0.06); }
+.fx-chat-incident strong { font-size: 13px; font-weight: 600; }
+.fx-chat-incident small { font-size: 12px; color: var(--muted); }
+.fx-chat-context ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; }
+.fx-chat-context li { display: flex; justify-content: space-between; gap: 8px; padding: 7px 8px; border-radius: 8px; font-size: 13px; }
+.fx-chat-context li:hover { background: var(--surface-2); }
+.fx-chat-context li small { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--faint); }
+.fx-chat-context li em { font-style: normal; font-family: var(--font-mono); font-size: 11px; color: var(--green); align-self: center; }
+.fx-chat-context li em:is(.degraded, .warning, .maintenance) { color: var(--amber); }
+.fx-chat-context li em:is(.offline, .down, .critical) { color: var(--rose); }
+.fx-chat-actions { display: grid; gap: 6px; }
+.fx-chat-actions button {
+  text-align: left; padding: 9px 11px; border-radius: 9px; border: 1px solid var(--line);
+  background: var(--bg); color: var(--text-2); font-size: 13px; cursor: pointer;
+}
+.fx-chat-actions button:hover:not(:disabled) { border-color: rgba(99, 102, 241, 0.4); color: var(--text); }
+@media (max-width: 1180px) { .fx-chat-layout { grid-template-columns: minmax(0, 1fr); } .fx-chat-context { position: static; } }
+
+/* ---------- Applications (AIDesigner "Applications Dashboard"): card grid ---------- */
+.fx-shell .v3-applications-layout { grid-template-columns: minmax(0, 1fr) 300px; }
+.fx-shell .v3-applications-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+  border: 0;
+  background: none;
+  overflow: visible;
+}
+.fx-shell .v3-applications-list > .v3-applications-empty { grid-column: 1 / -1; border: 1px solid var(--line); border-radius: 14px; }
+.fx-shell .v3-applications-row {
+  grid-template-columns: 36px minmax(0, 1fr);
+  grid-template-areas: "icon name" "health health";
+  align-items: start;
+  row-gap: 14px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  transition: border-color 0.15s, background 0.15s;
+}
+.fx-shell .v3-applications-row:last-child { border-bottom: 1px solid var(--line); }
+.fx-shell .v3-applications-row > svg {
+  grid-area: icon; box-sizing: content-box; padding: 9px; width: 18px; height: 18px;
+  border-radius: 10px; background: var(--accent-soft); color: var(--accent-2);
+}
+.fx-shell .v3-applications-row .v3-applications-name { grid-area: name; }
+.fx-shell .v3-applications-row .v3-applications-health { grid-area: health; justify-self: start; }
+.fx-shell .v3-applications-row:hover { background: var(--surface-2); border-color: var(--line-strong); }
+.fx-shell .v3-applications-row.selected { border-color: rgba(99, 102, 241, 0.5); background: var(--surface-2); }
+.fx-shell .v3-applications-detail { background: var(--surface); position: sticky; top: 80px; }
+@media (max-width: 1100px) { .fx-shell .v3-applications-layout { grid-template-columns: 1fr; } .fx-shell .v3-applications-detail { position: static; } }

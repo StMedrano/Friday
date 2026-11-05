@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
 import type { FridaySession } from '../hooks/useFridaySession'
@@ -80,5 +80,33 @@ describe('FridayWorkspace', () => {
   it('does not show suggestions once a conversation exists', () => {
     render(<FridayWorkspace session={session()} query="" onQueryChange={vi.fn()} onSubmit={vi.fn()}/>)
     expect(screen.queryByRole('button', { name: /what needs attention right now/i })).not.toBeInTheDocument()
+  })
+})
+
+describe('FridayWorkspace context rail', () => {
+  const context = {
+    live: false,
+    incidents: [{ id: 'i1', title: 'Service offline', serviceName: 'nginx-proxy-manager', severity: 'high', host: 'vm100', status: 'open' }],
+    services: [
+      { id: 's1', name: 'Proxmox VE', host: 'pve-01', status: 'online' },
+      { id: 's2', name: 'VM 110 · Umbrel', host: 'umbrel', status: 'degraded' },
+    ],
+  }
+
+  it('shows what Friday can see: open incidents and services with text status', () => {
+    render(<FridayWorkspace session={session()} query="" onQueryChange={vi.fn()} onSubmit={vi.fn()} context={context as never}/>)
+    const rail = screen.getByRole('complementary', { name: 'Active context' })
+    expect(rail).toHaveTextContent('nginx-proxy-manager')
+    expect(rail).toHaveTextContent('VM 110 · Umbrel')
+    expect(rail).toHaveTextContent(/degraded/i)
+    expect(rail).toHaveTextContent(/sample/i)
+  })
+
+  it('sends a suggested action from the rail', async () => {
+    const s = session()
+    render(<FridayWorkspace session={s} query="" onQueryChange={vi.fn()} onSubmit={vi.fn()} context={context as never}/>)
+    const rail = screen.getByRole('complementary', { name: 'Active context' })
+    await userEvent.setup().click(within(rail).getByRole('button', { name: 'Explain the open incidents.' }))
+    expect(s.sendMessage).toHaveBeenCalledWith('Explain the open incidents.')
   })
 })
