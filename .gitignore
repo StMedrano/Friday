@@ -11,3 +11,5 @@ coverage/
 *.tsbuildinfo
 .superdesign/cache/
 repositories.json
+test-results/
+playwright-report/
