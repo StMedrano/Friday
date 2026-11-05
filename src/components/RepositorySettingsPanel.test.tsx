@@ -20,7 +20,7 @@ describe('RepositorySettingsPanel', () => {
     const form = await screen.findByRole('form', { name: 'Add repository' })
     fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'Docs' } })
     fireEvent.change(within(form).getByLabelText('Checkout path'), { target: { value: '/repositories/docs' } })
-    fireEvent.change(within(form).getByLabelText('Remote URL'), { target: { value: 'https://github.com/o/docs.git' } })
+    fireEvent.change(within(form).getByLabelText('GitHub or remote URL'), { target: { value: 'https://github.com/o/docs.git' } })
     fireEvent.change(within(form).getByLabelText('Default branch'), { target: { value: 'trunk' } })
     fireEvent.change(within(form).getByLabelText('Excluded paths'), { target: { value: 'drafts/**, tmp' } })
     fireEvent.click(within(form).getByRole('button', { name: 'Add repository' }))
@@ -79,5 +79,25 @@ describe('RepositorySettingsPanel', () => {
     render(<RepositorySettingsPanel />)
     expect(await screen.findByText(/Repository settings are unavailable/)).toBeInTheDocument()
     expect(screen.queryByRole('button')).not.toBeInTheDocument()
+  })
+})
+
+describe('RepositorySettingsPanel GitHub-only', () => {
+  it('adds a repository from a GitHub URL alone, without sending a path', async () => {
+    const site = { id: 'site', name: 'Site', remote: 'https://github.com/o/site', defaultBranch: 'main', mode: 'read-only', enabled: true, exclude: [] }
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, options?: RequestInit) => options?.method === 'POST'
+      ? reply({ ...view([site], true), repository: site }, 201)
+      : reply(view([])))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<RepositorySettingsPanel />)
+
+    const form = await screen.findByRole('form', { name: 'Add repository' })
+    fireEvent.change(within(form).getByLabelText('Name'), { target: { value: 'Site' } })
+    fireEvent.change(within(form).getByLabelText('GitHub or remote URL'), { target: { value: 'https://github.com/o/site' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Add repository' }))
+
+    expect(await screen.findByText(/Site added/)).toBeInTheDocument()
+    expect(JSON.parse(String(fetchMock.mock.calls[1][1]?.body))).toEqual({ name: 'Site', remote: 'https://github.com/o/site', defaultBranch: 'main', enabled: true, exclude: [] })
+    expect(screen.getByText(/GitHub only/)).toBeInTheDocument()
   })
 })

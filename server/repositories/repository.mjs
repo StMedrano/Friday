@@ -45,6 +45,7 @@ export function toPublicRepository(repository) {
     defaultBranch: repository.defaultBranch,
     mode: repository.mode,
     enabled: true,
+    checkout: Boolean(repository.path),
   }
 }
 
@@ -80,8 +81,12 @@ export function parseEntry(value, index) {
   }
   if (value.enabled === false) return null
   if (typeof value.id !== 'string' || !ID.test(value.id) || typeof value.name !== 'string' || !value.name.trim()
-    || value.name.length > 120 || typeof value.path !== 'string' || !value.path.trim()
-    || !MODES.has(value.mode)) {
+    || value.name.length > 120 || !MODES.has(value.mode)) {
+    throw new Error(`Repository registry entry ${index} is invalid`)
+  }
+  // A GitHub-only entry has no checkout path, only a remote.
+  const hasPath = typeof value.path === 'string' && value.path.trim() !== ''
+  if ((value.path !== undefined && value.path !== null && !hasPath) || (!hasPath && !publicRemote(value.remote))) {
     throw new Error(`Repository registry entry ${index} is invalid`)
   }
   if (value.exclude !== undefined && (!Array.isArray(value.exclude)
@@ -91,7 +96,7 @@ export function parseEntry(value, index) {
   return {
     id: value.id,
     name: value.name.trim(),
-    path: resolve(value.path),
+    path: hasPath ? resolve(value.path) : undefined,
     remote: publicRemote(value.remote),
     defaultBranch: typeof value.defaultBranch === 'string' && value.defaultBranch.trim() ? value.defaultBranch.trim() : 'main',
     mode: value.mode,
@@ -132,6 +137,7 @@ export class LocalRepositoryRegistry {
   async resolvePath(id, requested = '.') {
     const repository = await this.get(id)
     if (!repository) throw new Error('Repository is not registered or enabled')
+    if (!repository.path) throw new Error('Repository has no local checkout')
     if (typeof requested !== 'string' || requested.includes('\0')) throw new Error('Path is outside repository')
     const pathname = requested.replaceAll('\\', '/') || '.'
     if (pathname.startsWith('/') || /^[A-Za-z]:\//.test(pathname)

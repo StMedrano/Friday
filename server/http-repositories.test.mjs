@@ -21,7 +21,7 @@ test('repository API returns safe metadata and never exposes local roots or regi
     const body = await response.json()
     assert.deepEqual(body, [{
       id: 'friday', name: 'Friday', remote: 'https://github.com/owner/friday.git',
-      defaultBranch: 'main', mode: 'read-only', enabled: true,
+      defaultBranch: 'main', mode: 'read-only', enabled: true, checkout: true,
     }])
     assert.equal(JSON.stringify(body).includes('/srv/private'), false)
     assert.equal(JSON.stringify(body).includes('token'), false)

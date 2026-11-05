@@ -35,11 +35,11 @@ test('loads only enabled Git repositories and returns safe public metadata', asy
     assert.equal(repo.path, root)
     assert.deepEqual(toPublicRepository(repo), {
       id: 'friday', name: 'Friday', remote: 'https://github.com/StMedrano/Friday.git',
-      defaultBranch: 'main', mode: 'read-only', enabled: true,
+      defaultBranch: 'main', mode: 'read-only', enabled: true, checkout: true,
     })
     assert.deepEqual(toPublicRepository({ ...repo, path: '/private/checkout', exclude: ['*.secret'] }), {
       id: 'friday', name: 'Friday', remote: 'https://github.com/StMedrano/Friday.git',
-      defaultBranch: 'main', mode: 'read-only', enabled: true,
+      defaultBranch: 'main', mode: 'read-only', enabled: true, checkout: true,
     })
     assert.deepEqual(await registry.resolvePath('friday', 'src/index.mjs'), join(root, 'src', 'index.mjs'))
     assert.equal(await readFile(await registry.resolvePath('friday', 'README.md'), 'utf8'), 'fixture\n')
@@ -239,7 +239,7 @@ test('honors repository exclusions and hides remotes with embedded credentials',
     await assert.rejects(refreshed.resolvePath('friday', 'private-data/inventory.json'), /excluded/i)
     assert.deepEqual(toPublicRepository(await refreshed.get('friday')), {
       id: 'friday', name: 'Friday', remote: 'https://github.com/StMedrano/Friday.git',
-      defaultBranch: 'main', mode: 'read-only', enabled: true,
+      defaultBranch: 'main', mode: 'read-only', enabled: true, checkout: true,
     })
   })
 })
@@ -364,4 +364,25 @@ test('fails closed on malformed registries and duplicate repository identifiers'
     ]))
     await assert.rejects(registry.list(), /invalid exclusions/i)
   })
+})
+
+test('a GitHub-only entry has no checkout: it lists with checkout false and refuses file access', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'friday-github-only-'))
+  const registryPath = join(dir, 'repositories.json')
+  await writeFile(registryPath, JSON.stringify([
+    { id: 'site', name: 'Site', remote: 'https://github.com/StMedrano/site.git', defaultBranch: 'main', mode: 'read-only' },
+  ]))
+  const registry = new LocalRepositoryRegistry({ registryPath })
+  const repo = await registry.get('site')
+  assert.equal(repo.path, undefined)
+  assert.deepEqual(toPublicRepository(repo), {
+    id: 'site', name: 'Site', remote: 'https://github.com/StMedrano/site.git',
+    defaultBranch: 'main', mode: 'read-only', enabled: true, checkout: false,
+  })
+  await assert.rejects(registry.resolvePath('site', '.'), /no local checkout/i)
+  await assert.rejects(registry.status('site'), /no local checkout/i)
+  await assert.rejects(registry.listFiles('site'), /no local checkout/i)
+
+  await writeFile(registryPath, JSON.stringify([{ id: 'bad', name: 'Bad', mode: 'read-only' }]))
+  await assert.rejects(new LocalRepositoryRegistry({ registryPath }).list(), /invalid/i)
 })

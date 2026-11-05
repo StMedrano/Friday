@@ -85,7 +85,7 @@ export type FridayAgentRegistryStatus = {
   errors?: string[]
 }
 
-export type FridayRepository = { id: string; name: string; remote?: string; defaultBranch: string; mode: string; enabled: boolean }
+export type FridayRepository = { id: string; name: string; remote?: string; defaultBranch: string; mode: string; enabled: boolean; checkout?: boolean }
 export type FridayRepositoryStatus = { branch: string; dirty: boolean }
 
 async function repositoryGet<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -399,10 +399,10 @@ export async function deleteEndpointCheck(id: string): Promise<FridayEndpointChe
 }
 
 export type FridayRepositoryEntry = {
-  id: string; name: string; path: string; remote?: string; defaultBranch: string
+  id: string; name: string; path?: string; remote?: string; defaultBranch: string
   mode: 'read-only' | 'development' | 'pr-enabled'; enabled: boolean; exclude: string[]
 }
-export type FridayRepositoryEntryInput = Omit<FridayRepositoryEntry, 'id' | 'mode' | 'remote'> & { remote?: string }
+export type FridayRepositoryEntryInput = Omit<FridayRepositoryEntry, 'id' | 'mode' | 'remote' | 'path'> & { remote?: string; path?: string }
 export type FridayRepositorySettings = { managed: boolean; allowedRoots: string[]; limit: number; repositories: FridayRepositoryEntry[] }
 
 export class FridayRepositorySettingsError extends Error {
