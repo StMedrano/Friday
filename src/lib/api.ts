@@ -116,6 +116,39 @@ export function fetchFridayRepositoryFile(id: string, path: string, signal?: Abo
   return repositoryGet<{ path: string; content: string }>(`/api/repositories/${encodeURIComponent(id)}/file?${query}`, signal)
 }
 
+export type FridayGitHubPullRequest = { number: number; title: string; author: string; draft: boolean; updatedAt?: string; url?: string }
+export type FridayGitHubSummary = {
+  repository: string
+  url: string
+  branch: string
+  fetchedAt: string
+  pullRequests: { open: number; more: boolean; items: FridayGitHubPullRequest[] }
+  ci: { state: 'success' | 'failure' | 'pending' | 'none'; total: number; failed: number; pending: number }
+  lastCommit: { sha: string; message: string; author: string; date?: string; url?: string }
+}
+/** `disabled`: the server has no GitHub read integration; `unsupported`: the remote is not on GitHub. */
+export type FridayGitHubResult =
+  | { state: 'ok'; summary: FridayGitHubSummary }
+  | { state: 'disabled' | 'unsupported' | 'unavailable' }
+
+function isGitHubSummary(value: unknown): value is FridayGitHubSummary {
+  const item = value as FridayGitHubSummary | null
+  return Boolean(item && typeof item === 'object' && typeof item.repository === 'string'
+    && item.pullRequests && typeof item.pullRequests.open === 'number' && Array.isArray(item.pullRequests.items)
+    && item.ci && ['success', 'failure', 'pending', 'none'].includes(item.ci.state)
+    && item.lastCommit && typeof item.lastCommit.sha === 'string')
+}
+
+export async function fetchFridayRepositoryGitHub(id: string, signal?: AbortSignal): Promise<FridayGitHubResult> {
+  const response = await fetch(`/api/repositories/${encodeURIComponent(id)}/github`, { method: 'GET', signal })
+  const body = await response.json().catch(() => null) as unknown
+  if (response.ok) return isGitHubSummary(body) ? { state: 'ok', summary: body } : { state: 'unavailable' }
+  const error = body && typeof body === 'object' && 'error' in body ? (body as { error?: string }).error : undefined
+  if (error === 'github-disabled') return { state: 'disabled' }
+  if (error === 'github-remote-unsupported') return { state: 'unsupported' }
+  return { state: 'unavailable' }
+}
+
 export type FridayAuditEvent = {
   seq: number; requestId: string; at: string; action: string
   phase: 'requested' | 'succeeded' | 'failed' | 'denied'

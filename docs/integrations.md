@@ -201,6 +201,15 @@ Protocol references: [Kuma metrics integration](https://github.com/louislam/upti
 
 Protocol references: [Grafana health API](https://grafana.com/docs/grafana/latest/developers/http_api/other/#health-api) and the Prometheus-compatible Grafana-managed rules endpoint used by Grafana's alerting UI. Live acceptance needs the intended HTTPS endpoint with a trusted certificate, a Viewer service account token, the site label, and a comparison of rule names and states against Grafana's alert list. No live connection or Grafana change was made from the cloud workspace.
 
+## GitHub pull requests, CI and last commit
+
+- Adapter: `server/adapters/github.mjs`, disabled by default with `FRIDAY_GITHUB_ENABLED=false`. It fills the Open PRs, CI status and Last commit columns and the pull request panel on the Repositories page for registered repositories whose `remote` is on `github.com`.
+- Server settings: `FRIDAY_GITHUB_TOKEN` (optional for public repositories), `FRIDAY_GITHUB_API_URL` (HTTPS, default `https://api.github.com`), `FRIDAY_GITHUB_CACHE_SECONDS` (30 to 3600, default 120). They are passed only to the Friday controller and listed explicitly in `compose.yaml`.
+- Token: a fine-grained personal access token limited to the registered repositories with read-only **Metadata**, **Contents**, **Pull requests** and **Commit statuses**. Friday never needs write access. If the token cannot read check runs, CI falls back to commit statuses only.
+- Route: `GET /api/repositories/:id/github`, behind the same Access gate as other repository reads. Queries are rejected. Errors are stable codes: `github-disabled` (503), `github-remote-unsupported` (404, the remote is not on GitHub or the branch name is unsafe), `github-unavailable` (502). The token and raw GitHub errors never reach the browser.
+- Requests per repository, all `GET` with redirects refused, an 8 second timeout and a 4 MiB response cap: open pulls (one page of 100), the default branch head commit, its check runs and its combined status. Results are cached per repository and branch for the configured time so the page does not spend the rate limit.
+- Normalized output: open PR count (`more` when a full page came back), the five most recently updated PRs (number, title, author, draft, updated time, a `github.com` link only), CI state (`success`, `failure`, `pending`, `none` with counts) and the last commit (short SHA, first line of the message, author, date, link). PR bodies and other fields are dropped.
+
 ## General advisory AI providers
 
 Friday's general assistant remains separate from matched local agents. Preferred sequential assistant chain:

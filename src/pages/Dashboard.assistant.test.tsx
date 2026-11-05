@@ -21,6 +21,7 @@ vi.mock('../lib/api', () => ({
   fetchMonitoringHistory: vi.fn(async () => []),
   askFridayAssistant: (...args: unknown[]) => askFridayAssistant(...args),
   fetchFridayRepositories: vi.fn(async () => [{ id: 'friday', name: 'Friday Controller', defaultBranch: 'main', mode: 'read-only', enabled: true }]),
+  fetchFridayRepositoryGitHub: vi.fn(async () => ({ state: 'disabled' })),
   fetchFridayRepositoryStatus: vi.fn(async () => ({ branch: 'main', dirty: false })),
   fetchFridayRepositoryFiles: vi.fn(async () => ['README.md']),
   fetchFridayRepositoryFile: vi.fn(async () => ({ path: 'README.md', content: 'Friday source' })),
