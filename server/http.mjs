@@ -260,6 +260,7 @@ export function createFridayServer({
   pushSubscriptions = null,
   readWebGrowthImpl = readWebGrowth,
   githubReader = null,
+  agentActivity = null,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
   const github = githubReader || createGitHubReader(config.github)
@@ -620,6 +621,15 @@ export function createFridayServer({
       }
     }
 
+    // Metadata-only agent activity (which agent answered, model, outcome); off unless FRIDAY_AGENT_ACTIVITY_ENABLED.
+    if (url.pathname === '/api/agents/activity') {
+      if (request.method !== 'GET') return json(response, 405, { error: 'read-only-endpoint' })
+      if (url.search) return json(response, 400, { error: 'unexpected-query' })
+      if (!agentActivity) return json(response, 503, { error: 'agent-activity-disabled' })
+      try { return json(response, 200, { events: agentActivity.list() }) }
+      catch { return json(response, 503, { error: 'agent-activity-unavailable' }) }
+    }
+
     const agentAskRoute = parseAgentAskRoute(url.pathname)
     if (request.method === 'POST' && agentAskRoute) {
       if (agentAskRoute.invalid) return json(response, 400, { error: 'invalid-agent-id' })
@@ -629,7 +639,14 @@ export function createFridayServer({
         const promptResult = validateAgentPrompt(body.prompt)
         if (!promptResult.ok) return json(response, 400, promptResult.result)
         const overview = await currentOverview({ config, monitoringRuntime, buildOverviewImpl: buildEffectiveOverview })
-        const result = await agentService.ask(agentAskRoute.agentId, { prompt: promptResult.prompt, overview })
+        const started = Date.now()
+        let result
+        try { result = await agentService.ask(agentAskRoute.agentId, { prompt: promptResult.prompt, overview }) }
+        catch (error) {
+          await agentActivity?.record({ agentId: agentAskRoute.agentId, error, durationMs: Date.now() - started }).catch(() => {})
+          throw error
+        }
+        await agentActivity?.record({ agentId: agentAskRoute.agentId, result, durationMs: Date.now() - started }).catch(() => {})
         if (result.available) return json(response, 200, result)
         if (result.error === 'agent-unavailable') return json(response, 404, result)
         return json(response, 503, result)

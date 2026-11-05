@@ -235,3 +235,9 @@ test('monitoring uptime record defaults off', () => {
   assert.equal(getConfig({}).monitoring.uptimeEnabled, false)
   assert.equal(getConfig({ FRIDAY_MONITORING_UPTIME_ENABLED: 'true' }).monitoring.uptimeEnabled, true)
 })
+
+test('agent activity log defaults off with a bounded server-side file', () => {
+  assert.deepEqual(getConfig({}).agentActivity, { enabled: false, path: '/data/agent-activity.json', limit: 500 })
+  assert.deepEqual(getConfig({ FRIDAY_AGENT_ACTIVITY_ENABLED: 'true', FRIDAY_AGENT_ACTIVITY_PATH: '/data/x.json', FRIDAY_AGENT_ACTIVITY_LIMIT: '5' }).agentActivity,
+    { enabled: true, path: '/data/x.json', limit: 50 })
+})

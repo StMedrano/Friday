@@ -82,6 +82,12 @@ The service credential stays on the Friday server/container. It must never be ex
 
 Registry sync is explicit and Git-owned. It is not an agent editor and cannot create infrastructure actions, approvals, tasks, memory, or executor records.
 
+### Agent activity log
+
+- `FRIDAY_AGENT_ACTIVITY_ENABLED=false` by default. When on, every `POST /api/agents/:id/ask` adds one entry to `FRIDAY_AGENT_ACTIVITY_PATH` (default `/data/agent-activity.json`, mode 0600, newest `FRIDAY_AGENT_ACTIVITY_LIMIT` entries, 50 to 2000, default 500): time, agent ID and name, outcome (`answered`, `unavailable`, `not-found`, `failed`), provider, model and profile when answered, `grounding-invalid` when the answer failed grounding, and duration.
+- Prompts, answers, error text and the asking identity are never stored. A failed write never fails the answer.
+- `GET /api/agents/activity` returns the entries newest first; queries and other methods are refused, and it answers 503 `agent-activity-disabled` when off. The Agents page shows them under Live agent events.
+
 ### CT108 local Ollama agent inference
 
 Agent profiles are server-side and Ollama-only:

@@ -1,6 +1,7 @@
 import NotConnected from './NotConnected'
 import { useEffect, useMemo, useState } from 'react'
 import AgentGroupsPanel from './AgentGroupsPanel'
+import AgentActivityPanel from './AgentActivityPanel'
 import {
   askFridayAgent,
   fetchFridayAgentRegistryStatus,
@@ -36,6 +37,7 @@ export default function AgentsWorkspace() {
   const [asking, setAsking] = useState(false)
   const [answer, setAnswer] = useState<FridayAgentResponse | null>(null)
   const [answerError, setAnswerError] = useState<string | null>(null)
+  const [asked, setAsked] = useState(0)
 
   async function load(signal?: AbortSignal) {
     const [nextAgents, nextStatus] = await Promise.all([
@@ -86,6 +88,7 @@ export default function AgentsWorkspace() {
       setAnswerError(error instanceof Error ? error.message : 'Local agent inference unavailable')
     } finally {
       setAsking(false)
+      setAsked((count) => count + 1)
     }
   }
 
@@ -197,7 +200,7 @@ export default function AgentsWorkspace() {
       <h2>Action center</h2>
       <NotConnected title="Approvals" detail="Agent requests that need your approval will queue here once the approval service is connected."/>
       <NotConnected title="New agents" detail="Agents are defined in Git and synced here; creating them from Friday is not connected."/>
-      <NotConnected title="Live agent events" detail="Task assignments and run logs stream here once agent runs are reported to Friday."/>
+      <AgentActivityPanel refreshKey={asked}/>
     </aside>
     </div>
   </section>

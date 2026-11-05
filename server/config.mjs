@@ -254,6 +254,12 @@ export function getConfig(env = process.env) {
       apiUrl: env.FRIDAY_GITHUB_API_URL || 'https://api.github.com',
       cacheSeconds: Math.min(3600, Math.max(30, Math.floor(positiveNumber(env.FRIDAY_GITHUB_CACHE_SECONDS, 120)))),
     },
+    // Metadata-only log of agent questions (agent, model, outcome, duration); never prompts or answers.
+    agentActivity: {
+      enabled: enabled(env.FRIDAY_AGENT_ACTIVITY_ENABLED),
+      path: env.FRIDAY_AGENT_ACTIVITY_PATH || '/data/agent-activity.json',
+      limit: Math.min(2000, Math.max(50, Math.floor(positiveNumber(env.FRIDAY_AGENT_ACTIVITY_LIMIT, 500)))),
+    },
     pushSubscriptions: {
       path: env.FRIDAY_PUSH_SUBSCRIPTIONS_PATH || '/data/push-subscriptions.json',
     },

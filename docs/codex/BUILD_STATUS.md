@@ -766,3 +766,7 @@ The Repositories page fills Open PRs, CI status and Last commit from GitHub when
 
 With `FRIDAY_MONITORING_UPTIME_ENABLED=true`, the monitoring runtime keeps a seven day hourly uptime record per service from its own polls, served read only at `GET /api/monitoring/uptime`. The Applications page shows 24 hour uptime, hourly bars and 24 hour / 7 day figures; with the flag off it keeps the "Not connected" state. Not deployed by this change.
 
+## Agent activity log, 2026-11-05
+
+With `FRIDAY_AGENT_ACTIVITY_ENABLED=true`, Friday keeps a metadata-only, bounded log of agent questions (agent, model, outcome, duration; never prompts or answers), served read only at `GET /api/agents/activity` and shown as Live agent events on the Agents page. Not deployed by this change.
+

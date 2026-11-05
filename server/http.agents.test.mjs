@@ -183,3 +183,44 @@ test('Phase 2C adds no public policy, plugin, context or MCP write endpoints',as
   }
  })
 })
+
+test('agent activity records each ask without prompt text and is read only', async () => {
+  const recorded = []
+  const agentActivity = {
+    async record(entry) { recorded.push(entry) },
+    list() { return [{ id: 'e1', at: '2026-11-05T10:00:00.000Z', agentId: 'proxmox-observer', outcome: 'answered', durationMs: 5 }] },
+  }
+  const agentService = {
+    async ask(id) {
+      if (id === 'broken') throw new Error('boom')
+      return { available: true, agentId: id, agentName: 'Proxmox Observer', provider: 'ollama', model: 'qwen3:4b', text: 'answer', execution: { performed: false } }
+    },
+  }
+  await withServer({ config: config(), agentRegistryService: registry(), agentService, agentActivity, buildOverviewImpl: async () => overview() }, async (base) => {
+    assert.equal((await post(base, '/api/agents/proxmox-observer/ask', { prompt: 'Check VM 100' })).status, 200)
+    assert.equal((await post(base, '/api/agents/broken/ask', { prompt: 'Check VM 100' })).status, 503)
+    assert.deepEqual(recorded.map((entry) => [entry.agentId, Boolean(entry.result), Boolean(entry.error), Number.isInteger(entry.durationMs)]),
+      [['proxmox-observer', true, false, true], ['broken', false, true, true]])
+    assert.doesNotMatch(JSON.stringify(recorded), /Check VM 100/)
+
+    const listed = await fetch(`${base}/api/agents/activity`)
+    assert.equal(listed.status, 200)
+    assert.equal((await listed.json()).events[0].id, 'e1')
+    assert.equal((await fetch(`${base}/api/agents/activity?limit=5`)).status, 400)
+    assert.equal((await post(base, '/api/agents/activity', {})).status, 405)
+  })
+
+  await withServer({ config: config(), agentRegistryService: registry(), buildOverviewImpl: async () => overview() }, async (base) => {
+    const response = await fetch(`${base}/api/agents/activity`)
+    assert.equal(response.status, 503)
+    assert.deepEqual(await response.json(), { error: 'agent-activity-disabled' })
+  })
+})
+
+test('a failing activity log never breaks an agent answer', async () => {
+  const agentActivity = { async record() { throw new Error('disk full') }, list() { return [] } }
+  const agentService = { async ask(id) { return { available: true, agentId: id, provider: 'ollama', text: 'ok', execution: { performed: false } } } }
+  await withServer({ config: config(), agentRegistryService: registry(), agentService, agentActivity, buildOverviewImpl: async () => overview() }, async (base) => {
+    assert.equal((await post(base, '/api/agents/proxmox-observer/ask', { prompt: 'Check' })).status, 200)
+  })
+})
