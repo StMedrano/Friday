@@ -52,6 +52,7 @@ services:
       FRIDAY_PROMETHEUS_ENABLED: "false"
       FRIDAY_SUPABASE_HEALTH_ENABLED: "false"
       FRIDAY_UPTIME_KUMA_ENABLED: "false"
+      FRIDAY_AIDESIGNER_ENABLED: "false"
     networks:
       - friday_staging
     healthcheck:

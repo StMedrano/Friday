@@ -757,3 +757,7 @@ Local Agent Platform Phase 1 is live-accepted. Next, fix site normalization, con
 ## Safety gate
 
 Do not implement infrastructure-changing agent or assistant actions until authentication, role policy, explicit approval, durable action audit logging, and the global automation kill switch exist and are tested.
+
+## AIDesigner design generation, 2026-11-05
+
+Friday has a server-side AIDesigner REST client (`server/adapters/aidesigner.mjs`), default off (`FRIDAY_AIDESIGNER_ENABLED`). `GET /api/aidesigner/sessions` lists recent design sessions for signed-in people; `POST /api/aidesigner/designs` generates a design into an AIDesigner session, operator-only and audited as `aidesigner.design.generate`, and returns only references (session, canvas, editor link), never HTML. The API key never leaves the server. Settings shows the integration's posture. No UI yet; nothing is deployed or enabled by this change.

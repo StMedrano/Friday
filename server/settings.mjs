@@ -74,6 +74,9 @@ export function buildSettingsView(config, {actionAudit = null} = {}) {
         configured: present(grafana.baseUrl) && present(grafana.token) && present(grafana.site),
         credentials: credentials(grafana.token), site: grafana.site,
       }),
+      integration('aidesigner', 'AIDesigner', config.aidesigner, {
+        configured: present(config.aidesigner?.apiKey), credentials: credentials(config.aidesigner?.apiKey),
+      }),
       integration('agent-registry', 'Local agent registry (Supabase)', registry, {
         configured: present(registry.supabaseUrl) && present(registry.supabaseServiceKey), credentials: credentials(registry.supabaseServiceKey),
       }),

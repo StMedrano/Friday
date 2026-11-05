@@ -83,6 +83,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | #109 leftovers, slice A (history validation, HomeLab observations, phone sheet focus) | Claude | `complete` | Branch `claude/friday-109-ui-slice`: `server/monitoring/history.mjs`, `/api/monitoring/history`, `src/components/HomeLabSnapshot.tsx`, `src/hooks/useModalFocus.ts`, `MobileNavigation.tsx` | 2026-11-02 | 2026-11-02 | Merged as #117. |
 | Non-root controller rehearsal (#109 leftovers, slice B) | Claude | `complete` | Branch `claude/friday-nonroot-rehearsal`: `Dockerfile` `runtime-nonroot` stage, `scripts/test-friday-volume-migration.sh`, `scripts/check-friday-volume-readiness.sh`, `scripts/test-controller-container-hardening.sh`, `scripts/scan-controller-image.sh`, CI | 2026-11-02 | 2026-11-02 | Merged as #118. Production cutover needs an approved VM102 window (see `docs/controller-nonroot-migration.md`). |
 | VM100 staging stack (#109 leftovers, slice C) | Claude | `complete` | Branch `claude/friday-staging-stack`: `deploy/staging/`, `scripts/verify-friday-staging*`, `scripts/test-friday-staging-isolation.sh`, `scripts/check-friday-edge-readiness*`, `server/security/access-staging.test.mjs`, CI, Makefile | 2026-11-03 | 2026-11-03 | Merged as #119. Redeploying staging on VM100 from main is an operator step. |
+| AIDesigner design generation API | Claude | `verification_needed` | Branch `claude/project-thread-u3n07g`: `server/adapters/aidesigner.mjs`, `/api/aidesigner/*`, `aidesigner` config, compose/.env.example/staging flag, `docs/integrations.md` | 2026-11-05 | 2026-11-05 | Open a PR; stays disabled until an operator sets `FRIDAY_AIDESIGNER_ENABLED` and `AIDESIGNER_API_KEY`. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -118,6 +119,18 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-11-05 11:30 CST — Claude — Added the AIDesigner design generation API
+
+- Status: `verification_needed`
+- Scope claimed: Branch `claude/project-thread-u3n07g`; `server/adapters/aidesigner.mjs`, `/api/aidesigner/sessions`, `/api/aidesigner/designs`, `aidesigner` config, settings posture, audit action `aidesigner.design.generate`, compose/.env.example/staging flag, docs.
+- Work performed: Owner asked for an AIDesigner API in Friday (and separately to connect the AIDesigner MCP to Claude). Added a server-side REST client from AIDesigner's published API docs. Listing sessions needs a signed-in person; generating a design spends credits, so it is operator-only, JSON-only, audited, and returns references only, never HTML. Default off.
+- Changes made: Code, tests, Compose env and docs. Nothing deployed; no key set anywhere.
+- Verification: `make verify` passed locally (861 node tests, vitest, build, Compose configs, staging validator). Not tested against the live AIDesigner API (no key in this environment).
+- Decisions: Premium `ultradesign` mode not exposed (extra credits). No UI yet.
+- Blockers/risks: Needs an AIDesigner API key and an approved deploy to use.
+- Next action: Review and merge the PR; then the owner adds `AIDESIGNER_API_KEY` to VM102 `.env` and sets `FRIDAY_AIDESIGNER_ENABLED=true` in an approved deploy.
+- Rollback/recovery: Set `FRIDAY_AIDESIGNER_ENABLED=false` or revert the PR.
 
 ### 2026-11-03 05:41 CST — Claude — Added the nightly builder backlog and rules
 

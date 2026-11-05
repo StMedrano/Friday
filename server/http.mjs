@@ -22,6 +22,8 @@ import { validateWebGrowthSnapshot } from './adapters/web-growth-schema.mjs'
 import { applySiteSettings, siteSettingsView } from './site-settings.mjs'
 import { applyEndpointChecks, endpointChecksView, environmentEndpointChecks } from './endpoint-checks.mjs'
 import { normalizeSubscription, vapidKeys } from './notifications/web-push.mjs'
+import { createAiDesigner } from './adapters/aidesigner.mjs'
+import { randomUUID } from 'node:crypto'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const publicDir = join(__dirname, '..', 'dist')
@@ -63,8 +65,9 @@ const mime = {
   '.ico': 'image/x-icon',
 }
 
-function json(response, statusCode, body) {
+function json(response, statusCode, body, extraHeaders = {}) {
   response.writeHead(statusCode, {
+    ...extraHeaders,
     'content-type': 'application/json; charset=utf-8',
     'cache-control': 'no-store',
     'x-content-type-options': 'nosniff',
@@ -151,6 +154,40 @@ function parseRepositoryToolRoute(pathname) {
 }
 
 const AUDIT_DETAIL = /^[a-z0-9-]{1,64}$/
+
+const AIDESIGNER_FIELDS = new Set(['prompt', 'viewport', 'sessionId', 'idempotencyKey'])
+const AIDESIGNER_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const AIDESIGNER_KEY = /^[A-Za-z0-9_-]{8,128}$/
+const AIDESIGNER_STATUS = {
+  'aidesigner-auth-failed': 502,
+  'aidesigner-credits-exhausted': 402,
+  'aidesigner-rate-limited': 429,
+  'aidesigner-session-not-found': 404,
+  'aidesigner-canvas-busy': 409,
+  'aidesigner-request-rejected': 400,
+}
+
+// Strict shape for a design request: unknown fields are refused rather than forwarded.
+function validateDesignRequest(body) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) return null
+  if (Object.keys(body).some(key => !AIDESIGNER_FIELDS.has(key))) return null
+  const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : ''
+  if (!prompt || prompt.length > 4000) return null
+  const viewport = body.viewport ?? 'desktop'
+  if (viewport !== 'desktop' && viewport !== 'mobile') return null
+  const sessionId = body.sessionId ?? null
+  if (sessionId !== null && (typeof sessionId !== 'string' || !AIDESIGNER_UUID.test(sessionId))) return null
+  const idempotencyKey = body.idempotencyKey ?? randomUUID()
+  if (typeof idempotencyKey !== 'string' || !AIDESIGNER_KEY.test(idempotencyKey)) return null
+  return { prompt, viewport, sessionId: sessionId && sessionId.toLowerCase(), idempotencyKey }
+}
+
+function aiDesignerFailure(error) {
+  const code = error?.code
+  const status = AIDESIGNER_STATUS[code]
+  if (!status) return { status: 503, body: { error: 'aidesigner-unavailable' } }
+  return { status, body: { error: code }, headers: status === 429 && error.retryAfter ? { 'retry-after': String(error.retryAfter) } : {} }
+}
 
 // Operator-managed Friday settings collections: GET lists, POST creates,
 // PUT /:id edits and DELETE /:id deletes. Every write is operator-only and audited.
@@ -250,6 +287,7 @@ export function createFridayServer({
   repositorySettings = null,
   pushSubscriptions = null,
   readWebGrowthImpl = readWebGrowth,
+  aiDesignerImpl = createAiDesigner,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
   const labelledConfig = (effectiveConfig = config) =>
@@ -282,7 +320,8 @@ export function createFridayServer({
       const collectionWrite = request.method !== 'GET' && request.method !== 'HEAD' && Boolean(settingsCollectionFor(url.pathname))
       const pushWrite = (request.method === 'POST' || request.method === 'DELETE') && url.pathname === '/api/notifications/web-push'
       const groupAdvisory = request.method === 'POST' && url.pathname === '/api/group-advisory'
-      const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || url.pathname === '/api/audit/events'
+      const aiDesignerGenerate = request.method === 'POST' && url.pathname === '/api/aidesigner/designs'
+      const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || aiDesignerGenerate || url.pathname === '/api/audit/events'
       let verdict
       try { verdict = await accessGate(request, operatorOnly) }
       catch { verdict = {status:503,error:'access-verification-unavailable'} }
@@ -295,7 +334,7 @@ export function createFridayServer({
       // for operational POST/PUT/DELETE handlers. Settings and registry writes with a body additionally require JSON.
       if (['POST', 'PUT', 'DELETE'].includes(request.method) && request.headers['sec-fetch-site'] === 'cross-site')
         return json(response, 403, {error:'access-denied'})
-      if ((registrySync || siteSettingsWrite || pushWrite || groupAdvisory || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
+      if ((registrySync || siteSettingsWrite || pushWrite || groupAdvisory || aiDesignerGenerate || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
         return json(response, 415, {error:'json-required'})
     }
 
@@ -327,6 +366,33 @@ export function createFridayServer({
       } catch {
         return json(response, 503, { error: 'web-growth-unavailable' })
       }
+    }
+
+    // AIDesigner: any signed-in person may list design sessions; generating a
+    // design spends credits, so it is operator-only (enforced by the gate above)
+    // and audited. Only references come back, never the generated HTML.
+    if (url.pathname === '/api/aidesigner/sessions' || url.pathname === '/api/aidesigner/designs') {
+      const human = identity && identity.kind !== 'service' && typeof identity.subject === 'string' && identity.subject
+      if (!human || config.mode !== 'live') return json(response, 503, { error: 'aidesigner-authentication-required' })
+      const generate = url.pathname === '/api/aidesigner/designs'
+      if (request.method !== (generate ? 'POST' : 'GET')) return json(response, 405, { error: 'method-not-allowed' })
+      if (url.search) return json(response, 400, { error: 'unexpected-query' })
+      if (config.aidesigner?.enabled !== true) return json(response, 503, { error: 'aidesigner-unavailable' })
+      const client = aiDesignerImpl(config.aidesigner)
+      if (!generate) {
+        try { return json(response, 200, { sessions: await client.listSessions() }) }
+        catch (error) { const failure = aiDesignerFailure(error); return json(response, failure.status, failure.body, failure.headers) }
+      }
+      let body
+      try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid-json' }) }
+      const input = validateDesignRequest(body)
+      if (!input) return json(response, 400, { error: 'invalid-design-request' })
+      let headers = {}
+      const result = await runAudited({ actionAudit, identity, action: 'aidesigner.design.generate', target: input.sessionId || 'new' }, async () => {
+        try { return { status: 200, body: await client.generateDesign(input) } }
+        catch (error) { const failure = aiDesignerFailure(error); headers = failure.headers || {}; return failure }
+      })
+      return json(response, result.status, result.body, headers)
     }
 
     // A person's own one-way work identity hash, so an operator can grant them

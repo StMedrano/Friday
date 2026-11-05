@@ -219,6 +219,19 @@ Provider adapters:
 
 Provider credentials stay server-side. General assistant providers receive normalized Friday state and no infrastructure execution tools.
 
+## AIDesigner design generation
+
+Friday can call the [AIDesigner REST API](https://www.aidesigner.ai/docs/api) to generate UI designs into AIDesigner editor projects. It is off by default.
+
+- Enable with `FRIDAY_AIDESIGNER_ENABLED=true` and `AIDESIGNER_API_KEY` (created in AIDesigner under Settings, API Keys). `AIDESIGNER_BASE_URL` must be an `https` origin; `FRIDAY_AIDESIGNER_TIMEOUT_MS` (default 180000) bounds one generation.
+- Needs live mode with Cloudflare Access. Service tokens are refused.
+- `GET /api/aidesigner/sessions`: any signed-in person; returns up to 20 recent sessions (id, title, editor link, canvas count, published link, updated time).
+- `POST /api/aidesigner/designs` with JSON `{ "prompt", "viewport"?: "desktop" | "mobile", "sessionId"?, "idempotencyKey"? }`: operator-only, audited as `aidesigner.design.generate`. It spends AIDesigner credits (1 per classic design). The design is written to a new session, or to `sessionId`, and Friday returns only the session, canvas and editor link, never the HTML. Unknown fields are refused, and the premium `ultradesign` mode is not exposed.
+- Provider errors are mapped without detail: 402 out of credits, 429 rate limited (with `Retry-After`), 404 unknown session, 409 canvas busy, 502 key rejected, 503 unavailable.
+- AIDesigner's own limits apply per account: 30 generations per minute and 4 at once.
+
+This is separate from the AIDesigner MCP server (`https://api.aidesigner.ai/api/v1/mcp`), which uses OAuth and is connected in the AI assistant, not in Friday.
+
 ## Adapter checklist
 
 Every integration must have explicit opt-in configuration, least-privilege credentials, timeouts, degraded-state handling, normalized/sanitized responses, automated tests without real credentials, server-side secrets, and a working credential-free mock/degraded mode where applicable.
