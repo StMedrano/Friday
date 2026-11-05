@@ -36,7 +36,7 @@ routes in `server/http.mjs`). Drop or flag anything that describes code
 **Done when:** every route, env var and file the docs name exists on `main`
 (checked with grep), and `docs/codex/NEXT_STEPS.md` links them.
 
-## port-e2e-smoke — `in-review`
+## port-e2e-smoke — `done`
 
 **Scope:** `playwright.config.mjs`, `tests/e2e/`, a CI step, `package.json`
 script. Source: the same #109 branch.
@@ -52,7 +52,7 @@ Chromium in the CI step.
 `make verify` is unchanged in runtime by more than a few seconds (e2e runs
 as its own CI step, not inside `make verify`).
 
-## refresh-next-steps — `ready`
+## refresh-next-steps — `in-review`
 
 **Scope:** `docs/codex/NEXT_STEPS.md` only.
 
