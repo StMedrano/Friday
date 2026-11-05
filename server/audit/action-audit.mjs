@@ -6,7 +6,7 @@ import {isAbsolute, join} from 'node:path'
 // Durable, append-only operator action audit. Separate from monitoring
 // history: one hash-chained JSON line per lifecycle event, fsynced before
 // the caller continues. No update, delete, rotate or repair API exists.
-const ACTIONS = new Set(['agents.registry.sync', 'incidents.diagnostics.rerun', 'settings.sites.update',
+const ACTIONS = new Set(['agents.registry.sync', 'incidents.diagnostics.rerun', 'approvals.decide', 'settings.sites.update',
   'settings.endpoints.create', 'settings.endpoints.update', 'settings.endpoints.delete',
   'settings.repositories.create', 'settings.repositories.update', 'settings.repositories.delete'])
 const PHASES = new Set(['requested', 'succeeded', 'failed', 'denied'])

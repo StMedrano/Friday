@@ -541,6 +541,44 @@ export async function fetchFridayAgentActivity(signal?: AbortSignal): Promise<Fr
   return body?.error === 'agent-activity-disabled' ? { state: 'disabled' } : { state: 'unavailable' }
 }
 
+export type FridayApprovalItem = {
+  id: string; incidentId: string; state: 'pending' | 'approved' | 'denied'
+  title: string; detail?: string; serviceName?: string; host?: string; severity?: 'high' | 'warning' | 'info'
+  recommendedAction?: string; openedAt?: string; decidedAt?: string; decidedBy?: string; incidentStatus?: 'open' | 'resolved'
+}
+export type FridayApprovals = { pending: FridayApprovalItem[]; recent: FridayApprovalItem[] }
+export type FridayApprovalsResult = { state: 'ok'; approvals: FridayApprovals } | { state: 'disabled' } | { state: 'unavailable' }
+
+const approvalItems = (value: unknown): FridayApprovalItem[] => Array.isArray(value)
+  ? value.filter((item): item is FridayApprovalItem => Boolean(item && typeof item === 'object'
+    && typeof (item as FridayApprovalItem).id === 'string' && typeof (item as FridayApprovalItem).incidentId === 'string'
+    && typeof (item as FridayApprovalItem).title === 'string' && typeof (item as FridayApprovalItem).state === 'string'))
+  : []
+
+/** Remediation proposals from open incidents, plus recent operator decisions. Nothing is executed. */
+export async function fetchFridayApprovals(signal?: AbortSignal): Promise<FridayApprovalsResult> {
+  const response = await fetch('/api/approvals', { method: 'GET', signal })
+  const body = await response.json().catch(() => null) as { error?: string; pending?: unknown; recent?: unknown } | null
+  if (response.ok && body && Array.isArray(body.pending) && Array.isArray(body.recent)) {
+    return { state: 'ok', approvals: { pending: approvalItems(body.pending), recent: approvalItems(body.recent) } }
+  }
+  return body?.error === 'approvals-disabled' ? { state: 'disabled' } : { state: 'unavailable' }
+}
+
+export class FridayApprovalError extends Error {
+  constructor(readonly code: string, readonly status: number) { super(code) }
+}
+
+/** Approve or deny one proposal. Operator only and audited; the decision is recorded, never executed. */
+export async function decideFridayApproval(incidentId: string, decision: 'approve' | 'deny', signal?: AbortSignal): Promise<FridayApprovalItem> {
+  const response = await fetch(`/api/approvals/${encodeURIComponent(incidentId)}/decision`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision }), signal,
+  })
+  const body = await response.json().catch(() => null) as { error?: string; approval?: FridayApprovalItem } | null
+  if (!response.ok || !body?.approval) throw new FridayApprovalError(body?.error || 'approvals-unavailable', response.status)
+  return body.approval
+}
+
 export async function askFridayAgent(agentId: string, prompt: string, signal?: AbortSignal): Promise<FridayAgentResponse> {
   const response = await fetch(`/api/agents/${encodeURIComponent(agentId)}/ask`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt }), signal })
   const body = await response.json() as FridayAgentResponse

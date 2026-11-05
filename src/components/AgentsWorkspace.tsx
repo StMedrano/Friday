@@ -2,6 +2,7 @@ import NotConnected from './NotConnected'
 import { useEffect, useMemo, useState } from 'react'
 import AgentGroupsPanel from './AgentGroupsPanel'
 import AgentActivityPanel from './AgentActivityPanel'
+import ApprovalsQueue from './ApprovalsQueue'
 import {
   askFridayAgent,
   fetchFridayAgentRegistryStatus,
@@ -198,7 +199,7 @@ export default function AgentsWorkspace() {
     </div>
     <aside className="fx-action-center" aria-label="Action center">
       <h2>Action center</h2>
-      <NotConnected title="Approvals" detail="Agent requests that need your approval will queue here once the approval service is connected."/>
+      <ApprovalsQueue compact/>
       <NotConnected title="New agents" detail="Agents are defined in Git and synced here; creating them from Friday is not connected."/>
       <AgentActivityPanel refreshKey={asked}/>
     </aside>

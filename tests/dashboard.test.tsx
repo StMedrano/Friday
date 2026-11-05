@@ -220,12 +220,12 @@ describe('Desktop navigation and layout', () => {
   it('marks only the workspaces without a production service as not connected', () => {
     installMatchMedia(false)
     render(<Dashboard />)
-    for (const name of ['Approvals', 'Memory']) {
+    for (const name of ['Memory']) {
       expect(screen.getByRole('button', { name })).toHaveClass('pending')
       expect(screen.getByRole('button', { name })).toHaveAttribute('title', `${name} · not connected`)
     }
     // Tasks, Audit and Settings have read-only production APIs now.
-    for (const name of ['Incidents', 'Tasks', 'Audit', 'Settings']) {
+    for (const name of ['Incidents', 'Tasks', 'Approvals', 'Audit', 'Settings']) {
       expect(screen.getByRole('button', { name })).not.toHaveClass('pending')
     }
   })

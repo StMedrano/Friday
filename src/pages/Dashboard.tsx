@@ -21,6 +21,7 @@ import MobileNavigation from '../components/MobileNavigation'
 import PwaControls from '../components/PwaControls'
 import RepositoriesWorkspace from '../components/RepositoriesWorkspace'
 import AuditWorkspace from '../components/AuditWorkspace'
+import ApprovalsQueue from '../components/ApprovalsQueue'
 import SettingsWorkspace from '../components/SettingsWorkspace'
 import '../monitoring.css'
 import '../mobile.css'
@@ -42,7 +43,7 @@ const navGroups: ReadonlyArray<readonly [string, ReadonlyArray<NavItem>]> = [
 ]
 const navItems = navGroups.flatMap(([, items]) => items)
 // Workspaces with no production-backed service yet.
-const pendingIds = new Set(['Approvals', 'Memory'])
+const pendingIds = new Set(['Memory'])
 const labelFor = (id: string) => navItems.find(([itemId]) => itemId === id)?.[1] ?? id
 const suggestions = ["What's degraded right now?", 'Summarize the last 24h of incidents', 'Which services changed today?']
 
@@ -187,7 +188,7 @@ export default function Dashboard() {
             query={query}
             onQueryChange={setQuery}
             onSubmit={submitFriday}
-          /> : active === 'Agents' ? <AgentsWorkspace/> : active === 'Settings' ? <SettingsWorkspace/> : active === 'Tasks' ? <TasksWorkspace/> : active === 'Audit' ? <AuditWorkspace/> : active === 'Repositories' ? <RepositoriesWorkspace/> : active === 'Applications' ? <ApplicationsWorkspace overview={overview} connected={connected}/> : active === 'Infrastructure' ? <InfrastructureWorkspace overview={overview} connected={connected}/> : active === 'Incidents' ? <IncidentsWorkspace
+          /> : active === 'Agents' ? <AgentsWorkspace/> : active === 'Settings' ? <SettingsWorkspace/> : active === 'Tasks' ? <TasksWorkspace/> : active === 'Audit' ? <AuditWorkspace/> : active === 'Approvals' ? <section className="fx-approvals-page" aria-label="Approvals workspace"><ApprovalsQueue/></section> : active === 'Repositories' ? <RepositoriesWorkspace/> : active === 'Applications' ? <ApplicationsWorkspace overview={overview} connected={connected}/> : active === 'Infrastructure' ? <InfrastructureWorkspace overview={overview} connected={connected}/> : active === 'Incidents' ? <IncidentsWorkspace
             incidents={incidents}
             services={overview.services}
             sites={overview.sites}
@@ -314,7 +315,7 @@ export default function Dashboard() {
             : active === 'Agents' ? <AgentsWorkspace/>
             : active === 'Applications' ? <ApplicationsWorkspace overview={overview} connected={connected}/>
             : active === 'Repositories' ? <RepositoriesWorkspace/>
-            : active === 'Audit' ? <AuditWorkspace/>
+            : active === 'Audit' ? <AuditWorkspace/> : active === 'Approvals' ? <section className="fx-approvals-page" aria-label="Approvals workspace"><ApprovalsQueue/></section>
             : active === 'Settings' ? <SettingsWorkspace/>
             : active === 'Tasks' ? <TasksWorkspace/>
             : active === 'Infrastructure' ? <InfrastructureWorkspace overview={overview} connected={connected}/>
@@ -332,7 +333,6 @@ function PendingCapabilityView({ name }: { name: string }) {
   const details: Record<string, string> = {
     Tasks: 'The Phase 2B task and handoff services exist internally, but are not yet exposed through an authenticated, project-scoped production API.',
     Memory: 'Scoped persistent and short-lived memory services exist internally, but the production UI has no approved identity-bound memory API.',
-    Approvals: 'The durable internal approval foundations are not a public approval queue. Signed identity, operator policy and audit must be connected first.',
   }
   return <section className="v3-pending-capability" aria-label={name + ' availability'}>
     <span className="v3-kicker">FRIDAY / RELEASE STATUS</span>

@@ -122,6 +122,15 @@ function parseIncidentDiagnosticRoute(pathname) {
   return { invalid: false, incidentId, kind: match[2] }
 }
 
+function parseApprovalDecisionRoute(pathname) {
+  const match = String(pathname || '').match(/^\/api\/approvals\/([^/]+)\/decision$/)
+  if (!match) return null
+  let incidentId
+  try { incidentId = decodeURIComponent(match[1]) } catch { return { invalid: true } }
+  if (!SAFE_INCIDENT_ID.test(incidentId)) return { invalid: true }
+  return { invalid: false, incidentId }
+}
+
 function parseIncidentDiagnosticRerunRoute(pathname) {
   const match = String(pathname || '').match(/^\/api\/incidents\/([^/]+)\/diagnostics\/rerun$/)
   if (!match) return null
@@ -261,6 +270,7 @@ export function createFridayServer({
   readWebGrowthImpl = readWebGrowth,
   githubReader = null,
   agentActivity = null,
+  approvalQueue = null,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
   const github = githubReader || createGitHubReader(config.github)
@@ -294,7 +304,8 @@ export function createFridayServer({
       const collectionWrite = request.method !== 'GET' && request.method !== 'HEAD' && Boolean(settingsCollectionFor(url.pathname))
       const pushWrite = (request.method === 'POST' || request.method === 'DELETE') && url.pathname === '/api/notifications/web-push'
       const groupAdvisory = request.method === 'POST' && url.pathname === '/api/group-advisory'
-      const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || url.pathname === '/api/audit/events'
+      const approvalDecision = request.method === 'POST' && Boolean(parseApprovalDecisionRoute(url.pathname))
+      const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || approvalDecision || url.pathname === '/api/audit/events'
       let verdict
       try { verdict = await accessGate(request, operatorOnly) }
       catch { verdict = {status:503,error:'access-verification-unavailable'} }
@@ -307,7 +318,7 @@ export function createFridayServer({
       // for operational POST/PUT/DELETE handlers. Settings and registry writes with a body additionally require JSON.
       if (['POST', 'PUT', 'DELETE'].includes(request.method) && request.headers['sec-fetch-site'] === 'cross-site')
         return json(response, 403, {error:'access-denied'})
-      if ((registrySync || siteSettingsWrite || pushWrite || groupAdvisory || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
+      if ((registrySync || siteSettingsWrite || pushWrite || groupAdvisory || approvalDecision || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
         return json(response, 415, {error:'json-required'})
     }
 
@@ -446,6 +457,43 @@ export function createFridayServer({
 
     if (request.method === 'GET' && url.pathname === '/api/incidents') {
       return json(response, 200, monitoringRuntime?.getIncidents?.() || { summary: { active: 0, high: 0, warning: 0, resolved: 0 }, incidents: [] })
+    }
+
+    // Approvals queue: open incidents with a recommended action wait for an operator
+    // to approve or deny. Decisions are recorded and audited; nothing is executed.
+    if (url.pathname === '/api/approvals') {
+      if (request.method !== 'GET') return json(response, 405, { error: 'read-only-endpoint' })
+      if (url.search) return json(response, 400, { error: 'unexpected-query' })
+      if (!approvalQueue) return json(response, 503, { error: 'approvals-disabled' })
+      if (config.monitoring?.enabled === false) return json(response, 503, { error: 'monitoring-disabled' })
+      try { return json(response, 200, approvalQueue.list(monitoringRuntime?.getIncidents?.().incidents || [])) }
+      catch { return json(response, 503, { error: 'approvals-unavailable' }) }
+    }
+
+    const approvalDecisionRoute = parseApprovalDecisionRoute(url.pathname)
+    if (approvalDecisionRoute) {
+      if (request.method !== 'POST') return json(response, 405, { error: 'method-not-allowed' })
+      if (approvalDecisionRoute.invalid) return json(response, 400, { error: 'invalid-incident-id' })
+      if (url.search) return json(response, 400, { error: 'unexpected-query' })
+      if (!approvalQueue) return json(response, 503, { error: 'approvals-disabled' })
+      if (config.monitoring?.enabled === false) return json(response, 503, { error: 'monitoring-disabled' })
+      let body
+      try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid-approval-decision' }) }
+      const decision = { approve: 'approved', deny: 'denied' }[body?.decision]
+      if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 1 || !decision)
+        return json(response, 400, { error: 'invalid-approval-decision' })
+      try {
+        const result = await runAudited({ actionAudit, identity, action: 'approvals.decide', target: approvalDecisionRoute.incidentId },
+          () => approvalQueue.decide({
+            incidents: monitoringRuntime?.getIncidents?.().incidents || [],
+            incidentId: approvalDecisionRoute.incidentId,
+            decision,
+            decidedBy: auditActor(identity).label || undefined,
+          }))
+        return json(response, result.status, result.body)
+      } catch {
+        return json(response, 503, { error: 'approvals-unavailable' })
+      }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/monitoring/history') {

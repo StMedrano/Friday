@@ -260,6 +260,12 @@ export function getConfig(env = process.env) {
       path: env.FRIDAY_AGENT_ACTIVITY_PATH || '/data/agent-activity.json',
       limit: Math.min(2000, Math.max(50, Math.floor(positiveNumber(env.FRIDAY_AGENT_ACTIVITY_LIMIT, 500)))),
     },
+    // Approvals queue for incident remediation; decisions are recorded and audited, never executed.
+    approvals: {
+      enabled: enabled(env.FRIDAY_APPROVALS_ENABLED),
+      path: env.FRIDAY_APPROVALS_PATH || '/data/approvals.json',
+      limit: Math.min(2000, Math.max(50, Math.floor(positiveNumber(env.FRIDAY_APPROVALS_LIMIT, 500)))),
+    },
     pushSubscriptions: {
       path: env.FRIDAY_PUSH_SUBSCRIPTIONS_PATH || '/data/push-subscriptions.json',
     },
