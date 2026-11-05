@@ -1,3 +1,4 @@
+import NotConnected from './NotConnected'
 import { useEffect, useState } from 'react'
 import { CheckCircle2 } from 'lucide-react'
 import { fetchProjectTasks, FridayWorkError, type FridayTask } from '../lib/api'
@@ -52,10 +53,12 @@ export default function TasksWorkspace() {
       </label>
     </div>
 
+    <NotConnected title="New tasks" detail="Creating, claiming and moving tasks needs the Tasks write path, which is waiting on your approval."/>
+
     {message ? <p role="status" className="v3-settings-message">{message}</p>
       : !tasks ? <p role="status" className="v3-settings-message">Loading tasks…</p>
         : tasks.length === 0 ? <p role="status" className="v3-settings-message">No tasks recorded for {project?.name} yet.</p>
-          : <ul className="v3-settings-list" aria-label={`${project?.name} tasks`}>
+          : <ul className="v3-settings-list fx-task-board" aria-label={`${project?.name} tasks`}>
             {tasks.map((task) => <li key={task.id}>
               <span className="v3-settings-name"><b>{task.title}</b><small>{task.id} · version {task.version}</small></span>
               <span className={`v3-settings-pill ${task.status === 'completed' ? 'on' : task.status === 'blocked' ? 'warn' : 'off'}`}>{STATUS_LABELS[task.status]}</span>

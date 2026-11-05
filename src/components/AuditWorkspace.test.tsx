@@ -50,3 +50,33 @@ describe('AuditWorkspace', () => {
     expect(await screen.findByText(/No audited actions yet/)).toBeInTheDocument()
   })
 })
+
+describe('AuditWorkspace filters and export', () => {
+  it('filters loaded events by text and result, and exports what is shown as CSV', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => reply({ integrity: 'verified', nextBefore: null, events: [
+      event(3, 'failed', { detail: 'incident-not-found' }),
+      event(2, 'succeeded', { action: 'agents.registry.sync', target: null }),
+    ] })))
+    const created: Blob[] = []
+    vi.stubGlobal('URL', Object.assign(URL, { createObjectURL: vi.fn((blob: Blob) => { created.push(blob); return 'blob:x' }), revokeObjectURL: vi.fn() }))
+    const user = userEvent.setup()
+    render(<AuditWorkspace />)
+    await screen.findByText(/Chain verified/)
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Result' }), 'failed')
+    expect(screen.queryByText('Registry sync')).not.toBeInTheDocument()
+    expect(screen.getByText('Diagnostic rerun')).toBeInTheDocument()
+
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Result' }), 'all')
+    await user.type(screen.getByRole('searchbox', { name: 'Search events' }), 'registry')
+    expect(screen.getByText('Registry sync')).toBeInTheDocument()
+    expect(screen.queryByText('Diagnostic rerun')).not.toBeInTheDocument()
+
+    vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    await user.click(screen.getByRole('button', { name: 'Export CSV' }))
+    const csv = await new Promise<string>((resolve) => { const reader = new FileReader(); reader.onload = () => resolve(String(reader.result)); reader.readAsText(created[0]) })
+    expect(csv.split('\n')[0]).toBe('seq,time,actor,action,target,result,detail')
+    expect(csv).toContain('agents.registry.sync')
+    expect(csv).not.toContain('incidents.diagnostics.rerun')
+  })
+})

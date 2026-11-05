@@ -1,3 +1,4 @@
+import NotConnected from './NotConnected'
 import { useMemo, useState } from 'react'
 import { AppWindow, Search, ShieldCheck } from 'lucide-react'
 import type { FridayOverview } from '../lib/api'
@@ -75,6 +76,11 @@ export default function ApplicationsWorkspace({ overview, connected }: Props) {
                 <small>{service.site || 'Unassigned'} · {service.host || 'Unknown host'} · {service.category}</small>
               </span>
               <span className={'v3-applications-health '+service.status}>{service.status}</span>
+              <span className="fx-app-meta" aria-hidden="true">
+                <span><small>Uptime</small><b className="fx-na">—</b></span>
+                <span><small>Last check</small><b>{service.updated || '—'}</b></span>
+              </span>
+              <span className="fx-app-spark" aria-hidden="true" title="Uptime history is not connected"/>
             </button>)}
       </section>
       <aside className="v3-applications-detail" aria-label="Selected service evidence">
@@ -90,6 +96,8 @@ export default function ApplicationsWorkspace({ overview, connected }: Props) {
           </dl>
           <p>{selected.detail || 'No service detail provided.'}</p>
         </> : <p>Select an observed service to inspect its status and evidence. App launching and management are not enabled.</p>}
+        <NotConnected title="Uptime history" detail="Uptime percentages and trend lines need stored check history per app." />
+        <NotConnected title="Open app" detail="Launching apps from Friday is not enabled." action="Open" />
       </aside>
     </div>
   </section>

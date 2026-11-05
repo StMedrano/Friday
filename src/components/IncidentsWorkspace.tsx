@@ -5,6 +5,7 @@ import type { Service, Site } from '../lib/infrastructure'
 import { observedIncidentSite, SHARED_SITE, UNASSIGNED_SITE } from '../lib/site-membership'
 import ActiveIncidents from './ActiveIncidents'
 import IncidentDetail from './IncidentDetail'
+import NotConnected from './NotConnected'
 
 function displayTime(value: string | null | undefined) {
   if (!value) return 'Not available'
@@ -51,15 +52,17 @@ export default function IncidentsWorkspace({
     ? selectedIncident : null
   const monitoringStatus = monitoring?.status || 'disabled'
 
-  return <section className="v3-detail v3-incidents-workspace">
-    <div className="v3-detail-hero">
+  const openCount = filtersActive ? filtered.filter(incident => incident.status === 'open').length : monitoring?.activeIncidents ?? incidents.filter(incident => incident.status === 'open').length
+
+  return <section className="v3-detail v3-incidents-workspace fx-incidents">
+    <div className="v3-detail-hero fx-page-head">
       <div className="v3-node-icon large"><Radar/></div>
-      <div><span className="v3-kicker">FRIDAY MONITORING / READ ONLY</span><h2>Incidents</h2><p>Detect, diagnose, and recommend. Infrastructure-changing actions are not available in this workspace.</p></div>
+      <div><span className="v3-kicker">FRIDAY MONITORING / READ ONLY</span><h2>Incidents <span className="fx-pill">{openCount} open</span></h2><p>Detect, diagnose, and recommend. Infrastructure-changing actions are not available in this workspace.</p></div>
     </div>
 
     <div className="v3-monitoring-strip">
       <article><ShieldCheck/><span><b>Monitoring {monitoringStatus.toUpperCase()}</b><small>{monitoring?.lastError || 'Read-only health evaluation is operating within policy.'}</small></span></article>
-      <article><Activity/><span><b>{filtersActive ? filtered.filter(incident => incident.status === 'open').length : monitoring?.activeIncidents ?? incidents.filter(incident => incident.status === 'open').length} active incidents{filtersActive ? ' in filter' : ''}</b><small>Last poll: {displayTime(monitoring?.lastPollAt)}</small></span></article>
+      <article><Activity/><span><b>{openCount} active incidents{filtersActive ? ' in filter' : ''}</b><small>Last poll: {displayTime(monitoring?.lastPollAt)}</small></span></article>
       <article><CheckCircle2/><span><b>{resolved.length} resolved</b><small>Resolution history is retained in FRIDAY-owned monitoring state.</small></span></article>
     </div>
 
@@ -80,16 +83,20 @@ export default function IncidentsWorkspace({
       <p>Exact service IDs determine site membership. History remains unfiltered; no infrastructure actions are available.</p>
     </section>
 
-    <section aria-label="Filtered incidents">
-      {filtered.length === 0 && incidents.length > 0
-        ? <p className="v3-history-empty">No incidents match these filters.</p>
-        : <ActiveIncidents incidents={filtered} onSelectIncident={onSelectIncident}/>}
-    </section>
-
-    {visibleSelected && <section className="v3-selected-diagnosis" aria-label="Selected incident diagnosis">
-      {onClearSelection && <button className="v3-readonly-action v3-diagnostic-back" onClick={onClearSelection}><ArrowLeft size={15}/> Back to incidents</button>}
-      <IncidentDetail incident={visibleSelected}/>
-    </section>}
+    <div className="fx-split">
+      <section className="fx-split-list" aria-label="Filtered incidents">
+        {filtered.length === 0 && incidents.length > 0
+          ? <p className="v3-history-empty">No incidents match these filters.</p>
+          : <ActiveIncidents incidents={filtered} onSelectIncident={onSelectIncident}/>}
+      </section>
+      <div className="fx-split-detail">
+        {visibleSelected ? <section className="v3-selected-diagnosis" aria-label="Selected incident diagnosis">
+          {onClearSelection && <button className="v3-readonly-action v3-diagnostic-back" onClick={onClearSelection}><ArrowLeft size={15}/> Back to incidents</button>}
+          <IncidentDetail incident={visibleSelected}/>
+        </section> : <div className="fx-empty-detail"><Radar size={20}/><b>Select an incident</b><p>Its diagnosis, evidence and recommended next step appear here.</p></div>}
+        <NotConnected title="Automated remediation" detail="Friday can only diagnose. Fixes need the approved action executor, operator policy and audit."/>
+      </div>
+    </div>
 
     <section className="v3-section">
       <div className="v3-section-head"><div><span className="v3-kicker">RECOVERY</span><h2>Recently resolved</h2></div><span>{resolved.length} recorded</span></div>
