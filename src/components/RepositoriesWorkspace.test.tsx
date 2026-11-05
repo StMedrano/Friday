@@ -30,6 +30,18 @@ describe('RepositoriesWorkspace', () => {
     expect(fetchMock.mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true)
   })
 
+  it('shows a GitHub-only repository without requesting checkout status or files', async () => {
+    const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = String(input)
+      if (url === '/api/repositories') return new Response(JSON.stringify([{ id: 'site', name: 'Site', remote: 'https://github.com/o/site', defaultBranch: 'main', mode: 'read-only', enabled: true, checkout: false }]))
+      return new Response(JSON.stringify({ error: 'github-disabled' }), { status: 503 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<RepositoriesWorkspace />)
+    expect(await screen.findByText(/registered from GitHub only/)).toBeInTheDocument()
+    expect(fetchMock.mock.calls.map(([input]) => String(input)).filter((url) => /\/(status|files)/.test(url))).toEqual([])
+  })
+
   it('shows safe empty and unavailable states', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify([]), { status: 200 })))
     const { rerender } = render(<RepositoriesWorkspace />)

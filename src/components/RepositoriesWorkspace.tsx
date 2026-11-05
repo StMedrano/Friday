@@ -95,6 +95,8 @@ export default function RepositoriesWorkspace() {
     return () => controller.abort()
   }, [repositories])
 
+  const selectedCheckout = repositories.find((repository) => repository.id === selectedId)?.checkout !== false
+
   useEffect(() => {
     if (!selectedId) return
     const controller = new AbortController()
@@ -104,6 +106,8 @@ export default function RepositoriesWorkspace() {
     setContent(null)
     setFileError('')
     setError('')
+    // A GitHub-only repository has no checkout on the controller to read.
+    if (!selectedCheckout) return
     Promise.all([
       fetchFridayRepositoryStatus(selectedId, controller.signal),
       fetchFridayRepositoryFiles(selectedId, '.', controller.signal),
@@ -114,7 +118,7 @@ export default function RepositoriesWorkspace() {
       if (reason?.name !== 'AbortError') setError('Repository contents unavailable.')
     })
     return () => controller.abort()
-  }, [selectedId])
+  }, [selectedId, selectedCheckout])
 
   useEffect(() => {
     if (!selectedId || !selectedFile) return
@@ -138,7 +142,7 @@ export default function RepositoriesWorkspace() {
 
     {loading ? <p role="status" className="v3-repository-message">Loading registered repositories…</p>
       : error && !selected ? <p role="alert" className="v3-repository-message">{error}</p>
-        : repositories.length === 0 ? <div className="v3-panel v3-repository-empty"><FolderGit2/><h3>No repositories are registered</h3><p>Enable a checkout in the server-side repository registry to browse it here.</p></div>
+        : repositories.length === 0 ? <div className="v3-panel v3-repository-empty"><FolderGit2/><h3>No repositories are registered</h3><p>Add a repository by its GitHub URL in Settings, Repositories. A local checkout is optional and only needed to browse files.</p></div>
           : <div className="v3-repository-grid">
             <section className="v3-panel v3-repository-panel fx-repo-table" aria-label="Registered repositories">
               <div className="v3-section-head"><div><span className="v3-kicker">WORKSPACES</span><h2>{repositories.length} registered</h2></div><ShieldCheck size={16} aria-label="Read only"/></div>
@@ -165,7 +169,11 @@ export default function RepositoriesWorkspace() {
               <NotConnected title="Repository configuration" detail="Sync strategy, auto-merge and required approvals are managed on GitHub, not in Friday." action="Edit configuration"/>
             </aside>
 
-            <section className="v3-panel v3-repository-panel" aria-label="Repository files" aria-busy={!status && !error}>
+            {!selectedCheckout ? <section className="v3-panel v3-repository-panel" aria-label="Repository files">
+              {selected && <div className="v3-repository-heading"><div><span className="v3-kicker">{selected.name.toUpperCase()}</span><h2>{selected.defaultBranch}</h2></div></div>}
+              <p className="v3-repository-message">{selected?.name} is registered from GitHub only, so there is no local checkout to browse. Add a checkout path in Settings to read its files here.</p>
+            </section>
+            : <section className="v3-panel v3-repository-panel" aria-label="Repository files" aria-busy={!status && !error}>
               {selected && <div className="v3-repository-heading">
                 <div><span className="v3-kicker">{selected.name.toUpperCase()}</span><h2>{selected.defaultBranch}</h2></div>
                 {status && <span className={`v3-repository-state ${status.dirty ? 'dirty' : 'clean'}`}><GitBranch size={14}/>{status.branch}<small>{status.dirty ? 'Working tree has local changes' : 'Working tree clean'}</small></span>}
@@ -181,7 +189,7 @@ export default function RepositoriesWorkspace() {
                       : <p className="v3-repository-message">Select a file to preview its text. Reads are limited to 64 KiB.</p>}
                   </div>
                 </div>
-            </section>
+            </section>}
           </div>}
   </section>
 }
