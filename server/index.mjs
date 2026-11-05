@@ -1,3 +1,4 @@
+import { createAgentActivityLog } from './agents/activity-log.mjs'
 import { fileURLToPath } from 'node:url'
 import { getConfig } from './config.mjs'
 import { createFridayServer } from './http.mjs'
@@ -111,7 +112,12 @@ if (config.work.enabled) {
   else console.log('Friday work reads enabled')
 }
 
-const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, endpointChecks, repositorySettings, pushSubscriptions, workReadBridge })
+// Default off. Records which agent answered, with which model and outcome; never prompts or answers.
+const agentActivity = config.agentActivity.enabled
+  ? await createAgentActivityLog({ path: config.agentActivity.path, limit: config.agentActivity.limit })
+  : null
+
+const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, endpointChecks, repositorySettings, pushSubscriptions, workReadBridge, agentActivity })
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`Friday listening on 0.0.0.0:${config.port} (${config.mode} mode)`)
 })

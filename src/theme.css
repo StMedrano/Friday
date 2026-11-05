@@ -694,3 +694,14 @@ code, kbd, pre, samp,
 .fx-not-connected-body { flex: 1 1 150px; }
 :is(.fx-action-center, .fx-repo-side, .v3-applications-detail, .fx-stats) .fx-not-connected { align-items: flex-start; }
 :is(.fx-action-center, .fx-repo-side, .v3-applications-detail, .fx-stats) .fx-not-connected :is(em, button) { margin-left: 42px; }
+
+/* Agents: live agent events (metadata-only activity log) */
+.fx-agent-activity { display: grid; gap: 10px; padding: 12px 14px; border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.fx-agent-activity h3 { margin: 0; font-size: 13px; font-weight: 600; }
+.fx-agent-activity ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 10px; }
+.fx-agent-activity li { display: grid; gap: 3px; }
+.fx-agent-activity-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.fx-agent-activity-head b { font-size: 13px; font-weight: 500; overflow-wrap: anywhere; }
+.fx-agent-activity small, .fx-activity-note { font-size: 12px; color: var(--muted); }
+.fx-activity-note { margin: 0; color: var(--faint); }
+

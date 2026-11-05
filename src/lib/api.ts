@@ -521,6 +521,26 @@ export async function routeFridayAgent(prompt: string, signal?: AbortSignal): Pr
   return body
 }
 
+export type FridayAgentActivityEvent = {
+  id: string; at: string; agentId: string; agentName?: string
+  outcome: 'answered' | 'unavailable' | 'not-found' | 'failed'
+  provider?: string; model?: string; modelProfile?: string; reason?: string; durationMs: number
+}
+export type FridayAgentActivityResult = { state: 'ok'; events: FridayAgentActivityEvent[] } | { state: 'disabled' } | { state: 'unavailable' }
+
+/** Metadata-only record of agent questions (never prompts or answers). */
+export async function fetchFridayAgentActivity(signal?: AbortSignal): Promise<FridayAgentActivityResult> {
+  const response = await fetch('/api/agents/activity', { method: 'GET', signal })
+  const body = await response.json().catch(() => null) as { error?: string; events?: unknown } | null
+  if (response.ok && body && Array.isArray(body.events)) {
+    const events = body.events.filter((item): item is FridayAgentActivityEvent => Boolean(item && typeof item === 'object'
+      && typeof (item as FridayAgentActivityEvent).id === 'string' && typeof (item as FridayAgentActivityEvent).agentId === 'string'
+      && typeof (item as FridayAgentActivityEvent).at === 'string' && typeof (item as FridayAgentActivityEvent).outcome === 'string'))
+    return { state: 'ok', events }
+  }
+  return body?.error === 'agent-activity-disabled' ? { state: 'disabled' } : { state: 'unavailable' }
+}
+
 export async function askFridayAgent(agentId: string, prompt: string, signal?: AbortSignal): Promise<FridayAgentResponse> {
   const response = await fetch(`/api/agents/${encodeURIComponent(agentId)}/ask`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt }), signal })
   const body = await response.json() as FridayAgentResponse

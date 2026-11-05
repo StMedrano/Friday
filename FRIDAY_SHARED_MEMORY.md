@@ -85,7 +85,8 @@ Only one agent should own a task or overlapping files/resources at a time.
 | VM100 staging stack (#109 leftovers, slice C) | Claude | `complete` | Branch `claude/friday-staging-stack`: `deploy/staging/`, `scripts/verify-friday-staging*`, `scripts/test-friday-staging-isolation.sh`, `scripts/check-friday-edge-readiness*`, `server/security/access-staging.test.mjs`, CI, Makefile | 2026-11-03 | 2026-11-03 | Merged as #119. Redeploying staging on VM100 from main is an operator step. |
 | Friday UI redesign from AIDesigner | Claude | `complete` | Branch `claude/project-thread-dnda8o`: `src/theme.css`, `src/pages/Dashboard.tsx` shell/Home, CSS palette in `src/*.css`, Geist fonts, `server/http.mjs` font MIME, audit API shape guard | 2026-11-05 | 2026-11-05 | Owner reviews PR; phone layout and per-workspace structure can follow the generated AIDesigner canvases. |
 | GitHub read integration for Repositories (PRs, CI, last commit) | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/adapters/github.mjs`, `/api/repositories/:id/github`, `server/config.mjs` `github`, `compose.yaml`, `.env.example`, `src/components/RepositoriesWorkspace.tsx`, `src/lib/api.ts`, docs | 2026-11-05 | 2026-11-05 | Open PR; stays off until an operator sets `FRIDAY_GITHUB_ENABLED` and a read-only token. |
-| Uptime history for Applications | Claude | `verification_needed` | Branch `claude/project-thread-2sw5y6`: `server/monitoring/uptime.mjs`, runtime/state, `/api/monitoring/uptime`, `FRIDAY_MONITORING_UPTIME_ENABLED`, `ApplicationsWorkspace.tsx`, docs | 2026-11-05 | 2026-11-05 | Merge after green CI; enable on VM102 in an approved deploy. |
+| Uptime history for Applications | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/monitoring/uptime.mjs`, runtime/state, `/api/monitoring/uptime`, `FRIDAY_MONITORING_UPTIME_ENABLED`, `ApplicationsWorkspace.tsx`, docs | 2026-11-05 | 2026-11-05 | Merge after green CI; enable on VM102 in an approved deploy. |
+| Agent activity log (Live agent events) | Claude | `verification_needed` | Branch `claude/project-thread-2sw5y6`: `server/agents/activity-log.mjs`, `/api/agents/activity`, ask handler, `FRIDAY_AGENT_ACTIVITY_*`, `AgentActivityPanel.tsx`, docs | 2026-11-05 | 2026-11-05 | Merge after green CI; enable on VM102 in an approved deploy. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -327,4 +328,13 @@ The ledger should normally be committed with the repository so every agent sees 
 - Blockers/risks: data starts accumulating only once the flag is on in production.
 - Next action: merge after CI; set `FRIDAY_MONITORING_UPTIME_ENABLED=true` on VM102 in an approved deploy.
 - Rollback/recovery: set the flag to false (the stored record is ignored) or revert.
+
+### 2026-11-05 — Claude — Agent activity log
+- Status: verification_needed (PR open). Uptime history #128 merged (not deployed). Owner picked this slice on a decision card.
+- Scope claimed: `server/agents/activity-log.mjs`, `server/http.mjs` ask handler and `/api/agents/activity`, `server/index.mjs`, `server/config.mjs`, `compose.yaml`, `.env.example`, staging flag, `src/components/AgentActivityPanel.tsx`, `AgentsWorkspace.tsx`, docs.
+- Work performed: Opt-in, bounded, metadata-only log of agent questions (no prompts, answers, error text or identity), atomic 0600 file, write failures swallowed. Read-only route; Agents action center shows the latest eight.
+- Verification: `make verify` passed.
+- Blockers/risks: none; empty until the flag is on in production.
+- Next action: merge after CI; set `FRIDAY_AGENT_ACTIVITY_ENABLED=true` on VM102 in an approved deploy. Remaining placeholders (approvals, remediation, new tasks/agents, open app) need owner approval.
+- Rollback/recovery: set the flag to false or revert.
 
