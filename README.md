@@ -255,7 +255,15 @@ make verify
 npm run validate:agent-registry-schema
 ```
 
-GitHub CI verifies frontend/server/observer tests, production build, shell syntax, observer/monitoring/diagnostics boundaries, the local-agent registry schema, matched-agent local-only/no-execution safety, Compose variants, and both Docker images.
+Browser smoke test (mock mode, no credentials, read-only): build first, then run Playwright. It loads the dashboard, checks the overview and Settings on desktop, and checks that the phone navigation sheet opens, traps focus and closes on Escape.
+
+```bash
+npm run build
+npx playwright install chromium   # once per machine
+npm run test:e2e
+```
+
+GitHub CI verifies frontend/server/observer tests, production build, shell syntax, observer/monitoring/diagnostics boundaries, the local-agent registry schema, matched-agent local-only/no-execution safety, Compose variants, and both Docker images. A separate `e2e` job runs the browser smoke test.
 
 # Codex start point
 

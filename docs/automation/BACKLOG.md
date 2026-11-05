@@ -9,7 +9,7 @@ Keep each item small enough for one pull request.
 
 ---
 
-## fix-authentik-flaky-test — `in-review`
+## fix-authentik-flaky-test — `done`
 
 **Scope:** `server/security/authentik.test.mjs` and, only if the root cause
 is there, `server/security/authentik*.mjs`.
@@ -36,7 +36,7 @@ routes in `server/http.mjs`). Drop or flag anything that describes code
 **Done when:** every route, env var and file the docs name exists on `main`
 (checked with grep), and `docs/codex/NEXT_STEPS.md` links them.
 
-## port-e2e-smoke — `ready`
+## port-e2e-smoke — `in-review`
 
 **Scope:** `playwright.config.mjs`, `tests/e2e/`, a CI step, `package.json`
 script. Source: the same #109 branch.

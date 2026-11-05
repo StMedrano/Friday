@@ -10,6 +10,7 @@
     "start": "node server/index.mjs",
     "preview": "vite preview --host 0.0.0.0",
     "test": "vitest run && node --test server/*.test.mjs server/security/*.test.mjs server/ai/*.test.mjs server/agents/*.test.mjs server/approvals/*.test.mjs server/adapters/*.test.mjs server/diagnostics/*.test.mjs server/monitoring/*.test.mjs server/repositories/*.test.mjs server/work/*.test.mjs server/audit/*.test.mjs server/notifications/*.test.mjs server/fabric/*.test.mjs observer/*.test.mjs scripts/*.test.mjs",
+    "test:e2e": "playwright test",
     "test:server": "node --test server/*.test.mjs server/security/*.test.mjs server/ai/*.test.mjs server/agents/*.test.mjs server/approvals/*.test.mjs server/adapters/*.test.mjs server/diagnostics/*.test.mjs server/monitoring/*.test.mjs server/repositories/*.test.mjs server/work/*.test.mjs server/audit/*.test.mjs server/notifications/*.test.mjs server/fabric/*.test.mjs observer/*.test.mjs scripts/*.test.mjs",
     "test:watch": "vitest",
     "validate:agent-registry-schema": "node scripts/validate-agent-registry-schema.mjs supabase/migrations/202608300001_friday_agent_registry.sql",
@@ -30,6 +31,7 @@
   "devDependencies": {
     "@fontsource-variable/geist": "5.3.0",
     "@fontsource-variable/geist-mono": "5.3.0",
+    "@playwright/test": "1.63.0",
     "@testing-library/jest-dom": "6.6.3",
     "@testing-library/react": "16.1.0",
     "@testing-library/user-event": "14.6.0",
