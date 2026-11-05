@@ -3,7 +3,8 @@ import {rankEligibleModelTargets} from './model-router.mjs'
 import {createNvidiaProvider} from './nvidia.mjs'
 import {ProviderUnavailableError} from './errors.mjs'
 
-// Internal only. Never exported as an HTTP API or wired into existing assistant/agent paths.
+// Internal only. Never exported as an HTTP API. The assistant uses it only when
+// FRIDAY_MODEL_FABRIC_ENABLED=true (see server/assistant.mjs).
 export function createModelFabric({config={},providers,fetchImpl,signalFactory}={}) {
   const modelConfig=config.modelFabric || {}
   const registry=buildModelTargets(modelConfig)
@@ -41,7 +42,7 @@ export function createModelFabric({config={},providers,fetchImpl,signalFactory}=
           continue
         }
         attempts.push({modelId:d.id,provider:d.provider,outcome:'success'})
-        return {available:true,provider:d.provider,modelId:d.id,model:providerConfig.model,text:response.text,attempts}
+        return {available:true,provider:d.provider,modelId:d.id,model:providerConfig.model,deployment:d.deployment,text:response.text,attempts}
       } catch (error) {
         if (!(error instanceof ProviderUnavailableError)) {
           attempts.push({modelId:d.id,provider:d.provider,outcome:'internal-error'})

@@ -63,7 +63,7 @@ source; do not invent status.
 
 **Done when:** every item references a real PR, file, or ledger entry.
 
-## wire-model-routing-into-chat — `ready`
+## wire-model-routing-into-chat — `in-review`
 
 **Scope:** `server/ai/` and the assistant route. Off by default.
 

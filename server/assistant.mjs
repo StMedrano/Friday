@@ -1,7 +1,8 @@
 import { previewCommand } from './core.mjs'
 import { ProviderUnavailableError } from './ai/errors.mjs'
-import { fridaySystemPrompt } from './ai/policy.mjs'
+import { fridaySystemPrompt, fridayUserPrompt } from './ai/policy.mjs'
 import { defaultProviders } from './ai/providers.mjs'
+import { createModelFabric } from './ai/model-fabric.mjs'
 
 function configured(providerId, providerConfig = {}) {
   if (providerId === 'ollama') {
@@ -24,6 +25,43 @@ function providerTimeoutMs(ai = {}, providerId) {
   return ai.cloudTimeoutMs || ai.timeoutMs || 15000
 }
 
+// Free-only model routing (FRIDAY_MODEL_FABRIC_ENABLED). Tries eligible free
+// targets one at a time, local first, with the same normalized Friday state the
+// providers receive and no tools. Returns null when nothing answered so the
+// caller keeps today's provider path.
+async function answerWithModelFabric({ config, fabric, text, history, overview, systemPrompt, attempts }) {
+  if (config?.modelFabric?.enabled !== true) return null
+  let result
+  try {
+    const router = fabric || createModelFabric({ config })
+    result = await router.generate({
+      requirements: { capabilities: [] },
+      request: {
+        messages: [
+          { role: 'system', content: systemPrompt },
+          { role: 'user', content: fridayUserPrompt(text, overview, history) },
+        ],
+      },
+    })
+  } catch {
+    result = { available: false, attempts: [] }
+  }
+  for (const attempt of Array.isArray(result?.attempts) ? result.attempts : []) {
+    if (attempt?.outcome === 'success') continue
+    attempts.push({ provider: String(attempt?.provider || 'model-fabric'), outcome: String(attempt?.outcome || 'internal-error') })
+  }
+  if (result?.available !== true || typeof result.text !== 'string' || !result.text.trim()) return null
+  return {
+    available: true,
+    mode: result.deployment === 'local' ? 'local-ai' : 'cloud-ai',
+    provider: result.provider,
+    model: result.model ?? null,
+    text: result.text,
+    fallbackUsed: attempts.length > 0,
+    attempts,
+  }
+}
+
 export async function answerAssistant({
   config,
   prompt,
@@ -33,6 +71,7 @@ export async function answerAssistant({
   previewImpl = previewCommand,
   systemPrompt: systemPromptOverride = null,
   signalFactory = timeoutSignal,
+  modelFabric = null,
 } = {}) {
   const text = String(prompt || '').trim()
   if (!text) {
@@ -49,6 +88,9 @@ export async function answerAssistant({
     const systemPrompt = typeof systemPromptOverride === 'string' && systemPromptOverride.trim()
       ? systemPromptOverride
       : fridaySystemPrompt()
+
+    const routed = await answerWithModelFabric({ config, fabric: modelFabric, text, history, overview, systemPrompt, attempts })
+    if (routed) return routed
 
     for (const providerId of order) {
       const provider = providers?.[providerId]

@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { answerAssistant } from './assistant.mjs'
 import { ProviderUnavailableError } from './ai/errors.mjs'
+import { createModelFabric } from './ai/model-fabric.mjs'
 
 function assistantConfig({ enabled = true, order = ['openai', 'anthropic', 'gemini', 'ollama'] } = {}) {
   return {
@@ -259,4 +260,135 @@ test('unconfigured providers are skipped instead of treated as failed attempts',
   assert.equal(result.provider, 'anthropic')
   assert.equal(result.fallbackUsed, false)
   assert.deepEqual(result.attempts, [])
+})
+
+// Free model routing (FRIDAY_MODEL_FABRIC_ENABLED)
+
+function fabricConfig({ fabricEnabled = true, order = ['openai'] } = {}) {
+  return {
+    ...assistantConfig({ order }),
+    modelFabric: {
+      enabled: fabricEnabled,
+      policy: { freeOnly: true, allowPaidFallback: false, maxPaidSpendPerDay: 0, preferLocal: true, preferNvidiaFree: true },
+      nvidia: {
+        enabled: true,
+        baseUrl: 'https://integrate.api.nvidia.com/v1',
+        apiKey: 'nvidia-secret',
+        models: [{ id: 'hosted-free', model: 'vendor/hosted', billingClass: 'free', capabilities: ['general'], supportsTools: false, supportsVision: false }],
+        localEnabled: true,
+        localBaseUrl: 'http://nvidia-nim:8000/v1',
+        localModels: [{ id: 'local-free', model: 'vendor/local', billingClass: 'free', capabilities: ['general'], supportsTools: false, supportsVision: false }],
+      },
+    },
+  }
+}
+
+function fakeNvidia(answer) {
+  const calls = []
+  return {
+    calls,
+    adapter: {
+      async health() {},
+      async generate({ providerConfig, request }) {
+        calls.push({ model: providerConfig.model, deployment: providerConfig.deployment, request })
+        return answer(providerConfig)
+      },
+    },
+  }
+}
+
+test('model routing flag off keeps the existing provider path and never calls the router', async () => {
+  let routed = 0
+  const result = await answerAssistant({
+    config: fabricConfig({ fabricEnabled: false }),
+    prompt: 'Check health',
+    overview: {},
+    modelFabric: { generate: async () => { routed += 1; return { available: true, text: 'router' } } },
+    providers: { openai: async () => ({ provider: 'openai', model: 'openai-model', text: 'Cloud answer' }) },
+  })
+  assert.equal(routed, 0)
+  assert.equal(result.provider, 'openai')
+  assert.equal(result.text, 'Cloud answer')
+})
+
+test('model routing flag on answers through the free router, local first, with normalized state and no tools', async () => {
+  const config = fabricConfig()
+  const nvidia = fakeNvidia(() => ({ text: 'Local free answer' }))
+  let openaiCalls = 0
+  const result = await answerAssistant({
+    config,
+    prompt: 'Check health',
+    history: [{ role: 'user', content: 'earlier question' }],
+    overview: { mode: 'live', services: [] },
+    modelFabric: createModelFabric({ config, providers: { nvidia: nvidia.adapter }, signalFactory: () => ({ signal: undefined }) }),
+    providers: { openai: async () => { openaiCalls += 1; return { provider: 'openai', text: 'unused' } } },
+  })
+
+  assert.deepEqual(result, {
+    available: true, mode: 'local-ai', provider: 'nvidia', model: 'vendor/local',
+    text: 'Local free answer', fallbackUsed: false, attempts: [],
+  })
+  assert.equal(openaiCalls, 0)
+  assert.equal(nvidia.calls.length, 1)
+  assert.equal(nvidia.calls[0].deployment, 'local')
+  const { request } = nvidia.calls[0]
+  assert.deepEqual(Object.keys(request), ['messages'])
+  assert.deepEqual(request.messages.map((m) => m.role), ['system', 'user'])
+  assert.match(request.messages[1].content, /Authoritative normalized Friday state:\n\{"mode":"live","services":\[\]\}/)
+  assert.match(request.messages[1].content, /earlier question/)
+})
+
+test('model routing fails over sequentially from local to hosted free models', async () => {
+  const config = fabricConfig()
+  const nvidia = fakeNvidia((providerConfig) => {
+    if (providerConfig.deployment === 'local') throw new ProviderUnavailableError('nvidia', 'timeout')
+    return { text: 'Hosted free answer' }
+  })
+  const result = await answerAssistant({
+    config,
+    prompt: 'Check health',
+    overview: {},
+    modelFabric: createModelFabric({ config, providers: { nvidia: nvidia.adapter }, signalFactory: () => ({ signal: undefined }) }),
+    providers: {},
+  })
+  assert.deepEqual(nvidia.calls.map((call) => call.deployment), ['local', 'hosted'])
+  assert.equal(result.mode, 'cloud-ai')
+  assert.equal(result.model, 'vendor/hosted')
+  assert.equal(result.fallbackUsed, true)
+  assert.deepEqual(result.attempts, [{ provider: 'nvidia', outcome: 'timeout' }])
+})
+
+test('model routing with every provider failing returns the same safe unavailable result as today', async () => {
+  const config = fabricConfig()
+  const nvidia = fakeNvidia(() => { throw new ProviderUnavailableError('nvidia', 'network') })
+  const result = await answerAssistant({
+    config,
+    prompt: 'tell me something unrelated',
+    overview: {},
+    modelFabric: createModelFabric({ config, providers: { nvidia: nvidia.adapter }, signalFactory: () => ({ signal: undefined }) }),
+    providers: { openai: unavailable('openai', 'upstream') },
+    previewImpl: () => ({ accepted: false, mode: 'preview', reason: 'unsupported-command' }),
+  })
+  assert.equal(result.available, false)
+  assert.equal(result.mode, 'local-analysis')
+  assert.equal(result.provider, 'deterministic')
+  assert.match(result.reason, /No configured AI provider was available/i)
+  assert.deepEqual(result.attempts, [
+    { provider: 'nvidia', outcome: 'network' },
+    { provider: 'nvidia', outcome: 'network' },
+    { provider: 'openai', outcome: 'upstream' },
+  ])
+  assert.doesNotMatch(JSON.stringify(result), /nvidia-secret/)
+})
+
+test('a broken model router never blocks the existing provider path', async () => {
+  const result = await answerAssistant({
+    config: fabricConfig(),
+    prompt: 'Check health',
+    overview: {},
+    modelFabric: { generate: async () => { throw new Error('boom') } },
+    providers: { openai: async () => ({ provider: 'openai', model: 'openai-model', text: 'Cloud answer' }) },
+  })
+  assert.equal(result.provider, 'openai')
+  assert.equal(result.text, 'Cloud answer')
 })

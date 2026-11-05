@@ -78,6 +78,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Service-token renewal | Codex/ChatGPT | `planned` | `friday-cloud-reader`; coordinated Cloudflare rotation and managed-runtime binding update | 2026-10-29 | 2026-10-29 | After the exact production merge target is identified, rotate with a bounded overlap, update the secure caller binding without exposing the secret, rerun acceptance, then retire the prior secret. |
 | Production deployment after development merge | unclaimed | `planned` | Merged `main` revision and authoritative VM102 checkout | 2026-10-29 | 2026-10-29 | Identify the exact development PR/branch, require its merge and green exact-head verification, then inventory VM102, preserve `.env`, run preflight, deploy the merged `main`, and run health plus cloud acceptance. |
 | Web Growth reader slice | Claude | `complete` | Branch `claude/friday-web-growth`: `server/adapters/web-growth*.mjs`, `/api/web-growth`, `integrations/web-growth-reader/`, Web Growth panel under the TechTactics group | 2026-10-31 | 2026-11-01 | Merged as #114. Stays disabled until an operator deploys the isolated reader and sets the reader URL, token and emails. |
+| Wire free model routing into chat | Claude | `verification_needed` | `server/assistant.mjs`, `server/ai/model-fabric.mjs`, tests, `docs/model-fabric.md`, backlog | 2026-11-05 | 2026-11-05 | Merge after CI. Stays off until `FRIDAY_MODEL_FABRIC_ENABLED=true` and free NVIDIA models are configured. |
 | Free model routing and NVIDIA readiness slice | Claude | `complete` | Branch `claude/friday-model-fabric`: `server/ai/model-{fabric,registry,router}.mjs`, `server/ai/nvidia.mjs`, `scripts/check-nvidia-catalog.mjs`, `modelFabric` config, docs | 2026-11-01 | 2026-11-01 | Merged as #115. Internal only and default off; not wired into chat or agents. |
 | Container and observer hardening slice | Claude | `complete` | Branch `claude/friday-container-hardening`: `observer/docker-proxy.mjs`, `observer/Dockerfile*`, `observer/compose.yaml`, controller `Dockerfile`, CI observer steps | 2026-11-01 | 2026-11-02 | Merged as #116. VM100 observer rollout and the controller non-root data migration each need a separate operator-approved window. |
 | #109 leftovers, slice A (history validation, HomeLab observations, phone sheet focus) | Claude | `complete` | Branch `claude/friday-109-ui-slice`: `server/monitoring/history.mjs`, `/api/monitoring/history`, `src/components/HomeLabSnapshot.tsx`, `src/hooks/useModalFocus.ts`, `MobileNavigation.tsx` | 2026-11-02 | 2026-11-02 | Merged as #117. |
@@ -297,7 +298,7 @@ The ledger should normally be committed with the repository so every agent sees 
 ### 2026-11-05 — Claude — Friday UI redesign from AIDesigner
 - Work: Pulled the owner's AIDesigner "Friday" canvases via the REST API and generated six more (Incidents, Applications, Repositories, Chat, Settings/Audit, phone). Re-skinned the app to zinc/indigo with bundled Geist fonts, replaced the icon rail with a grouped labeled sidebar, rebuilt desktop Home (greeting, Ask card, suggestions, stat cards, action-center rail) using real data only. Only Approvals and Memory are marked not connected now. Audit no longer crashes when the API answers 200 with non-JSON; the server serves .woff/.woff2 with font MIME types.
 - Verification: `make verify` passed (vitest 213, node 849, build, Compose).
-- Blockers: none. Not deployed.
+- Blockers: none. Deployed 2026-11-05 at `7aac30d`.
 - Next: owner review of the PR.
 
 ### 2026-11-05 — Claude — Friday UI redesign slice 2 (backend check)
@@ -321,7 +322,7 @@ The ledger should normally be committed with the repository so every agent sees 
 - Rollback/recovery: set `FRIDAY_GITHUB_ENABLED=false` or revert the PR.
 
 ### 2026-11-05 — Claude — Uptime history for Applications
-- Status: verification_needed (PR open). GitHub integration #127 merged (not deployed).
+- Status: verification_needed (PR open). GitHub integration #127 merged (deployed 2026-11-05 at `7aac30d`).
 - Scope claimed: `server/monitoring/uptime.mjs`, `server/monitoring/{runtime,state}.mjs`, `/api/monitoring/uptime`, `server/config.mjs`, `compose.yaml`, `.env.example`, staging flag, `ApplicationsWorkspace.tsx`, `src/lib/api.ts`, docs.
 - Work performed: Opt-in seven day hourly uptime record per service, written from each successful poll into the monitoring state file (max 300 services, maintenance excluded, degraded counts as up). Read-only route with explicit 503s. Applications shows 24h uptime, hourly bars and a 24h/7d detail.
 - Verification: `make verify` (see PR).
@@ -330,7 +331,7 @@ The ledger should normally be committed with the repository so every agent sees 
 - Rollback/recovery: set the flag to false (the stored record is ignored) or revert.
 
 ### 2026-11-05 — Claude — Agent activity log
-- Status: verification_needed (PR open). Uptime history #128 merged (not deployed). Owner picked this slice on a decision card.
+- Status: verification_needed (PR open). Uptime history #128 merged (deployed 2026-11-05 at `7aac30d`). Owner picked this slice on a decision card.
 - Scope claimed: `server/agents/activity-log.mjs`, `server/http.mjs` ask handler and `/api/agents/activity`, `server/index.mjs`, `server/config.mjs`, `compose.yaml`, `.env.example`, staging flag, `src/components/AgentActivityPanel.tsx`, `AgentsWorkspace.tsx`, docs.
 - Work performed: Opt-in, bounded, metadata-only log of agent questions (no prompts, answers, error text or identity), atomic 0600 file, write failures swallowed. Read-only route; Agents action center shows the latest eight.
 - Verification: `make verify` passed.
@@ -339,10 +340,17 @@ The ledger should normally be committed with the repository so every agent sees 
 - Rollback/recovery: set the flag to false or revert.
 
 ### 2026-11-05 — Claude — Agent on duty (Infrastructure)
-- Status: verification_needed (PR open). Agent activity log #129 merged (not deployed).
+- Status: verification_needed (PR open). Agent activity log #129 merged (deployed 2026-11-05 at `7aac30d`).
 - Scope claimed: `src/components/AgentOnDuty.tsx`, `InfrastructureWorkspace.tsx`, `src/theme.css`. UI only, no new server route or flag.
 - Work performed: Infrastructure's "Agent on duty" card now names the enabled registry agent whose declared `scope.hosts` covers the visible hosts, with its last answer time from the agent activity log when that is on. Stays "Not connected" when the registry is unavailable.
 - Verification: `make verify` passed.
 - Next action: merge after CI. Remaining placeholders (approvals, remediation, task/agent creation, open app) and the VM102 deploy wait for the owner.
 - Rollback/recovery: revert the PR.
 
+### 2026-11-05 — Claude — Free model routing in chat
+- Status: verification_needed (PR open). #127 to #130 are deployed on VM102 at `7aac30d` (owner ran the deploy; GitHub, uptime and agent activity flags on, `make health` ok).
+- Scope claimed: `server/assistant.mjs`, `server/ai/model-fabric.mjs`, `server/assistant.test.mjs`, `docs/model-fabric.md`, `docs/automation/BACKLOG.md`.
+- Work performed: When `FRIDAY_AI_ENABLED` and `FRIDAY_MODEL_FABRIC_ENABLED` are both true, the assistant (chat, group advisory, agent ask) first tries the free-only router: eligible free NVIDIA targets one at a time, local first, normalized Friday state and history only, no tools. If none answers, it continues down today's provider order and deterministic analysis, so the safe unavailable result is unchanged. Router failures are recorded as sanitized attempts. Flag off changes nothing.
+- Verification: `make verify` (see PR).
+- Next action: merge after CI. Turning it on needs free NVIDIA models configured on VM102 in an approved deploy. Next slice: approvals queue (owner picked it 2026-11-05).
+- Rollback/recovery: set `FRIDAY_MODEL_FABRIC_ENABLED=false` or revert.
