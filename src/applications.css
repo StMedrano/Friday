@@ -28,7 +28,7 @@
 }
 .v3-applications-hero p {
   font-size: 12px;
-  color: #9ba8b5;
+  color: #a4a4ac;
   max-width: 730px;
   line-height: 1.65;
   margin: 0;
@@ -40,7 +40,7 @@
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 10px;
-  color: #acbac8;
+  color: #b7b7bd;
   font-size: 12px;
 }
 .v3-applications-counts {
@@ -60,7 +60,7 @@
 }
 .v3-applications-counts article span {
   font-size: 12px;
-  color: #90a0af;
+  color: #9b9ba4;
 }
 .v3-applications-counts article strong {
   font-size: 24px;
@@ -79,7 +79,7 @@
   align-items: center;
   border: 1px solid var(--line);
   border-radius: 11px;
-  background: #0e131b;
+  background: #18181b;
   min-width: min(100%, 290px);
   padding: 9px 12px;
 }
@@ -115,8 +115,8 @@
 }
 .v3-applications-filters button[aria-pressed="true"] {
   color: var(--cyan);
-  border-color: rgba(103, 217, 255, 0.35);
-  background: rgba(103, 217, 255, 0.07);
+  border-color: rgba(165, 180, 252, 0.35);
+  background: rgba(165, 180, 252, 0.07);
 }
 .v3-applications-filters button:focus-visible,
 .v3-applications-row:focus-visible {
@@ -157,7 +157,7 @@
 }
 .v3-applications-row:hover,
 .v3-applications-row.selected {
-  background: rgba(103, 217, 255, 0.06);
+  background: rgba(165, 180, 252, 0.06);
 }
 .v3-applications-row svg {
   color: var(--cyan);
@@ -173,7 +173,7 @@
 }
 .v3-applications-name small {
   font-size: 12px;
-  color: #9ba8b5;
+  color: #a4a4ac;
   overflow-wrap: anywhere;
 }
 .v3-applications-health {
@@ -190,7 +190,7 @@
   color: var(--amber);
 }
 .v3-applications-health.maintenance {
-  color: #bdc4cc;
+  color: #c2c2c7;
 }
 .v3-applications-detail {
   padding: 20px;
@@ -217,7 +217,7 @@
 }
 .v3-applications-detail dt {
   font-size: 12px;
-  color: #90a0af;
+  color: #9b9ba4;
 }
 .v3-applications-detail dd {
   font-size: 12px;
@@ -228,7 +228,7 @@
 .v3-applications-detail p,
 .v3-applications-empty {
   font-size: 12px;
-  color: #a1aeba;
+  color: #a9a9b2;
   line-height: 1.65;
   margin: 0;
 }
@@ -249,7 +249,7 @@
 }
 .v3-pending-capability p {
   margin: 0;
-  color: #acb7c2;
+  color: #b3b3bb;
   font-size: 13px;
   max-width: 720px;
   line-height: 1.6;

@@ -134,6 +134,8 @@ export async function fetchFridayAuditEvents(before: number | null = null, signa
   const response = await fetch(`/api/audit/events?${query}`, { method: 'GET', signal })
   const body = await response.json().catch(() => ({})) as FridayAuditPage | { error?: string }
   if (!response.ok) throw new FridayAuditError('error' in body && body.error ? body.error : 'audit-unavailable', response.status)
+  // Without the API (for example a static preview), the server may answer 200 with HTML.
+  if (!Array.isArray((body as FridayAuditPage).events)) throw new FridayAuditError('audit-unavailable', response.status)
   return body as FridayAuditPage
 }
 

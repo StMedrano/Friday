@@ -66,7 +66,7 @@
 }
 .v3-incident-body > p {
   font-size: 11px;
-  color: #778594;
+  color: #7f7f8c;
   line-height: 1.5;
   margin: 8px 0;
 }
@@ -84,20 +84,20 @@
 .v3-recommendation {
   margin-top: 10px;
   padding: 10px 11px;
-  border: 1px solid rgba(103, 217, 255, 0.12);
+  border: 1px solid rgba(165, 180, 252, 0.12);
   border-radius: 8px;
-  background: rgba(103, 217, 255, 0.025);
+  background: rgba(165, 180, 252, 0.025);
 }
 .v3-recommendation strong {
   font-size: 11px;
-  color: #83919d;
+  color: #8a8a96;
   text-transform: uppercase;
   letter-spacing: 0.08em;
 }
 .v3-recommendation p {
   font-size: 11px;
   line-height: 1.5;
-  color: #9ca9b4;
+  color: #a4a4ac;
   margin: 4px 0 0;
 }
 .v3-incident-policy {
@@ -112,7 +112,7 @@
   letter-spacing: 0.08em;
 }
 .v3-incident-policy span {
-  color: #778594;
+  color: #7f7f8c;
 }
 .v3-incident-policy strong {
   max-width: 130px;
@@ -139,7 +139,7 @@
 }
 .v3-incident-empty b {
   font-size: 12px;
-  color: #c6d0d7;
+  color: #ccccd1;
 }
 .v3-incident-empty span {
   font-size: 11px;
@@ -196,7 +196,7 @@
   border-bottom: 0;
 }
 .v3-history-row > svg {
-  color: #6f8190;
+  color: #787887;
 }
 .v3-history-row span b,
 .v3-history-row span small {
@@ -280,9 +280,9 @@
   display: grid;
   gap: 16px;
   margin: 22px 0;
-  border: 1px solid rgba(103, 217, 255, 0.16);
+  border: 1px solid rgba(165, 180, 252, 0.16);
   border-radius: 16px;
-  background: rgba(103, 217, 255, 0.018);
+  background: rgba(165, 180, 252, 0.018);
   padding: 18px;
   min-width: 0;
 }
@@ -365,7 +365,7 @@
   padding: 9px 11px;
   font-size: 11px;
   line-height: 1.55;
-  color: #a5b1bb;
+  color: #acacb4;
 }
 .v3-diagnostic-empty,
 .v3-diagnostic-error,
@@ -388,7 +388,7 @@
   gap: 10px;
   padding: 10px 12px;
   font-size: 11px;
-  color: #96a4af;
+  color: #9e9ea7;
 }
 .v3-diagnostic-state svg {
   color: var(--cyan);
@@ -399,10 +399,10 @@
 }
 .v3-readonly-action {
   min-height: 44px;
-  border: 1px solid rgba(103, 217, 255, 0.22);
+  border: 1px solid rgba(165, 180, 252, 0.22);
   border-radius: 10px;
-  background: rgba(103, 217, 255, 0.05);
-  color: #b6eefe;
+  background: rgba(165, 180, 252, 0.05);
+  color: #e0e7ff;
   padding: 0 13px;
   font: inherit;
   font-size: 11px;
@@ -438,13 +438,13 @@
   border: 1px solid var(--line);
   border-radius: 12px;
   padding: 12px;
-  background: #070a0e;
+  background: #09090b;
   font:
     11px/1.55 ui-monospace,
     SFMono-Regular,
     Consolas,
     monospace;
-  color: #a9bac7;
+  color: #b4b4bc;
   box-sizing: border-box;
 }
 .v3-diagnostic-authority {
@@ -529,7 +529,7 @@
   border: 1px solid var(--line);
   border-radius: 11px;
   background: rgba(255, 255, 255, 0.012);
-  color: #a7b4c0;
+  color: #b0b0b7;
   display: flex;
   align-items: flex-start;
   flex-direction: column;
@@ -539,9 +539,9 @@
   text-align: left;
 }
 .v3-topology-sites button[aria-pressed="true"] {
-  border-color: rgba(103, 217, 255, 0.42);
-  background: rgba(103, 217, 255, 0.06);
-  color: #ccf4ff;
+  border-color: rgba(165, 180, 252, 0.42);
+  background: rgba(165, 180, 252, 0.06);
+  color: #e0e7ff;
 }
 .v3-topology-sites button:focus-visible {
   outline: 2px solid var(--cyan);
@@ -621,7 +621,7 @@
   height: 8px;
   width: 8px;
   border-radius: 50%;
-  background: #6d7b85;
+  background: #727280;
 }
 .v3-topology-service i.online {
   background: var(--green);
@@ -719,14 +719,14 @@
   background: rgba(255, 255, 255, 0.013);
   font: inherit;
   font-size: 11px;
-  color: #9aabb8;
+  color: #a5a5ad;
   cursor: pointer;
   overflow-wrap: anywhere;
 }
 .v3-incident-triage button[aria-pressed="true"] {
-  border-color: rgba(103, 217, 255, 0.38);
-  color: #c6f0ff;
-  background: rgba(103, 217, 255, 0.065);
+  border-color: rgba(165, 180, 252, 0.38);
+  color: #e0e7ff;
+  background: rgba(165, 180, 252, 0.065);
 }
 .v3-incident-triage button:focus-visible {
   outline: 2px solid var(--cyan);

@@ -68,7 +68,7 @@ describe('Dashboard assistant integration', () => {
     expect(await screen.findByText('friday-ollama is LXC 108')).toBeInTheDocument()
     expect(askFridayAssistant).toHaveBeenNthCalledWith(1, 'Check friday-ollama', { history: [] })
 
-    await user.click(screen.getByRole('button', { name: /^FRIDAY$/i }))
+    await user.click(screen.getByRole('button', { name: /^Chat$/i }))
     expect(screen.getByText('FRIDAY / SESSION')).toBeInTheDocument()
     expect(screen.getByText('Advisory only · No actions executed')).toBeInTheDocument()
     expect(screen.getByText('Check friday-ollama')).toBeInTheDocument()
@@ -86,7 +86,7 @@ describe('Dashboard assistant integration', () => {
       ],
     })
 
-    await user.click(screen.getByRole('button', { name: /^Overview$/i }))
+    await user.click(screen.getByRole('button', { name: /^Home$/i }))
     expect(screen.getByText('Check friday-ollama')).toBeInTheDocument()
     expect(screen.getByText('friday-ollama is LXC 108')).toBeInTheDocument()
     expect(screen.getByText('Compare it to VM102')).toBeInTheDocument()

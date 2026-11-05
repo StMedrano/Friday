@@ -53,7 +53,7 @@
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  color: #9aa8b2;
+  color: #a2a2aa;
   white-space: nowrap;
 }
 .v3-settings-pill.on {
@@ -76,11 +76,11 @@
   margin: 10px 0 0;
   padding: 0;
   font-size: 12px;
-  color: #cfe9f3;
+  color: #dfdfe3;
 }
 .v3-settings-order li {
   padding: 3px 8px;
-  border: 1px solid rgba(103, 217, 255, 0.18);
+  border: 1px solid rgba(165, 180, 252, 0.18);
   border-radius: 8px;
 }
 .v3-settings-facts {
@@ -95,7 +95,7 @@
 }
 .v3-settings-facts dd {
   margin: 0;
-  color: #c7d2d9;
+  color: #ceced2;
 }
 .v3-settings-safety {
   display: flex;
@@ -106,7 +106,7 @@
   color: var(--green);
 }
 .v3-settings-message {
-  color: #81909c;
+  color: #898994;
   font-size: 12px;
   line-height: 1.6;
 }
