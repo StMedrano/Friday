@@ -273,6 +273,18 @@ describe('Preview data and service scanability', () => {
     expect(screen.getByRole('note', { name: /preview data/i })).toBeInTheDocument()
   })
 
+  it('says the server is in mock mode instead of claiming the API is disconnected', async () => {
+    installMatchMedia(false)
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => String(input) === '/api/overview'
+      ? new Response(JSON.stringify({ ...liveOverview, mode: 'mock' }), { status: 200 })
+      : new Response('{}', { status: 503 })))
+    render(<Dashboard />)
+    await screen.findByText(/API connected · mock mode/i)
+    const note = screen.getByRole('note', { name: /preview data/i })
+    expect(note).toHaveTextContent(/mock mode/i)
+    expect(note).not.toHaveTextContent(/isn't connected/i)
+  })
+
   it('hides the preview banner once live data arrives', async () => {
     installMatchMedia(false)
     vi.stubGlobal('fetch', liveFetch())

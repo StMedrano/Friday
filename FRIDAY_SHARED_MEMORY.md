@@ -296,3 +296,8 @@ The ledger should normally be committed with the repository so every agent sees 
 - Verification: `make verify` passed (vitest 213, node 849, build, Compose).
 - Blockers: none. Not deployed.
 - Next: owner review of the PR.
+
+### 2026-11-05 — Claude — Friday UI redesign slice 2 (backend check)
+- Work: Merged #124. Ran the real server (`FRIDAY_MODE=mock`, built UI) and drove all 12 screens: no page errors; 503s only from features disabled in mock mode (agents, audit, monitoring history, assistant AI), each shown with an honest message. Chat gets an Active context rail (open incidents, visible services, suggested questions) from normalized state; Applications becomes a card grid; the preview banner now says mock mode when the API is connected.
+- Verification: `make verify` passed (vitest 216, node 849).
+- Next: owner review of the PR.
