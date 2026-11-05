@@ -1,4 +1,4 @@
-import NotConnected from './NotConnected'
+import AgentOnDuty from './AgentOnDuty'
 import { useMemo, useState } from 'react'
 import { Network, Server, ShieldCheck } from 'lucide-react'
 import type { FridayOverview } from '../lib/api'
@@ -59,7 +59,7 @@ export default function InfrastructureWorkspace({ overview, connected }: {
       <div className="fx-stat healthy"><span className="fx-stat-icon"><Server size={17} aria-hidden="true"/></span><small>Hosts</small><strong>{new Set(overview.services.map((service) => hostLabel(service.host))).size}<em>observed</em></strong></div>
       <div className={`fx-stat ${overview.services.some((service) => service.status !== 'online') ? 'attention' : 'healthy'}`}><span className="fx-stat-icon"><Network size={17} aria-hidden="true"/></span><small>Services</small><strong>{overview.services.filter((service) => service.status === 'online').length}<em>/{overview.services.length} online</em></strong></div>
       <div className={`fx-stat ${overview.alerts.length ? 'attention' : 'healthy'}`}><span className="fx-stat-icon"><ShieldCheck size={17} aria-hidden="true"/></span><small>Alerts</small><strong>{overview.alerts.length}<em>{overview.alerts.length ? 'active' : 'none'}</em></strong></div>
-      <NotConnected title="Agent on duty" detail="Which agent watches this infrastructure appears once agent runs report to Friday."/>
+      <AgentOnDuty hosts={hostGroups.map(([host]) => host)}/>
     </section>
 
     <section className="v3-panel v3-topology-panel" aria-label="Site topology">
