@@ -1,3 +1,4 @@
+import NotConnected from './NotConnected'
 import { useMemo, useState } from 'react'
 import { Network, Server, ShieldCheck } from 'lucide-react'
 import type { FridayOverview } from '../lib/api'
@@ -54,6 +55,13 @@ export default function InfrastructureWorkspace({ overview, connected }: {
       </div>
     </div>
 
+    <section className="fx-stats fx-stats-compact" aria-label="Infrastructure summary">
+      <div className="fx-stat healthy"><span className="fx-stat-icon"><Server size={17} aria-hidden="true"/></span><small>Hosts</small><strong>{new Set(overview.services.map((service) => hostLabel(service.host))).size}<em>observed</em></strong></div>
+      <div className={`fx-stat ${overview.services.some((service) => service.status !== 'online') ? 'attention' : 'healthy'}`}><span className="fx-stat-icon"><Network size={17} aria-hidden="true"/></span><small>Services</small><strong>{overview.services.filter((service) => service.status === 'online').length}<em>/{overview.services.length} online</em></strong></div>
+      <div className={`fx-stat ${overview.alerts.length ? 'attention' : 'healthy'}`}><span className="fx-stat-icon"><ShieldCheck size={17} aria-hidden="true"/></span><small>Alerts</small><strong>{overview.alerts.length}<em>{overview.alerts.length ? 'active' : 'none'}</em></strong></div>
+      <NotConnected title="Agent on duty" detail="Which agent watches this infrastructure appears once agent runs report to Friday."/>
+    </section>
+
     <section className="v3-panel v3-topology-panel" aria-label="Site topology">
       <div className="v3-section-head">
         <div><span className="v3-kicker">SITE INVENTORY</span><h2>Observed locations</h2></div>
@@ -101,5 +109,21 @@ export default function InfrastructureWorkspace({ overview, connected }: {
         </article>)}
       </div>}
     </section>
+
+    {visible.length > 0 && <section className="v3-section" aria-label="Active services table">
+      <div className="v3-section-head"><div><span className="v3-kicker">SERVICES</span><h2>Active services</h2></div></div>
+      <div className="v3-panel fx-table-wrap">
+        <table className="fx-table">
+          <thead><tr><th scope="col">Service</th><th scope="col">Host</th><th scope="col">Status</th><th scope="col">Last observed</th><th scope="col">Agent access</th></tr></thead>
+          <tbody>{[...visible].sort((a, b) => statusPriority[a.status] - statusPriority[b.status] || a.name.localeCompare(b.name)).map((service) => <tr key={service.id}>
+            <td><b>{service.name}</b><small>{service.category}</small></td>
+            <td><code>{hostLabel(service.host)}</code></td>
+            <td><span className={`fx-status ${service.status}`}>{service.status}</span></td>
+            <td>{service.updated || '—'}</td>
+            <td className="fx-na" title="Per-service agent access is not connected">Not connected</td>
+          </tr>)}</tbody>
+        </table>
+      </div>
+    </section>}
   </section>
 }

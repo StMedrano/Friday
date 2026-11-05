@@ -575,3 +575,104 @@ code, kbd, pre, samp,
 .fx-shell .v3-applications-row.selected { border-color: rgba(99, 102, 241, 0.5); background: var(--surface-2); }
 .fx-shell .v3-applications-detail { background: var(--surface); position: sticky; top: 80px; }
 @media (max-width: 1100px) { .fx-shell .v3-applications-layout { grid-template-columns: 1fr; } .fx-shell .v3-applications-detail { position: static; } }
+
+/* ---------- Shared pieces for the AIDesigner page layouts ---------- */
+.fx-not-connected {
+  display: flex; align-items: center; gap: 12px; padding: 12px 14px;
+  border: 1px dashed var(--line-strong); border-radius: 12px; background: rgba(255, 255, 255, 0.015);
+}
+.fx-not-connected-icon { width: 30px; height: 30px; flex: none; display: grid; place-items: center; border-radius: 8px; background: var(--surface-2); color: var(--faint); }
+.fx-not-connected-body { flex: 1; min-width: 0; display: grid; gap: 2px; }
+.fx-not-connected-body b { font-size: 13px; font-weight: 600; }
+.fx-not-connected-body small { font-size: 12px; color: var(--muted); line-height: 1.45; }
+.fx-not-connected em, .fx-na { font-style: normal; font-family: var(--font-mono); font-size: 11px; color: var(--faint); }
+.fx-not-connected em { padding: 2px 6px; border: 1px solid var(--line-strong); border-radius: 5px; white-space: nowrap; }
+.fx-not-connected button, .fx-button {
+  display: inline-flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px; border-radius: 9px;
+  border: 1px solid var(--line-strong); background: var(--surface-2); color: var(--text-2); font-size: 13px; cursor: pointer; white-space: nowrap;
+}
+.fx-button.primary { background: var(--accent); border-color: transparent; color: #fff; }
+.fx-not-connected button:disabled, .fx-button:disabled { opacity: 0.5; cursor: not-allowed; }
+.fx-pill {
+  display: inline-block; vertical-align: middle; margin-left: 8px; padding: 2px 8px; border-radius: 6px;
+  font-family: var(--font-mono); font-size: 12px; font-weight: 500; letter-spacing: 0;
+  background: var(--surface-2); border: 1px solid var(--line-strong); color: var(--text-2);
+}
+.fx-tabs { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px; margin-bottom: 18px; width: fit-content; border: 1px solid var(--line); border-radius: 11px; background: var(--surface); }
+.fx-tabs button { height: 32px; padding: 0 14px; border: 0; border-radius: 8px; background: none; color: var(--muted); font-size: 13px; cursor: pointer; }
+.fx-tabs button:is([aria-selected="true"], [aria-pressed="true"]) { background: var(--surface-2); color: var(--text); box-shadow: inset 0 0 0 1px var(--line-strong); }
+.fx-tab-group { display: contents; }
+.fx-tab-group[hidden], [hidden] { display: none !important; }
+.fx-filterbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 4px 0 14px; }
+.fx-search-field { flex: 1; min-width: 200px; display: flex; align-items: center; gap: 8px; height: 34px; padding: 0 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); color: var(--faint); }
+.fx-search-field input { flex: 1; border: 0; outline: 0; background: none; color: var(--text); font-size: 13px; }
+.fx-select { display: flex; align-items: center; gap: 6px; height: 34px; padding: 0 4px 0 10px; border: 1px solid var(--line); border-radius: 9px; background: var(--bg); font-size: 12px; color: var(--faint); }
+.fx-select select { border: 0; background: none; color: var(--text); font-size: 13px; padding: 0 4px; }
+.fx-table-wrap { padding: 0; overflow-x: auto; }
+.fx-table, .fx-repo-table table { width: 100%; border-collapse: collapse; font-size: 13px; }
+.fx-table th, .fx-repo-table th {
+  text-align: left; padding: 11px 16px; font-family: var(--font-mono); font-size: 11px; font-weight: 500;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); border-bottom: 1px solid var(--line);
+}
+.fx-table td, .fx-repo-table td { padding: 12px 16px; border-bottom: 1px solid var(--line); vertical-align: middle; }
+.fx-table tr:last-child td, .fx-repo-table tr:last-child td { border-bottom: 0; }
+.fx-table td small { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--faint); margin-top: 2px; }
+.fx-table code, .fx-repo-table code { font-family: var(--font-mono); font-size: 12px; color: var(--text-2); }
+.fx-status { display: inline-flex; align-items: center; gap: 6px; padding: 2px 8px; border-radius: 6px; font-size: 12px; text-transform: capitalize;
+  color: #6ee7b7; border: 1px solid rgba(52, 211, 153, 0.3); background: rgba(52, 211, 153, 0.06); }
+.fx-status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+.fx-status:is(.degraded, .warning, .maintenance) { color: #fde68a; border-color: rgba(251, 191, 36, 0.3); background: rgba(251, 191, 36, 0.06); }
+.fx-status:is(.offline, .down, .critical) { color: #fda4af; border-color: rgba(251, 113, 133, 0.3); background: rgba(251, 113, 133, 0.06); }
+.fx-stats-compact { margin-bottom: 20px; }
+.fx-stats-compact .fx-stat { cursor: default; min-height: 0; }
+.fx-stats-compact .fx-stat:hover { transform: none; }
+.fx-stats-compact .fx-not-connected { border-radius: 16px; }
+
+/* Incidents: list + detail split */
+.fx-split { display: grid; grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1.3fr); gap: 18px; align-items: start; margin: 18px 0 6px; }
+.fx-split-detail { position: sticky; top: 80px; display: grid; gap: 12px; }
+.fx-empty-detail { display: grid; justify-items: center; gap: 6px; padding: 40px 20px; text-align: center; border: 1px solid var(--line); border-radius: 14px; background: var(--surface); color: var(--faint); }
+.fx-empty-detail b { color: var(--text); font-size: 14px; }
+.fx-empty-detail p { margin: 0; font-size: 13px; color: var(--muted); }
+.fx-page-head h2 { display: flex; align-items: center; }
+
+/* Repositories: table + side panel */
+.fx-shell .v3-repository-grid { grid-template-columns: minmax(0, 1fr) 300px; }
+.fx-shell .v3-repository-grid > [aria-label="Repository files"] { grid-column: 1 / -1; }
+.fx-repo-table { padding: 16px 0 0; overflow-x: auto; }
+.fx-repo-table .v3-section-head { padding: 0 16px; }
+.fx-repo-table td button { display: flex; align-items: center; gap: 10px; border: 0; background: none; color: var(--text); text-align: left; cursor: pointer; padding: 0; }
+.fx-repo-table td button b { display: block; font-weight: 600; }
+.fx-repo-table td button small { display: block; font-family: var(--font-mono); font-size: 11px; color: var(--faint); }
+.fx-repo-table tr.selected td { background: rgba(99, 102, 241, 0.06); }
+.fx-repo-table tr.selected td:first-child { box-shadow: inset 2px 0 0 var(--accent); }
+.fx-repo-table td em { font-style: normal; font-family: var(--font-mono); font-size: 11px; color: var(--muted); }
+.fx-repo-side { display: grid; gap: 12px; align-content: start; }
+
+/* Agents: main + action center rail */
+.fx-with-rail { display: grid; grid-template-columns: minmax(0, 1fr) 300px; gap: 18px; align-items: start; }
+.fx-with-rail-main { min-width: 0; display: grid; gap: 14px; }
+.fx-action-center { position: sticky; top: 80px; display: grid; gap: 10px; padding: 16px; border: 1px solid var(--line); border-radius: 16px; background: var(--surface); }
+.fx-action-center h2 { margin: 0 0 4px; font-size: 15px; font-weight: 600; }
+
+/* Applications card extras */
+.fx-shell .v3-applications-row { grid-template-areas: "icon name" "health health" "meta meta" "spark spark"; }
+.fx-app-meta { grid-area: meta; display: grid; grid-template-columns: 1fr 1fr; gap: 8px; padding-top: 12px; border-top: 1px solid var(--line); }
+.fx-app-meta small { display: block; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
+.fx-app-meta b { font-size: 13px; font-weight: 500; }
+.fx-app-spark { grid-area: spark; height: 18px; border-radius: 4px; background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 10px); opacity: 0.7; }
+.fx-shell .v3-applications-detail { display: grid; gap: 10px; }
+
+/* Tasks board */
+.fx-task-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
+.fx-task-board li { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
+.v3-tasks-workspace > .fx-not-connected { margin: 0 0 16px; }
+
+@media (max-width: 1180px) {
+  .fx-split, .fx-with-rail, .fx-shell .v3-repository-grid { grid-template-columns: minmax(0, 1fr); }
+  .fx-split-detail, .fx-action-center { position: static; }
+}
+.fx-not-connected { flex-wrap: wrap; }
+.fx-not-connected-body { flex: 1 1 150px; }
+:is(.fx-action-center, .fx-repo-side, .v3-applications-detail, .fx-stats) .fx-not-connected { align-items: flex-start; }
+:is(.fx-action-center, .fx-repo-side, .v3-applications-detail, .fx-stats) .fx-not-connected :is(em, button) { margin-left: 42px; }

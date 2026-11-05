@@ -301,3 +301,8 @@ The ledger should normally be committed with the repository so every agent sees 
 - Work: Merged #124. Ran the real server (`FRIDAY_MODE=mock`, built UI) and drove all 12 screens: no page errors; 503s only from features disabled in mock mode (agents, audit, monitoring history, assistant AI), each shown with an honest message. Chat gets an Active context rail (open incidents, visible services, suggested questions) from normalized state; Applications becomes a card grid; the preview banner now says mock mode when the API is connected.
 - Verification: `make verify` passed (vitest 216, node 849).
 - Next: owner review of the PR.
+
+### 2026-11-05 — Claude — Friday UI redesign slice 3 (remaining page layouts)
+- Work: Owner asked for the AIDesigner layouts on every page even where the backend lacks the feature. Added `NotConnected` (inert, text-labelled placeholder; disabled button at most). Incidents list+detail split; Repositories table + PR/CI side panel; Settings tabs incl. Audit log; Audit search, result filter and client-side CSV export of loaded events; Applications card metrics; Agents filters + action center; Infrastructure stat cards + services table; Tasks new-task placeholder. Existing safety tests (no create/approve/execute buttons) kept.
+- Verification: `make verify` passed (vitest 219, node 849); all screens driven against the real server in mock mode with no page errors.
+- Next: owner review of the PR.

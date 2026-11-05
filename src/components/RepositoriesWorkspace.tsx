@@ -1,3 +1,4 @@
+import NotConnected from './NotConnected'
 import { useEffect, useState } from 'react'
 import { FileCode2, FolderGit2, GitBranch, ShieldCheck } from 'lucide-react'
 import {
@@ -76,18 +77,29 @@ export default function RepositoriesWorkspace() {
       : error && !selected ? <p role="alert" className="v3-repository-message">{error}</p>
         : repositories.length === 0 ? <div className="v3-panel v3-repository-empty"><FolderGit2/><h3>No repositories are registered</h3><p>Enable a checkout in the server-side repository registry to browse it here.</p></div>
           : <div className="v3-repository-grid">
-            <section className="v3-panel v3-repository-panel" aria-label="Registered repositories">
+            <section className="v3-panel v3-repository-panel fx-repo-table" aria-label="Registered repositories">
               <div className="v3-section-head"><div><span className="v3-kicker">WORKSPACES</span><h2>{repositories.length} registered</h2></div><ShieldCheck size={16} aria-label="Read only"/></div>
-              <div className="v3-repository-picker">
-                {repositories.map((repository) => <button
-                  type="button"
-                  key={repository.id}
-                  className={repository.id === selectedId ? 'selected' : ''}
-                  aria-pressed={repository.id === selectedId}
-                  onClick={() => setSelectedId(repository.id)}
-                ><FolderGit2 size={16}/><span><b>{repository.name}</b><small>{repository.remote || repository.id}</small></span><em>{repository.mode}</em></button>)}
-              </div>
+              <table>
+                <thead><tr><th scope="col">Repository</th><th scope="col">Default branch</th><th scope="col">Open PRs</th><th scope="col">CI status</th><th scope="col">Last commit</th><th scope="col">Access</th></tr></thead>
+                <tbody>{repositories.map((repository) => <tr key={repository.id} className={repository.id === selectedId ? 'selected' : ''}>
+                  <td><button
+                    type="button"
+                    aria-pressed={repository.id === selectedId}
+                    onClick={() => setSelectedId(repository.id)}
+                  ><FolderGit2 size={16}/><span><b>{repository.name}</b><small>{repository.remote || repository.id}</small></span></button></td>
+                  <td><code>{repository.defaultBranch}</code></td>
+                  <td className="fx-na" title="Pull request data is not connected">—</td>
+                  <td className="fx-na" title="CI status is not connected">Not connected</td>
+                  <td className="fx-na" title="Commit history is not connected">—</td>
+                  <td><em>{repository.mode}</em></td>
+                </tr>)}</tbody>
+              </table>
             </section>
+
+            <aside className="fx-repo-side" aria-label="Repository activity">
+              <NotConnected title="Pull requests and CI" detail="Open PRs, check runs and recent PR activity need a GitHub read integration on the server." action="Connect GitHub"/>
+              <NotConnected title="Repository configuration" detail="Sync strategy, auto-merge and required approvals are managed on GitHub, not in Friday." action="Edit configuration"/>
+            </aside>
 
             <section className="v3-panel v3-repository-panel" aria-label="Repository files" aria-busy={!status && !error}>
               {selected && <div className="v3-repository-heading">
