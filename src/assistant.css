@@ -2,7 +2,7 @@
   margin-top: 13px;
   display: grid;
   gap: 7px;
-  color: #71808f;
+  color: #7a7a86;
 }
 .v3-assistant-meta {
   display: flex;
@@ -27,8 +27,8 @@
 }
 .v3-assistant-badge.cloud-ai {
   color: var(--cyan);
-  border-color: rgba(103, 217, 255, 0.22);
-  background: rgba(103, 217, 255, 0.05);
+  border-color: rgba(165, 180, 252, 0.22);
+  background: rgba(165, 180, 252, 0.05);
 }
 .v3-assistant-badge.local-ai {
   color: var(--green);
@@ -51,7 +51,7 @@
   color: #e3aa89;
 }
 .v3-assistant-reply.loading .v3-assistant-text {
-  color: #8aa7b8;
+  color: #9c9ca6;
 }
 .v3-command form input:disabled,
 .v3-mobile-command-form input:disabled,
@@ -75,7 +75,7 @@
   border: 0;
   background: transparent;
   padding: 0;
-  color: #71808f;
+  color: #7a7a86;
   font: inherit;
   font-size: 11px;
   cursor: pointer;
@@ -90,7 +90,7 @@
   display: grid;
   gap: 4px;
   font-size: 11px;
-  color: #71808f;
+  color: #7a7a86;
 }
 .v3-friday-conversation {
   display: grid;
@@ -121,7 +121,7 @@
   background: rgba(255, 255, 255, 0.025);
   font-size: 12px;
   line-height: 1.5;
-  color: #9aabb7;
+  color: #a4a4ad;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
@@ -145,10 +145,10 @@
   border: 1px solid var(--line);
   border-radius: 10px;
   padding: 8px 10px;
-  background: rgba(4, 12, 18, 0.45);
+  background: rgba(9, 9, 11, 0.45);
 }
 .v3-friday-composer > svg {
-  color: #71808f;
+  color: #7a7a86;
 }
 .v3-friday-composer input {
   min-width: 0;
@@ -193,7 +193,7 @@
   padding: 18px;
   border: 1px solid var(--line);
   border-radius: 14px;
-  background: rgba(4, 12, 18, 0.36);
+  background: rgba(9, 9, 11, 0.36);
 }
 .v3-friday-workspace-head {
   display: flex;
@@ -209,7 +209,7 @@
 }
 .v3-friday-workspace-head p {
   margin: 0;
-  color: #8aa7b8;
+  color: #9c9ca6;
   font-size: 12px;
 }
 .v3-friday-session-tools {
@@ -225,7 +225,7 @@
   border: 1px solid var(--line);
   border-radius: 8px;
   background: rgba(255, 255, 255, 0.025);
-  color: #91a6b4;
+  color: #9e9ea7;
   padding: 7px 10px;
   font: inherit;
   font-size: 11px;
@@ -255,7 +255,7 @@
   font-size: 11px;
   font-weight: 800;
   letter-spacing: 0.14em;
-  color: #71808f;
+  color: #7a7a86;
 }
 .v3-friday-empty p {
   margin: 0;
@@ -356,16 +356,16 @@
   max-width: 560px;
 }
 .v3-friday-suggestions button {
-  border: 1px solid rgba(103, 217, 255, 0.18);
+  border: 1px solid rgba(165, 180, 252, 0.18);
   border-radius: 999px;
-  background: rgba(103, 217, 255, 0.04);
-  color: #c6e9f5;
+  background: rgba(165, 180, 252, 0.04);
+  color: #e0e7ff;
   padding: 8px 13px;
   font-size: 12px;
   cursor: pointer;
 }
 .v3-friday-suggestions button:hover:not(:disabled) {
-  background: rgba(103, 217, 255, 0.09);
+  background: rgba(165, 180, 252, 0.09);
 }
 .v3-friday-suggestions button:focus-visible {
   outline: 2px solid var(--cyan);

@@ -43,7 +43,7 @@
   padding: 2px 8px;
   border-radius: 999px;
   border: 1px solid var(--line);
-  color: #c7d2d9;
+  color: #ceced2;
 }
 .v3-audit-phase.succeeded {
   color: var(--green);
@@ -55,7 +55,7 @@
 .v3-audit-list code {
   grid-column: 2/4;
   font-size: 11px;
-  color: #c7d2d9;
+  color: #ceced2;
 }
 .v3-audit-list time {
   color: var(--muted);
@@ -70,7 +70,7 @@
   color: var(--green);
 }
 .v3-audit-message {
-  color: #81909c;
+  color: #898994;
   font-size: 12px;
   line-height: 1.6;
 }
@@ -100,7 +100,7 @@
   border: 1px solid var(--line);
   border-radius: 9px;
   background: transparent;
-  color: #cfe9f3;
+  color: #dfdfe3;
   padding: 8px 12px;
   cursor: pointer;
 }

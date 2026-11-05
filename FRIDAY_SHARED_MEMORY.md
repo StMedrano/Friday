@@ -83,6 +83,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | #109 leftovers, slice A (history validation, HomeLab observations, phone sheet focus) | Claude | `complete` | Branch `claude/friday-109-ui-slice`: `server/monitoring/history.mjs`, `/api/monitoring/history`, `src/components/HomeLabSnapshot.tsx`, `src/hooks/useModalFocus.ts`, `MobileNavigation.tsx` | 2026-11-02 | 2026-11-02 | Merged as #117. |
 | Non-root controller rehearsal (#109 leftovers, slice B) | Claude | `complete` | Branch `claude/friday-nonroot-rehearsal`: `Dockerfile` `runtime-nonroot` stage, `scripts/test-friday-volume-migration.sh`, `scripts/check-friday-volume-readiness.sh`, `scripts/test-controller-container-hardening.sh`, `scripts/scan-controller-image.sh`, CI | 2026-11-02 | 2026-11-02 | Merged as #118. Production cutover needs an approved VM102 window (see `docs/controller-nonroot-migration.md`). |
 | VM100 staging stack (#109 leftovers, slice C) | Claude | `complete` | Branch `claude/friday-staging-stack`: `deploy/staging/`, `scripts/verify-friday-staging*`, `scripts/test-friday-staging-isolation.sh`, `scripts/check-friday-edge-readiness*`, `server/security/access-staging.test.mjs`, CI, Makefile | 2026-11-03 | 2026-11-03 | Merged as #119. Redeploying staging on VM100 from main is an operator step. |
+| Friday UI redesign from AIDesigner | Claude | `complete` | Branch `claude/project-thread-dnda8o`: `src/theme.css`, `src/pages/Dashboard.tsx` shell/Home, CSS palette in `src/*.css`, Geist fonts, `server/http.mjs` font MIME, audit API shape guard | 2026-11-05 | 2026-11-05 | Owner reviews PR; phone layout and per-workspace structure can follow the generated AIDesigner canvases. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -289,3 +290,9 @@ After placing this file at the current Friday repository root, add this exact in
 > Before starting work, read `FRIDAY_SHARED_MEMORY.md` completely. Claim your task in **Active work**, avoid overlapping another agent's scope, and update the ledger plus append an Activity log entry before stopping. Never put secrets in the ledger.
 
 The ledger should normally be committed with the repository so every agent sees the same history. If runtime details should remain private, keep sensitive operational values in the approved secret manager and record only non-secret evidence here.
+
+### 2026-11-05 — Claude — Friday UI redesign from AIDesigner
+- Work: Pulled the owner's AIDesigner "Friday" canvases via the REST API and generated six more (Incidents, Applications, Repositories, Chat, Settings/Audit, phone). Re-skinned the app to zinc/indigo with bundled Geist fonts, replaced the icon rail with a grouped labeled sidebar, rebuilt desktop Home (greeting, Ask card, suggestions, stat cards, action-center rail) using real data only. Only Approvals and Memory are marked not connected now. Audit no longer crashes when the API answers 200 with non-JSON; the server serves .woff/.woff2 with font MIME types.
+- Verification: `make verify` passed (vitest 213, node 849, build, Compose).
+- Blockers: none. Not deployed.
+- Next: owner review of the PR.

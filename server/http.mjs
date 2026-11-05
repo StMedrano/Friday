@@ -61,6 +61,12 @@ const mime = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+}
+
+export function staticContentType(path) {
+  return mime[extname(path)] || 'application/octet-stream'
 }
 
 function json(response, statusCode, body) {
@@ -96,7 +102,7 @@ function serveStatic(requestPath, response) {
   if (!existsSync(path) || statSync(path).isDirectory()) path = join(publicDir, 'index.html')
   if (!existsSync(path)) return false
   response.writeHead(200, {
-    'content-type': mime[extname(path)] || 'application/octet-stream',
+    'content-type': staticContentType(path),
     'cache-control': path.endsWith('index.html') || path.endsWith('/sw.js') || path.endsWith('.webmanifest') ? 'no-cache' : 'public, max-age=3600',
     'x-content-type-options': 'nosniff',
     'x-frame-options': 'DENY',
