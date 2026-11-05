@@ -22,7 +22,7 @@ deterministic without loosening what it asserts.
 `node --test --test-concurrency=8 server/`, its assertions are unchanged or
 stricter, and `make verify` passes.
 
-## port-auth-failover-docs — `ready`
+## port-auth-failover-docs — `in-review`
 
 **Scope:** docs only. Source: `docs/friday-authentication-failover.md` and
 `docs/phase2c-operator-auth-hardening.md` on branch
@@ -52,7 +52,7 @@ Chromium in the CI step.
 `make verify` is unchanged in runtime by more than a few seconds (e2e runs
 as its own CI step, not inside `make verify`).
 
-## refresh-next-steps — `in-review`
+## refresh-next-steps — `done`
 
 **Scope:** `docs/codex/NEXT_STEPS.md` only.
 

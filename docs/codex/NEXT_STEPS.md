@@ -27,7 +27,7 @@ by default unless noted.
 Listed in `docs/automation/BACKLOG.md` under "Needs owner approval" or in the ledger.
 
 - **Tasks write path** (`tasks-write-path`): creating or editing project tasks from Friday. Needs a write role on the VM132 work database. The "New tasks" control stays "Not connected".
-- **Authentik as primary login** (`authentik-primary-login`). Authentik verification exists (`server/security/authentik.mjs`); Cloudflare Access is still primary.
+- **Authentik as primary login** (`authentik-primary-login`). Authentik verification exists (`server/security/authentik.mjs`); Cloudflare Access is still primary. Runbook for the switch and the outage fallback: `docs/friday-authentication-failover.md`.
 - **Non-root controller cutover** (`controller-nonroot-cutover`). The candidate image is on `main` (#118); the cutover needs a VM102 data-volume ownership change in a maintenance window.
 - **Automated fixes**: acting on approved proposals from #133. Today an approval is a record only.
 - **Create agents from Friday** and **Open app** (Applications): still "Not connected" by design.
@@ -44,8 +44,11 @@ Listed in `docs/automation/BACKLOG.md` under "Needs owner approval" or in the le
 
 Taken in order by the nightly builder from `docs/automation/BACKLOG.md`.
 
-1. `port-auth-failover-docs`: bring the authentication failover and operator-auth hardening docs from #109's branch onto `main`, corrected to what `main` actually has.
-2. Keep this file current after each merge or deploy.
+1. Keep this file current after each merge or deploy.
+
+The authentication docs from #109's branch are on `main`, corrected to what
+`main` does: `docs/friday-authentication-failover.md` and
+`docs/phase2c-operator-auth-hardening.md` (origin checks, operator-only routes).
 
 PR #109 (`integration/friday-development-main-20261029`) stays open as a source
 branch; do not merge it whole.
