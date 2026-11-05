@@ -68,13 +68,26 @@ export function projectApprovals(incidents, decisions) {
   }
 }
 
+// Bound the stored history without dropping a decision whose incident is still
+// open: that record is what keeps the proposal decided, so it must survive pruning.
+function prune(decisions, incidents, max) {
+  if (decisions.length <= max) return decisions
+  const open = new Set((Array.isArray(incidents) ? incidents : []).filter((incident) => incident?.status === 'open').map((incident) => incident.id))
+  let excess = decisions.length - max
+  return decisions.filter((entry) => {
+    if (excess > 0 && !open.has(entry.incidentId)) { excess -= 1; return false }
+    return true
+  })
+}
+
 export async function createApprovalQueue({ path, limit = 500, now = Date.now } = {}) {
   if (!path) throw new Error('Approvals path is required')
   const max = Math.min(MAX_LIMIT, Math.max(1, Math.floor(Number(limit) || 500)))
   let decisions = []
   try {
     const stored = JSON.parse(await readFile(path, 'utf8'))
-    decisions = (Array.isArray(stored?.decisions) ? stored.decisions : []).map(clean).filter(Boolean).slice(-max)
+    // Not truncated here: open-incident decisions may legitimately exceed the limit.
+    decisions = (Array.isArray(stored?.decisions) ? stored.decisions : []).map(clean).filter(Boolean).slice(-2 * MAX_LIMIT)
   } catch {
     decisions = []
   }
@@ -99,7 +112,7 @@ export async function createApprovalQueue({ path, limit = 500, now = Date.now } 
         const proposal = pendingProposals(incidents, decisions).find((item) => item.incidentId === incidentId)
         if (!proposal) return { status: 404, body: { error: 'approval-not-found' } }
         const record = clean({ id: randomUUID(), incidentId, decision, decidedAt: new Date(now()).toISOString(), decidedBy, proposal })
-        const next = [...decisions, record].slice(-max)
+        const next = prune([...decisions, record], incidents, max)
         try { await save(next) } catch { return { status: 503, body: { error: 'approvals-unavailable' } } }
         decisions = next
         return {

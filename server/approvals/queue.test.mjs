@@ -94,7 +94,21 @@ test('malformed stored decisions are dropped and the history is bounded', async 
   ] }))
   const queue = await createApprovalQueue({ path, limit: 1, now: () => NOW })
   assert.deepEqual(queue.list([]).recent.map((item) => item.id), ['a'])
+  // Incident x is resolved (absent), so its decision is the one pruned.
   await queue.decide({ incidents: [incident('plex')], incidentId: 'plex', decision: 'denied' })
   const stored = JSON.parse(await readFile(path, 'utf8'))
   assert.deepEqual(stored.decisions.map((item) => item.incidentId), ['plex'])
+})
+
+test('pruning past the limit never reopens a decided proposal whose incident is still open', async () => {
+  const queue = await createApprovalQueue({ path: await tempPath(), limit: 2, now: () => NOW })
+  const incidents = ['a', 'b', 'c'].map((id) => incident(id))
+  for (const id of ['a', 'b', 'c']) assert.equal((await queue.decide({ incidents, incidentId: id, decision: 'denied' })).status, 200)
+  assert.deepEqual(queue.list(incidents).pending, [])
+  assert.equal((await queue.decide({ incidents, incidentId: 'a', decision: 'approved' })).status, 409)
+
+  // Once incident a resolves, its decision is the first to be pruned.
+  const later = [incident('b'), incident('c'), incident('d')]
+  await queue.decide({ incidents: later, incidentId: 'd', decision: 'approved' })
+  assert.deepEqual(queue.list(later).recent.map((item) => item.incidentId).sort(), ['b', 'c', 'd'])
 })
