@@ -458,6 +458,17 @@ export function createFridayServer({
       catch { return json(response, 502, { error: 'monitoring-history-invalid' }) }
     }
 
+    if (request.method === 'GET' && url.pathname === '/api/monitoring/uptime') {
+      // Per-service uptime from Friday's own polls; off unless FRIDAY_MONITORING_UPTIME_ENABLED.
+      if (config.monitoring?.enabled === false) return json(response, 503, { error: 'monitoring-disabled' })
+      if (config.monitoring?.uptimeEnabled !== true) return json(response, 503, { error: 'uptime-disabled' })
+      if (url.search) return json(response, 400, { error: 'unexpected-query' })
+      let uptime = null
+      try { uptime = typeof monitoringRuntime?.getUptime === 'function' ? await monitoringRuntime.getUptime() : null } catch { uptime = null }
+      if (!uptime || !Array.isArray(uptime.services)) return json(response, 503, { error: 'uptime-unavailable' })
+      return json(response, 200, uptime)
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/audit/events') {
       if (!actionAudit) return json(response, 503, { error: 'audit-not-enabled' })
       try {

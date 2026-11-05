@@ -32,6 +32,12 @@ Inspect output is allowlisted. Logs are explicit-request only, sanitized, bounde
 - APIs: `GET /api/incidents` and `GET /api/monitoring/history`.
 - Monitoring grants no provider write permissions.
 
+### Uptime history
+
+- `FRIDAY_MONITORING_UPTIME_ENABLED=false` by default. When on (and monitoring is on), every successful monitoring poll adds one sample per service to hourly buckets kept for seven days in the existing monitoring state file (`server/monitoring/uptime.mjs`). At most 300 services are tracked; services with no samples left in the window are dropped, and retired services are removed.
+- Online and degraded count as up, offline as down, and maintenance (intentionally stopped guests) is left out. Nothing is backfilled: the record starts when the flag is turned on.
+- `GET /api/monitoring/uptime` returns 24 hour and 7 day uptime, check counts and the last 24 hourly buckets per service. It answers 503 `monitoring-disabled`, `uptime-disabled` or `uptime-unavailable` instead of an empty success, and rejects queries. The Applications page shows the 24 hour figure, hourly bars and a detail panel from it.
+
 ## Incident Diagnostics
 
 Diagnostics remain environment-gated by `FRIDAY_DIAGNOSTICS_ENABLED`. Supported VM100 incidents can receive metadata-only diagnostic snapshots; raw logs are never fetched automatically and are never persisted. Explicit log inspection is read-only.

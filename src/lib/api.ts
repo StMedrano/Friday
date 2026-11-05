@@ -116,6 +116,27 @@ export function fetchFridayRepositoryFile(id: string, path: string, signal?: Abo
   return repositoryGet<{ path: string; content: string }>(`/api/repositories/${encodeURIComponent(id)}/file?${query}`, signal)
 }
 
+export type FridayUptimeWindow = { uptime: number | null; checks: number; degraded: number; offline: number }
+export type FridayUptimeHour = { at: string; online: number; degraded: number; offline: number; maintenance: number }
+export type FridayServiceUptime = { serviceId: string; name: string; last24h: FridayUptimeWindow; last7d: FridayUptimeWindow; hourly: FridayUptimeHour[] }
+export type FridayUptimeResult =
+  | { state: 'ok'; generatedAt: string; services: FridayServiceUptime[] }
+  | { state: 'disabled' | 'unavailable' }
+
+/** Per-service uptime recorded from Friday's own monitoring polls. */
+export async function fetchFridayUptime(signal?: AbortSignal): Promise<FridayUptimeResult> {
+  const response = await fetch('/api/monitoring/uptime', { method: 'GET', signal })
+  const body = await response.json().catch(() => null) as { error?: string; generatedAt?: string; services?: unknown } | null
+  if (response.ok && body && typeof body.generatedAt === 'string' && Array.isArray(body.services)) {
+    const services = body.services.filter((item): item is FridayServiceUptime => Boolean(item && typeof item === 'object'
+      && typeof (item as FridayServiceUptime).serviceId === 'string' && (item as FridayServiceUptime).last24h
+      && (item as FridayServiceUptime).last7d && Array.isArray((item as FridayServiceUptime).hourly)))
+    return { state: 'ok', generatedAt: body.generatedAt, services }
+  }
+  if (body?.error === 'uptime-disabled' || body?.error === 'monitoring-disabled') return { state: 'disabled' }
+  return { state: 'unavailable' }
+}
+
 export type FridayGitHubPullRequest = { number: number; title: string; author: string; draft: boolean; updatedAt?: string; url?: string }
 export type FridayGitHubSummary = {
   repository: string

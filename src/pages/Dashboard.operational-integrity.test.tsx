@@ -12,6 +12,7 @@ vi.mock('../lib/api', () => ({
     activities: [], incidents: [], monitoring: null,
   } }),
   fetchMonitoringHistory: vi.fn(async () => []),
+  fetchFridayUptime: vi.fn(async () => ({ state: 'disabled' })),
   askFridayAssistant: vi.fn(async () => ({ available: false, execution: { performed: false } })),
 }))
 vi.mock('../hooks/usePhoneLayout', () => ({ usePhoneLayout: () => false }))

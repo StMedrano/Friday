@@ -1,6 +1,6 @@
 import { render, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import ApplicationsWorkspace from './ApplicationsWorkspace'
 import type { FridayOverview } from '../lib/api'
 
@@ -57,5 +57,39 @@ describe('ApplicationsWorkspace observed, read-only application inventory', () =
     rerender(<ApplicationsWorkspace overview={{ ...example, services: [] }} connected />)
     expect(screen.getByText(/no application-related services are present in the current inventory/i)).toBeInTheDocument()
     expect(screen.queryByText('Nextcloud')).not.toBeInTheDocument()
+  })
+
+  describe('uptime history', () => {
+    afterEach(() => vi.unstubAllGlobals())
+
+    it('shows recorded uptime and hourly bars from Friday monitoring', async () => {
+      const fetchMock = vi.fn(async () => new Response(JSON.stringify({
+        generatedAt: '2026-11-05T10:00:00.000Z', windowHours: 168, services: [{
+          serviceId: 'emby', name: 'Emby',
+          last24h: { uptime: 91.67, checks: 12, degraded: 0, offline: 1 },
+          last7d: { uptime: 99.5, checks: 200, degraded: 0, offline: 1 },
+          hourly: [{ at: '2026-11-05T09:00:00.000Z', online: 11, degraded: 0, offline: 1, maintenance: 0 }],
+        }],
+      })))
+      vi.stubGlobal('fetch', fetchMock)
+      const user = userEvent.setup()
+      render(<ApplicationsWorkspace overview={example} connected />)
+      const inventory = screen.getByRole('region', { name: 'Observed application services' })
+      expect(await within(inventory).findByText('91.67%')).toBeInTheDocument()
+      await user.click(within(inventory).getByRole('button', { name: /Emby/i }))
+      const detail = screen.getByRole('region', { name: 'Uptime history' })
+      expect(detail).toHaveTextContent('99.50%')
+      expect(within(detail).getByRole('img', { name: /Hourly uptime for Emby/ })).toBeInTheDocument()
+      expect(screen.queryByRole('note', { name: 'Uptime history: not connected' })).not.toBeInTheDocument()
+      await user.click(within(inventory).getByRole('button', { name: /Nextcloud/i }))
+      expect(screen.getByRole('region', { name: 'Uptime history' })).toHaveTextContent('No uptime samples have been recorded for Nextcloud yet.')
+      expect(fetchMock).toHaveBeenCalledWith('/api/monitoring/uptime', expect.objectContaining({ method: 'GET' }))
+    })
+
+    it('keeps the not connected state when the uptime record is off', async () => {
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'uptime-disabled' }), { status: 503 })))
+      render(<ApplicationsWorkspace overview={example} connected />)
+      expect(await screen.findByRole('note', { name: 'Uptime history: not connected' })).toBeInTheDocument()
+    })
   })
 })

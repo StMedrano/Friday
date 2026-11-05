@@ -1,3 +1,4 @@
+import { projectUptime, recordUptime } from './uptime.mjs'
 import { appendHistory, createEmptyMonitoringState, incidentList, monitoringSummary } from './state.mjs'
 import { evaluateMonitoring, retireService as retireServiceState } from './incidents.mjs'
 import { incidentChanges } from '../notifications/ntfy.mjs'
@@ -171,6 +172,10 @@ export function createMonitoringRuntime({
           ...evaluated.state,
           schemaVersion: 2,
           diagnostics: priorDiagnostics,
+          // Opt-in per-service uptime record; one sample per service per successful poll.
+          uptime: monitoringConfig.uptimeEnabled === true
+            ? recordUptime(monitoringState.uptime, overview?.services, timestamp)
+            : (monitoringState.uptime || {}),
         }
         latestOverview = overview
         meta.lastSuccessAt = timestamp
@@ -371,7 +376,9 @@ export function createMonitoringRuntime({
       state: monitoringState, serviceId, config: monitoringConfig, now: now().toISOString(), reason,
     })
     if (!retired.changed) return false
-    monitoringState = { ...retired.state, schemaVersion: monitoringState.schemaVersion || 2, diagnostics: monitoringState.diagnostics || {} }
+    const uptime = { ...(monitoringState.uptime || {}) }
+    delete uptime[String(serviceId || '')]
+    monitoringState = { ...retired.state, schemaVersion: monitoringState.schemaVersion || 2, diagnostics: monitoringState.diagnostics || {}, uptime }
     await persistState()
     return true
   }
@@ -385,6 +392,7 @@ export function createMonitoringRuntime({
     getIncidents() { return { summary: incidentSummary(monitoringState), incidents: incidentList(monitoringState) } },
     getHistory() { return { events: [...(monitoringState.history || [])].reverse().map((event) => ({ ...event })) } },
     getSummary() { return monitoringSummary(monitoringState, meta) },
+    getUptime() { return monitoringConfig.uptimeEnabled === true ? projectUptime(monitoringState.uptime, now().getTime()) : null },
     getDiagnostic,
     rerunDiagnostic,
     getIncidentLogs,
