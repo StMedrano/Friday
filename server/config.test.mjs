@@ -230,3 +230,8 @@ test('GitHub read integration defaults off with a server-only token and a bounde
   assert.equal(getConfig({ FRIDAY_GITHUB_CACHE_SECONDS: '5' }).github.cacheSeconds, 30)
   assert.equal(getConfig({ FRIDAY_GITHUB_CACHE_SECONDS: '99999' }).github.cacheSeconds, 3600)
 })
+
+test('monitoring uptime record defaults off', () => {
+  assert.equal(getConfig({}).monitoring.uptimeEnabled, false)
+  assert.equal(getConfig({ FRIDAY_MONITORING_UPTIME_ENABLED: 'true' }).monitoring.uptimeEnabled, true)
+})

@@ -203,6 +203,8 @@ export function getConfig(env = process.env) {
       offlineGraceSeconds: positiveNumber(env.FRIDAY_MONITORING_OFFLINE_GRACE_SECONDS, 300),
       statePath: env.FRIDAY_MONITORING_STATE_PATH || '/data/monitoring-state.json',
       historyLimit: positiveNumber(env.FRIDAY_MONITORING_HISTORY_LIMIT, 2000),
+      // Opt-in hourly per-service uptime record kept for seven days in the monitoring state file.
+      uptimeEnabled: enabled(env.FRIDAY_MONITORING_UPTIME_ENABLED),
     },
     notifications: {
       ntfy: { url: env.FRIDAY_NTFY_URL || '', token: env.FRIDAY_NTFY_TOKEN || '' },

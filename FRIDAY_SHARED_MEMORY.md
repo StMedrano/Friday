@@ -84,7 +84,8 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Non-root controller rehearsal (#109 leftovers, slice B) | Claude | `complete` | Branch `claude/friday-nonroot-rehearsal`: `Dockerfile` `runtime-nonroot` stage, `scripts/test-friday-volume-migration.sh`, `scripts/check-friday-volume-readiness.sh`, `scripts/test-controller-container-hardening.sh`, `scripts/scan-controller-image.sh`, CI | 2026-11-02 | 2026-11-02 | Merged as #118. Production cutover needs an approved VM102 window (see `docs/controller-nonroot-migration.md`). |
 | VM100 staging stack (#109 leftovers, slice C) | Claude | `complete` | Branch `claude/friday-staging-stack`: `deploy/staging/`, `scripts/verify-friday-staging*`, `scripts/test-friday-staging-isolation.sh`, `scripts/check-friday-edge-readiness*`, `server/security/access-staging.test.mjs`, CI, Makefile | 2026-11-03 | 2026-11-03 | Merged as #119. Redeploying staging on VM100 from main is an operator step. |
 | Friday UI redesign from AIDesigner | Claude | `complete` | Branch `claude/project-thread-dnda8o`: `src/theme.css`, `src/pages/Dashboard.tsx` shell/Home, CSS palette in `src/*.css`, Geist fonts, `server/http.mjs` font MIME, audit API shape guard | 2026-11-05 | 2026-11-05 | Owner reviews PR; phone layout and per-workspace structure can follow the generated AIDesigner canvases. |
-| GitHub read integration for Repositories (PRs, CI, last commit) | Claude | `verification_needed` | Branch `claude/project-thread-2sw5y6`: `server/adapters/github.mjs`, `/api/repositories/:id/github`, `server/config.mjs` `github`, `compose.yaml`, `.env.example`, `src/components/RepositoriesWorkspace.tsx`, `src/lib/api.ts`, docs | 2026-11-05 | 2026-11-05 | Open PR; stays off until an operator sets `FRIDAY_GITHUB_ENABLED` and a read-only token. |
+| GitHub read integration for Repositories (PRs, CI, last commit) | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/adapters/github.mjs`, `/api/repositories/:id/github`, `server/config.mjs` `github`, `compose.yaml`, `.env.example`, `src/components/RepositoriesWorkspace.tsx`, `src/lib/api.ts`, docs | 2026-11-05 | 2026-11-05 | Open PR; stays off until an operator sets `FRIDAY_GITHUB_ENABLED` and a read-only token. |
+| Uptime history for Applications | Claude | `verification_needed` | Branch `claude/project-thread-2sw5y6`: `server/monitoring/uptime.mjs`, runtime/state, `/api/monitoring/uptime`, `FRIDAY_MONITORING_UPTIME_ENABLED`, `ApplicationsWorkspace.tsx`, docs | 2026-11-05 | 2026-11-05 | Merge after green CI; enable on VM102 in an approved deploy. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -317,3 +318,13 @@ The ledger should normally be committed with the repository so every agent sees 
 - Blockers/risks: needs a fine-grained read-only token in VM102 `.env` and a deploy.
 - Next action: owner review/merge; then set `FRIDAY_GITHUB_ENABLED=true` and `FRIDAY_GITHUB_TOKEN` on VM102 in an approved deploy.
 - Rollback/recovery: set `FRIDAY_GITHUB_ENABLED=false` or revert the PR.
+
+### 2026-11-05 — Claude — Uptime history for Applications
+- Status: verification_needed (PR open). GitHub integration #127 merged (not deployed).
+- Scope claimed: `server/monitoring/uptime.mjs`, `server/monitoring/{runtime,state}.mjs`, `/api/monitoring/uptime`, `server/config.mjs`, `compose.yaml`, `.env.example`, staging flag, `ApplicationsWorkspace.tsx`, `src/lib/api.ts`, docs.
+- Work performed: Opt-in seven day hourly uptime record per service, written from each successful poll into the monitoring state file (max 300 services, maintenance excluded, degraded counts as up). Read-only route with explicit 503s. Applications shows 24h uptime, hourly bars and a 24h/7d detail.
+- Verification: `make verify` (see PR).
+- Blockers/risks: data starts accumulating only once the flag is on in production.
+- Next action: merge after CI; set `FRIDAY_MONITORING_UPTIME_ENABLED=true` on VM102 in an approved deploy.
+- Rollback/recovery: set the flag to false (the stored record is ignored) or revert.
+

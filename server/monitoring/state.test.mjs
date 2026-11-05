@@ -17,6 +17,7 @@ test('monitoring config is safe and disabled by default', () => {
     offlineGraceSeconds: 300,
     statePath: '/data/monitoring-state.json',
     historyLimit: 2000,
+    uptimeEnabled: false,
   })
 })
 
@@ -53,6 +54,7 @@ test('empty monitoring state uses schema version two with diagnostics map', () =
     incidents: [],
     history: [],
     diagnostics: {},
+    uptime: {},
   })
 })
 
@@ -137,4 +139,11 @@ test('monitoringSummary reports active incident severities and runtime metadata'
     openHigh: 1,
     openWarning: 1,
   })
+})
+
+test('stored uptime survives normalization and malformed uptime becomes empty', () => {
+  const uptime = { svc: { name: 'svc', buckets: [[Date.parse('2026-11-05T10:00:00.000Z'), 1, 0, 0, 0]] } }
+  assert.deepEqual(normalizeMonitoringState({ uptime }).uptime, uptime)
+  assert.deepEqual(normalizeMonitoringState({ uptime: ['bad'] }).uptime, {})
+  assert.deepEqual(normalizeMonitoringState({ schemaVersion: 1 }).uptime, {})
 })

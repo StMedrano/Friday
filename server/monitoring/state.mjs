@@ -1,3 +1,5 @@
+import { normalizeUptime } from './uptime.mjs'
+
 export function createEmptyMonitoringState() {
   return {
     schemaVersion: 2,
@@ -5,6 +7,7 @@ export function createEmptyMonitoringState() {
     incidents: [],
     history: [],
     diagnostics: {},
+    uptime: {},
   }
 }
 
@@ -17,6 +20,7 @@ export function normalizeMonitoringState(value) {
     incidents: Array.isArray(input.incidents) ? structuredClone(input.incidents) : [],
     history: Array.isArray(input.history) ? structuredClone(input.history) : [],
     diagnostics: objectOrEmpty(input.diagnostics),
+    uptime: normalizeUptime(input.uptime),
   }
 }
 

@@ -671,6 +671,14 @@ code, kbd, pre, samp,
 .fx-app-meta small { display: block; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--faint); }
 .fx-app-meta b { font-size: 13px; font-weight: 500; }
 .fx-app-spark { grid-area: spark; height: 18px; border-radius: 4px; background: repeating-linear-gradient(90deg, var(--line) 0 6px, transparent 6px 10px); opacity: 0.7; }
+.fx-uptime-bars { grid-area: spark; display: flex; align-items: flex-end; gap: 2px; height: 18px; }
+.fx-uptime-detail .fx-uptime-bars { height: 36px; margin: 10px 0 6px; }
+.fx-uptime-bars i { flex: 1; min-width: 2px; border-radius: 2px; background: var(--green); opacity: 0.8; }
+.fx-uptime-bars i.degraded { background: var(--amber); }
+.fx-uptime-bars i.down { background: var(--rose); }
+.fx-uptime-bars i.maintenance { background: var(--line-strong); }
+.fx-uptime-detail { display: grid; gap: 6px; padding: 12px 0; border-top: 1px solid var(--line); }
+.fx-uptime-detail p { margin: 0; font-size: 12px; color: var(--muted); }
 .fx-shell .v3-applications-detail { display: grid; gap: 10px; }
 
 /* Tasks board */
