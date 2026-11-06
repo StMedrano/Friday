@@ -271,6 +271,14 @@ export function getConfig(env = process.env) {
       path: env.FRIDAY_APPROVALS_PATH || '/data/approvals.json',
       limit: Math.min(2000, Math.max(50, Math.floor(positiveNumber(env.FRIDAY_APPROVALS_LIMIT, 500)))),
     },
+    // AIDesigner REST API for generating UI designs. The key stays server-side;
+    // generating spends AIDesigner credits, so it is operator-only and audited.
+    aidesigner: {
+      enabled: enabled(env.FRIDAY_AIDESIGNER_ENABLED),
+      apiKey: env.AIDESIGNER_API_KEY || '',
+      baseUrl: env.AIDESIGNER_BASE_URL || 'https://api.aidesigner.ai',
+      timeoutMs: Math.ceil(positiveNumber(env.FRIDAY_AIDESIGNER_TIMEOUT_MS, 180000)),
+    },
     pushSubscriptions: {
       path: env.FRIDAY_PUSH_SUBSCRIPTIONS_PATH || '/data/push-subscriptions.json',
     },

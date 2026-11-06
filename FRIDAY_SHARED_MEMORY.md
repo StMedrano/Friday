@@ -96,6 +96,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | GitHub read integration for Repositories (PRs, CI, last commit) | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/adapters/github.mjs`, `/api/repositories/:id/github`, `server/config.mjs` `github`, `compose.yaml`, `.env.example`, `src/components/RepositoriesWorkspace.tsx`, `src/lib/api.ts`, docs | 2026-11-05 | 2026-11-05 | Open PR; stays off until an operator sets `FRIDAY_GITHUB_ENABLED` and a read-only token. |
 | Uptime history for Applications | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/monitoring/uptime.mjs`, runtime/state, `/api/monitoring/uptime`, `FRIDAY_MONITORING_UPTIME_ENABLED`, `ApplicationsWorkspace.tsx`, docs | 2026-11-05 | 2026-11-05 | Merge after green CI; enable on VM102 in an approved deploy. |
 | Agent activity log (Live agent events) | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/agents/activity-log.mjs`, `/api/agents/activity`, ask handler, `FRIDAY_AGENT_ACTIVITY_*`, `AgentActivityPanel.tsx`, docs | 2026-11-05 | 2026-11-05 | Merge after green CI; enable on VM102 in an approved deploy. |
+| AIDesigner design generation API | Claude | `verification_needed` | Branch `claude/project-thread-u3n07g`: `server/adapters/aidesigner.mjs`, `/api/aidesigner/*`, `aidesigner` config, compose/.env.example/staging flag, `docs/integrations.md` | 2026-11-05 | 2026-11-05 | Open a PR; stays disabled until an operator sets `FRIDAY_AIDESIGNER_ENABLED` and `AIDESIGNER_API_KEY`. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -132,6 +133,17 @@ Copy this block into the Activity log and fill every field:
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
 
+### 2026-11-05 11:30 CST — Claude — Added the AIDesigner design generation API
+
+- Status: `verification_needed`
+- Scope claimed: Branch `claude/project-thread-u3n07g`; `server/adapters/aidesigner.mjs`, `/api/aidesigner/sessions`, `/api/aidesigner/designs`, `aidesigner` config, settings posture, audit action `aidesigner.design.generate`, compose/.env.example/staging flag, docs.
+- Work performed: Owner asked for an AIDesigner API in Friday (and separately to connect the AIDesigner MCP to Claude). Added a server-side REST client from AIDesigner's published API docs. Listing sessions needs a signed-in person; generating a design spends credits, so it is operator-only, JSON-only, audited, and returns references only, never HTML. Default off.
+- Changes made: Code, tests, Compose env and docs. Nothing deployed; no key set anywhere.
+- Verification: `make verify` passed locally (861 node tests, vitest, build, Compose configs, staging validator). Not tested against the live AIDesigner API (no key in this environment).
+- Decisions: Premium `ultradesign` mode not exposed (extra credits). No UI yet.
+- Blockers/risks: Needs an AIDesigner API key and an approved deploy to use.
+- Next action: Review and merge the PR; then the owner adds `AIDESIGNER_API_KEY` to VM102 `.env` and sets `FRIDAY_AIDESIGNER_ENABLED=true` in an approved deploy.
+- Rollback/recovery: Set `FRIDAY_AIDESIGNER_ENABLED=false` or revert the PR.
 ### 2026-11-06 13:53 CST — Claude — Added four ready items to the nightly backlog
 
 - Owner asked to add all four suggested items (2026-11-06): `refresh-docs-after-138`, `service-token-expiry-warning`, `e2e-tasks-approvals-smoke`, `not-connected-setup-links`. Marked `tasks-write-path` `done` (merged as #138).

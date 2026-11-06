@@ -770,3 +770,6 @@ With `FRIDAY_MONITORING_UPTIME_ENABLED=true`, the monitoring runtime keeps a sev
 
 With `FRIDAY_AGENT_ACTIVITY_ENABLED=true`, Friday keeps a metadata-only, bounded log of agent questions (agent, model, outcome, duration; never prompts or answers), served read only at `GET /api/agents/activity` and shown as Live agent events on the Agents page. Not deployed by this change.
 
+## AIDesigner design generation, 2026-11-05
+
+Friday has a server-side AIDesigner REST client (`server/adapters/aidesigner.mjs`), default off (`FRIDAY_AIDESIGNER_ENABLED`). `GET /api/aidesigner/sessions` lists recent design sessions for signed-in people; `POST /api/aidesigner/designs` generates a design into an AIDesigner session, operator-only and audited as `aidesigner.design.generate`, and returns only references (session, canvas, editor link), never HTML. The API key never leaves the server. Settings shows the integration's posture. No UI yet; nothing is deployed or enabled by this change.

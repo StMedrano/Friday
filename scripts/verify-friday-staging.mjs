@@ -31,6 +31,7 @@ const expected={
  FRIDAY_PROMETHEUS_ENABLED:'false',
  FRIDAY_SUPABASE_HEALTH_ENABLED:'false',
  FRIDAY_UPTIME_KUMA_ENABLED:'false',
+ FRIDAY_AIDESIGNER_ENABLED:'false',
 }
 const productionAud='f566316cef0d66e796fc90eeb68fbddb2f08926d9a4f14599fed509046c1c564'
 export function validateStagingCompose(c){
