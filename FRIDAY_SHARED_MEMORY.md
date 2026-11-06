@@ -85,6 +85,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Port e2e smoke test | Claude | `complete` | `playwright.config.mjs`, `tests/e2e/`, CI `e2e` job, `package.json`, README | 2026-11-05 | 2026-11-05 | Merged as #135. |
 | Refresh NEXT_STEPS | Claude | `complete` | `docs/codex/NEXT_STEPS.md`, backlog | 2026-11-05 | 2026-11-05 | Merged as #136. |
 | Port auth failover docs | Claude | `complete` | `docs/friday-authentication-failover.md`, `docs/phase2c-operator-auth-hardening.md`, NEXT_STEPS, backlog | 2026-11-05 | 2026-11-05 | Merged as #137. |
+| Add four ready backlog items | Claude | `complete` | `docs/automation/BACKLOG.md`, this ledger | 2026-11-06 | 2026-11-06 | Owner merges; the nightly builder takes items from the top. |
 | Tasks write path (create only) | Claude | `verification_needed` | `server/work/task-insert-repository.mjs`, `server/work/http-writes.mjs`, bridge `createTask`, `supabase/migrations/202611060001_friday_work_writer.sql`, Tasks screen | 2026-11-06 | 2026-11-06 | Merge after CI; owner applies the role SQL, mints the key and sets the flag. |
 | Free model routing and NVIDIA readiness slice | Claude | `complete` | Branch `claude/friday-model-fabric`: `server/ai/model-{fabric,registry,router}.mjs`, `server/ai/nvidia.mjs`, `scripts/check-nvidia-catalog.mjs`, `modelFabric` config, docs | 2026-11-01 | 2026-11-01 | Merged as #115. Internal only and default off; not wired into chat or agents. |
 | Container and observer hardening slice | Claude | `complete` | Branch `claude/friday-container-hardening`: `observer/docker-proxy.mjs`, `observer/Dockerfile*`, `observer/compose.yaml`, controller `Dockerfile`, CI observer steps | 2026-11-01 | 2026-11-02 | Merged as #116. VM100 observer rollout and the controller non-root data migration each need a separate operator-approved window. |
@@ -130,6 +131,13 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-11-06 13:53 CST — Claude — Added four ready items to the nightly backlog
+
+- Owner asked to add all four suggested items (2026-11-06): `refresh-docs-after-138`, `service-token-expiry-warning`, `e2e-tasks-approvals-smoke`, `not-connected-setup-links`. Marked `tasks-write-path` `done` (merged as #138).
+- Nightly PRs #121 and #122 are superseded by #134 and #137; owner to close them so the builder has room.
+- Verification: docs only; `make verify` run before opening the PR.
+- Next: the nightly builder takes `refresh-docs-after-138` first.
 
 ### 2026-11-03 05:41 CST — Claude — Added the nightly builder backlog and rules
 
