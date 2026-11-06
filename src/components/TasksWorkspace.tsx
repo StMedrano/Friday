@@ -51,6 +51,8 @@ export default function TasksWorkspace() {
   const [notice, setNotice] = useState('')
   // One id per draft, so a retry after a dropped response never adds a second task.
   const requestId = useRef(newRequestId())
+  const selectedProject = useRef(projectId)
+  selectedProject.current = projectId
 
   useEffect(() => {
     const controller = new AbortController()
@@ -69,18 +71,22 @@ export default function TasksWorkspace() {
     event.preventDefault()
     const trimmed = title.trim()
     if (!trimmed || saving) return
+    const submittedProject = projectId
+    const submittedName = project?.name
     setSaving(true)
     setNotice('')
     try {
       const task = await createProjectTask({
-        projectId, title: trimmed, requestId: requestId.current,
+        projectId: submittedProject, title: trimmed, requestId: requestId.current,
         ...(detail.trim() ? { objective: detail.trim() } : {}),
       })
-      setTasks((current) => [task, ...(current || []).filter((item) => item.id !== task.id)])
+      // Only show it if that project is still the one on screen.
+      if (selectedProject.current === submittedProject && task.projectId === submittedProject)
+        setTasks((current) => [task, ...(current || []).filter((item) => item.id !== task.id)])
       setTitle('')
       setDetail('')
       requestId.current = newRequestId()
-      setNotice(`Added “${task.title}” to ${project?.name}. It is ready; nothing was started.`)
+      setNotice(`Added “${task.title}” to ${submittedName}. It is ready; nothing was started.`)
     } catch (reason) {
       if (reason instanceof FridayWorkError && reason.status === 409) requestId.current = newRequestId()
       setNotice(createFailure(reason))
@@ -100,7 +106,7 @@ export default function TasksWorkspace() {
 
     <div className="v3-settings-form">
       <label htmlFor="v3-task-project">Project
-        <select id="v3-task-project" value={projectId} onChange={(event) => setProjectId(event.target.value)}>
+        <select id="v3-task-project" value={projectId} disabled={saving} onChange={(event) => setProjectId(event.target.value)}>
           {PROJECTS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>
       </label>

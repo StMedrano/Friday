@@ -93,4 +93,21 @@ describe('TasksWorkspace', () => {
     expect(await screen.findByText('Only an operator with access to this project can add tasks.')).toBeInTheDocument()
     expect(within(form).getByLabelText('New task')).toHaveValue('Draft')
   })
+
+  it('does not show a task under another project if the selection changed while saving', async () => {
+    let finish: (value: Response) => void = () => {}
+    const created = { id: 'task-9', projectId: 'friday-ai-os', title: 'Slow one', status: 'ready', version: 1 }
+    vi.stubGlobal('fetch', vi.fn((_input: RequestInfo | URL, options?: RequestInit) => options?.method === 'POST'
+      ? new Promise<Response>((resolve) => { finish = resolve })
+      : Promise.resolve(new Response(JSON.stringify({ tasks: [], canCreate: true }), { status: 200 }))))
+    const { rerender } = render(<TasksWorkspace />)
+    const form = await screen.findByRole('form', { name: 'New task' })
+    fireEvent.change(within(form).getByLabelText('New task'), { target: { value: 'Slow one' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Add task' }))
+    expect(screen.getByLabelText('Project')).toBeDisabled()
+    rerender(<TasksWorkspace />)
+    finish(new Response(JSON.stringify({ task: created }), { status: 201 }))
+    expect(await screen.findByText(/Added “Slow one” to Friday AI OS/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Project')).not.toBeDisabled()
+  })
 })
