@@ -78,11 +78,23 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Service-token renewal | Codex/ChatGPT | `planned` | `friday-cloud-reader`; coordinated Cloudflare rotation and managed-runtime binding update | 2026-10-29 | 2026-10-29 | After the exact production merge target is identified, rotate with a bounded overlap, update the secure caller binding without exposing the secret, rerun acceptance, then retire the prior secret. |
 | Production deployment after development merge | unclaimed | `planned` | Merged `main` revision and authoritative VM102 checkout | 2026-10-29 | 2026-10-29 | Identify the exact development PR/branch, require its merge and green exact-head verification, then inventory VM102, preserve `.env`, run preflight, deploy the merged `main`, and run health plus cloud acceptance. |
 | Web Growth reader slice | Claude | `complete` | Branch `claude/friday-web-growth`: `server/adapters/web-growth*.mjs`, `/api/web-growth`, `integrations/web-growth-reader/`, Web Growth panel under the TechTactics group | 2026-10-31 | 2026-11-01 | Merged as #114. Stays disabled until an operator deploys the isolated reader and sets the reader URL, token and emails. |
+| Wire free model routing into chat | Claude | `complete` | `server/assistant.mjs`, `server/ai/model-fabric.mjs`, tests, `docs/model-fabric.md`, backlog | 2026-11-05 | 2026-11-05 | Merged as #131. Stays off until `FRIDAY_MODEL_FABRIC_ENABLED=true` and free NVIDIA models are configured. |
+| GitHub-only repositories | Claude | `complete` | `server/repositories/`, `RepositorySettingsPanel.tsx`, `RepositoriesWorkspace.tsx`, `src/lib/api.ts`, docs | 2026-11-05 | 2026-11-05 | Merged as #132. Owner redeploys VM102 and adds repos by GitHub URL in Settings. |
+| Approvals queue | Claude | `complete` | `server/approvals/`, `server/http.mjs` approvals routes, `server/index.mjs`, `server/config.mjs`, `server/audit/action-audit.mjs`, compose/staging/.env.example, `ApprovalsQueue.tsx`, `AgentsWorkspace.tsx`, `Dashboard.tsx`, docs | 2026-11-05 | 2026-11-05 | Merged as #133. Owner sets `FRIDAY_APPROVALS_ENABLED=true` in an approved deploy. |
+| Fix flaky Authentik test | Claude | `complete` | `server/security/authentik.test.mjs`, backlog | 2026-11-05 | 2026-11-05 | Merged as #134. |
+| Port e2e smoke test | Claude | `complete` | `playwright.config.mjs`, `tests/e2e/`, CI `e2e` job, `package.json`, README | 2026-11-05 | 2026-11-05 | Merged as #135. |
+| Refresh NEXT_STEPS | Claude | `complete` | `docs/codex/NEXT_STEPS.md`, backlog | 2026-11-05 | 2026-11-05 | Merged as #136. |
+| Port auth failover docs | Claude | `complete` | `docs/friday-authentication-failover.md`, `docs/phase2c-operator-auth-hardening.md`, NEXT_STEPS, backlog | 2026-11-05 | 2026-11-05 | Merged as #137. |
+| Tasks write path (create only) | Claude | `verification_needed` | `server/work/task-insert-repository.mjs`, `server/work/http-writes.mjs`, bridge `createTask`, `supabase/migrations/202611060001_friday_work_writer.sql`, Tasks screen | 2026-11-06 | 2026-11-06 | Merge after CI; owner applies the role SQL, mints the key and sets the flag. |
 | Free model routing and NVIDIA readiness slice | Claude | `complete` | Branch `claude/friday-model-fabric`: `server/ai/model-{fabric,registry,router}.mjs`, `server/ai/nvidia.mjs`, `scripts/check-nvidia-catalog.mjs`, `modelFabric` config, docs | 2026-11-01 | 2026-11-01 | Merged as #115. Internal only and default off; not wired into chat or agents. |
 | Container and observer hardening slice | Claude | `complete` | Branch `claude/friday-container-hardening`: `observer/docker-proxy.mjs`, `observer/Dockerfile*`, `observer/compose.yaml`, controller `Dockerfile`, CI observer steps | 2026-11-01 | 2026-11-02 | Merged as #116. VM100 observer rollout and the controller non-root data migration each need a separate operator-approved window. |
 | #109 leftovers, slice A (history validation, HomeLab observations, phone sheet focus) | Claude | `complete` | Branch `claude/friday-109-ui-slice`: `server/monitoring/history.mjs`, `/api/monitoring/history`, `src/components/HomeLabSnapshot.tsx`, `src/hooks/useModalFocus.ts`, `MobileNavigation.tsx` | 2026-11-02 | 2026-11-02 | Merged as #117. |
 | Non-root controller rehearsal (#109 leftovers, slice B) | Claude | `complete` | Branch `claude/friday-nonroot-rehearsal`: `Dockerfile` `runtime-nonroot` stage, `scripts/test-friday-volume-migration.sh`, `scripts/check-friday-volume-readiness.sh`, `scripts/test-controller-container-hardening.sh`, `scripts/scan-controller-image.sh`, CI | 2026-11-02 | 2026-11-02 | Merged as #118. Production cutover needs an approved VM102 window (see `docs/controller-nonroot-migration.md`). |
 | VM100 staging stack (#109 leftovers, slice C) | Claude | `complete` | Branch `claude/friday-staging-stack`: `deploy/staging/`, `scripts/verify-friday-staging*`, `scripts/test-friday-staging-isolation.sh`, `scripts/check-friday-edge-readiness*`, `server/security/access-staging.test.mjs`, CI, Makefile | 2026-11-03 | 2026-11-03 | Merged as #119. Redeploying staging on VM100 from main is an operator step. |
+| Friday UI redesign from AIDesigner | Claude | `complete` | Branch `claude/project-thread-dnda8o`: `src/theme.css`, `src/pages/Dashboard.tsx` shell/Home, CSS palette in `src/*.css`, Geist fonts, `server/http.mjs` font MIME, audit API shape guard | 2026-11-05 | 2026-11-05 | Owner reviews PR; phone layout and per-workspace structure can follow the generated AIDesigner canvases. |
+| GitHub read integration for Repositories (PRs, CI, last commit) | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/adapters/github.mjs`, `/api/repositories/:id/github`, `server/config.mjs` `github`, `compose.yaml`, `.env.example`, `src/components/RepositoriesWorkspace.tsx`, `src/lib/api.ts`, docs | 2026-11-05 | 2026-11-05 | Open PR; stays off until an operator sets `FRIDAY_GITHUB_ENABLED` and a read-only token. |
+| Uptime history for Applications | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/monitoring/uptime.mjs`, runtime/state, `/api/monitoring/uptime`, `FRIDAY_MONITORING_UPTIME_ENABLED`, `ApplicationsWorkspace.tsx`, docs | 2026-11-05 | 2026-11-05 | Merge after green CI; enable on VM102 in an approved deploy. |
+| Agent activity log (Live agent events) | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/agents/activity-log.mjs`, `/api/agents/activity`, ask handler, `FRIDAY_AGENT_ACTIVITY_*`, `AgentActivityPanel.tsx`, docs | 2026-11-05 | 2026-11-05 | Merge after green CI; enable on VM102 in an approved deploy. |
 | AIDesigner design generation API | Claude | `verification_needed` | Branch `claude/project-thread-u3n07g`: `server/adapters/aidesigner.mjs`, `/api/aidesigner/*`, `aidesigner` config, compose/.env.example/staging flag, `docs/integrations.md` | 2026-11-05 | 2026-11-05 | Open a PR; stays disabled until an operator sets `FRIDAY_AIDESIGNER_ENABLED` and `AIDESIGNER_API_KEY`. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
@@ -302,3 +314,108 @@ After placing this file at the current Friday repository root, add this exact in
 > Before starting work, read `FRIDAY_SHARED_MEMORY.md` completely. Claim your task in **Active work**, avoid overlapping another agent's scope, and update the ledger plus append an Activity log entry before stopping. Never put secrets in the ledger.
 
 The ledger should normally be committed with the repository so every agent sees the same history. If runtime details should remain private, keep sensitive operational values in the approved secret manager and record only non-secret evidence here.
+
+### 2026-11-05 — Claude — Friday UI redesign from AIDesigner
+- Work: Pulled the owner's AIDesigner "Friday" canvases via the REST API and generated six more (Incidents, Applications, Repositories, Chat, Settings/Audit, phone). Re-skinned the app to zinc/indigo with bundled Geist fonts, replaced the icon rail with a grouped labeled sidebar, rebuilt desktop Home (greeting, Ask card, suggestions, stat cards, action-center rail) using real data only. Only Approvals and Memory are marked not connected now. Audit no longer crashes when the API answers 200 with non-JSON; the server serves .woff/.woff2 with font MIME types.
+- Verification: `make verify` passed (vitest 213, node 849, build, Compose).
+- Blockers: none. Deployed 2026-11-05 at `7aac30d`.
+- Next: owner review of the PR.
+
+### 2026-11-05 — Claude — Friday UI redesign slice 2 (backend check)
+- Work: Merged #124. Ran the real server (`FRIDAY_MODE=mock`, built UI) and drove all 12 screens: no page errors; 503s only from features disabled in mock mode (agents, audit, monitoring history, assistant AI), each shown with an honest message. Chat gets an Active context rail (open incidents, visible services, suggested questions) from normalized state; Applications becomes a card grid; the preview banner now says mock mode when the API is connected.
+- Verification: `make verify` passed (vitest 216, node 849).
+- Next: owner review of the PR.
+
+### 2026-11-05 — Claude — Friday UI redesign slice 3 (remaining page layouts)
+- Work: Owner asked for the AIDesigner layouts on every page even where the backend lacks the feature. Added `NotConnected` (inert, text-labelled placeholder; disabled button at most). Incidents list+detail split; Repositories table + PR/CI side panel; Settings tabs incl. Audit log; Audit search, result filter and client-side CSV export of loaded events; Applications card metrics; Agents filters + action center; Infrastructure stat cards + services table; Tasks new-task placeholder. Existing safety tests (no create/approve/execute buttons) kept.
+- Verification: `make verify` passed (vitest 219, node 849); all screens driven against the real server in mock mode with no page errors.
+- Next: owner review of the PR.
+
+### 2026-11-05 — Claude — GitHub read integration for Repositories
+- Status: verification_needed (PR open; live GitHub read not run).
+- Scope claimed: `server/adapters/github.mjs`, `GET /api/repositories/:id/github`, `github` config, `compose.yaml`, `.env.example`, staging flag, `RepositoriesWorkspace.tsx`, `src/lib/api.ts`, docs.
+- Work performed: Server-side, GET-only GitHub reader (open PRs, default-branch CI from check runs plus commit statuses, last commit), cached per repo/branch, 4 MiB/8 s bounds, stable error codes, token never returned. Repositories page fills Open PRs / CI / Last commit and a PR side panel; keeps "Not connected" when the flag is off.
+- Verification: `make verify` passed (vitest 223, node 860, build, Compose, staging validator). The cloud container gets 403 from api.github.com, so no live read was made.
+- Decisions: off by default (`FRIDAY_GITHUB_ENABLED=false`); staging pins it false.
+- Blockers/risks: needs a fine-grained read-only token in VM102 `.env` and a deploy.
+- Next action: owner review/merge; then set `FRIDAY_GITHUB_ENABLED=true` and `FRIDAY_GITHUB_TOKEN` on VM102 in an approved deploy.
+- Rollback/recovery: set `FRIDAY_GITHUB_ENABLED=false` or revert the PR.
+
+### 2026-11-05 — Claude — Uptime history for Applications
+- Status: verification_needed (PR open). GitHub integration #127 merged (deployed 2026-11-05 at `7aac30d`).
+- Scope claimed: `server/monitoring/uptime.mjs`, `server/monitoring/{runtime,state}.mjs`, `/api/monitoring/uptime`, `server/config.mjs`, `compose.yaml`, `.env.example`, staging flag, `ApplicationsWorkspace.tsx`, `src/lib/api.ts`, docs.
+- Work performed: Opt-in seven day hourly uptime record per service, written from each successful poll into the monitoring state file (max 300 services, maintenance excluded, degraded counts as up). Read-only route with explicit 503s. Applications shows 24h uptime, hourly bars and a 24h/7d detail.
+- Verification: `make verify` (see PR).
+- Blockers/risks: data starts accumulating only once the flag is on in production.
+- Next action: merge after CI; set `FRIDAY_MONITORING_UPTIME_ENABLED=true` on VM102 in an approved deploy.
+- Rollback/recovery: set the flag to false (the stored record is ignored) or revert.
+
+### 2026-11-05 — Claude — Agent activity log
+- Status: verification_needed (PR open). Uptime history #128 merged (deployed 2026-11-05 at `7aac30d`). Owner picked this slice on a decision card.
+- Scope claimed: `server/agents/activity-log.mjs`, `server/http.mjs` ask handler and `/api/agents/activity`, `server/index.mjs`, `server/config.mjs`, `compose.yaml`, `.env.example`, staging flag, `src/components/AgentActivityPanel.tsx`, `AgentsWorkspace.tsx`, docs.
+- Work performed: Opt-in, bounded, metadata-only log of agent questions (no prompts, answers, error text or identity), atomic 0600 file, write failures swallowed. Read-only route; Agents action center shows the latest eight.
+- Verification: `make verify` passed.
+- Blockers/risks: none; empty until the flag is on in production.
+- Next action: merge after CI; set `FRIDAY_AGENT_ACTIVITY_ENABLED=true` on VM102 in an approved deploy. Remaining placeholders (approvals, remediation, new tasks/agents, open app) need owner approval.
+- Rollback/recovery: set the flag to false or revert.
+
+### 2026-11-05 — Claude — Agent on duty (Infrastructure)
+- Status: verification_needed (PR open). Agent activity log #129 merged (deployed 2026-11-05 at `7aac30d`).
+- Scope claimed: `src/components/AgentOnDuty.tsx`, `InfrastructureWorkspace.tsx`, `src/theme.css`. UI only, no new server route or flag.
+- Work performed: Infrastructure's "Agent on duty" card now names the enabled registry agent whose declared `scope.hosts` covers the visible hosts, with its last answer time from the agent activity log when that is on. Stays "Not connected" when the registry is unavailable.
+- Verification: `make verify` passed.
+- Next action: merge after CI. Remaining placeholders (approvals, remediation, task/agent creation, open app) and the VM102 deploy wait for the owner.
+- Rollback/recovery: revert the PR.
+
+### 2026-11-05 — Claude — Free model routing in chat
+- Status: verification_needed (PR open). #127 to #130 are deployed on VM102 at `7aac30d` (owner ran the deploy; GitHub, uptime and agent activity flags on, `make health` ok).
+- Scope claimed: `server/assistant.mjs`, `server/ai/model-fabric.mjs`, `server/assistant.test.mjs`, `docs/model-fabric.md`, `docs/automation/BACKLOG.md`.
+- Work performed: When `FRIDAY_AI_ENABLED` and `FRIDAY_MODEL_FABRIC_ENABLED` are both true, the assistant (chat, group advisory, agent ask) first tries the free-only router: eligible free NVIDIA targets one at a time, local first, normalized Friday state and history only, no tools. If none answers, it continues down today's provider order and deterministic analysis, so the safe unavailable result is unchanged. Router failures are recorded as sanitized attempts. Flag off changes nothing.
+- Verification: `make verify` (see PR).
+- Next action: merge after CI. Turning it on needs free NVIDIA models configured on VM102 in an approved deploy. Next slice: approvals queue (owner picked it 2026-11-05).
+- Rollback/recovery: set `FRIDAY_MODEL_FABRIC_ENABLED=false` or revert.
+
+### 2026-11-05 — Claude — GitHub-only repositories
+- Status: verification_needed (PR open). Free model routing merged as #131 (not deployed).
+- Why: the owner saw no repositories on Friday. VM102 mounts no checkouts (no `compose.repositories.yaml` overlay), so nothing was registered and the GitHub token had nothing to read. The owner chose GitHub-only registration on a decision card.
+- Work performed: a registry entry may omit `path` when its `remote` is a github.com repository. The public list adds `checkout: true|false`; status, files and file reads refuse entries with no checkout. Settings, Repositories accepts a GitHub URL alone; the Repositories page skips file browsing for GitHub-only entries. No new flag (registration is operator-only and audited as before; GitHub data stays behind `FRIDAY_GITHUB_ENABLED`).
+- Verification: `make verify` (see PR).
+- Next action: merge after CI; owner redeploys VM102 and adds repositories by GitHub URL in Settings. Approvals queue is next (work saved locally, not pushed).
+- Rollback/recovery: revert; stored GitHub-only entries would then fail validation and Friday falls back to the registry file, so remove them first.
+
+### 2026-11-05 — Claude — Approvals queue
+- Status: verification_needed (PR open). GitHub-only repositories merged as #132 (not deployed). Owner picked the approvals queue on a decision card ("operator only and audited; nothing is executed yet").
+- Work performed: opt-in queue (`FRIDAY_APPROVALS_ENABLED`). Pending proposals are the open monitoring incidents with a recommended action; operators approve or deny on the Approvals page or in the Agents action center. Decisions are stored in an atomic 0600 file, serialized so the first wins, and audited as `approvals.decide`. Nothing executes (`execution.performed:false`). The older homelab-control staging-canary foundation is untouched.
+- Verification: `make verify` (see PR).
+- Next action: merge after CI; set `FRIDAY_APPROVALS_ENABLED=true` on VM102 in an approved deploy. Automated fixes that act on approved proposals still need owner approval.
+- Rollback/recovery: set the flag to false (the stored decisions are ignored) or revert.
+
+### 2026-11-05 — Claude — Flaky Authentik "invalid issuer…deny" test
+- Status: verification_needed (PR open). Approvals queue merged as #133 (not deployed).
+- Root cause: not load or shared state. The test tampered the signature by replacing its last two base64url characters with `xx`. A 256-byte RS256 signature is 342 characters and base64url ignores the 4 padding bits of the last one, so when the original ended in `x` plus a character whose top two bits are `11` (1 in 256 per run, with the random test key) the tampered token decoded to the real signature, verified, and the deny assertion saw 200.
+- Fix: a `tamper()` helper changes the signature's first character (all 6 bits significant). Assertions unchanged. `server/security/access.test.mjs` uses a 5-character variant with a negligible (about 1 in 64^4) chance; left as is.
+- Verification: 50 consecutive runs of `node --test --test-concurrency=8 server/security/*.test.mjs` passed; `make verify` (see PR).
+- Next action: merge after CI. Next backlog items: port-e2e-smoke, refresh-next-steps.
+
+### 2026-11-05 — Claude — Browser smoke test (port-e2e-smoke)
+- Status: verification_needed (PR open). Flaky Authentik test fix merged as #134.
+- Work performed: Playwright (`@playwright/test` 1.63.0, pinned) smoke test against a loopback mock-mode Friday server serving the built UI. Covers desktop load, overview nav and Read-only badge, Settings navigation, and the phone More sheet (opens, keeps focus inside over 12 Tabs, closes on Escape and returns focus, navigates to Settings). Wrote a fresh fixture instead of porting #109's task fixture; no task write tests. Runs as its own CI job (`e2e`), not inside `make verify`.
+- Verification: `npm run test:e2e` passed locally (2 tests, about 3 s); `make verify` (see PR).
+- Next action: merge after CI. Next backlog item: refresh-next-steps.
+
+### 2026-11-05 — Claude — Refresh NEXT_STEPS (refresh-next-steps)
+- Status: verification_needed (PR open). Browser smoke test merged as #135; its CI `e2e` job passed.
+- Work performed: rewrote `docs/codex/NEXT_STEPS.md` as an ordered queue: merged-not-deployed (#131 to #135, with the flag to set for each), owner decisions, owner operations (service token expires 2026-11-24), and next agent work. Every item references a PR, file or ledger entry.
+- Next action: merge after CI. Next backlog item: port-auth-failover-docs.
+
+### 2026-11-05 — Claude — Port authentication docs (port-auth-failover-docs)
+- Status: verification_needed (PR open). NEXT_STEPS refresh merged as #136.
+- Work performed: brought `docs/friday-authentication-failover.md` and `docs/phase2c-operator-auth-hardening.md` from #109's branch, rewritten against `main` (`server/security/access.mjs`, the operator-only check in `server/http.mjs`, `server/config.mjs`). Dropped what `main` lacks and said so: no `FRIDAY_REGISTRY_SYNC_OPERATOR_TOKEN` second bearer for registry sync, no 20-per-minute POST limit, and diagnostic reruns are open to any valid identity (not operator-only). The failover doc is marked as a runbook for the unapproved `authentik-primary-login` decision. Linked both from NEXT_STEPS.
+- Verification: grepped every file path and `FRIDAY_*` name in both docs against the tree; operator-only route list matches `server/http.mjs`; behaviour matches `server/security/access-staging.test.mjs`. Docs only, no code change.
+- Next action: merge after CI. The backlog has no other `ready` items; the rest need owner approval.
+
+### 2026-11-06 — Claude — New task (tasks-write-path, create only)
+- Status: verification_needed (PR open). Owner approved "Creating task" on 2026-11-06 via the project chat. Claiming, moving and editing tasks are not approved and not built.
+- Work performed: `POST /api/work/tasks` behind `FRIDAY_WORK_WRITE_ENABLED` (default off; needs work reads on). The work bridge re-verifies the Access JWT, requires an operator email and a project grant, derives the principal server-side, and writes through a new insert-only repository (fixed host, table and columns; retry-safe by request id; different content on a reused id is 409). Audited as `work.tasks.create`. New SQL `supabase/migrations/202611060001_friday_work_writer.sql` creates NOLOGIN `friday_work_writer` with column INSERT/SELECT on `friday_work_items` and RLS that only accepts new `ready` rows from `access:` principals. Tasks screen shows a New task form only when the list response says `canCreate`.
+- Verification: role SQL and `tests/sql/shared-work-writer.sql` passed on a disposable local Postgres 16 (re-run safe); repository, bridge/HTTP and UI tests added; `make verify` (see PR).
+- Next action: merge after CI. Owner, to switch on: apply the SQL on VM132, mint a `friday_work_writer` JWT into `FRIDAY_WORK_WRITE_KEY`, set `FRIDAY_WORK_WRITE_ENABLED=true`, redeploy.

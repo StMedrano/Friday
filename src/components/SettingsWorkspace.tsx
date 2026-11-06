@@ -6,6 +6,10 @@ import EndpointChecksPanel from './EndpointChecksPanel'
 import RepositorySettingsPanel from './RepositorySettingsPanel'
 import PushControls from './PushControls'
 import WorkIdentityPanel from './WorkIdentityPanel'
+import AuditWorkspace from './AuditWorkspace'
+
+const TABS = ['General', 'Notifications', 'Sites', 'Access & roles', 'Audit log'] as const
+type Tab = typeof TABS[number]
 
 const CREDENTIALS: Record<FridayCredentialState, string> = {
   present: 'Credentials present', missing: 'Credentials missing', 'not-required': 'No credentials needed',
@@ -21,6 +25,7 @@ function auditSummary(audit: FridaySettings['audit'] | undefined) {
 export default function SettingsWorkspace() {
   const [settings, setSettings] = useState<FridaySettings | null>(null)
   const [error, setError] = useState('')
+  const [tab, setTab] = useState<Tab>('General')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -36,10 +41,15 @@ export default function SettingsWorkspace() {
       <div><span className="v3-kicker">SERVER CONFIGURATION</span><h2>Settings</h2><p>Effective controller configuration. Operators can edit site labels, endpoint checks and repositories here. Secrets, addresses and identities are never sent to the browser; change everything else in the server environment and redeploy.</p></div>
     </div>
 
-    {error ? <p role="alert" className="v3-settings-message">{error}</p>
+    <div className="fx-tabs" role="tablist" aria-label="Settings sections">
+      {TABS.map((name) => <button key={name} type="button" role="tab" id={`settings-tab-${name}`} aria-selected={tab === name} onClick={() => setTab(name)}>{name}</button>)}
+    </div>
+
+    {tab === 'Audit log' ? <div role="tabpanel" aria-labelledby="settings-tab-Audit log"><AuditWorkspace/></div>
+      : error ? <p role="alert" className="v3-settings-message">{error}</p>
       : !settings ? <p role="status" className="v3-settings-message">Loading settings…</p>
         : <div className="v3-settings-grid">
-          <section className="v3-panel v3-settings-wide" aria-label="Integrations">
+          <section className="v3-panel v3-settings-wide" aria-label="Integrations" hidden={tab !== 'General'}>
             <div className="v3-section-head"><div><span className="v3-kicker">INTEGRATIONS</span><h2>{settings.integrations.filter((item) => item.enabled).length} of {settings.integrations.length} enabled</h2></div><span className="v3-settings-mode">{settings.mode} mode</span></div>
             <ul className="v3-settings-list">
               {settings.integrations.map((item) => <li key={item.id}>
@@ -52,11 +62,13 @@ export default function SettingsWorkspace() {
             </ul>
           </section>
 
-          <SiteSettingsPanel/>
-          <EndpointChecksPanel/>
-          <RepositorySettingsPanel/>
+          <div className="fx-tab-group" hidden={tab !== 'Sites'}>
+            <SiteSettingsPanel/>
+            <EndpointChecksPanel/>
+            <RepositorySettingsPanel/>
+          </div>
 
-          <section className="v3-panel" aria-label="AI providers">
+          <section className="v3-panel" aria-label="AI providers" hidden={tab !== 'General'}>
             <div className="v3-section-head"><div><span className="v3-kicker">ASSISTANT</span><h2>AI {settings.ai.enabled ? 'enabled' : 'disabled'}</h2></div></div>
             <ol className="v3-settings-order">{settings.ai.providerOrder.map((id, index) => <li key={id}>{index + 1}. {id}</li>)}</ol>
             <ul className="v3-settings-list compact">
@@ -69,7 +81,16 @@ export default function SettingsWorkspace() {
             <p className="v3-settings-message">Timeouts: cloud {settings.ai.cloudTimeoutMs ?? '—'} ms · local {settings.ai.localTimeoutMs ?? '—'} ms. Failover is sequential.</p>
           </section>
 
-          <section className="v3-panel" aria-label="Access and safety">
+          <section className="v3-panel" aria-label="Notifications" hidden={tab !== 'Notifications'}>
+            <div className="v3-section-head"><div><span className="v3-kicker">NOTIFICATIONS</span><h2>Alerts</h2></div></div>
+            <dl className="v3-settings-facts">
+              <dt>ntfy</dt><dd>{onOff(Boolean(settings.notifications?.ntfy))}</dd>
+              <dt>Browser push</dt><dd>{onOff(Boolean(settings.notifications?.webPush))}</dd>
+            </dl>
+            <PushControls/>
+          </section>
+
+          <section className="v3-panel" aria-label="Access and safety" hidden={tab !== 'Access & roles'}>
             <div className="v3-section-head"><div><span className="v3-kicker">ACCESS</span><h2>Origin verification {settings.access.originVerification ? 'on' : 'off'}</h2></div><Lock size={16} aria-hidden="true"/></div>
             <dl className="v3-settings-facts">
               <dt>Cloudflare Access</dt><dd>{settings.access.configured ? 'Configured' : 'Not configured'}</dd>
@@ -80,7 +101,6 @@ export default function SettingsWorkspace() {
               <dt>Notifications</dt><dd>{[settings.notifications?.ntfy ? 'ntfy' : null, settings.notifications?.webPush ? 'browser push' : null].filter(Boolean).join(' · ') || 'Not configured'}</dd>
               <dt>Automation API</dt><dd>{onOff(settings.automationApi.enabled)} · port {settings.automationApi.port ?? '—'} · {settings.automationApi.serviceTokens} service tokens · read only</dd>
             </dl>
-            <PushControls/>
             <WorkIdentityPanel/>
             <p className="v3-settings-safety"><ShieldCheck size={14} aria-hidden="true"/>Only site labels, endpoint checks and repositories are writable here. No infrastructure actions or executor exist in this build.</p>
           </section>

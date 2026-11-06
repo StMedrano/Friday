@@ -203,6 +203,8 @@ export function getConfig(env = process.env) {
       offlineGraceSeconds: positiveNumber(env.FRIDAY_MONITORING_OFFLINE_GRACE_SECONDS, 300),
       statePath: env.FRIDAY_MONITORING_STATE_PATH || '/data/monitoring-state.json',
       historyLimit: positiveNumber(env.FRIDAY_MONITORING_HISTORY_LIMIT, 2000),
+      // Opt-in hourly per-service uptime record kept for seven days in the monitoring state file.
+      uptimeEnabled: enabled(env.FRIDAY_MONITORING_UPTIME_ENABLED),
     },
     notifications: {
       ntfy: { url: env.FRIDAY_NTFY_URL || '', token: env.FRIDAY_NTFY_TOKEN || '' },
@@ -217,6 +219,11 @@ export function getConfig(env = process.env) {
       readKey: env.FRIDAY_WORK_READ_KEY || '',
       gatewayKey: env.FRIDAY_WORK_READ_GATEWAY_KEY || '',
       grantsPath: env.FRIDAY_WORK_GRANTS_PATH || '/data/work-grants.json',
+      // "New task" needs work reads on as well, plus an insert-only key.
+      write: {
+        enabled: enabled(env.FRIDAY_WORK_WRITE_ENABLED),
+        key: env.FRIDAY_WORK_WRITE_KEY || '',
+      },
     },
     // Internal free-only model fabric. Opt-in, never wired to a paid fallback.
     modelFabric: {
@@ -244,6 +251,25 @@ export function getConfig(env = process.env) {
       baseUrl: env.FRIDAY_WEB_GROWTH_READER_URL || '',
       token: env.FRIDAY_WEB_GROWTH_READER_TOKEN || '',
       readerEmails: [...new Set(String(env.FRIDAY_WEB_GROWTH_READER_EMAILS || '').split(',').map((value) => value.trim().toLowerCase()).filter(Boolean))],
+    },
+    // Read-only GitHub summary for registered repositories (open PRs, CI, last commit).
+    github: {
+      enabled: enabled(env.FRIDAY_GITHUB_ENABLED),
+      token: env.FRIDAY_GITHUB_TOKEN || '',
+      apiUrl: env.FRIDAY_GITHUB_API_URL || 'https://api.github.com',
+      cacheSeconds: Math.min(3600, Math.max(30, Math.floor(positiveNumber(env.FRIDAY_GITHUB_CACHE_SECONDS, 120)))),
+    },
+    // Metadata-only log of agent questions (agent, model, outcome, duration); never prompts or answers.
+    agentActivity: {
+      enabled: enabled(env.FRIDAY_AGENT_ACTIVITY_ENABLED),
+      path: env.FRIDAY_AGENT_ACTIVITY_PATH || '/data/agent-activity.json',
+      limit: Math.min(2000, Math.max(50, Math.floor(positiveNumber(env.FRIDAY_AGENT_ACTIVITY_LIMIT, 500)))),
+    },
+    // Approvals queue for incident remediation; decisions are recorded and audited, never executed.
+    approvals: {
+      enabled: enabled(env.FRIDAY_APPROVALS_ENABLED),
+      path: env.FRIDAY_APPROVALS_PATH || '/data/approvals.json',
+      limit: Math.min(2000, Math.max(50, Math.floor(positiveNumber(env.FRIDAY_APPROVALS_LIMIT, 500)))),
     },
     // AIDesigner REST API for generating UI designs. The key stays server-side;
     // generating spends AIDesigner credits, so it is operator-only and audited.

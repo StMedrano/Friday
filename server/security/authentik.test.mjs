@@ -20,6 +20,11 @@ const token=(claims={},header={})=>{
  const signed=b64({alg:'RS256',kid:'ak-fixture',typ:'JWT',...header})+'.'+b64(payload)
  return signed+'.'+sign('RSA-SHA256',Buffer.from(signed),privateKey).toString('base64url')
 }
+// Change the signature's first character: all six of its bits are significant,
+// so the decoded signature always differs. Editing the last characters is not
+// safe, because base64url ignores the trailing padding bits and the tampered
+// token can decode to the original signature (about 1 run in 256 with a random key).
+const tamper=jwt=>{const [h,p,s]=jwt.split('.');return h+'.'+p+'.'+(s[0]==='A'?'B':'A')+s.slice(1)}
 function fixture(overrides={}){
  const seen=[]
  let current=TIME
@@ -90,7 +95,7 @@ test('invalid issuer, wrong audience, wrong signature, expired, future nbf, miss
   token({}, {alg:'HS256'}),
   token({}, {kid:'wrong'}),
   token({}, {typ:'dpop+id_token'}),
-  token().slice(0,-2)+'xx',
+  tamper(token()),
  ]
  for(const badJwt of bad){assert.equal((await f.gate(request(badJwt))).status,403)}
  assert.equal((await f.gate(request(token({aud:['friday-private-client','other-client'],azp:clientId})))).status,200)

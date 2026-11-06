@@ -1,5 +1,8 @@
+import NotConnected from './NotConnected'
 import { useEffect, useMemo, useState } from 'react'
 import AgentGroupsPanel from './AgentGroupsPanel'
+import AgentActivityPanel from './AgentActivityPanel'
+import ApprovalsQueue from './ApprovalsQueue'
 import {
   askFridayAgent,
   fetchFridayAgentRegistryStatus,
@@ -24,6 +27,7 @@ function displayDate(value?: string | null) {
 }
 
 export default function AgentsWorkspace() {
+  const [agentFilter, setAgentFilter] = useState<'all' | 'enabled' | 'disabled'>('all')
   const [agents, setAgents] = useState<FridayAgent[]>([])
   const [status, setStatus] = useState<FridayAgentRegistryStatus | null>(null)
   const [selectedId, setSelectedId] = useState<string>('')
@@ -34,6 +38,7 @@ export default function AgentsWorkspace() {
   const [asking, setAsking] = useState(false)
   const [answer, setAnswer] = useState<FridayAgentResponse | null>(null)
   const [answerError, setAnswerError] = useState<string | null>(null)
+  const [asked, setAsked] = useState(0)
 
   async function load(signal?: AbortSignal) {
     const [nextAgents, nextStatus] = await Promise.all([
@@ -84,6 +89,7 @@ export default function AgentsWorkspace() {
       setAnswerError(error instanceof Error ? error.message : 'Local agent inference unavailable')
     } finally {
       setAsking(false)
+      setAsked((count) => count + 1)
     }
   }
 
@@ -108,6 +114,8 @@ export default function AgentsWorkspace() {
       <strong>Git is authoritative.</strong> Sync copies validated definitions into Friday-owned registry state only; it cannot edit policy or managed infrastructure.
     </div>
 
+    <div className="fx-with-rail">
+    <div className="fx-with-rail-main">
     <AgentGroupsPanel/>
 
     {unavailable && !agents.length ? <div className="v3-agent-empty" role="status">
@@ -120,9 +128,15 @@ export default function AgentsWorkspace() {
       <p>Synchronize approved Git definitions after the local registry is configured.</p>
     </div> : null}
 
+    {agents.length > 0 && <div className="fx-tabs" role="group" aria-label="Filter agents">
+      {(['all', 'enabled', 'disabled'] as const).map((value) => <button key={value} type="button" aria-pressed={agentFilter === value} onClick={() => setAgentFilter(value)}>
+        {value === 'all' ? `All (${agents.length})` : value === 'enabled' ? `Enabled (${agents.filter((agent) => agent.enabled).length})` : `Disabled (${agents.filter((agent) => !agent.enabled).length})`}
+      </button>)}
+    </div>}
+
     {agents.length > 0 ? <div className="v3-agent-layout">
       <aside className="v3-agent-list" aria-label="Registered agents">
-        {agents.map((agent) => <button
+        {agents.filter((agent) => agentFilter === 'all' || (agentFilter === 'enabled') === agent.enabled).map((agent) => <button
           type="button"
           key={agent.id}
           className={`v3-agent-card ${selectedId === agent.id ? 'selected' : ''}`}
@@ -182,5 +196,13 @@ export default function AgentsWorkspace() {
         </div> : null}
       </article> : null}
     </div> : null}
+    </div>
+    <aside className="fx-action-center" aria-label="Action center">
+      <h2>Action center</h2>
+      <ApprovalsQueue compact/>
+      <NotConnected title="New agents" detail="Agents are defined in Git and synced here; creating them from Friday is not connected."/>
+      <AgentActivityPanel refreshKey={asked}/>
+    </aside>
+    </div>
   </section>
 }

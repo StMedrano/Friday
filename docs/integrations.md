@@ -32,6 +32,12 @@ Inspect output is allowlisted. Logs are explicit-request only, sanitized, bounde
 - APIs: `GET /api/incidents` and `GET /api/monitoring/history`.
 - Monitoring grants no provider write permissions.
 
+### Uptime history
+
+- `FRIDAY_MONITORING_UPTIME_ENABLED=false` by default. When on (and monitoring is on), every successful monitoring poll adds one sample per service to hourly buckets kept for seven days in the existing monitoring state file (`server/monitoring/uptime.mjs`). At most 300 services are tracked; services with no samples left in the window are dropped, and retired services are removed.
+- Online and degraded count as up, offline as down, and maintenance (intentionally stopped guests) is left out. Nothing is backfilled: the record starts when the flag is turned on.
+- `GET /api/monitoring/uptime` returns 24 hour and 7 day uptime, check counts and the last 24 hourly buckets per service. It answers 503 `monitoring-disabled`, `uptime-disabled` or `uptime-unavailable` instead of an empty success, and rejects queries. The Applications page shows the 24 hour figure, hourly bars and a detail panel from it.
+
 ## Incident Diagnostics
 
 Diagnostics remain environment-gated by `FRIDAY_DIAGNOSTICS_ENABLED`. Supported VM100 incidents can receive metadata-only diagnostic snapshots; raw logs are never fetched automatically and are never persisted. Explicit log inspection is read-only.
@@ -75,6 +81,27 @@ FRIDAY_SUPABASE_SERVICE_KEY=
 The service credential stays on the Friday server/container. It must never be exposed through frontend/browser configuration. The registry client is constrained to the two approved Friday resources, normalizes upstream failures, and does not return the service key in errors.
 
 Registry sync is explicit and Git-owned. It is not an agent editor and cannot create infrastructure actions, approvals, tasks, memory, or executor records.
+
+### Agent activity log
+
+- `FRIDAY_AGENT_ACTIVITY_ENABLED=false` by default. When on, every `POST /api/agents/:id/ask` adds one entry to `FRIDAY_AGENT_ACTIVITY_PATH` (default `/data/agent-activity.json`, mode 0600, newest `FRIDAY_AGENT_ACTIVITY_LIMIT` entries, 50 to 2000, default 500): time, agent ID and name, outcome (`answered`, `unavailable`, `not-found`, `failed`), provider, model and profile when answered, `grounding-invalid` when the answer failed grounding, and duration.
+- Prompts, answers, error text and the asking identity are never stored. A failed write never fails the answer.
+- `GET /api/agents/activity` returns the entries newest first; queries and other methods are refused, and it answers 503 `agent-activity-disabled` when off. The Agents page shows them under Live agent events.
+
+### Approvals queue
+
+- `FRIDAY_APPROVALS_ENABLED=false` by default. When on, each open monitoring incident that carries a recommended action is a pending proposal. An operator approves or denies it on the Approvals page or in the Agents action center.
+- Decisions go to `FRIDAY_APPROVALS_PATH` (default `/data/approvals.json`, mode 0600, newest `FRIDAY_APPROVALS_LIMIT` decisions, 50 to 2000, default 500) with the incident's title, service, severity and recommended action, the time, and the operator's email. Each decision is also written to the action audit as `approvals.decide` when the audit is on.
+- A decision is a record only. Nothing is executed: every response carries `execution.performed: false`. Automated fixes are a separate, approval-gated change.
+- `GET /api/approvals` returns `pending` (oldest first) and the 20 most recent decisions. `POST /api/approvals/:incidentId/decision` with `{"decision":"approve"|"deny"}` is operator-only, JSON-only and refused cross-site. Errors: 503 `approvals-disabled` or `monitoring-disabled`, 400 `invalid-approval-decision`, 404 `approval-not-found` (the incident is no longer open), 409 `approval-already-decided`. Decisions on one proposal are serialized, so only the first wins.
+
+### New tasks (Tasks write path)
+
+- `FRIDAY_WORK_WRITE_ENABLED=false` by default, and it only works when project task reads are on (`FRIDAY_WORK_READ_ENABLED=true` with a valid grant file). When both are on, the Tasks screen shows a "New task" form with a title and optional details.
+- Who can add: a signed-in person whose email is in `FRIDAY_ACCESS_OPERATOR_EMAILS` **and** whose grant file entry lists the project. Everyone else gets 403 `work-write-denied`. The browser never sends a role or principal; the server derives `access:<sha256 of the Access subject>` itself.
+- What it writes: one row in `friday_work_items` with status `ready`, version 1, no claim and no acceptance criteria. If details are left blank the title is used as the objective. Nothing claims, moves, edits or runs a task.
+- Database role: apply `supabase/migrations/202611060001_friday_work_writer.sql` on VM132 (safe to re-run). It creates the NOLOGIN role `friday_work_writer` that may only insert those columns and read tasks back; RLS only accepts new `ready` rows from an `access:` principal. Mint a PostgREST JWT with `"role":"friday_work_writer"` and put it in `FRIDAY_WORK_WRITE_KEY`. Never use the service key. The gateway key (`FRIDAY_WORK_READ_GATEWAY_KEY`) is reused.
+- `POST /api/work/tasks` with `{"projectId","title","objective"?,"requestId"}` is operator-only, JSON-only, refused cross-site, and written to the action audit as `work.tasks.create` with the project as target. `requestId` makes retries safe: the same person and id return the first task; reusing the id with different content is 409 `work-task-request-reused`. Other errors: 400 `invalid-work-task`, 404 when the path is off, 503 `work-write-unavailable`. `GET /api/work/tasks` adds `"canCreate": true` only when the path is on.
 
 ### CT108 local Ollama agent inference
 
@@ -200,6 +227,16 @@ Protocol references: [Kuma metrics integration](https://github.com/louislam/upti
 - Data-source alert rules (Prometheus/Loki-managed) and dashboards are out of scope for this slice.
 
 Protocol references: [Grafana health API](https://grafana.com/docs/grafana/latest/developers/http_api/other/#health-api) and the Prometheus-compatible Grafana-managed rules endpoint used by Grafana's alerting UI. Live acceptance needs the intended HTTPS endpoint with a trusted certificate, a Viewer service account token, the site label, and a comparison of rule names and states against Grafana's alert list. No live connection or Grafana change was made from the cloud workspace.
+
+## GitHub pull requests, CI and last commit
+
+- Adapter: `server/adapters/github.mjs`, disabled by default with `FRIDAY_GITHUB_ENABLED=false`. It fills the Open PRs, CI status and Last commit columns and the pull request panel on the Repositories page for registered repositories whose `remote` is on `github.com`.
+- Server settings: `FRIDAY_GITHUB_TOKEN` (optional for public repositories), `FRIDAY_GITHUB_API_URL` (HTTPS, default `https://api.github.com`), `FRIDAY_GITHUB_CACHE_SECONDS` (30 to 3600, default 120). They are passed only to the Friday controller and listed explicitly in `compose.yaml`.
+- GitHub-only repositories: in Settings, Repositories, an operator can add a repository with just its GitHub URL (`https://github.com/owner/name` or `git@github.com:owner/name.git`) and no checkout path. It lists on the Repositories page with its pull requests, CI and last commit; file browsing and working tree status need a checkout path under `FRIDAY_REPOSITORY_ROOTS`. Without a path, a non-GitHub remote is rejected (`invalid-repository-github-remote`).
+- Token: a fine-grained personal access token limited to the registered repositories with read-only **Metadata**, **Contents**, **Pull requests** and **Commit statuses**. Friday never needs write access. If the token cannot read check runs, CI falls back to commit statuses only.
+- Route: `GET /api/repositories/:id/github`, behind the same Access gate as other repository reads. Queries are rejected. Errors are stable codes: `github-disabled` (503), `github-remote-unsupported` (404, the remote is not on GitHub or the branch name is unsafe), `github-unavailable` (502). The token and raw GitHub errors never reach the browser.
+- Requests per repository, all `GET` with redirects refused, an 8 second timeout and a 4 MiB response cap: open pulls (one page of 100), the default branch head commit, its check runs and its combined status. Results are cached per repository and branch for the configured time so the page does not spend the rate limit.
+- Normalized output: open PR count (`more` when a full page came back), the five most recently updated PRs (number, title, author, draft, updated time, a `github.com` link only), CI state (`success`, `failure`, `pending`, `none` with counts) and the last commit (short SHA, first line of the message, author, date, link). PR bodies and other fields are dropped.
 
 ## General advisory AI providers
 

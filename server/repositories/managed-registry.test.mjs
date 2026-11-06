@@ -182,3 +182,20 @@ test('once managed, repository writes no longer depend on the original registry 
     assert.equal((await fetch(base + '/api/settings/repositories')).status, 200)
   })
 })
+
+test('store registers a GitHub-only repository without a checkout and the API lists it', async t => {
+  const {allowed, storePath} = await fixture(t)
+  const store = await createRepositorySettingsStore({path: storePath, allowedRoots: [allowed]})
+  const created = await store.create({name: 'Web Site', remote: 'https://github.com/StMedrano/site', defaultBranch: 'main'}, [])
+  assert.deepEqual(created, {id: 'web-site', name: 'Web Site', remote: 'https://github.com/StMedrano/site', defaultBranch: 'main', mode: 'read-only', enabled: true, exclude: []})
+  const edited = await store.update('web-site', {name: 'Site', remote: 'git@github.com:StMedrano/site.git', path: ''}, [])
+  assert.equal(edited.path, undefined)
+  assert.equal(edited.remote, 'git@github.com:StMedrano/site.git')
+  for (const [bad, reason] of [
+    [{name: 'No location'}, 'repository-location-required'],
+    [{name: 'GitLab', remote: 'https://gitlab.com/a/b.git'}, 'invalid-repository-github-remote'],
+    [{name: 'Deep', remote: 'https://github.com/a/b/tree/main'}, 'invalid-repository-github-remote'],
+  ]) await assert.rejects(store.create(bad, []), {code: 'invalid-repository', message: reason})
+  const registry = new ManagedRepositoryRegistry({registryPath: join(allowed, 'none.json'), store})
+  assert.deepEqual((await registry.list()).map(entry => [entry.id, entry.path]), [['web-site', undefined]])
+})

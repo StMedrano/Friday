@@ -496,7 +496,7 @@ The VM100 observer no longer mounts the Docker socket. A no-network, rootless si
 
 ## Free model routing and NVIDIA readiness, 2026-11-01
 
-The free-only model fabric is ported from the group-workspace branch as an internal module (`server/ai/model-fabric.mjs`, `model-registry.mjs`, `model-router.mjs`, `nvidia.mjs`). It ranks enabled, free targets with local models first, tries them in order and returns `no-free-model-available` with sanitized attempts instead of falling back to a paid model; the policy is frozen with zero paid spend. The NVIDIA provider pins hosted calls to `https://integrate.api.nvidia.com/v1`, requires local endpoints to use a `/v1` root, refuses redirects and caps output tokens. `npm run check:nvidia-catalog` checks the hosted catalog with an owner-private key file and explicit consent variables. Everything is default off (`FRIDAY_MODEL_FABRIC_ENABLED`, `FRIDAY_NVIDIA_ENABLED`) and nothing calls the fabric yet; wiring it into chat or agents is a separate change. See `docs/model-fabric.md` and `docs/nvidia-readiness.md`.
+The free-only model fabric is ported from the group-workspace branch as an internal module (`server/ai/model-fabric.mjs`, `model-registry.mjs`, `model-router.mjs`, `nvidia.mjs`). It ranks enabled, free targets with local models first, tries them in order and returns `no-free-model-available` with sanitized attempts instead of falling back to a paid model; the policy is frozen with zero paid spend. The NVIDIA provider pins hosted calls to `https://integrate.api.nvidia.com/v1`, requires local endpoints to use a `/v1` root, refuses redirects and caps output tokens. `npm run check:nvidia-catalog` checks the hosted catalog with an owner-private key file and explicit consent variables. Everything is default off (`FRIDAY_MODEL_FABRIC_ENABLED`, `FRIDAY_NVIDIA_ENABLED`). With the flag on, the assistant asks the fabric first and falls back to the existing provider order (see `docs/model-fabric.md`, Chat routing). See `docs/model-fabric.md` and `docs/nvidia-readiness.md`.
 
 ## Web Growth reader, 2026-10-31
 
@@ -757,6 +757,18 @@ Local Agent Platform Phase 1 is live-accepted. Next, fix site normalization, con
 ## Safety gate
 
 Do not implement infrastructure-changing agent or assistant actions until authentication, role policy, explicit approval, durable action audit logging, and the global automation kill switch exist and are tested.
+
+## GitHub read integration for Repositories, 2026-11-05
+
+The Repositories page fills Open PRs, CI status and Last commit from GitHub when `FRIDAY_GITHUB_ENABLED=true`. `GET /api/repositories/:id/github` is read only, cached, and returns stable error codes; with the flag off (the default) the page keeps its "Not connected" state. Details in `docs/integrations.md`. Not deployed by this change.
+
+## Uptime history for Applications, 2026-11-05
+
+With `FRIDAY_MONITORING_UPTIME_ENABLED=true`, the monitoring runtime keeps a seven day hourly uptime record per service from its own polls, served read only at `GET /api/monitoring/uptime`. The Applications page shows 24 hour uptime, hourly bars and 24 hour / 7 day figures; with the flag off it keeps the "Not connected" state. Not deployed by this change.
+
+## Agent activity log, 2026-11-05
+
+With `FRIDAY_AGENT_ACTIVITY_ENABLED=true`, Friday keeps a metadata-only, bounded log of agent questions (agent, model, outcome, duration; never prompts or answers), served read only at `GET /api/agents/activity` and shown as Live agent events on the Agents page. Not deployed by this change.
 
 ## AIDesigner design generation, 2026-11-05
 

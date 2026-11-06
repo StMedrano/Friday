@@ -1,6 +1,10 @@
 # Friday Agent Fabric — Phase 2A Internal Model Fabric
 
-The free-first model fabric is an **internal, opt-in server module**. It is not the user-facing Friday Assistant, not a public HTTP endpoint, and not an infrastructure tool executor. Deploying this branch does not enable it automatically.
+The free-first model fabric is an **internal, opt-in server module**. It is not a public HTTP endpoint and not an infrastructure tool executor. Deploying this branch does not enable it automatically.
+
+## Chat routing
+
+When both `FRIDAY_AI_ENABLED=true` and `FRIDAY_MODEL_FABRIC_ENABLED=true`, the Friday Assistant (chat, group advisory and agent questions) asks the fabric first. It tries eligible free targets one at a time, local first, sending only the system prompt, recent history and normalized Friday state, with no tools. If no free model answers, the assistant continues with the configured `FRIDAY_AI_PROVIDER_ORDER` and then deterministic analysis, exactly as it does with the flag off. Failed free attempts appear in the response's sanitized `attempts` list. With the flag off, the fabric is never called.
 
 ## Policy
 

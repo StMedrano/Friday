@@ -12,12 +12,14 @@ import { normalizeAssistantHistory, validateAssistantPrompt } from './assistant-
 import { validateAgentId, validateAgentPrompt, validateRegistrySyncBody } from './agents/input.mjs'
 import { createAccessGate } from './security/access.mjs'
 import { handleWorkReadHttp } from './work/http-reads.mjs'
+import { createWorkTask, isWorkTaskCreate, workTaskAuditTarget } from './work/http-writes.mjs'
 import { auditActor } from './audit/action-audit.mjs'
 import { buildSettingsView } from './settings.mjs'
 import { getGroupWorkspace } from './agents/group-workspace.mjs'
 import { groupAdvisoryPolicy } from './agents/group-advisory.mjs'
 import { workSubjectHash } from './work/file-subject-grants.mjs'
 import { readWebGrowth } from './adapters/web-growth.mjs'
+import { createGitHubReader } from './adapters/github.mjs'
 import { validateWebGrowthSnapshot } from './adapters/web-growth-schema.mjs'
 import { applySiteSettings, siteSettingsView } from './site-settings.mjs'
 import { applyEndpointChecks, endpointChecksView, environmentEndpointChecks } from './endpoint-checks.mjs'
@@ -63,6 +65,12 @@ const mime = {
   '.svg': 'image/svg+xml',
   '.png': 'image/png',
   '.ico': 'image/x-icon',
+  '.woff2': 'font/woff2',
+  '.woff': 'font/woff',
+}
+
+export function staticContentType(path) {
+  return mime[extname(path)] || 'application/octet-stream'
 }
 
 function json(response, statusCode, body, extraHeaders = {}) {
@@ -99,7 +107,7 @@ function serveStatic(requestPath, response) {
   if (!existsSync(path) || statSync(path).isDirectory()) path = join(publicDir, 'index.html')
   if (!existsSync(path)) return false
   response.writeHead(200, {
-    'content-type': mime[extname(path)] || 'application/octet-stream',
+    'content-type': staticContentType(path),
     'cache-control': path.endsWith('index.html') || path.endsWith('/sw.js') || path.endsWith('.webmanifest') ? 'no-cache' : 'public, max-age=3600',
     'x-content-type-options': 'nosniff',
     'x-frame-options': 'DENY',
@@ -116,6 +124,15 @@ function parseIncidentDiagnosticRoute(pathname) {
   try { incidentId = decodeURIComponent(match[1]) } catch { return { invalid: true } }
   if (!SAFE_INCIDENT_ID.test(incidentId)) return { invalid: true }
   return { invalid: false, incidentId, kind: match[2] }
+}
+
+function parseApprovalDecisionRoute(pathname) {
+  const match = String(pathname || '').match(/^\/api\/approvals\/([^/]+)\/decision$/)
+  if (!match) return null
+  let incidentId
+  try { incidentId = decodeURIComponent(match[1]) } catch { return { invalid: true } }
+  if (!SAFE_INCIDENT_ID.test(incidentId)) return { invalid: true }
+  return { invalid: false, incidentId }
 }
 
 function parseIncidentDiagnosticRerunRoute(pathname) {
@@ -146,12 +163,14 @@ function parseAgentAskRoute(pathname) {
 }
 
 function parseRepositoryToolRoute(pathname) {
-  const match = String(pathname || '').match(/^\/api\/repositories\/([^/]+)\/(status|files|file)$/)
+  const match = String(pathname || '').match(/^\/api\/repositories\/([^/]+)\/(status|files|file|github)$/)
   if (!match) return null
   let id
   try { id = decodeURIComponent(match[1]) } catch { return { invalid: true } }
   return SAFE_REPOSITORY_ID.test(id) ? { id, tool: match[2] } : { invalid: true }
 }
+
+const GITHUB_ERRORS = { 'github-disabled': 503, 'github-remote-unsupported': 404, 'github-unavailable': 502 }
 
 const AUDIT_DETAIL = /^[a-z0-9-]{1,64}$/
 
@@ -287,9 +306,13 @@ export function createFridayServer({
   repositorySettings = null,
   pushSubscriptions = null,
   readWebGrowthImpl = readWebGrowth,
+  githubReader = null,
+  agentActivity = null,
+  approvalQueue = null,
   aiDesignerImpl = createAiDesigner,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
+  const github = githubReader || createGitHubReader(config.github)
   const labelledConfig = (effectiveConfig = config) =>
     siteSettings ? applySiteSettings(effectiveConfig, siteSettings.get()) : effectiveConfig
   const buildEffectiveOverview = (effectiveConfig) => {
@@ -321,7 +344,9 @@ export function createFridayServer({
       const pushWrite = (request.method === 'POST' || request.method === 'DELETE') && url.pathname === '/api/notifications/web-push'
       const groupAdvisory = request.method === 'POST' && url.pathname === '/api/group-advisory'
       const aiDesignerGenerate = request.method === 'POST' && url.pathname === '/api/aidesigner/designs'
-      const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || aiDesignerGenerate || url.pathname === '/api/audit/events'
+      const approvalDecision = request.method === 'POST' && Boolean(parseApprovalDecisionRoute(url.pathname))
+      const taskCreate = isWorkTaskCreate(request.method, url.pathname)
+      const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || approvalDecision || taskCreate || aiDesignerGenerate || url.pathname === '/api/audit/events'
       let verdict
       try { verdict = await accessGate(request, operatorOnly) }
       catch { verdict = {status:503,error:'access-verification-unavailable'} }
@@ -334,8 +359,19 @@ export function createFridayServer({
       // for operational POST/PUT/DELETE handlers. Settings and registry writes with a body additionally require JSON.
       if (['POST', 'PUT', 'DELETE'].includes(request.method) && request.headers['sec-fetch-site'] === 'cross-site')
         return json(response, 403, {error:'access-denied'})
-      if ((registrySync || siteSettingsWrite || pushWrite || groupAdvisory || aiDesignerGenerate || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
+      if ((registrySync || siteSettingsWrite || pushWrite || groupAdvisory || approvalDecision || taskCreate || aiDesignerGenerate || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
         return json(response, 415, {error:'json-required'})
+    }
+
+    // The one work write: a new 'ready' task. Off unless the bridge was built
+    // with the insert-only writer; the bridge re-checks operator and project grant.
+    if (isWorkTaskCreate(request.method, url.pathname)) {
+      if (!workReadBridge?.canCreateTasks) return json(response, 404, { error: 'not-found' })
+      let body
+      try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid-work-task' }) }
+      const result = await runAudited({ actionAudit, identity, action: 'work.tasks.create', target: workTaskAuditTarget(body) },
+        () => createWorkTask({ request, url, body, bridge: workReadBridge }))
+      return json(response, result.status, result.body)
     }
 
     // Opt-in read-only transport; server/index.mjs does not inject a bridge.
@@ -502,6 +538,43 @@ export function createFridayServer({
       return json(response, 200, monitoringRuntime?.getIncidents?.() || { summary: { active: 0, high: 0, warning: 0, resolved: 0 }, incidents: [] })
     }
 
+    // Approvals queue: open incidents with a recommended action wait for an operator
+    // to approve or deny. Decisions are recorded and audited; nothing is executed.
+    if (url.pathname === '/api/approvals') {
+      if (request.method !== 'GET') return json(response, 405, { error: 'read-only-endpoint' })
+      if (url.search) return json(response, 400, { error: 'unexpected-query' })
+      if (!approvalQueue) return json(response, 503, { error: 'approvals-disabled' })
+      if (config.monitoring?.enabled === false) return json(response, 503, { error: 'monitoring-disabled' })
+      try { return json(response, 200, approvalQueue.list(monitoringRuntime?.getIncidents?.().incidents || [])) }
+      catch { return json(response, 503, { error: 'approvals-unavailable' }) }
+    }
+
+    const approvalDecisionRoute = parseApprovalDecisionRoute(url.pathname)
+    if (approvalDecisionRoute) {
+      if (request.method !== 'POST') return json(response, 405, { error: 'method-not-allowed' })
+      if (approvalDecisionRoute.invalid) return json(response, 400, { error: 'invalid-incident-id' })
+      if (url.search) return json(response, 400, { error: 'unexpected-query' })
+      if (!approvalQueue) return json(response, 503, { error: 'approvals-disabled' })
+      if (config.monitoring?.enabled === false) return json(response, 503, { error: 'monitoring-disabled' })
+      let body
+      try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid-approval-decision' }) }
+      const decision = { approve: 'approved', deny: 'denied' }[body?.decision]
+      if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 1 || !decision)
+        return json(response, 400, { error: 'invalid-approval-decision' })
+      try {
+        const result = await runAudited({ actionAudit, identity, action: 'approvals.decide', target: approvalDecisionRoute.incidentId },
+          () => approvalQueue.decide({
+            incidents: monitoringRuntime?.getIncidents?.().incidents || [],
+            incidentId: approvalDecisionRoute.incidentId,
+            decision,
+            decidedBy: auditActor(identity).label || undefined,
+          }))
+        return json(response, result.status, result.body)
+      } catch {
+        return json(response, 503, { error: 'approvals-unavailable' })
+      }
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/monitoring/history') {
       // Never report an unavailable or malformed history as an empty one.
       if (config.monitoring?.enabled === false) return json(response, 503, { error: 'monitoring-disabled' })
@@ -511,6 +584,17 @@ export function createFridayServer({
       catch { return json(response, 503, { error: 'monitoring-history-unavailable' }) }
       try { return json(response, 200, projectMonitoringHistory(history)) }
       catch { return json(response, 502, { error: 'monitoring-history-invalid' }) }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/monitoring/uptime') {
+      // Per-service uptime from Friday's own polls; off unless FRIDAY_MONITORING_UPTIME_ENABLED.
+      if (config.monitoring?.enabled === false) return json(response, 503, { error: 'monitoring-disabled' })
+      if (config.monitoring?.uptimeEnabled !== true) return json(response, 503, { error: 'uptime-disabled' })
+      if (url.search) return json(response, 400, { error: 'unexpected-query' })
+      let uptime = null
+      try { uptime = typeof monitoringRuntime?.getUptime === 'function' ? await monitoringRuntime.getUptime() : null } catch { uptime = null }
+      if (!uptime || !Array.isArray(uptime.services)) return json(response, 503, { error: 'uptime-unavailable' })
+      return json(response, 200, uptime)
     }
 
     if (request.method === 'GET' && url.pathname === '/api/audit/events') {
@@ -591,6 +675,20 @@ export function createFridayServer({
     if (request.method === 'GET' && repositoryToolRoute) {
       if (repositoryToolRoute.invalid) return json(response, 400, { error: 'invalid-repository-id' })
       if (!repositoryRegistry) return json(response, 503, { error: 'repository-registry-unavailable' })
+      // Read-only GitHub summary (open PRs, CI, last commit); off unless FRIDAY_GITHUB_ENABLED.
+      if (repositoryToolRoute.tool === 'github') {
+        if (url.search) return json(response, 400, { error: 'unexpected-query' })
+        let repository
+        try { repository = (await repositoryRegistry.list()).find((item) => item.id === repositoryToolRoute.id) }
+        catch { return json(response, 503, { error: 'repository-registry-unavailable' }) }
+        if (!repository) return json(response, 404, { error: 'repository-not-found' })
+        try {
+          return json(response, 200, await github.summary(repository))
+        } catch (error) {
+          const code = GITHUB_ERRORS[error?.code] ? error.code : 'github-unavailable'
+          return json(response, GITHUB_ERRORS[code], { error: code })
+        }
+      }
       try {
         if (repositoryToolRoute.tool === 'status') return json(response, 200, await repositoryRegistry.status(repositoryToolRoute.id))
         if (repositoryToolRoute.tool === 'files') {
@@ -650,6 +748,15 @@ export function createFridayServer({
       }
     }
 
+    // Metadata-only agent activity (which agent answered, model, outcome); off unless FRIDAY_AGENT_ACTIVITY_ENABLED.
+    if (url.pathname === '/api/agents/activity') {
+      if (request.method !== 'GET') return json(response, 405, { error: 'read-only-endpoint' })
+      if (url.search) return json(response, 400, { error: 'unexpected-query' })
+      if (!agentActivity) return json(response, 503, { error: 'agent-activity-disabled' })
+      try { return json(response, 200, { events: agentActivity.list() }) }
+      catch { return json(response, 503, { error: 'agent-activity-unavailable' }) }
+    }
+
     const agentAskRoute = parseAgentAskRoute(url.pathname)
     if (request.method === 'POST' && agentAskRoute) {
       if (agentAskRoute.invalid) return json(response, 400, { error: 'invalid-agent-id' })
@@ -659,7 +766,14 @@ export function createFridayServer({
         const promptResult = validateAgentPrompt(body.prompt)
         if (!promptResult.ok) return json(response, 400, promptResult.result)
         const overview = await currentOverview({ config, monitoringRuntime, buildOverviewImpl: buildEffectiveOverview })
-        const result = await agentService.ask(agentAskRoute.agentId, { prompt: promptResult.prompt, overview })
+        const started = Date.now()
+        let result
+        try { result = await agentService.ask(agentAskRoute.agentId, { prompt: promptResult.prompt, overview }) }
+        catch (error) {
+          await agentActivity?.record({ agentId: agentAskRoute.agentId, error, durationMs: Date.now() - started }).catch(() => {})
+          throw error
+        }
+        await agentActivity?.record({ agentId: agentAskRoute.agentId, result, durationMs: Date.now() - started }).catch(() => {})
         if (result.available) return json(response, 200, result)
         if (result.error === 'agent-unavailable') return json(response, 404, result)
         return json(response, 503, result)

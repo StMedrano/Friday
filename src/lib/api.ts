@@ -85,7 +85,7 @@ export type FridayAgentRegistryStatus = {
   errors?: string[]
 }
 
-export type FridayRepository = { id: string; name: string; remote?: string; defaultBranch: string; mode: string; enabled: boolean }
+export type FridayRepository = { id: string; name: string; remote?: string; defaultBranch: string; mode: string; enabled: boolean; checkout?: boolean }
 export type FridayRepositoryStatus = { branch: string; dirty: boolean }
 
 async function repositoryGet<T>(path: string, signal?: AbortSignal): Promise<T> {
@@ -116,6 +116,60 @@ export function fetchFridayRepositoryFile(id: string, path: string, signal?: Abo
   return repositoryGet<{ path: string; content: string }>(`/api/repositories/${encodeURIComponent(id)}/file?${query}`, signal)
 }
 
+export type FridayUptimeWindow = { uptime: number | null; checks: number; degraded: number; offline: number }
+export type FridayUptimeHour = { at: string; online: number; degraded: number; offline: number; maintenance: number }
+export type FridayServiceUptime = { serviceId: string; name: string; last24h: FridayUptimeWindow; last7d: FridayUptimeWindow; hourly: FridayUptimeHour[] }
+export type FridayUptimeResult =
+  | { state: 'ok'; generatedAt: string; services: FridayServiceUptime[] }
+  | { state: 'disabled' | 'unavailable' }
+
+/** Per-service uptime recorded from Friday's own monitoring polls. */
+export async function fetchFridayUptime(signal?: AbortSignal): Promise<FridayUptimeResult> {
+  const response = await fetch('/api/monitoring/uptime', { method: 'GET', signal })
+  const body = await response.json().catch(() => null) as { error?: string; generatedAt?: string; services?: unknown } | null
+  if (response.ok && body && typeof body.generatedAt === 'string' && Array.isArray(body.services)) {
+    const services = body.services.filter((item): item is FridayServiceUptime => Boolean(item && typeof item === 'object'
+      && typeof (item as FridayServiceUptime).serviceId === 'string' && (item as FridayServiceUptime).last24h
+      && (item as FridayServiceUptime).last7d && Array.isArray((item as FridayServiceUptime).hourly)))
+    return { state: 'ok', generatedAt: body.generatedAt, services }
+  }
+  if (body?.error === 'uptime-disabled' || body?.error === 'monitoring-disabled') return { state: 'disabled' }
+  return { state: 'unavailable' }
+}
+
+export type FridayGitHubPullRequest = { number: number; title: string; author: string; draft: boolean; updatedAt?: string; url?: string }
+export type FridayGitHubSummary = {
+  repository: string
+  url: string
+  branch: string
+  fetchedAt: string
+  pullRequests: { open: number; more: boolean; items: FridayGitHubPullRequest[] }
+  ci: { state: 'success' | 'failure' | 'pending' | 'none'; total: number; failed: number; pending: number }
+  lastCommit: { sha: string; message: string; author: string; date?: string; url?: string }
+}
+/** `disabled`: the server has no GitHub read integration; `unsupported`: the remote is not on GitHub. */
+export type FridayGitHubResult =
+  | { state: 'ok'; summary: FridayGitHubSummary }
+  | { state: 'disabled' | 'unsupported' | 'unavailable' }
+
+function isGitHubSummary(value: unknown): value is FridayGitHubSummary {
+  const item = value as FridayGitHubSummary | null
+  return Boolean(item && typeof item === 'object' && typeof item.repository === 'string'
+    && item.pullRequests && typeof item.pullRequests.open === 'number' && Array.isArray(item.pullRequests.items)
+    && item.ci && ['success', 'failure', 'pending', 'none'].includes(item.ci.state)
+    && item.lastCommit && typeof item.lastCommit.sha === 'string')
+}
+
+export async function fetchFridayRepositoryGitHub(id: string, signal?: AbortSignal): Promise<FridayGitHubResult> {
+  const response = await fetch(`/api/repositories/${encodeURIComponent(id)}/github`, { method: 'GET', signal })
+  const body = await response.json().catch(() => null) as unknown
+  if (response.ok) return isGitHubSummary(body) ? { state: 'ok', summary: body } : { state: 'unavailable' }
+  const error = body && typeof body === 'object' && 'error' in body ? (body as { error?: string }).error : undefined
+  if (error === 'github-disabled') return { state: 'disabled' }
+  if (error === 'github-remote-unsupported') return { state: 'unsupported' }
+  return { state: 'unavailable' }
+}
+
 export type FridayAuditEvent = {
   seq: number; requestId: string; at: string; action: string
   phase: 'requested' | 'succeeded' | 'failed' | 'denied'
@@ -134,6 +188,8 @@ export async function fetchFridayAuditEvents(before: number | null = null, signa
   const response = await fetch(`/api/audit/events?${query}`, { method: 'GET', signal })
   const body = await response.json().catch(() => ({})) as FridayAuditPage | { error?: string }
   if (!response.ok) throw new FridayAuditError('error' in body && body.error ? body.error : 'audit-unavailable', response.status)
+  // Without the API (for example a static preview), the server may answer 200 with HTML.
+  if (!Array.isArray((body as FridayAuditPage).events)) throw new FridayAuditError('audit-unavailable', response.status)
   return body as FridayAuditPage
 }
 
@@ -174,26 +230,43 @@ export type FridayTask = {
 }
 
 export class FridayWorkError extends Error {
-  constructor(readonly status: number) { super('work-unavailable') }
+  constructor(readonly status: number, readonly code = '') { super('work-unavailable') }
 }
 
 const TASK_STATUSES = new Set(['ready', 'in_progress', 'blocked', 'review', 'completed', 'cancelled'])
 
+function parseTask(value: unknown, status: number): FridayTask {
+  const task = value as FridayTask
+  if (!task || typeof task !== 'object' || typeof task.id !== 'string' || typeof task.projectId !== 'string' ||
+    typeof task.title !== 'string' || !TASK_STATUSES.has(task.status) || !Number.isSafeInteger(task.version)) {
+    throw new FridayWorkError(status)
+  }
+  return task
+}
+
+export type FridayTaskBoard = { tasks: FridayTask[]; canCreate: boolean }
+
 /** Read a project's tasks. Rejects a malformed payload rather than showing partial work. */
-export async function fetchProjectTasks(projectId: string, signal?: AbortSignal): Promise<FridayTask[]> {
+export async function fetchProjectTasks(projectId: string, signal?: AbortSignal): Promise<FridayTaskBoard> {
   const query = new URLSearchParams({ projectId })
   const response = await fetch(`/api/work/tasks?${query}`, { method: 'GET', signal })
   if (!response.ok) throw new FridayWorkError(response.status)
-  const body = await response.json().catch(() => null) as { tasks?: unknown } | null
+  const body = await response.json().catch(() => null) as { tasks?: unknown; canCreate?: unknown } | null
   if (!body || !Array.isArray(body.tasks)) throw new FridayWorkError(response.status)
-  return body.tasks.map((value) => {
-    const task = value as FridayTask
-    if (!task || typeof task !== 'object' || typeof task.id !== 'string' || typeof task.projectId !== 'string' ||
-      typeof task.title !== 'string' || !TASK_STATUSES.has(task.status) || !Number.isSafeInteger(task.version)) {
-      throw new FridayWorkError(response.status)
-    }
-    return task
+  return { tasks: body.tasks.map((value) => parseTask(value, response.status)), canCreate: body.canCreate === true }
+}
+
+/**
+ * Add a 'ready' task to a project. `requestId` makes a retry safe: the same id
+ * returns the task already created instead of adding a second one.
+ */
+export async function createProjectTask(input: { projectId: string; title: string; objective?: string; requestId: string }): Promise<FridayTask> {
+  const response = await fetch('/api/work/tasks', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
   })
+  const body = await response.json().catch(() => null) as { task?: unknown; error?: unknown } | null
+  if (!response.ok) throw new FridayWorkError(response.status, typeof body?.error === 'string' ? body.error : '')
+  return parseTask(body?.task, response.status)
 }
 
 export type FridayGroupAdvice = {
@@ -343,10 +416,10 @@ export async function deleteEndpointCheck(id: string): Promise<FridayEndpointChe
 }
 
 export type FridayRepositoryEntry = {
-  id: string; name: string; path: string; remote?: string; defaultBranch: string
+  id: string; name: string; path?: string; remote?: string; defaultBranch: string
   mode: 'read-only' | 'development' | 'pr-enabled'; enabled: boolean; exclude: string[]
 }
-export type FridayRepositoryEntryInput = Omit<FridayRepositoryEntry, 'id' | 'mode' | 'remote'> & { remote?: string }
+export type FridayRepositoryEntryInput = Omit<FridayRepositoryEntry, 'id' | 'mode' | 'remote' | 'path'> & { remote?: string; path?: string }
 export type FridayRepositorySettings = { managed: boolean; allowedRoots: string[]; limit: number; repositories: FridayRepositoryEntry[] }
 
 export class FridayRepositorySettingsError extends Error {
@@ -463,6 +536,64 @@ export async function routeFridayAgent(prompt: string, signal?: AbortSignal): Pr
   const body = await response.json() as FridayAgentRouteResponse
   if (!response.ok) throw new Error(body.reason || body.error || 'Friday agent routing unavailable')
   return body
+}
+
+export type FridayAgentActivityEvent = {
+  id: string; at: string; agentId: string; agentName?: string
+  outcome: 'answered' | 'unavailable' | 'not-found' | 'failed'
+  provider?: string; model?: string; modelProfile?: string; reason?: string; durationMs: number
+}
+export type FridayAgentActivityResult = { state: 'ok'; events: FridayAgentActivityEvent[] } | { state: 'disabled' } | { state: 'unavailable' }
+
+/** Metadata-only record of agent questions (never prompts or answers). */
+export async function fetchFridayAgentActivity(signal?: AbortSignal): Promise<FridayAgentActivityResult> {
+  const response = await fetch('/api/agents/activity', { method: 'GET', signal })
+  const body = await response.json().catch(() => null) as { error?: string; events?: unknown } | null
+  if (response.ok && body && Array.isArray(body.events)) {
+    const events = body.events.filter((item): item is FridayAgentActivityEvent => Boolean(item && typeof item === 'object'
+      && typeof (item as FridayAgentActivityEvent).id === 'string' && typeof (item as FridayAgentActivityEvent).agentId === 'string'
+      && typeof (item as FridayAgentActivityEvent).at === 'string' && typeof (item as FridayAgentActivityEvent).outcome === 'string'))
+    return { state: 'ok', events }
+  }
+  return body?.error === 'agent-activity-disabled' ? { state: 'disabled' } : { state: 'unavailable' }
+}
+
+export type FridayApprovalItem = {
+  id: string; incidentId: string; state: 'pending' | 'approved' | 'denied'
+  title: string; detail?: string; serviceName?: string; host?: string; severity?: 'high' | 'warning' | 'info'
+  recommendedAction?: string; openedAt?: string; decidedAt?: string; decidedBy?: string; incidentStatus?: 'open' | 'resolved'
+}
+export type FridayApprovals = { pending: FridayApprovalItem[]; recent: FridayApprovalItem[] }
+export type FridayApprovalsResult = { state: 'ok'; approvals: FridayApprovals } | { state: 'disabled' } | { state: 'unavailable' }
+
+const approvalItems = (value: unknown): FridayApprovalItem[] => Array.isArray(value)
+  ? value.filter((item): item is FridayApprovalItem => Boolean(item && typeof item === 'object'
+    && typeof (item as FridayApprovalItem).id === 'string' && typeof (item as FridayApprovalItem).incidentId === 'string'
+    && typeof (item as FridayApprovalItem).title === 'string' && typeof (item as FridayApprovalItem).state === 'string'))
+  : []
+
+/** Remediation proposals from open incidents, plus recent operator decisions. Nothing is executed. */
+export async function fetchFridayApprovals(signal?: AbortSignal): Promise<FridayApprovalsResult> {
+  const response = await fetch('/api/approvals', { method: 'GET', signal })
+  const body = await response.json().catch(() => null) as { error?: string; pending?: unknown; recent?: unknown } | null
+  if (response.ok && body && Array.isArray(body.pending) && Array.isArray(body.recent)) {
+    return { state: 'ok', approvals: { pending: approvalItems(body.pending), recent: approvalItems(body.recent) } }
+  }
+  return body?.error === 'approvals-disabled' ? { state: 'disabled' } : { state: 'unavailable' }
+}
+
+export class FridayApprovalError extends Error {
+  constructor(readonly code: string, readonly status: number) { super(code) }
+}
+
+/** Approve or deny one proposal. Operator only and audited; the decision is recorded, never executed. */
+export async function decideFridayApproval(incidentId: string, decision: 'approve' | 'deny', signal?: AbortSignal): Promise<FridayApprovalItem> {
+  const response = await fetch(`/api/approvals/${encodeURIComponent(incidentId)}/decision`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ decision }), signal,
+  })
+  const body = await response.json().catch(() => null) as { error?: string; approval?: FridayApprovalItem } | null
+  if (!response.ok || !body?.approval) throw new FridayApprovalError(body?.error || 'approvals-unavailable', response.status)
+  return body.approval
 }
 
 export async function askFridayAgent(agentId: string, prompt: string, signal?: AbortSignal): Promise<FridayAgentResponse> {

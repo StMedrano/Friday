@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { ScrollText, ShieldAlert, ShieldCheck } from 'lucide-react'
+import { Download, ScrollText, Search, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { fetchFridayAuditEvents, FridayAuditError, type FridayAuditEvent } from '../lib/api'
 
 const ACTION_LABELS: Record<string, string> = {
@@ -24,6 +24,17 @@ function failureMessage(reason: unknown) {
   return 'The action audit is unavailable. Audited actions are refused until it recovers.'
 }
 
+const csvCell = (value: unknown) => {
+  const text = value === null || value === undefined ? '' : String(value)
+  // Quote everything and neutralize spreadsheet formula prefixes.
+  return '"' + (/^[=+\-@]/.test(text) ? "'" + text : text).replaceAll('"', '""') + '"'
+}
+
+export function auditCsv(events: FridayAuditEvent[]) {
+  const rows = events.map((event) => [event.seq, event.at, actorLabel(event), event.action, event.target, event.phase, event.detail].map(csvCell).join(','))
+  return ['seq,time,actor,action,target,result,detail', ...rows].join('\n')
+}
+
 function actorLabel(event: FridayAuditEvent) {
   if (event.actor.kind === 'unauthenticated') return 'Unauthenticated (local mode)'
   return event.actor.label || (event.actor.kind === 'service' ? 'Service token' : 'Verified user') + ' · ' + (event.actor.id || '').slice(0, 10)
@@ -36,6 +47,8 @@ export default function AuditWorkspace() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [error, setError] = useState('')
+  const [search, setSearch] = useState('')
+  const [phase, setPhase] = useState('all')
 
   useEffect(() => {
     const controller = new AbortController()
@@ -58,6 +71,19 @@ export default function AuditWorkspace() {
       .finally(() => setLoadingMore(false))
   }
 
+  const needle = search.trim().toLowerCase()
+  const shown = events.filter((event) => (phase === 'all' || event.phase === phase) && (!needle ||
+    [event.action, ACTION_LABELS[event.action], event.target, event.detail, actorLabel(event)].some((value) => value?.toLowerCase().includes(needle))))
+
+  function exportCsv() {
+    const url = URL.createObjectURL(new Blob([auditCsv(shown)], { type: 'text/csv' }))
+    const link = document.createElement('a')
+    link.href = url
+    link.download = 'friday-audit.csv'
+    link.click()
+    URL.revokeObjectURL(url)
+  }
+
   return <section className="v3-audit-workspace" aria-label="Action audit workspace">
     <div className="v3-detail-hero">
       <div className="v3-node-icon large"><ScrollText/></div>
@@ -69,9 +95,17 @@ export default function AuditWorkspace() {
         : integrity === 'broken' ? <div className="v3-panel v3-audit-empty broken" role="alert"><ShieldAlert/><h3>Audit log failed integrity verification</h3><p>The hash chain does not verify. Audited actions are refused until an operator investigates the log on the controller.</p></div>
           : <section className="v3-panel" aria-label="Audited actions">
             <div className="v3-section-head"><div><span className="v3-kicker">EVENTS</span><h2>{events.length ? `${events.length} shown` : 'No audited actions yet'}</h2></div><span className="v3-audit-integrity"><ShieldCheck size={14}/>Chain verified</span></div>
+            {events.length > 0 && <div className="fx-filterbar">
+              <label className="fx-search-field"><Search size={14} aria-hidden="true"/><input type="search" aria-label="Search events" placeholder="Search events…" value={search} onChange={(e) => setSearch(e.target.value)}/></label>
+              <label className="fx-select"><span>Result</span><select aria-label="Result" value={phase} onChange={(e) => setPhase(e.target.value)}>
+                <option value="all">All</option>{Object.entries(PHASE_LABELS).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+              </select></label>
+              <button type="button" className="fx-button" onClick={exportCsv} disabled={!shown.length}><Download size={14} aria-hidden="true"/>Export CSV</button>
+            </div>}
             {events.length === 0 ? <p className="v3-audit-message">Registry syncs and diagnostic reruns will appear here once requested.</p>
+              : shown.length === 0 ? <p className="v3-audit-message">No loaded events match these filters.</p>
               : <ol className="v3-audit-list">
-                {events.map((event) => <li key={event.seq} className={event.phase}>
+                {shown.map((event) => <li key={event.seq} className={event.phase}>
                   <span className="v3-audit-seq">#{event.seq}</span>
                   <span className="v3-audit-main"><b>{ACTION_LABELS[event.action] || event.action}</b><small>{event.target ? event.target + ' · ' : ''}{actorLabel(event)}</small></span>
                   <span className={`v3-audit-phase ${event.phase}`}>{PHASE_LABELS[event.phase] || event.phase}</span>

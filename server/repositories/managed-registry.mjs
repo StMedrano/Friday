@@ -1,5 +1,6 @@
 import {lstat, mkdir, readFile, realpath, rename, writeFile} from 'node:fs/promises'
 import {dirname, isAbsolute, relative, resolve, sep} from 'node:path'
+import {parseGitHubRemote} from '../adapters/github.mjs'
 import {LocalRepositoryRegistry, MAX_REGISTRY_BYTES, MODES, parseEntry, publicRemote, REPOSITORY_ID} from './repository.mjs'
 
 // Operator-managed repository registry. Until the first write the mounted
@@ -7,6 +8,8 @@ import {LocalRepositoryRegistry, MAX_REGISTRY_BYTES, MODES, parseEntry, publicRe
 // create, edit or delete copies it to the Friday data volume, which then wins.
 // New or moved paths must be Git checkouts inside FRIDAY_REPOSITORY_ROOTS, and the
 // API can only register read-only repositories; other modes stay a file decision.
+// A GitHub-only entry has no path: just a github.com remote, so Friday can show its
+// pull requests, CI and last commit without a checkout on the controller.
 
 export const MAX_REPOSITORIES = 32
 const FIELDS = new Set(['id', 'name', 'path', 'remote', 'defaultBranch', 'mode', 'enabled', 'exclude'])
@@ -24,19 +27,22 @@ export function validateRepositoryEntry(input) {
   const name = typeof input.name === 'string' ? input.name.trim() : ''
   if (typeof input.id !== 'string' || !REPOSITORY_ID.test(input.id)) invalid('invalid-repository-id')
   if (!name || name.length > 120 || CONTROL.test(name)) invalid('invalid-repository-name')
-  if (typeof input.path !== 'string' || !isAbsolute(input.path) || input.path.length > 1024 || CONTROL.test(input.path)) invalid('invalid-repository-path')
+  const hasPath = !(input.path === undefined || input.path === null || input.path === '')
+  if (hasPath && (typeof input.path !== 'string' || !isAbsolute(input.path) || input.path.length > 1024 || CONTROL.test(input.path))) invalid('invalid-repository-path')
   if (!MODES.has(input.mode ?? 'read-only')) invalid('invalid-repository-mode')
   if (input.enabled !== undefined && typeof input.enabled !== 'boolean') invalid('invalid-repository-enabled')
   const branch = input.defaultBranch === undefined || input.defaultBranch === '' ? 'main' : input.defaultBranch
   if (typeof branch !== 'string' || !BRANCH.test(branch) || branch.includes('..')) invalid('invalid-repository-branch')
   const remote = input.remote === undefined || input.remote === '' || input.remote === null ? undefined : publicRemote(input.remote)
   if (input.remote && !remote) invalid('invalid-repository-remote')
+  if (!hasPath && !remote) invalid('repository-location-required')
+  if (!hasPath && !parseGitHubRemote(remote)) invalid('invalid-repository-github-remote')
   const exclude = input.exclude ?? []
   if (!Array.isArray(exclude) || exclude.length > 50 ||
     exclude.some(pattern => typeof pattern !== 'string' || !pattern.trim() || pattern.length > 300 || pattern.startsWith('/') || CONTROL.test(pattern)))
     invalid('invalid-repository-exclude')
   return {
-    id: input.id, name, path: resolve(input.path), ...(remote ? {remote} : {}), defaultBranch: branch,
+    id: input.id, name, ...(hasPath ? {path: resolve(input.path)} : {}), ...(remote ? {remote} : {}), defaultBranch: branch,
     mode: input.mode ?? 'read-only', enabled: input.enabled ?? true, exclude: exclude.map(pattern => pattern.trim()),
   }
 }
@@ -128,7 +134,7 @@ export async function createRepositorySettingsStore({path, allowedRoots = [], fs
       return mutate(baseline, async entries => {
         if (entries.some(existing => existing.id === entry.id)) failure('repository-exists')
         if (entries.length >= MAX_REPOSITORIES) failure('repository-limit')
-        await checkPath(entry.path, allowedRoots)
+        if (entry.path) await checkPath(entry.path, allowedRoots)
         entries.push(entry)
         return entry
       })
@@ -142,7 +148,7 @@ export async function createRepositorySettingsStore({path, allowedRoots = [], fs
         // Keep a mode set in the registry file; the API itself only grants read-only.
         const mode = input.mode === undefined ? existing.mode : draft.mode
         if (mode !== 'read-only' && mode !== existing.mode) invalid('invalid-repository-mode')
-        if (draft.path !== existing.path) await checkPath(draft.path, allowedRoots)
+        if (draft.path && draft.path !== existing.path) await checkPath(draft.path, allowedRoots)
         entries[index] = {...draft, mode}
         return entries[index]
       })

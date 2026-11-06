@@ -9,7 +9,7 @@ Keep each item small enough for one pull request.
 
 ---
 
-## fix-authentik-flaky-test — `ready`
+## fix-authentik-flaky-test — `done`
 
 **Scope:** `server/security/authentik.test.mjs` and, only if the root cause
 is there, `server/security/authentik*.mjs`.
@@ -22,7 +22,7 @@ deterministic without loosening what it asserts.
 `node --test --test-concurrency=8 server/`, its assertions are unchanged or
 stricter, and `make verify` passes.
 
-## port-auth-failover-docs — `ready`
+## port-auth-failover-docs — `done`
 
 **Scope:** docs only. Source: `docs/friday-authentication-failover.md` and
 `docs/phase2c-operator-auth-hardening.md` on branch
@@ -36,7 +36,7 @@ routes in `server/http.mjs`). Drop or flag anything that describes code
 **Done when:** every route, env var and file the docs name exists on `main`
 (checked with grep), and `docs/codex/NEXT_STEPS.md` links them.
 
-## port-e2e-smoke — `ready`
+## port-e2e-smoke — `done`
 
 **Scope:** `playwright.config.mjs`, `tests/e2e/`, a CI step, `package.json`
 script. Source: the same #109 branch.
@@ -52,7 +52,7 @@ Chromium in the CI step.
 `make verify` is unchanged in runtime by more than a few seconds (e2e runs
 as its own CI step, not inside `make verify`).
 
-## refresh-next-steps — `ready`
+## refresh-next-steps — `done`
 
 **Scope:** `docs/codex/NEXT_STEPS.md` only.
 
@@ -63,7 +63,7 @@ source; do not invent status.
 
 **Done when:** every item references a real PR, file, or ledger entry.
 
-## wire-model-routing-into-chat — `ready`
+## wire-model-routing-into-chat — `done`
 
 **Scope:** `server/ai/` and the assistant route. Off by default.
 
@@ -80,10 +80,12 @@ and `make verify` passes.
 
 ## Needs owner approval (do not start)
 
-## tasks-write-path — `needs-approval`
+## tasks-write-path — `in-review`
 
-Creating or editing project tasks from Friday (the #109 create/paging path).
-Needs the owner to approve a Tasks write path and its database role first.
+Owner approved creating tasks on 2026-11-06 ("Creating task"). Scope: a New
+task form and `POST /api/work/tasks` behind `FRIDAY_WORK_WRITE_ENABLED`
+(default off), operator plus project grant, insert-only `friday_work_writer`
+role. Claiming, moving and editing tasks are not part of this approval.
 
 ## authentik-primary-login — `needs-approval`
 

@@ -8,6 +8,8 @@ import {
 const ERRORS: Record<string, string> = {
   'invalid-repository-name': 'Give the repository a name (up to 120 characters).',
   'invalid-repository-path': 'The checkout path must be an absolute container path.',
+  'repository-location-required': 'Add a GitHub URL, a checkout path, or both.',
+  'invalid-repository-github-remote': 'Without a checkout path, the remote must be a GitHub repository URL such as https://github.com/owner/name.',
   'invalid-repository-remote': 'The remote must be an https, http, ssh or git URL.',
   'invalid-repository-branch': 'The default branch name is not valid.',
   'invalid-repository-exclude': 'Excluded paths must be relative patterns such as drafts/**.',
@@ -23,11 +25,11 @@ const ERRORS: Record<string, string> = {
 type Draft = { name: string; path: string; remote: string; defaultBranch: string; exclude: string; enabled: boolean }
 const EMPTY: Draft = { name: '', path: '', remote: '', defaultBranch: 'main', exclude: '', enabled: true }
 const toDraft = (entry: FridayRepositoryEntry): Draft => ({
-  name: entry.name, path: entry.path, remote: entry.remote || '', defaultBranch: entry.defaultBranch, exclude: entry.exclude.join(', '), enabled: entry.enabled,
+  name: entry.name, path: entry.path || '', remote: entry.remote || '', defaultBranch: entry.defaultBranch, exclude: entry.exclude.join(', '), enabled: entry.enabled,
 })
 const toInput = (draft: Draft): FridayRepositoryEntryInput => ({
   name: draft.name.trim(),
-  path: draft.path.trim(),
+  ...(draft.path.trim() ? { path: draft.path.trim() } : {}),
   ...(draft.remote.trim() ? { remote: draft.remote.trim() } : {}),
   defaultBranch: draft.defaultBranch.trim() || 'main',
   enabled: draft.enabled,
@@ -50,8 +52,8 @@ function RepositoryForm({ label, draft, onChange, onSubmit, submit, busy, onCanc
   const handle = (event: FormEvent) => { event.preventDefault(); onSubmit() }
   return <form className="v3-settings-form" aria-label={label} onSubmit={handle}>
     <label>Name <input maxLength={120} {...field('name')}/></label>
-    <label>Checkout path <input maxLength={1024} placeholder="/repositories/name" {...field('path')}/></label>
-    <label>Remote URL <input maxLength={2048} placeholder="optional" {...field('remote')}/></label>
+    <label>GitHub or remote URL <input maxLength={2048} placeholder="https://github.com/owner/name" {...field('remote')}/></label>
+    <label>Checkout path <input maxLength={1024} placeholder="optional, e.g. /repositories/name" {...field('path')}/></label>
     <label>Default branch <input maxLength={100} {...field('defaultBranch')}/></label>
     <label>Excluded paths <input placeholder="drafts/**, tmp" {...field('exclude')}/></label>
     <label><input type="checkbox" checked={draft.enabled} onChange={(event) => onChange({ ...draft, enabled: event.target.checked })}/> Enabled</label>
@@ -112,7 +114,7 @@ export default function RepositorySettingsPanel() {
               {editing?.id === entry.id
                 ? <RepositoryForm label={`Edit ${entry.name}`} draft={editing.draft} onChange={(next) => setEditing({ id: entry.id, draft: next })} onSubmit={save} submit="Save repository" busy={busy} onCancel={() => setEditing(null)}/>
                 : <>
-                  <span className="v3-settings-name"><b>{entry.name}</b><small>{entry.enabled ? 'Enabled' : 'Disabled'} · {entry.mode} · {entry.path} · {entry.defaultBranch}</small></span>
+                  <span className="v3-settings-name"><b>{entry.name}</b><small>{entry.enabled ? 'Enabled' : 'Disabled'} · {entry.mode} · {entry.path || 'GitHub only'} · {entry.defaultBranch}</small></span>
                   <span>
                     <button type="button" className="text-button" onClick={() => setEditing({ id: entry.id, draft: toDraft(entry) })} aria-label={`Edit ${entry.name}`} disabled={busy}><Pencil size={14} aria-hidden="true"/></button>
                     <button type="button" className="text-button" onClick={() => remove(entry)} aria-label={`Remove ${entry.name}`} disabled={busy}><Trash2 size={14} aria-hidden="true"/></button>

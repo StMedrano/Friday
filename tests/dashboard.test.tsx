@@ -155,7 +155,7 @@ describe('Friday v3 command center', () => {
   it('preserves desktop V3 rail and command center above phone width', () => {
     installMatchMedia(false)
     render(<Dashboard />)
-    expect(document.querySelector('.v3-rail')).not.toBeNull()
+    expect(screen.getByRole('complementary', { name: 'Friday navigation' })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /what would you like me to handle/i })).toBeInTheDocument()
     expect(screen.queryByRole('navigation', { name: /mobile command bar/i })).not.toBeInTheDocument()
   })
@@ -217,14 +217,29 @@ describe('Desktop navigation and layout', () => {
     expect(screen.getByRole('region', { name: 'Infrastructure workspace' })).toBeInTheDocument()
   })
 
-  it('separates not-connected workspaces in the rail', () => {
+  it('marks only the workspaces without a production service as not connected', () => {
     installMatchMedia(false)
     render(<Dashboard />)
-    for (const name of ['Tasks', 'Approvals', 'Memory', 'Audit', 'Settings']) {
+    for (const name of ['Memory']) {
       expect(screen.getByRole('button', { name })).toHaveClass('pending')
       expect(screen.getByRole('button', { name })).toHaveAttribute('title', `${name} · not connected`)
     }
-    expect(screen.getByRole('button', { name: 'Incidents' })).not.toHaveClass('pending')
+    // Tasks, Audit and Settings have read-only production APIs now.
+    for (const name of ['Incidents', 'Tasks', 'Approvals', 'Audit', 'Settings']) {
+      expect(screen.getByRole('button', { name })).not.toHaveClass('pending')
+    }
+  })
+
+  it('groups the sidebar like the Friday design and marks the current page', async () => {
+    installMatchMedia(false)
+    const user = userEvent.setup()
+    render(<Dashboard />)
+    const nav = screen.getByRole('navigation', { name: 'Workspaces' })
+    for (const group of ['Core', 'Systems', 'Admin']) expect(within(nav).getByText(group)).toBeInTheDocument()
+    expect(within(nav).getByRole('button', { name: 'Home' })).toHaveAttribute('aria-current', 'page')
+    await user.click(within(nav).getByRole('button', { name: 'Infrastructure' }))
+    expect(within(nav).getByRole('button', { name: 'Infrastructure' })).toHaveAttribute('aria-current', 'page')
+    expect(within(nav).getByRole('button', { name: 'Home' })).not.toHaveAttribute('aria-current')
   })
 
   it('shows one visible page title per workspace', async () => {
@@ -256,6 +271,18 @@ describe('Preview data and service scanability', () => {
     installMatchMedia(true)
     render(<Dashboard />)
     expect(screen.getByRole('note', { name: /preview data/i })).toBeInTheDocument()
+  })
+
+  it('says the server is in mock mode instead of claiming the API is disconnected', async () => {
+    installMatchMedia(false)
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => String(input) === '/api/overview'
+      ? new Response(JSON.stringify({ ...liveOverview, mode: 'mock' }), { status: 200 })
+      : new Response('{}', { status: 503 })))
+    render(<Dashboard />)
+    await screen.findByText(/API connected · mock mode/i)
+    const note = screen.getByRole('note', { name: /preview data/i })
+    expect(note).toHaveTextContent(/mock mode/i)
+    expect(note).not.toHaveTextContent(/isn't connected/i)
   })
 
   it('hides the preview banner once live data arrives', async () => {

@@ -21,7 +21,7 @@ test('repository API returns safe metadata and never exposes local roots or regi
     const body = await response.json()
     assert.deepEqual(body, [{
       id: 'friday', name: 'Friday', remote: 'https://github.com/owner/friday.git',
-      defaultBranch: 'main', mode: 'read-only', enabled: true,
+      defaultBranch: 'main', mode: 'read-only', enabled: true, checkout: true,
     }])
     assert.equal(JSON.stringify(body).includes('/srv/private'), false)
     assert.equal(JSON.stringify(body).includes('token'), false)
@@ -78,4 +78,44 @@ test('repository file limits require decimal digits before numeric conversion', 
     }
     assert.deepEqual(limits, [100, 1, 200])
   })
+})
+
+test('repository GitHub summary is read-only, off by default, and maps reader errors to stable codes', async () => {
+  const registry = { async list() {
+    return [{ id: 'friday', name: 'Friday', path: '/srv/private/friday', remote: 'https://github.com/StMedrano/Friday.git', defaultBranch: 'main', mode: 'read-only', enabled: true }]
+  } }
+
+  await withServer({ repositoryRegistry: registry }, async (base) => {
+    const response = await fetch(`${base}/api/repositories/friday/github`)
+    assert.equal(response.status, 503)
+    assert.deepEqual(await response.json(), { error: 'github-disabled' })
+  })
+
+  const seen = []
+  const summary = { repository: 'StMedrano/Friday', url: 'https://github.com/StMedrano/Friday', branch: 'main', fetchedAt: '2026-11-05T18:00:00.000Z',
+    pullRequests: { open: 0, more: false, items: [] }, ci: { state: 'none', total: 0, failed: 0, pending: 0 },
+    lastCommit: { sha: '3a21f9d', message: 'm', author: 'a', date: '2026-11-05T17:00:00Z', url: 'https://github.com/StMedrano/Friday/commit/x' } }
+  const githubReader = { async summary(repository) {
+    seen.push(repository.id)
+    if (repository.id === 'friday') return summary
+    throw Object.assign(new Error('x'), { code: 'github-unavailable' })
+  } }
+  await withServer({ repositoryRegistry: registry, githubReader }, async (base) => {
+    const ok = await fetch(`${base}/api/repositories/friday/github`)
+    assert.equal(ok.status, 200)
+    assert.deepEqual(await ok.json(), summary)
+    assert.equal((await fetch(`${base}/api/repositories/missing/github`)).status, 404)
+    assert.equal((await fetch(`${base}/api/repositories/friday/github?refresh=1`)).status, 400)
+    assert.equal((await fetch(`${base}/api/repositories/friday/github`, { method: 'POST' })).status, 404)
+    assert.deepEqual(seen, ['friday'])
+  })
+
+  for (const [code, status] of [['github-disabled', 503], ['github-remote-unsupported', 404], ['github-unavailable', 502], [undefined, 502]]) {
+    await withServer({ repositoryRegistry: registry, githubReader: { async summary() { throw Object.assign(new Error('secret token'), { code }) } } }, async (base) => {
+      const response = await fetch(`${base}/api/repositories/friday/github`)
+      assert.equal(response.status, status)
+      const body = await response.json()
+      assert.deepEqual(body, { error: code || 'github-unavailable' })
+    })
+  }
 })

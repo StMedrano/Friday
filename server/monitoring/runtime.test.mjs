@@ -384,3 +384,33 @@ test('retireService is inert when monitoring is disabled', async () => {
   const runtime = createMonitoringRuntime({ config: config(false), collectOverview: async () => overview(), store: { async load() {}, async save() { throw Error('no') } } })
   assert.equal(await runtime.retireService('svc', 'x'), false)
 })
+
+test('uptime is recorded per poll only when enabled and dropped for retired services', async () => {
+  let time = Date.parse('2026-11-05T10:00:00.000Z')
+  let status = 'online'
+  const saved = []
+  const make = (uptimeEnabled) => createMonitoringRuntime({
+    config: { ...config(true), monitoring: { ...config(true).monitoring, uptimeEnabled } },
+    collectOverview: async () => overview(status),
+    store: { async load() { return createEmptyMonitoringState() }, async save(state) { saved.push(state) } },
+    now: () => new Date(time),
+    setIntervalImpl() { return 1 },
+  })
+
+  const off = make(false)
+  await off.start()
+  assert.equal(off.getUptime(), null)
+  assert.deepEqual(saved.at(-1).uptime, {})
+
+  const runtime = make(true)
+  await runtime.start()
+  time += 30_000
+  status = 'offline'
+  await runtime.poll()
+  const projected = runtime.getUptime()
+  assert.deepEqual(projected.services.map(({ serviceId, last24h }) => [serviceId, last24h]), [['svc', { uptime: 50, checks: 2, degraded: 0, offline: 1 }]])
+  assert.deepEqual(saved.at(-1).uptime.svc.buckets, [[Date.parse('2026-11-05T10:00:00.000Z'), 1, 0, 1, 0]])
+
+  assert.equal(await runtime.retireService('svc'), true)
+  assert.deepEqual(runtime.getUptime().services, [])
+})
