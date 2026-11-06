@@ -12,6 +12,7 @@ import { normalizeAssistantHistory, validateAssistantPrompt } from './assistant-
 import { validateAgentId, validateAgentPrompt, validateRegistrySyncBody } from './agents/input.mjs'
 import { createAccessGate } from './security/access.mjs'
 import { handleWorkReadHttp } from './work/http-reads.mjs'
+import { createWorkTask, isWorkTaskCreate, workTaskAuditTarget } from './work/http-writes.mjs'
 import { auditActor } from './audit/action-audit.mjs'
 import { buildSettingsView } from './settings.mjs'
 import { getGroupWorkspace } from './agents/group-workspace.mjs'
@@ -305,7 +306,8 @@ export function createFridayServer({
       const pushWrite = (request.method === 'POST' || request.method === 'DELETE') && url.pathname === '/api/notifications/web-push'
       const groupAdvisory = request.method === 'POST' && url.pathname === '/api/group-advisory'
       const approvalDecision = request.method === 'POST' && Boolean(parseApprovalDecisionRoute(url.pathname))
-      const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || approvalDecision || url.pathname === '/api/audit/events'
+      const taskCreate = isWorkTaskCreate(request.method, url.pathname)
+      const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || approvalDecision || taskCreate || url.pathname === '/api/audit/events'
       let verdict
       try { verdict = await accessGate(request, operatorOnly) }
       catch { verdict = {status:503,error:'access-verification-unavailable'} }
@@ -318,8 +320,19 @@ export function createFridayServer({
       // for operational POST/PUT/DELETE handlers. Settings and registry writes with a body additionally require JSON.
       if (['POST', 'PUT', 'DELETE'].includes(request.method) && request.headers['sec-fetch-site'] === 'cross-site')
         return json(response, 403, {error:'access-denied'})
-      if ((registrySync || siteSettingsWrite || pushWrite || groupAdvisory || approvalDecision || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
+      if ((registrySync || siteSettingsWrite || pushWrite || groupAdvisory || approvalDecision || taskCreate || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
         return json(response, 415, {error:'json-required'})
+    }
+
+    // The one work write: a new 'ready' task. Off unless the bridge was built
+    // with the insert-only writer; the bridge re-checks operator and project grant.
+    if (isWorkTaskCreate(request.method, url.pathname)) {
+      if (!workReadBridge?.canCreateTasks) return json(response, 404, { error: 'not-found' })
+      let body
+      try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid-work-task' }) }
+      const result = await runAudited({ actionAudit, identity, action: 'work.tasks.create', target: workTaskAuditTarget(body) },
+        () => createWorkTask({ request, url, body, bridge: workReadBridge }))
+      return json(response, result.status, result.body)
     }
 
     // Opt-in read-only transport; server/index.mjs does not inject a bridge.

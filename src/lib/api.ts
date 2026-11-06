@@ -230,26 +230,43 @@ export type FridayTask = {
 }
 
 export class FridayWorkError extends Error {
-  constructor(readonly status: number) { super('work-unavailable') }
+  constructor(readonly status: number, readonly code = '') { super('work-unavailable') }
 }
 
 const TASK_STATUSES = new Set(['ready', 'in_progress', 'blocked', 'review', 'completed', 'cancelled'])
 
+function parseTask(value: unknown, status: number): FridayTask {
+  const task = value as FridayTask
+  if (!task || typeof task !== 'object' || typeof task.id !== 'string' || typeof task.projectId !== 'string' ||
+    typeof task.title !== 'string' || !TASK_STATUSES.has(task.status) || !Number.isSafeInteger(task.version)) {
+    throw new FridayWorkError(status)
+  }
+  return task
+}
+
+export type FridayTaskBoard = { tasks: FridayTask[]; canCreate: boolean }
+
 /** Read a project's tasks. Rejects a malformed payload rather than showing partial work. */
-export async function fetchProjectTasks(projectId: string, signal?: AbortSignal): Promise<FridayTask[]> {
+export async function fetchProjectTasks(projectId: string, signal?: AbortSignal): Promise<FridayTaskBoard> {
   const query = new URLSearchParams({ projectId })
   const response = await fetch(`/api/work/tasks?${query}`, { method: 'GET', signal })
   if (!response.ok) throw new FridayWorkError(response.status)
-  const body = await response.json().catch(() => null) as { tasks?: unknown } | null
+  const body = await response.json().catch(() => null) as { tasks?: unknown; canCreate?: unknown } | null
   if (!body || !Array.isArray(body.tasks)) throw new FridayWorkError(response.status)
-  return body.tasks.map((value) => {
-    const task = value as FridayTask
-    if (!task || typeof task !== 'object' || typeof task.id !== 'string' || typeof task.projectId !== 'string' ||
-      typeof task.title !== 'string' || !TASK_STATUSES.has(task.status) || !Number.isSafeInteger(task.version)) {
-      throw new FridayWorkError(response.status)
-    }
-    return task
+  return { tasks: body.tasks.map((value) => parseTask(value, response.status)), canCreate: body.canCreate === true }
+}
+
+/**
+ * Add a 'ready' task to a project. `requestId` makes a retry safe: the same id
+ * returns the task already created instead of adding a second one.
+ */
+export async function createProjectTask(input: { projectId: string; title: string; objective?: string; requestId: string }): Promise<FridayTask> {
+  const response = await fetch('/api/work/tasks', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(input),
   })
+  const body = await response.json().catch(() => null) as { task?: unknown; error?: unknown } | null
+  if (!response.ok) throw new FridayWorkError(response.status, typeof body?.error === 'string' ? body.error : '')
+  return parseTask(body?.task, response.status)
 }
 
 export type FridayGroupAdvice = {

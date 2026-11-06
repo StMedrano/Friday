@@ -14,8 +14,11 @@ const id=s=>typeof s==='string'&&s.trim()===s&&s.length>=1&&s.length<=128&&
 const cleanString=(s,max)=>typeof s==='string'&&s.trim()!==''&&s.length<=max&&
  !forbidden.test(s)
 const int=(v,max)=>Number.isSafeInteger(v)&&v>=1&&v<=max
-const unused=Object.freeze({enabled:false,
- listTasks:async()=>deny(),getTask:async()=>deny(),searchMemory:async()=>deny()})
+const unused=Object.freeze({enabled:false,canCreateTasks:false,
+ listTasks:async()=>deny(),getTask:async()=>deny(),searchMemory:async()=>deny(),
+ createTask:async()=>deny()})
+const writeError=code=>{const e=Error('work-write-'+code);e.code=code;return e}
+const TITLE_MAX=160,OBJECTIVE_MAX=4000
 
 const safeTask=(row,allowedProjects,expectedProject)=>{
  if(!row||typeof row!=='object'||!id(row.id)||!id(row.projectId)||
@@ -57,19 +60,20 @@ const checkedScopes=(scopes,actor)=>{
  * The signed human Cloudflare Access subject determines identity; ONLY a
  * server-owned provisioner may return project/scope grants. Neither prompts,
  * client headers, nor caller-requested actor/roles can create permissions.
- * Returns bounded, redacted task/memory projections only. No HTTP routes,
- * Supabase connection, account provisioning or mutation authority.
+ * Returns bounded, redacted task/memory projections. No HTTP routes, Supabase
+ * connection or account provisioning. Its only write is createTask, present
+ * only when an insert-only taskWriter is injected (see task-insert-repository).
  */
 export function createPrivateWorkReadBridge({
- enabled=false,access,workService,memoryService,grantsForSubject,fetchKeys,
+ enabled=false,access,workService,memoryService,grantsForSubject,fetchKeys,taskWriter=null,
 }={}){
  if(enabled!==true||access?.enabled!==true||
     typeof workService?.list!=='function'||typeof workService?.get!=='function'||
     typeof memoryService?.search!=='function'||typeof grantsForSubject!=='function')
   return unused
  const gate=createAccessGate(access,fetchKeys?{fetchImpl:fetchKeys}:{})
- async function actorFor(request){
-  const identity=await gate(request,false)
+ async function actorFor(request,operatorOnly=false){
+  const identity=await gate(request,operatorOnly)
   if(identity?.status!==200||identity.identity?.kind==='service'||
      !id(identity.identity?.subject))deny()
   const grants=await grantsForSubject(identity.identity.subject)
@@ -92,8 +96,37 @@ export function createPrivateWorkReadBridge({
  async function guarded(request,fn){
   try{return await fn(await actorFor(request))}catch{deny()}
  }
+ const canCreateTasks=taskWriter?.enabled===true&&typeof taskWriter.create==='function'
  return Object.freeze({
   enabled:true,
+  canCreateTasks,
+  /**
+   * New task in a project the signed-in operator is granted. Needs an
+   * operator email AND a project grant; the task starts as 'ready' and is
+   * never claimed, moved or run by Friday.
+   */
+  async createTask(request,input){
+   if(!canCreateTasks)throw writeError('disabled')
+   let actor
+   try{actor=await actorFor(request,true)}catch{throw writeError('denied')}
+   if(!exact(input,['projectId','title','objective','requestId'],['projectId','title','requestId'])||
+      !id(input.projectId)||!id(input.requestId)||
+      !cleanString(input.title,TITLE_MAX)||
+      (input.objective!==undefined&&input.objective!==''&&!cleanString(input.objective,OBJECTIVE_MAX)))
+    throw writeError('invalid')
+   if(!actor.allowedProjectIds.includes(input.projectId))throw writeError('denied')
+   const title=input.title.trim()
+   const objective=typeof input.objective==='string'&&input.objective.trim()?input.objective.trim():title
+   const inputFingerprint=createHash('sha256')
+    .update(JSON.stringify({projectId:input.projectId,title,objective})).digest('hex')
+   let row
+   try{
+    row=await taskWriter.create({projectId:input.projectId,title,objective,
+     principalId:actor.principalId,requestId:input.requestId,inputFingerprint})
+   }catch(error){throw writeError(error?.code==='conflict'?'conflict':'unavailable')}
+   try{return safeTask(row,actor.allowedProjectIds,input.projectId)}
+   catch{throw writeError('unavailable')}
+  },
   async listTasks(request,input){
    return guarded(request,async actor=>{
     if(!exact(input,['projectId','limit'],['projectId'])||

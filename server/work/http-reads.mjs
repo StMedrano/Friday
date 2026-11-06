@@ -66,6 +66,9 @@ export async function handleWorkReadHttp({request,url,bridge}={}){
   if((plural!=='task'&&!Array.isArray(result))||
      (plural==='task'&&(result===null||typeof result!=='object'||Array.isArray(result))))
     return denied()
-  return {status:200,body:{[plural]:result}}
+  const body={[plural]:result}
+  // Tells the Tasks screen whether to offer "New task"; the POST re-checks everything.
+  if(op==='listTasks'&&bridge.canCreateTasks===true)body.canCreate=true
+  return {status:200,body}
  }catch{return denied()}
 }

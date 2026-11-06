@@ -124,11 +124,11 @@ export function createFileWorkSubjectGrants({filePath,now=Date.now}={}){
  * grant AI tools, or establish any real authenticated user by itself.
  */
 export function createTrustedWorkReadBridge({
- enabled=false,grantFilePath,now=Date.now,access,workService,memoryService,fetchKeys,
+ enabled=false,grantFilePath,now=Date.now,access,workService,memoryService,fetchKeys,taskWriter=null,
 }={}){
  const source=createFileWorkSubjectGrants({filePath:grantFilePath,now})
  return createPrivateWorkReadBridge({
   enabled:enabled===true&&source.enabled,access,workService,memoryService,fetchKeys,
-  grantsForSubject:source.grantsForSubject,
+  grantsForSubject:source.grantsForSubject,taskWriter,
  })
 }
