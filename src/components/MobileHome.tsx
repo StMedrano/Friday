@@ -80,7 +80,9 @@ export default function MobileHome({
       ? `${active.length} open incident${active.length === 1 ? '' : 's'}. ${health.online} of ${health.total} services online.`
       : serviceAttention.length
         ? `Core ops running. ${serviceAttention.length} service${serviceAttention.length === 1 ? '' : 's'} ${serviceAttention.length === 1 ? 'needs' : 'need'} attention.`
-        : 'Core ops normal. All services online.'
+        : health.online === health.total
+          ? 'Core ops normal. All services online.'
+          : `Core ops normal. ${health.total - health.online} in maintenance.`
   const statusTone: Tone = active.length || serviceAttention.some((s) => s.status === 'offline') ? 'bad' : serviceAttention.length ? 'warn' : health.total ? 'ok' : 'muted'
 
   return <div className="v3-mobile-home fx-m-home" data-testid="mobile-home">
@@ -100,7 +102,7 @@ export default function MobileHome({
     </section>
 
     <section className="v3-mobile-health fx-m-stats" data-mobile-section="health" aria-label="System health summary">
-      <article><header><Layers size={16} aria-hidden="true"/><Tag tone={serviceAttention.length ? (serviceAttention.some((s) => s.status === 'offline') ? 'bad' : 'warn') : 'ok'}>{serviceAttention.length ? 'Degraded' : 'Online'}</Tag></header><strong>{health.online}/{health.total}</strong><span>Services online</span></article>
+      <article><header><Layers size={16} aria-hidden="true"/><Tag tone={serviceAttention.length ? (serviceAttention.some((s) => s.status === 'offline') ? 'bad' : 'warn') : health.online === health.total ? 'ok' : 'muted'}>{serviceAttention.length ? 'Degraded' : health.online === health.total ? 'Online' : 'Maintenance'}</Tag></header><strong>{health.online}/{health.total}</strong><span>Services online</span></article>
       <article><header><AlertTriangle size={16} aria-hidden="true"/><Tag tone={active.length ? 'bad' : 'ok'}>{active.length ? 'Open' : 'Clear'}</Tag></header><strong>{active.length}</strong><span>Incidents</span></article>
       <article><header><Globe size={16} aria-hidden="true"/><Tag tone={sitesOnline === overview.sites.length ? 'ok' : 'warn'}>{sitesOnline === overview.sites.length ? 'Online' : 'Check'}</Tag></header><strong>{overview.sites.length} {overview.sites.length === 1 ? 'site' : 'sites'}</strong><span>Active sites</span></article>
       <article><header><Activity size={16} aria-hidden="true"/><Tag tone={health.level === 'nominal' ? 'ok' : health.level === 'critical' ? 'bad' : health.level === 'unknown' ? 'muted' : 'warn'}>{health.label}</Tag></header><strong>{health.percent === null ? '—' : `${health.percent}%`}</strong><span>Health</span></article>

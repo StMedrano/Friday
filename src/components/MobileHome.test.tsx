@@ -159,4 +159,16 @@ describe('MobileHome', () => {
     expect(screen.getByText('1 site')).toBeInTheDocument()
     expect(screen.getByText(/API connected · live mode/i)).toBeInTheDocument()
   })
+
+  it('does not claim all services are online while some are in maintenance', () => {
+    const maintenance: FridayOverview = {
+      ...overview,
+      incidents: [],
+      services: overview.services.map((service) => service.status === 'online' ? service : { ...service, status: 'maintenance' as const }),
+    }
+    render(<MobileHome overview={maintenance} {...baseProps}/>)
+    expect(screen.queryByText(/all services online/i)).not.toBeInTheDocument()
+    expect(screen.getByText(/2 in maintenance/i)).toBeInTheDocument()
+    expect(screen.getByText('Maintenance')).toBeInTheDocument()
+  })
 })
