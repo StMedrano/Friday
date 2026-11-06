@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { AlertTriangle, Home, Menu, Server, Sparkles } from 'lucide-react'
+import { AlertCircle, Home, Menu, MessageCircle, Server } from 'lucide-react'
 import { useModalFocus } from '../hooks/useModalFocus'
 
 type MobileNavigationProps = {
@@ -22,16 +22,16 @@ export default function MobileNavigation({ active, activeIncidents, onNavigate }
   }
 
   const primary = [
-    { destination: 'Overview', label: 'Home', icon: Home },
-    { destination: 'FRIDAY', label: 'FRIDAY', icon: Sparkles },
-    { destination: 'Infrastructure', label: 'Infrastructure', icon: Server },
-    { destination: 'Incidents', label: 'Incidents', icon: AlertTriangle },
+    { destination: 'Overview', label: 'Home', name: 'Home', icon: Home },
+    { destination: 'FRIDAY', label: 'Chat', name: 'Chat', icon: MessageCircle },
+    { destination: 'Infrastructure', label: 'Infra', name: 'Infrastructure', icon: Server },
+    { destination: 'Incidents', label: 'Alerts', name: 'Alerts: Incidents', icon: AlertCircle },
   ]
 
   return <>
     <nav className="v3-mobile-command-bar" aria-label="Mobile command bar">
-      {primary.map(({ destination, label, icon: Icon }) => {
-        const incidentLabel = destination === 'Incidents' && activeIncidents > 0 ? `Incidents, ${activeIncidents} active` : label
+      {primary.map(({ destination, label, name, icon: Icon }) => {
+        const incidentLabel = destination === 'Incidents' && activeIncidents > 0 ? `${name}, ${activeIncidents} active` : name
         return <button
           type="button"
           key={destination}

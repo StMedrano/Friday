@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, FolderGit2, HardDrive, Home, MemoryStick, MessageSquare, Network, Search, Server, Settings, ShieldCheck, Sparkles } from 'lucide-react'
+import { Activity, AlertTriangle, AppWindow, Bot, Boxes, CheckCircle2, ChevronRight, Cpu, Database, FolderGit2, HardDrive, Hexagon, Home, MemoryStick, MessageSquare, Network, Search, Server, Settings, ShieldCheck, Sparkles } from 'lucide-react'
 import { fetchMonitoringHistory, useFridayOverview, type FridayIncident, type MonitoringEvent } from '../lib/api'
 import { useFridaySession } from '../hooks/useFridaySession'
 import { statusLabel, statusPriority, summarizeHealth } from '../lib/status'
@@ -32,6 +32,7 @@ import '../applications.css'
 import '../audit.css'
 import '../settings.css'
 import '../theme.css'
+import '../mobile-aid.css'
 
 type NavItem = readonly [id: string, label: string, icon: typeof Home]
 
@@ -157,8 +158,8 @@ export default function Dashboard() {
     return <div className="v3-shell v3-phone-shell">
       <div className="v3-workspace">
         <header className="v3-mobile-header">
-          <div className="v3-mobile-brand"><span className="v3-live-dot"/><strong>FRIDAY</strong><small>AI OPERATIONS</small></div>
-          <div className={`v3-mobile-status ${connected ? 'online' : 'warning'}`}><i/>{connected ? 'LIVE' : 'SAFE'}</div>
+          <div className="v3-mobile-brand fx-m-brand"><Hexagon size={20} aria-hidden="true" className="fx-m-logo"/><strong>Friday</strong></div>
+          <div className={`v3-mobile-status ${connected ? 'online' : 'warning'}`}><i/>{connected ? 'LIVE' : 'PREVIEW'}</div>
           <PwaControls/>
         </header>
         <main className="v3-main">

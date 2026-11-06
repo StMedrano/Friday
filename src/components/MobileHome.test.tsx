@@ -58,17 +58,17 @@ const baseProps = {
 }
 
 describe('MobileHome', () => {
-  it('puts operational attention before health and the FRIDAY command surface', () => {
+  it('follows the AIDesigner phone order: greeting and ask bar, stats, then attention', () => {
     render(<MobileHome overview={overview} {...baseProps}/>)
 
     const sections = screen.getByTestId('mobile-home').children
-    expect(sections[0]).toHaveAttribute('data-mobile-section', 'attention')
+    expect(sections[0]).toHaveAttribute('data-mobile-section', 'friday')
     expect(sections[1]).toHaveAttribute('data-mobile-section', 'health')
-    expect(sections[2]).toHaveAttribute('data-mobile-section', 'friday')
+    expect(sections[2]).toHaveAttribute('data-mobile-section', 'attention')
     expect(sections[3]).toHaveAttribute('data-mobile-section', 'infrastructure')
     expect(sections[4]).toHaveAttribute('data-mobile-section', 'services')
 
-    expect(screen.getByRole('heading', { level: 1, name: 'nginx-proxy-manager' })).toBeInTheDocument()
+    expect(screen.getByRole('heading', { level: 3, name: 'nginx-proxy-manager' })).toBeInTheDocument()
     expect(screen.getByText(/1 HIGH INCIDENT/i)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: /view diagnosis/i })).toBeInTheDocument()
     expect(screen.getByRole('heading', { name: /ask friday/i })).toBeInTheDocument()
@@ -120,8 +120,8 @@ describe('MobileHome', () => {
     const attention = document.querySelector('[data-mobile-section="attention"]') as HTMLElement
     expect(within(attention).queryByText(/system nominal/i)).not.toBeInTheDocument()
     expect(within(attention).getByRole('heading', { name: /2 services need attention/i })).toBeInTheDocument()
-    expect(within(attention).getByText(/nginx-proxy-manager · offline/i)).toBeInTheDocument()
-    expect(within(attention).getByText(/AdGuard Home · degraded/i)).toBeInTheDocument()
+    expect(within(attention).getByRole('heading', { name: 'nginx-proxy-manager' })).toBeInTheDocument()
+    expect(within(attention).getByRole('heading', { name: 'AdGuard Home' })).toBeInTheDocument()
     expect(within(attention).queryByRole('button', { name: /view diagnosis/i })).not.toBeInTheDocument()
   })
 
