@@ -46,7 +46,7 @@ test('reports integration posture as enabled/configured/credential presence', ()
   assert.equal(byId.endpoints.checks, 2)
   assert.equal(byId.docker.credentials, 'not-required')
   assert.equal(byId['uptime-kuma'].enabled, false)
-  assert.deepEqual(view.integrations.map(item => item.id), ['proxmox', 'vm100-observer', 'docker', 'endpoints', 'omada', 'adguard', 'prometheus', 'uptime-kuma', 'grafana', 'agent-registry'])
+  assert.deepEqual(view.integrations.map(item => item.id), ['proxmox', 'vm100-observer', 'docker', 'endpoints', 'omada', 'adguard', 'prometheus', 'uptime-kuma', 'grafana', 'aidesigner', 'agent-registry'])
 })
 
 test('AdGuard and Prometheus are configured only with URL, site and both credentials', () => {
