@@ -1,0 +1,79 @@
+/* Phone layout matched to the AIDesigner "Friday" phone canvas. */
+@media (max-width: 700px) {
+  .v3-phone-shell .v3-mobile-header { height: 60px; padding: 0 16px; border-bottom: 1px solid var(--line); }
+  .v3-phone-shell .fx-m-brand { gap: 10px; }
+  .v3-phone-shell .fx-m-brand strong { font-size: 17px; font-weight: 600; letter-spacing: 0; }
+  .v3-phone-shell .fx-m-logo { color: var(--accent); fill: var(--accent); }
+  .v3-phone-shell .v3-mobile-status { margin-left: auto; margin-right: 8px; height: 24px; border-radius: 999px; padding: 0 10px; font-family: var(--font-mono); font-size: 10px; font-weight: 500; }
+  .v3-phone-shell .v3-mobile-status.online { background: rgba(52, 211, 153, 0.08); border-color: rgba(52, 211, 153, 0.25); color: var(--green); }
+  .v3-phone-shell .v3-mobile-status.warning { background: rgba(251, 191, 36, 0.08); border-color: rgba(251, 191, 36, 0.25); color: var(--amber); }
+
+  .v3-phone-shell .v3-main { padding: 20px 16px 96px; }
+  .v3-phone-shell .fx-m-home { gap: 28px; }
+
+  /* Greeting + ask bar */
+  .v3-phone-shell .fx-m-hero { display: grid; min-height: 0; overflow: visible; backdrop-filter: none; gap: 10px; padding: 0; border: 0; background: none; box-shadow: none; }
+  .v3-phone-shell .fx-m-hero h1 { margin: 0; font-size: 26px; line-height: 1.15; font-weight: 600; letter-spacing: -0.02em; color: var(--text); }
+  .v3-phone-shell .fx-m-status { margin: 0 0 8px; display: flex; align-items: center; gap: 8px; font-size: 14px; color: var(--text-2); }
+  .v3-phone-shell .fx-m-status i { width: 7px; height: 7px; border-radius: 50%; background: var(--muted); flex: 0 0 auto; }
+  .v3-phone-shell .fx-m-status.ok i { background: var(--green); }
+  .v3-phone-shell .fx-m-status.warn i { background: var(--amber); }
+  .v3-phone-shell .fx-m-status.bad i { background: var(--rose); }
+  .v3-phone-shell .fx-m-hero .v3-friday-composer { min-height: 52px; border-radius: 14px; border: 1px solid var(--line-strong); background: var(--surface); }
+  .v3-phone-shell .fx-m-mode { font-size: 11px; color: var(--faint); font-family: var(--font-mono); }
+
+  .v3-phone-shell .fx-m-hero::after { display: none; }
+  .v3-phone-shell .fx-m-stats article { border-right: 1px solid var(--line-strong); justify-content: flex-start; }
+  .v3-phone-shell .fx-m-stats .fx-m-tag { font-size: 10px; letter-spacing: 0.06em; }
+
+  /* Stat cards */
+  .v3-phone-shell .fx-m-stats { border: 0; background: none; overflow: visible; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .v3-phone-shell .fx-m-stats article { min-height: 110px; padding: 14px; border-radius: 14px; border: 1px solid var(--line-strong); background: linear-gradient(180deg, var(--surface-2), var(--surface)); display: flex; flex-direction: column; text-align: left; align-items: stretch; }
+  .v3-phone-shell .fx-m-stats article header { width: 100%; display: flex; justify-content: space-between; align-items: center; color: var(--muted); margin-bottom: auto; }
+  .v3-phone-shell .fx-m-stats strong { margin-top: 18px; font-size: 26px; font-weight: 600; letter-spacing: -0.02em; color: var(--text); }
+  .v3-phone-shell .fx-m-stats article > span { margin-top: 4px; font-family: var(--font-sans); font-size: 13px; color: var(--muted); text-transform: none; letter-spacing: 0; }
+
+  .v3-phone-shell .fx-m-tag { display: inline-flex; align-items: center; gap: 5px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted); }
+  .v3-phone-shell .fx-m-tag i { width: 5px; height: 5px; border-radius: 50%; background: currentColor; }
+  .v3-phone-shell .fx-m-tag.ok { color: var(--green); }
+  .v3-phone-shell .fx-m-tag.warn { color: var(--amber); }
+  .v3-phone-shell .fx-m-tag.bad { color: var(--rose); }
+
+  /* Section heads */
+  .v3-phone-shell .fx-m-section-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; }
+  .v3-phone-shell .fx-m-section-head h2 { margin: 0; font-size: 16px; font-weight: 600; color: var(--text); }
+  .v3-phone-shell .fx-m-section-head button { border: 0; background: none; color: var(--muted); font-size: 13px; padding: 6px 0; min-height: 32px; cursor: pointer; }
+  .v3-phone-shell .fx-m-kicker { display: block; margin-top: 2px; font-family: var(--font-mono); font-size: 10px; letter-spacing: 0.08em; color: var(--muted); }
+
+  /* Needs attention */
+  .v3-phone-shell .fx-m-attention { padding: 0; border: 0; background: none; box-shadow: none; display: grid; gap: 12px; }
+  .v3-phone-shell .fx-m-attention > .fx-m-section-head { margin-bottom: 0; }
+  .v3-phone-shell .fx-m-alert { border-radius: 16px; border: 1px solid var(--line-strong); background: var(--surface); padding: 16px; display: grid; gap: 12px; }
+  .v3-phone-shell .fx-m-alert.bad { border-color: rgba(251, 113, 133, 0.28); background: linear-gradient(180deg, rgba(251, 113, 133, 0.05), var(--surface)); }
+  .v3-phone-shell .fx-m-alert.warn { border-color: rgba(251, 191, 36, 0.22); }
+  .v3-phone-shell .fx-m-alert header { display: flex; gap: 12px; align-items: flex-start; }
+  .v3-phone-shell .fx-m-alert header > div { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; min-width: 0; }
+  .v3-phone-shell .fx-m-alert h3 { flex: 1 0 100%; margin: 0; font-size: 16px; font-weight: 600; color: var(--text); overflow-wrap: anywhere; }
+  .v3-phone-shell .fx-m-alert small { font-size: 11px; color: var(--faint); font-family: var(--font-mono); }
+  .v3-phone-shell .fx-m-alert-icon { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; flex: 0 0 auto; background: var(--surface-2); border: 1px solid var(--line-strong); color: var(--muted); }
+  .v3-phone-shell .fx-m-alert.bad .fx-m-alert-icon { color: var(--rose); background: rgba(251, 113, 133, 0.1); border-color: rgba(251, 113, 133, 0.22); }
+  .v3-phone-shell .fx-m-alert.warn .fx-m-alert-icon { color: var(--amber); background: rgba(251, 191, 36, 0.1); border-color: rgba(251, 191, 36, 0.22); }
+  .v3-phone-shell .fx-m-alert pre { margin: 0; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: rgba(0, 0, 0, 0.3); font-family: var(--font-mono); font-size: 12px; line-height: 1.6; color: var(--text-2); white-space: pre-wrap; overflow-wrap: anywhere; }
+  .v3-phone-shell .fx-m-alert footer { display: flex; align-items: center; justify-content: space-between; gap: 10px; font-size: 11px; color: var(--faint); }
+  .v3-phone-shell .fx-m-nominal { display: flex; gap: 12px; align-items: center; padding: 16px; border-radius: 16px; border: 1px solid rgba(52, 211, 153, 0.2); background: var(--surface); color: var(--green); }
+  .v3-phone-shell .fx-m-nominal h2 { margin: 0; font-size: 16px; color: var(--text); }
+  .v3-phone-shell .fx-m-nominal p { margin: 2px 0 0; font-size: 13px; color: var(--muted); }
+
+  /* Lists below */
+  .v3-phone-shell .v3-mobile-infrastructure,
+  .v3-phone-shell .v3-mobile-services { padding: 0; border: 0; background: none; box-shadow: none; }
+
+  /* Bottom tab bar */
+  .v3-phone-shell .v3-mobile-command-bar { padding: 6px 4px calc(10px + env(safe-area-inset-bottom)); background: rgba(9, 9, 11, 0.96); border-top: 1px solid var(--line-strong); box-shadow: none; }
+  .v3-phone-shell .v3-mobile-nav-button { gap: 5px; font-size: 11px; color: var(--muted); border-radius: 0; background: none; min-height: 52px; }
+  .v3-phone-shell .v3-mobile-nav-button.active { color: var(--accent-2); background: none; }
+  .v3-phone-shell .v3-mobile-nav-button.active::before { content: ""; position: absolute; top: -6px; left: 50%; width: 28px; height: 3px; border-radius: 0 0 3px 3px; background: var(--accent); transform: translateX(-50%); }
+  .v3-phone-shell .v3-mobile-nav-icon { height: 22px; }
+  .v3-phone-shell .v3-mobile-nav-icon svg { width: 22px; height: 22px; }
+  .v3-phone-shell .v3-mobile-nav-icon em { right: -6px; top: -3px; min-width: 8px; width: 8px; height: 8px; padding: 0; font-size: 0; background: var(--amber); }
+}

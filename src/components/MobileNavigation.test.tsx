@@ -22,7 +22,7 @@ describe('MobileNavigation', () => {
     const { rerender } = render(<MobileNavigation active="Overview" activeIncidents={2} onNavigate={() => {}}/>)
     expect(screen.getByRole('button', { name: /incidents, 2 active/i })).toBeInTheDocument()
     rerender(<MobileNavigation active="Overview" activeIncidents={0} onNavigate={() => {}}/>)
-    expect(screen.getByRole('button', { name: 'Incidents' })).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Alerts: Incidents' })).toBeInTheDocument()
   })
 
   it('opens an accessible More dialog with all secondary views and navigates while closing', async () => {

@@ -127,13 +127,13 @@ describe('Friday v3 command center', () => {
 
     expect(screen.getByRole('navigation', { name: /mobile command bar/i })).toBeInTheDocument()
     expect(document.querySelector('.v3-rail')).toBeNull()
-    expect(await screen.findByRole('heading', { level: 1, name: 'nginx-proxy-manager' })).toBeInTheDocument()
+    expect(await screen.findByRole('heading', { level: 3, name: 'nginx-proxy-manager' })).toBeInTheDocument()
 
     const attention = document.querySelector('[data-mobile-section="attention"]')
     const friday = document.querySelector('[data-mobile-section="friday"]')
     expect(attention).not.toBeNull()
     expect(friday).not.toBeNull()
-    expect(attention!.compareDocumentPosition(friday!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    expect(friday!.compareDocumentPosition(attention!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
   })
 
   it('opens the selected diagnosis from mobile Home and preserves history loading', async () => {
@@ -143,7 +143,7 @@ describe('Friday v3 command center', () => {
     const user = userEvent.setup()
     render(<Dashboard />)
 
-    await screen.findByRole('heading', { level: 1, name: 'nginx-proxy-manager' })
+    await screen.findByRole('heading', { level: 3, name: 'nginx-proxy-manager' })
     await user.click(screen.getByRole('button', { name: /view diagnosis/i }))
 
     expect(screen.getByRole('button', { name: /incidents, 1 active/i })).toHaveAttribute('aria-current', 'page')
