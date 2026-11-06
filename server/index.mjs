@@ -13,6 +13,7 @@ import { createSupabaseWorkReadRepository } from './work/read-only-repository.mj
 import { createWorkService } from './work/work-service.mjs'
 import { createMemoryService } from './work/memory-service.mjs'
 import { createTrustedWorkReadBridge } from './work/file-subject-grants.mjs'
+import { createSupabaseTaskInsertRepository } from './work/task-insert-repository.mjs'
 import { createMonitoringRuntime } from './monitoring/runtime.mjs'
 import { createFileMonitoringStore } from './monitoring/store.mjs'
 import { createSupabaseRegistryClient } from './agents/supabase-client.mjs'
@@ -108,9 +109,19 @@ if (config.work.enabled) {
     access: config.access,
     workService: createWorkService({ repository }),
     memoryService: createMemoryService({ repository }),
+    // Default off. Insert-only role; operators with a project grant can add a 'ready' task.
+    taskWriter: config.work.write.enabled ? createSupabaseTaskInsertRepository({
+      baseUrl: config.agents.registry.supabaseUrl,
+      writeKey: config.work.write.key,
+      gatewayKey: config.work.gatewayKey,
+    }) : null,
   })
   if (!workReadBridge?.enabled) console.warn('Friday work reads stayed disabled; check Access configuration, the work read key and the grant file')
   else console.log('Friday work reads enabled')
+  if (config.work.write.enabled) {
+    if (workReadBridge?.canCreateTasks) console.log('Friday new tasks enabled')
+    else console.warn('Friday new tasks stayed disabled; check FRIDAY_WORK_WRITE_KEY and that work reads are enabled')
+  }
 }
 
 // Default off. Records which agent answered, with which model and outcome; never prompts or answers.

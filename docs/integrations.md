@@ -95,6 +95,14 @@ Registry sync is explicit and Git-owned. It is not an agent editor and cannot cr
 - A decision is a record only. Nothing is executed: every response carries `execution.performed: false`. Automated fixes are a separate, approval-gated change.
 - `GET /api/approvals` returns `pending` (oldest first) and the 20 most recent decisions. `POST /api/approvals/:incidentId/decision` with `{"decision":"approve"|"deny"}` is operator-only, JSON-only and refused cross-site. Errors: 503 `approvals-disabled` or `monitoring-disabled`, 400 `invalid-approval-decision`, 404 `approval-not-found` (the incident is no longer open), 409 `approval-already-decided`. Decisions on one proposal are serialized, so only the first wins.
 
+### New tasks (Tasks write path)
+
+- `FRIDAY_WORK_WRITE_ENABLED=false` by default, and it only works when project task reads are on (`FRIDAY_WORK_READ_ENABLED=true` with a valid grant file). When both are on, the Tasks screen shows a "New task" form with a title and optional details.
+- Who can add: a signed-in person whose email is in `FRIDAY_ACCESS_OPERATOR_EMAILS` **and** whose grant file entry lists the project. Everyone else gets 403 `work-write-denied`. The browser never sends a role or principal; the server derives `access:<sha256 of the Access subject>` itself.
+- What it writes: one row in `friday_work_items` with status `ready`, version 1, no claim and no acceptance criteria. If details are left blank the title is used as the objective. Nothing claims, moves, edits or runs a task.
+- Database role: apply `supabase/migrations/202611060001_friday_work_writer.sql` on VM132 (safe to re-run). It creates the NOLOGIN role `friday_work_writer` that may only insert those columns and read tasks back; RLS only accepts new `ready` rows from an `access:` principal. Mint a PostgREST JWT with `"role":"friday_work_writer"` and put it in `FRIDAY_WORK_WRITE_KEY`. Never use the service key. The gateway key (`FRIDAY_WORK_READ_GATEWAY_KEY`) is reused.
+- `POST /api/work/tasks` with `{"projectId","title","objective"?,"requestId"}` is operator-only, JSON-only, refused cross-site, and written to the action audit as `work.tasks.create` with the project as target. `requestId` makes retries safe: the same person and id return the first task; reusing the id with different content is 409 `work-task-request-reused`. Other errors: 400 `invalid-work-task`, 404 when the path is off, 503 `work-write-unavailable`. `GET /api/work/tasks` adds `"canCreate": true` only when the path is on.
+
 ### CT108 local Ollama agent inference
 
 Agent profiles are server-side and Ollama-only:

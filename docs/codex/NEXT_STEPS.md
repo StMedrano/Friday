@@ -21,14 +21,15 @@ by default unless noted.
 | #133 | Approvals queue for incident remediation; decisions recorded and audited, nothing executed. | Set `FRIDAY_APPROVALS_ENABLED=true` (`docs/integrations.md`, Approvals queue). |
 | #134 | Test-only: deterministic Authentik tampered-signature test. | Nothing. |
 | #135 | Mock-mode Playwright smoke test in its own `e2e` CI job. | Nothing (CI only). |
+| (this PR) | New task on the Tasks screen: operators with a project grant add a `ready` task. Nothing claims or runs it. | Apply `supabase/migrations/202611060001_friday_work_writer.sql` on VM132, mint a `friday_work_writer` JWT into `FRIDAY_WORK_WRITE_KEY`, set `FRIDAY_WORK_WRITE_ENABLED=true` (`docs/integrations.md`, New tasks). |
 
 ## 2. Waiting on an owner decision (do not start)
 
 Listed in `docs/automation/BACKLOG.md` under "Needs owner approval" or in the ledger.
 
-- **Tasks write path** (`tasks-write-path`): creating or editing project tasks from Friday. Needs a write role on the VM132 work database. The "New tasks" control stays "Not connected".
 - **Authentik as primary login** (`authentik-primary-login`). Authentik verification exists (`server/security/authentik.mjs`); Cloudflare Access is still primary. Runbook for the switch and the outage fallback: `docs/friday-authentication-failover.md`.
 - **Non-root controller cutover** (`controller-nonroot-cutover`). The candidate image is on `main` (#118); the cutover needs a VM102 data-volume ownership change in a maintenance window.
+- **Claiming, moving or editing tasks** from Friday: not built; only creating a task was approved (2026-11-06).
 - **Automated fixes**: acting on approved proposals from #133. Today an approval is a record only.
 - **Create agents from Friday** and **Open app** (Applications): still "Not connected" by design.
 - **Endpoint checks**: `FRIDAY_ENDPOINTS_ENABLED` stays off (owner's call, ledger 2026-10-29).

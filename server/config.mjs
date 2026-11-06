@@ -219,6 +219,11 @@ export function getConfig(env = process.env) {
       readKey: env.FRIDAY_WORK_READ_KEY || '',
       gatewayKey: env.FRIDAY_WORK_READ_GATEWAY_KEY || '',
       grantsPath: env.FRIDAY_WORK_GRANTS_PATH || '/data/work-grants.json',
+      // "New task" needs work reads on as well, plus an insert-only key.
+      write: {
+        enabled: enabled(env.FRIDAY_WORK_WRITE_ENABLED),
+        key: env.FRIDAY_WORK_WRITE_KEY || '',
+      },
     },
     // Internal free-only model fabric. Opt-in, never wired to a paid fallback.
     modelFabric: {

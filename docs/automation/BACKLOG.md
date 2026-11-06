@@ -22,7 +22,7 @@ deterministic without loosening what it asserts.
 `node --test --test-concurrency=8 server/`, its assertions are unchanged or
 stricter, and `make verify` passes.
 
-## port-auth-failover-docs — `in-review`
+## port-auth-failover-docs — `done`
 
 **Scope:** docs only. Source: `docs/friday-authentication-failover.md` and
 `docs/phase2c-operator-auth-hardening.md` on branch
@@ -80,10 +80,12 @@ and `make verify` passes.
 
 ## Needs owner approval (do not start)
 
-## tasks-write-path — `needs-approval`
+## tasks-write-path — `in-review`
 
-Creating or editing project tasks from Friday (the #109 create/paging path).
-Needs the owner to approve a Tasks write path and its database role first.
+Owner approved creating tasks on 2026-11-06 ("Creating task"). Scope: a New
+task form and `POST /api/work/tasks` behind `FRIDAY_WORK_WRITE_ENABLED`
+(default off), operator plus project grant, insert-only `friday_work_writer`
+role. Claiming, moving and editing tasks are not part of this approval.
 
 ## authentik-primary-login — `needs-approval`
 

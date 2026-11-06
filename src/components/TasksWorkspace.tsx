@@ -1,7 +1,7 @@
 import NotConnected from './NotConnected'
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { CheckCircle2 } from 'lucide-react'
-import { fetchProjectTasks, FridayWorkError, type FridayTask } from '../lib/api'
+import { createProjectTask, fetchProjectTasks, FridayWorkError, type FridayTask } from '../lib/api'
 
 const PROJECTS = [
   { id: 'friday-ai-os', name: 'Friday AI OS' },
@@ -13,6 +13,8 @@ const STATUS_LABELS: Record<FridayTask['status'], string> = {
   ready: 'Ready', in_progress: 'In progress', blocked: 'Blocked',
   review: 'In review', completed: 'Completed', cancelled: 'Cancelled',
 }
+const TITLE_MAX = 160
+const DETAIL_MAX = 4000
 
 function failureMessage(reason: unknown) {
   if (reason instanceof FridayWorkError) {
@@ -22,27 +24,78 @@ function failureMessage(reason: unknown) {
   return 'Project tasks are unavailable.'
 }
 
+function createFailure(reason: unknown) {
+  if (reason instanceof FridayWorkError) {
+    if (reason.status === 403) return 'Only an operator with access to this project can add tasks.'
+    if (reason.status === 400) return 'Check the title: it is required and up to 160 characters, with no secrets.'
+    if (reason.status === 404) return 'Adding tasks is switched off on this controller.'
+    if (reason.code === 'audit-unavailable') return 'The action audit could not record this, so the task was not added.'
+  }
+  return 'The task could not be added. Try again.'
+}
+
+function newRequestId() {
+  return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+    ? crypto.randomUUID()
+    : `req-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`
+}
+
 export default function TasksWorkspace() {
   const [projectId, setProjectId] = useState(PROJECTS[0].id)
   const [tasks, setTasks] = useState<FridayTask[] | null>(null)
+  const [canCreate, setCanCreate] = useState(false)
   const [message, setMessage] = useState('')
+  const [title, setTitle] = useState('')
+  const [detail, setDetail] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [notice, setNotice] = useState('')
+  // One id per draft, so a retry after a dropped response never adds a second task.
+  const requestId = useRef(newRequestId())
 
   useEffect(() => {
     const controller = new AbortController()
     setTasks(null)
     setMessage('')
+    setNotice('')
     fetchProjectTasks(projectId, controller.signal)
-      .then(setTasks)
-      .catch((reason) => { if (reason?.name !== 'AbortError') setMessage(failureMessage(reason)) })
+      .then((board) => { setTasks(board.tasks); setCanCreate(board.canCreate) })
+      .catch((reason) => { if (reason?.name !== 'AbortError') { setCanCreate(false); setMessage(failureMessage(reason)) } })
     return () => controller.abort()
   }, [projectId])
 
   const project = PROJECTS.find((item) => item.id === projectId)
+
+  const submit = async (event: FormEvent) => {
+    event.preventDefault()
+    const trimmed = title.trim()
+    if (!trimmed || saving) return
+    setSaving(true)
+    setNotice('')
+    try {
+      const task = await createProjectTask({
+        projectId, title: trimmed, requestId: requestId.current,
+        ...(detail.trim() ? { objective: detail.trim() } : {}),
+      })
+      setTasks((current) => [task, ...(current || []).filter((item) => item.id !== task.id)])
+      setTitle('')
+      setDetail('')
+      requestId.current = newRequestId()
+      setNotice(`Added “${task.title}” to ${project?.name}. It is ready; nothing was started.`)
+    } catch (reason) {
+      if (reason instanceof FridayWorkError && reason.status === 409) requestId.current = newRequestId()
+      setNotice(createFailure(reason))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return <section className="v3-tasks-workspace" aria-label="Project tasks workspace">
     <div className="v3-detail-hero">
       <div className="v3-node-icon large"><CheckCircle2/></div>
       <div><span className="v3-kicker">PROJECT WORK</span><h2>Tasks</h2>
-        <p>Read-only project tasks from Friday's work database. Nothing on this screen creates, claims or changes a task.</p></div>
+        <p>{canCreate
+          ? 'Project tasks from Friday’s work database. Operators can add a task; nothing here claims, moves or runs one.'
+          : 'Read-only project tasks from Friday’s work database. Nothing on this screen creates, claims or changes a task.'}</p></div>
     </div>
 
     <div className="v3-settings-form">
@@ -53,7 +106,20 @@ export default function TasksWorkspace() {
       </label>
     </div>
 
-    <NotConnected title="New tasks" detail="Creating, claiming and moving tasks needs the Tasks write path, which is waiting on your approval."/>
+    {canCreate
+      ? <form className="v3-settings-form fx-task-create" aria-label="New task" onSubmit={(event) => void submit(event)}>
+        <label htmlFor="v3-task-title">New task
+          <input id="v3-task-title" value={title} maxLength={TITLE_MAX} required placeholder="What needs doing?"
+            onChange={(event) => { setTitle(event.target.value); requestId.current = newRequestId() }}/>
+        </label>
+        <label htmlFor="v3-task-detail">Details (optional)
+          <input id="v3-task-detail" value={detail} maxLength={DETAIL_MAX} placeholder="Goal or notes"
+            onChange={(event) => { setDetail(event.target.value); requestId.current = newRequestId() }}/>
+        </label>
+        <button type="submit" disabled={saving || !title.trim()}>{saving ? 'Adding…' : 'Add task'}</button>
+      </form>
+      : <NotConnected title="New tasks" detail="Adding tasks is off on this controller (FRIDAY_WORK_WRITE_ENABLED). Claiming and moving tasks are not built."/>}
+    {notice && <p role="status" className="v3-settings-message">{notice}</p>}
 
     {message ? <p role="status" className="v3-settings-message">{message}</p>
       : !tasks ? <p role="status" className="v3-settings-message">Loading tasks…</p>
