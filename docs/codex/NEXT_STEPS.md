@@ -1,6 +1,7 @@
 # Friday — Ordered Finish Queue
 
-Last refreshed 2026-11-05 from `git log` on `main` and `FRIDAY_SHARED_MEMORY.md`.
+Last refreshed 2026-11-07 from `git log` on `main` (at `42ace44`, #140) and
+`FRIDAY_SHARED_MEMORY.md`.
 Earlier versions of this file (PWA staging, Tasks read path, four-project
 catalog) described work that has since merged; see `git log -- docs/codex/NEXT_STEPS.md`.
 
@@ -21,7 +22,11 @@ by default unless noted.
 | #133 | Approvals queue for incident remediation; decisions recorded and audited, nothing executed. | Set `FRIDAY_APPROVALS_ENABLED=true` (`docs/integrations.md`, Approvals queue). |
 | #134 | Test-only: deterministic Authentik tampered-signature test. | Nothing. |
 | #135 | Mock-mode Playwright smoke test in its own `e2e` CI job. | Nothing (CI only). |
-| (this PR) | New task on the Tasks screen: operators with a project grant add a `ready` task. Nothing claims or runs it. | Apply `supabase/migrations/202611060001_friday_work_writer.sql` on VM132, mint a `friday_work_writer` JWT into `FRIDAY_WORK_WRITE_KEY`, set `FRIDAY_WORK_WRITE_ENABLED=true` (`docs/integrations.md`, New tasks). |
+| #136, #137 | Docs only: this queue, and the authentication failover and operator-access docs. | Nothing. |
+| #138 | New task on the Tasks screen: operators with a project grant add a `ready` task. Nothing claims or runs it. | Apply `supabase/migrations/202611060001_friday_work_writer.sql` on VM132, mint a `friday_work_writer` JWT into `FRIDAY_WORK_WRITE_KEY`, set `FRIDAY_WORK_WRITE_ENABLED=true` (`docs/integrations.md`, New tasks). |
+| #123 | Server-side AIDesigner REST client: list design sessions, generate a design (operator-only, audited, spends credits). No UI. | Add `AIDESIGNER_API_KEY` and set `FRIDAY_AIDESIGNER_ENABLED=true` (`docs/integrations.md`). |
+| #139 | Docs only: four `ready` items added to `docs/automation/BACKLOG.md`. | Nothing. |
+| #140 | Phone layout matches the AIDesigner phone design. Always on. | Nothing beyond the deploy. |
 
 ## 2. Waiting on an owner decision (do not start)
 
@@ -45,7 +50,10 @@ Listed in `docs/automation/BACKLOG.md` under "Needs owner approval" or in the le
 
 Taken in order by the nightly builder from `docs/automation/BACKLOG.md`.
 
-1. Keep this file current after each merge or deploy.
+1. `service-token-expiry-warning`: show when `friday-cloud-reader` expires.
+2. `e2e-tasks-approvals-smoke`: extend the mock-mode smoke test to Tasks and Approvals.
+3. `not-connected-setup-links`: point each "Not connected" placeholder at its setup doc.
+4. Keep this file current after each merge or deploy.
 
 The authentication docs from #109's branch are on `main`, corrected to what
 `main` does: `docs/friday-authentication-failover.md` and
