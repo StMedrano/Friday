@@ -773,3 +773,7 @@ With `FRIDAY_AGENT_ACTIVITY_ENABLED=true`, Friday keeps a metadata-only, bounded
 ## AIDesigner design generation, 2026-11-05
 
 Friday has a server-side AIDesigner REST client (`server/adapters/aidesigner.mjs`), default off (`FRIDAY_AIDESIGNER_ENABLED`). `GET /api/aidesigner/sessions` lists recent design sessions for signed-in people; `POST /api/aidesigner/designs` generates a design into an AIDesigner session, operator-only and audited as `aidesigner.design.generate`, and returns only references (session, canvas, editor link), never HTML. The API key never leaves the server. Settings shows the integration's posture. No UI yet; nothing is deployed or enabled by this change.
+
+## Service token expiry warning, 2026-11-08
+
+Optional `FRIDAY_SERVICE_TOKEN_EXPIRES_AT` (a date only). `GET /api/settings` reports `serviceToken` with days remaining and `ok`/`warning`/`expired`; Settings, Access & roles shows it, warning at 14 days or fewer. Unset or invalid shows nothing. Not deployed; see `docs/integrations.md`, Service token expiry.

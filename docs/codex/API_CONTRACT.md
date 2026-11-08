@@ -38,7 +38,9 @@ only: mode, Access (origin verification, configured, operator count),
 each integration's `enabled`, `configured` (required fields present),
 `credentials` (`present`/`missing`/`not-required`), site label and
 Proxmox TLS verification, AI provider order with credential presence and
-model names, monitoring/diagnostics, the automation API, action audit
+model names, monitoring/diagnostics, the automation API, the optional
+service token expiry (`serviceToken`: `expiresAt` date, `daysRemaining`,
+`state` `ok`/`warning`/`expired`, or `null` when unset), action audit
 state (`enabled`, `integrity`, event count; never its directory), and fixed
 `safety` facts (`writableSettings`, `infrastructureActions`, `executor`
 all `false`). It never returns secrets, tokens, usernames, operator

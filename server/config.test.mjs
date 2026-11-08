@@ -241,3 +241,12 @@ test('agent activity log defaults off with a bounded server-side file', () => {
   assert.deepEqual(getConfig({ FRIDAY_AGENT_ACTIVITY_ENABLED: 'true', FRIDAY_AGENT_ACTIVITY_PATH: '/data/x.json', FRIDAY_AGENT_ACTIVITY_LIMIT: '5' }).agentActivity,
     { enabled: true, path: '/data/x.json', limit: 50 })
 })
+
+test('service token expiry date is optional, date-only and never breaks startup', () => {
+  assert.deepEqual(getConfig({}).serviceToken, { expiresAt: '' })
+  assert.deepEqual(getConfig({ FRIDAY_SERVICE_TOKEN_EXPIRES_AT: '2026-11-24' }).serviceToken, { expiresAt: '2026-11-24' })
+  assert.deepEqual(getConfig({ FRIDAY_SERVICE_TOKEN_EXPIRES_AT: ' 2026-11-24T18:30:00Z ' }).serviceToken, { expiresAt: '2026-11-24' })
+  for (const invalid of ['soon', '2026-13-01', '2026-02-30', '24/11/2026', '2026-11-24junk']) {
+    assert.deepEqual(getConfig({ FRIDAY_SERVICE_TOKEN_EXPIRES_AT: invalid }).serviceToken, { expiresAt: '' }, invalid)
+  }
+})
