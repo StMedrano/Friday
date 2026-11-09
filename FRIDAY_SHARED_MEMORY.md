@@ -85,8 +85,8 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Port e2e smoke test | Claude | `complete` | `playwright.config.mjs`, `tests/e2e/`, CI `e2e` job, `package.json`, README | 2026-11-05 | 2026-11-05 | Merged as #135. |
 | Refresh NEXT_STEPS | Claude | `complete` | `docs/codex/NEXT_STEPS.md`, backlog | 2026-11-05 | 2026-11-05 | Merged as #136. |
 | Port auth failover docs | Claude | `complete` | `docs/friday-authentication-failover.md`, `docs/phase2c-operator-auth-hardening.md`, NEXT_STEPS, backlog | 2026-11-05 | 2026-11-05 | Merged as #137. |
-| Add four ready backlog items | Claude | `complete` | `docs/automation/BACKLOG.md`, this ledger | 2026-11-06 | 2026-11-06 | Owner merges; the nightly builder takes items from the top. |
-| Tasks write path (create only) | Claude | `verification_needed` | `server/work/task-insert-repository.mjs`, `server/work/http-writes.mjs`, bridge `createTask`, `supabase/migrations/202611060001_friday_work_writer.sql`, Tasks screen | 2026-11-06 | 2026-11-06 | Merge after CI; owner applies the role SQL, mints the key and sets the flag. |
+| Add four ready backlog items | Claude | `complete` | `docs/automation/BACKLOG.md`, this ledger | 2026-11-06 | 2026-11-07 | Merged as #139. The nightly builder takes items from the top. |
+| Tasks write path (create only) | Claude | `complete` | `server/work/task-insert-repository.mjs`, `server/work/http-writes.mjs`, bridge `createTask`, `supabase/migrations/202611060001_friday_work_writer.sql`, Tasks screen | 2026-11-06 | 2026-11-07 | Merged as #138, not deployed. Owner applies the role SQL on VM132, mints the key and sets the flag in an approved deploy. |
 | Free model routing and NVIDIA readiness slice | Claude | `complete` | Branch `claude/friday-model-fabric`: `server/ai/model-{fabric,registry,router}.mjs`, `server/ai/nvidia.mjs`, `scripts/check-nvidia-catalog.mjs`, `modelFabric` config, docs | 2026-11-01 | 2026-11-01 | Merged as #115. Internal only and default off; not wired into chat or agents. |
 | Container and observer hardening slice | Claude | `complete` | Branch `claude/friday-container-hardening`: `observer/docker-proxy.mjs`, `observer/Dockerfile*`, `observer/compose.yaml`, controller `Dockerfile`, CI observer steps | 2026-11-01 | 2026-11-02 | Merged as #116. VM100 observer rollout and the controller non-root data migration each need a separate operator-approved window. |
 | #109 leftovers, slice A (history validation, HomeLab observations, phone sheet focus) | Claude | `complete` | Branch `claude/friday-109-ui-slice`: `server/monitoring/history.mjs`, `/api/monitoring/history`, `src/components/HomeLabSnapshot.tsx`, `src/hooks/useModalFocus.ts`, `MobileNavigation.tsx` | 2026-11-02 | 2026-11-02 | Merged as #117. |
@@ -98,6 +98,12 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Agent activity log (Live agent events) | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/agents/activity-log.mjs`, `/api/agents/activity`, ask handler, `FRIDAY_AGENT_ACTIVITY_*`, `AgentActivityPanel.tsx`, docs | 2026-11-05 | 2026-11-05 | Merge after green CI; enable on VM102 in an approved deploy. |
 | AIDesigner design generation API | Claude | `verification_needed` | Branch `claude/project-thread-u3n07g`: `server/adapters/aidesigner.mjs`, `/api/aidesigner/*`, `aidesigner` config, compose/.env.example/staging flag, `docs/integrations.md` | 2026-11-05 | 2026-11-05 | Open a PR; stays disabled until an operator sets `FRIDAY_AIDESIGNER_ENABLED` and `AIDESIGNER_API_KEY`. |
 | Setup links on Not connected placeholders (not-connected-setup-links) | Claude nightly builder | `verification_needed` | Branch `bot/nightly-not-connected-setup-links`: `src/components/NotConnected.tsx`, six callers and their tests, `src/theme.css` | 2026-11-08 | 2026-11-08 | Merge after CI. |
+| Friday UI redesign from AIDesigner | Claude | `complete` | Branch `claude/project-thread-dnda8o`: `src/theme.css`, `src/pages/Dashboard.tsx` shell/Home, CSS palette in `src/*.css`, Geist fonts, `server/http.mjs` font MIME, audit API shape guard | 2026-11-05 | 2026-11-07 | Merged as #124, #125 and #126 (phone layout #140). #124 to #126 are deployed on VM102 at `7aac30d`; #140 is not deployed. |
+| GitHub read integration for Repositories (PRs, CI, last commit) | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/adapters/github.mjs`, `/api/repositories/:id/github`, `server/config.mjs` `github`, `compose.yaml`, `.env.example`, `src/components/RepositoriesWorkspace.tsx`, `src/lib/api.ts`, docs | 2026-11-05 | 2026-11-07 | Merged as #127; deployed on VM102 at `7aac30d` with `FRIDAY_GITHUB_ENABLED` on. |
+| Uptime history for Applications | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/monitoring/uptime.mjs`, runtime/state, `/api/monitoring/uptime`, `FRIDAY_MONITORING_UPTIME_ENABLED`, `ApplicationsWorkspace.tsx`, docs | 2026-11-05 | 2026-11-07 | Merged as #128; deployed on VM102 at `7aac30d` with `FRIDAY_MONITORING_UPTIME_ENABLED` on. |
+| Agent activity log (Live agent events) | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/agents/activity-log.mjs`, `/api/agents/activity`, ask handler, `FRIDAY_AGENT_ACTIVITY_*`, `AgentActivityPanel.tsx`, docs | 2026-11-05 | 2026-11-07 | Merged as #129; deployed on VM102 at `7aac30d` with `FRIDAY_AGENT_ACTIVITY_ENABLED` on. |
+| AIDesigner design generation API | Claude | `complete` | Branch `claude/project-thread-u3n07g`: `server/adapters/aidesigner.mjs`, `/api/aidesigner/*`, `aidesigner` config, compose/.env.example/staging flag, `docs/integrations.md` | 2026-11-05 | 2026-11-07 | Merged as #123, not deployed. Stays disabled until an operator sets `FRIDAY_AIDESIGNER_ENABLED` and `AIDESIGNER_API_KEY`. |
+| Refresh docs after #138 (`refresh-docs-after-138`) | Claude nightly builder | `in_progress` | Branch `bot/nightly-refresh-docs-after-138`: `docs/codex/NEXT_STEPS.md`, `docs/codex/BUILD_STATUS.md`, this table, `docs/automation/BACKLOG.md`. Docs only. | 2026-11-07 | 2026-11-07 | Owner reviews and merges the pull request. |
 | Tasks and Approvals browser smoke test (e2e-tasks-approvals-smoke) | Claude nightly builder | `verification_needed` | Branch `bot/nightly-e2e-tasks-approvals-smoke`: `tests/e2e/smoke.spec.mjs` only (mock server unchanged) | 2026-11-08 | 2026-11-08 | Merge after CI. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
@@ -134,6 +140,18 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-11-07 01:49 CST — Claude nightly builder — Refreshed docs after #138
+
+- Status: `verification_needed`
+- Scope claimed: Branch `bot/nightly-refresh-docs-after-138`; `docs/codex/NEXT_STEPS.md`, `docs/codex/BUILD_STATUS.md`, the Active work table, `docs/automation/BACKLOG.md`. Docs only.
+- Work performed: Backlog item `refresh-docs-after-138`. NEXT_STEPS: replaced the "(this PR)" row with #138 and added #123, #136/#137, #139 and #140 to merged-not-deployed; next agent work lists the three remaining `ready` items. BUILD_STATUS: added a PR state table for every PR the file names (from `git log` ancestry on `main` at `42ace44` and the GitHub PR record); #50 reached `main` through #49; #20 is an open issue. Active work: the task write path, AIDesigner API, backlog, redesign, GitHub, uptime and agent activity rows now say merged, with deploy state only where the ledger already recorded it (`7aac30d`, 2026-11-05).
+- Changes made: Docs only. Prior Activity log entries left as written.
+- Verification: `make verify` passed (vitest 238/238, node 918 pass 0 fail 1 skipped of 919, build, Compose configs, staging validator); ancestry checked with `git merge-base --is-ancestor` against `main` and `7aac30d`.
+- Decisions: none.
+- Blockers/risks: `CODEX.md` still calls PR #9 "draft/open"; GitHub shows it closed unmerged. Outside this item's scope.
+- Next action: Owner reviews and merges; the builder takes `service-token-expiry-warning` next.
+- Rollback/recovery: Revert the pull request.
 
 ### 2026-11-05 11:30 CST — Claude — Added the AIDesigner design generation API
 

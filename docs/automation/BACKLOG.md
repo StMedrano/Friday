@@ -76,7 +76,7 @@ no tools.
 used, local first), and every provider failing (same safe error as today),
 and `make verify` passes.
 
-## refresh-docs-after-138 — `ready`
+## refresh-docs-after-138 — `in-review`
 
 **Scope:** `docs/codex/NEXT_STEPS.md`, `docs/codex/BUILD_STATUS.md` and the
 Active work table in `FRIDAY_SHARED_MEMORY.md` only. Docs only.
