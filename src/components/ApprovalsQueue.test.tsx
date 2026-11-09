@@ -50,5 +50,6 @@ describe('ApprovalsQueue', () => {
     vi.stubGlobal('fetch', vi.fn(async () => reply({ error: 'approvals-disabled' }, 503)))
     render(<ApprovalsQueue/>)
     expect(await screen.findByLabelText('Approvals: not connected')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'How to connect: Approvals queue' })).toBeInTheDocument()
   })
 })

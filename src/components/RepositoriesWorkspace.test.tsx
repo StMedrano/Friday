@@ -119,6 +119,7 @@ describe('RepositoriesWorkspace', () => {
     }))
     render(<RepositoriesWorkspace />)
     expect(await screen.findByRole('note', { name: 'Pull requests and CI: not connected' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'How to connect: GitHub pull requests, CI and last commit' })).toBeInTheDocument()
     expect(screen.getByTitle('CI status is not connected')).toHaveTextContent('Not connected')
   })
 })

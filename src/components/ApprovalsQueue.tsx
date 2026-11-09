@@ -63,7 +63,7 @@ export default function ApprovalsQueue({ compact = false }: { compact?: boolean 
   }
 
   if (!result || result.state === 'disabled') {
-    return <NotConnected title="Approvals" detail="Remediation proposals from open incidents queue here once the approvals queue (FRIDAY_APPROVALS_ENABLED) is on."/>
+    return <NotConnected title="Approvals" detail="Remediation proposals from open incidents queue here once the approvals queue (FRIDAY_APPROVALS_ENABLED) is on." setup="Approvals queue"/>
   }
   if (result.state === 'unavailable') return <p className="fx-activity-note" role="status">Approvals could not be loaded.</p>
 

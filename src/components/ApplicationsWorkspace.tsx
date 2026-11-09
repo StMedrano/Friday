@@ -148,7 +148,7 @@ export default function ApplicationsWorkspace({ overview, connected }: Props) {
         </> : <p>Select an observed service to inspect its status and evidence. App launching and management are not enabled.</p>}
         {uptime?.state === 'ok' ? (selected ? <UptimeDetail uptime={uptimeById.get(selected.id)} name={selected.name}/> : null)
           : uptime?.state === 'unavailable' ? <p className="v3-applications-empty" role="status">Uptime history could not be loaded.</p>
-            : <NotConnected title="Uptime history" detail="Uptime percentages and trend lines need the monitoring uptime record (FRIDAY_MONITORING_UPTIME_ENABLED) on the server." />}
+            : <NotConnected title="Uptime history" detail="Uptime percentages and trend lines need the monitoring uptime record (FRIDAY_MONITORING_UPTIME_ENABLED) on the server." setup="Uptime history" />}
         <NotConnected title="Open app" detail="Launching apps from Friday is not enabled." action="Open" />
       </aside>
     </div>

@@ -80,6 +80,7 @@ describe('TasksWorkspace', () => {
     await screen.findByRole('list', { name: 'Friday AI OS tasks' })
     expect(screen.queryByRole('form', { name: 'New task' })).not.toBeInTheDocument()
     expect(screen.getByText(/FRIDAY_WORK_WRITE_ENABLED/)).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'How to connect: New tasks (Tasks write path)' })).toBeInTheDocument()
   })
 
   it('explains a denied create without losing the draft', async () => {

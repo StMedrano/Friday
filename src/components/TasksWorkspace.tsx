@@ -124,7 +124,7 @@ export default function TasksWorkspace() {
         </label>
         <button type="submit" disabled={saving || !title.trim()}>{saving ? 'Adding…' : 'Add task'}</button>
       </form>
-      : <NotConnected title="New tasks" detail="Adding tasks is off on this controller (FRIDAY_WORK_WRITE_ENABLED). Claiming and moving tasks are not built."/>}
+      : <NotConnected title="New tasks" detail="Adding tasks is off on this controller (FRIDAY_WORK_WRITE_ENABLED). Claiming and moving tasks are not built." setup="New tasks (Tasks write path)"/>}
     {notice && <p role="status" className="v3-settings-message">{notice}</p>}
 
     {message ? <p role="status" className="v3-settings-message">{message}</p>
