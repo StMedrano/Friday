@@ -91,7 +91,7 @@ evidence of it.
 **Done when:** every PR named in those files has the state `git log` shows,
 no "(this PR)" placeholder remains, and `make verify` passes.
 
-## service-token-expiry-warning — `ready`
+## service-token-expiry-warning — `in-review`
 
 **Scope:** `server/config.mjs`, a read-only field on an existing status
 response, `compose.yaml`, `.env.example`, the Settings or Overview UI, tests,

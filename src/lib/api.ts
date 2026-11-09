@@ -207,6 +207,7 @@ export type FridaySettings = {
   notifications?: { ntfy: boolean; webPush?: boolean }
   monitoring: { enabled: boolean; pollSeconds: number | null; offlineGraceSeconds: number | null; historyLimit: number | null; diagnostics: boolean }
   automationApi: { enabled: boolean; port: number | null; serviceTokens: number; readOnly: boolean }
+  serviceToken?: { expiresAt: string; daysRemaining: number; state: 'ok' | 'warning' | 'expired' } | null
   audit: { enabled: boolean; integrity: 'verified' | 'broken' | 'unavailable' | null; events: number | null }
   safety: { writableSettings: boolean; infrastructureActions: boolean; executor: boolean }
 }
