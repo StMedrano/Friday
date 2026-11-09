@@ -97,6 +97,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Uptime history for Applications | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/monitoring/uptime.mjs`, runtime/state, `/api/monitoring/uptime`, `FRIDAY_MONITORING_UPTIME_ENABLED`, `ApplicationsWorkspace.tsx`, docs | 2026-11-05 | 2026-11-05 | Merge after green CI; enable on VM102 in an approved deploy. |
 | Agent activity log (Live agent events) | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/agents/activity-log.mjs`, `/api/agents/activity`, ask handler, `FRIDAY_AGENT_ACTIVITY_*`, `AgentActivityPanel.tsx`, docs | 2026-11-05 | 2026-11-05 | Merge after green CI; enable on VM102 in an approved deploy. |
 | AIDesigner design generation API | Claude | `verification_needed` | Branch `claude/project-thread-u3n07g`: `server/adapters/aidesigner.mjs`, `/api/aidesigner/*`, `aidesigner` config, compose/.env.example/staging flag, `docs/integrations.md` | 2026-11-05 | 2026-11-05 | Open a PR; stays disabled until an operator sets `FRIDAY_AIDESIGNER_ENABLED` and `AIDESIGNER_API_KEY`. |
+| Tasks and Approvals browser smoke test (e2e-tasks-approvals-smoke) | Claude nightly builder | `verification_needed` | Branch `bot/nightly-e2e-tasks-approvals-smoke`: `tests/e2e/smoke.spec.mjs` only (mock server unchanged) | 2026-11-08 | 2026-11-08 | Merge after CI. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -428,3 +429,9 @@ The ledger should normally be committed with the repository so every agent sees 
 - Next action: merge after CI. Owner, to switch on: apply the SQL on VM132, mint a `friday_work_writer` JWT into `FRIDAY_WORK_WRITE_KEY`, set `FRIDAY_WORK_WRITE_ENABLED=true`, redeploy.
 
 - 2026-11-06 (Claude, UI redesign thread): Phone Home, header and tab bar restyled to match the AIDesigner phone canvas (greeting + ask bar first, icon stat cards with status tags, "Needs attention" cards, Home/Chat/Infra/Alerts/More tabs with indicator). New `src/mobile-aid.css`; no backend or API changes. Verification: `make verify` passed (vitest 237). Next: deploy to VM102 with the user's OK.
+
+### 2026-11-08 19:06 CST — Claude nightly builder — Tasks and Approvals browser smoke test (e2e-tasks-approvals-smoke)
+- Status: verification_needed (PR open). Owner asked to continue building on 2026-11-08 while #141 and #142 were still open, so this run went past the two-open-PR pause at the owner's request.
+- Work performed: two read-only Playwright tests in `tests/e2e/smoke.spec.mjs`. Tasks: opens the screen, checks the "Project tasks are not enabled on this controller." status and the "New tasks" not connected note, and that no Add task button exists. Approvals: opens the queue, checks its not connected note and that no Approve or Deny button exists. Nothing is clicked beyond navigation; `tests/e2e/mock-server.mjs` is unchanged and keeps every write flag off. The two existing tests are unchanged.
+- Verification: `npm run test:e2e` passed locally (4 tests). Mutation check: renaming the Approvals placeholder and changing the Tasks message made both new tests fail; source restored. (Turning on `FRIDAY_APPROVALS_ENABLED` in the mock server does not change anything, because the approvals queue is created in `server/index.mjs`, not by `createFridayServer`.) `make verify` (see PR).
+- Next action: merge after CI. Next ready item: not-connected-setup-links.

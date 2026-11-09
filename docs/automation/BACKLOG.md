@@ -107,7 +107,7 @@ and must not break startup. Never read or show the token itself.
 and expired; the variable is listed in `compose.yaml` and `.env.example`; and
 `make verify` passes.
 
-## e2e-tasks-approvals-smoke — `ready`
+## e2e-tasks-approvals-smoke — `in-review`
 
 **Scope:** `tests/e2e/smoke.spec.mjs`, `tests/e2e/mock-server.mjs`.
 
