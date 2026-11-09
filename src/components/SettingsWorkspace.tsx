@@ -22,6 +22,17 @@ function auditSummary(audit: FridaySettings['audit'] | undefined) {
   return ['Enabled', INTEGRITY[audit.integrity || 'unavailable'], audit.events !== null ? `${audit.events} events` : null].filter(Boolean).join(' · ')
 }
 
+function serviceTokenText(token: NonNullable<FridaySettings['serviceToken']>) {
+  if (token.state === 'expired') return `Expired on ${token.expiresAt}. Renew it now.`
+  const when = token.daysRemaining === 0 ? 'Expires today' : `Expires in ${token.daysRemaining} day${token.daysRemaining === 1 ? '' : 's'}`
+  return `${when} (${token.expiresAt})${token.state === 'warning' ? '. Renew it soon.' : ''}`
+}
+
+function ServiceTokenExpiry({ token }: { token: NonNullable<FridaySettings['serviceToken']> }) {
+  const tone = token.state === 'expired' ? 'error' : token.state === 'warning' ? 'warn' : 'off'
+  return <span data-testid="service-token-expiry" className={`v3-settings-pill ${tone}`} role={token.state === 'ok' ? undefined : 'status'}>{serviceTokenText(token)}</span>
+}
+
 export default function SettingsWorkspace() {
   const [settings, setSettings] = useState<FridaySettings | null>(null)
   const [error, setError] = useState('')
@@ -94,6 +105,7 @@ export default function SettingsWorkspace() {
             <div className="v3-section-head"><div><span className="v3-kicker">ACCESS</span><h2>Origin verification {settings.access.originVerification ? 'on' : 'off'}</h2></div><Lock size={16} aria-hidden="true"/></div>
             <dl className="v3-settings-facts">
               <dt>Cloudflare Access</dt><dd>{settings.access.configured ? 'Configured' : 'Not configured'}</dd>
+              {settings.serviceToken && <><dt>Service token</dt><dd><ServiceTokenExpiry token={settings.serviceToken}/></dd></>}
               <dt>Operators</dt><dd>{settings.access.operators ? `${settings.access.operators} configured` : 'No operators configured (operator actions denied)'}</dd>
               <dt>Monitoring</dt><dd>{onOff(settings.monitoring.enabled)} · every {settings.monitoring.pollSeconds ?? '—'} s · grace {settings.monitoring.offlineGraceSeconds ?? '—'} s</dd>
               <dt>Diagnostics</dt><dd>{onOff(settings.monitoring.diagnostics)}</dd>

@@ -46,6 +46,29 @@ describe('SettingsWorkspace', () => {
     expect(fetchMock.mock.calls.every(([, options]) => !options?.method || options.method === 'GET')).toBe(true)
   })
 
+  it('shows nothing about the service token when no expiry date is configured', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ...settings, serviceToken: null }), { status: 200 })))
+    render(<SettingsWorkspace />)
+    await screen.findByRole('region', { name: 'Integrations' })
+    expect(screen.queryByText('Service token')).not.toBeInTheDocument()
+    expect(screen.queryByTestId('service-token-expiry')).not.toBeInTheDocument()
+  })
+
+  it.each([
+    [{ expiresAt: '2026-12-31', daysRemaining: 53, state: 'ok' }, 'Expires in 53 days (2026-12-31)', 'off'],
+    [{ expiresAt: '2026-11-22', daysRemaining: 14, state: 'warning' }, 'Expires in 14 days (2026-11-22). Renew it soon.', 'warn'],
+    [{ expiresAt: '2026-11-09', daysRemaining: 1, state: 'warning' }, 'Expires in 1 day (2026-11-09). Renew it soon.', 'warn'],
+    [{ expiresAt: '2026-11-08', daysRemaining: 0, state: 'warning' }, 'Expires today (2026-11-08). Renew it soon.', 'warn'],
+    [{ expiresAt: '2026-11-07', daysRemaining: -1, state: 'expired' }, 'Expired on 2026-11-07. Renew it now.', 'error'],
+  ])('shows the service token expiry %#', async (serviceToken, text, tone) => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ...settings, serviceToken }), { status: 200 })))
+    render(<SettingsWorkspace />)
+    const expiry = await screen.findByTestId('service-token-expiry')
+    expect(expiry).toHaveTextContent(text)
+    expect(expiry).toHaveClass(`v3-settings-pill`, tone)
+    expect(expiry.getAttribute('role')).toBe(serviceToken.state === 'ok' ? null : 'status')
+  })
+
   it('reports an unavailable settings API', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'access-denied' }), { status: 403 })))
     render(<SettingsWorkspace />)

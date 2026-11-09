@@ -1,5 +1,5 @@
 import type { FormEventHandler, ReactNode } from 'react'
-import { AlertTriangle, ChevronRight, Server, ShieldCheck } from 'lucide-react'
+import { Activity, AlertTriangle, ChevronRight, Globe, Layers, Server, ShieldCheck } from 'lucide-react'
 import type { FridayIncident, FridayOverview } from '../lib/api'
 import type { FridaySessionMessage } from '../hooks/useFridaySession'
 import FridayComposer from './FridayComposer'
@@ -12,6 +12,17 @@ const statusRank = { offline: 0, degraded: 1, maintenance: 2, online: 3 } as con
 function displayTime(value: string) {
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? value : date.toLocaleString()
+}
+
+function greeting(now = new Date()) {
+  const hour = now.getHours()
+  return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening'
+}
+
+type Tone = 'ok' | 'warn' | 'bad' | 'muted'
+
+function Tag({ tone, children }: { tone: Tone, children: ReactNode }) {
+  return <span className={`fx-m-tag ${tone}`}><i aria-hidden="true"/>{children}</span>
 }
 
 type MobileHomeProps = {
@@ -62,30 +73,23 @@ export default function MobileHome({
     return items.findIndex((item) => `${item.host}:${item.name}` === key) === index
   }).slice(0, 3)
 
-  return <div className="v3-mobile-home" data-testid="mobile-home">
-    <section className={`v3-mobile-attention ${primaryIncident ? primaryIncident.severity : serviceAttention.length ? health.level : 'nominal'}`} data-mobile-section="attention">
-      {primaryIncident ? <>
-        <div className="v3-mobile-attention-head"><AlertTriangle size={18}/><span>{active.length} {primaryIncident.severity.toUpperCase()} INCIDENT{active.length === 1 ? '' : 'S'}</span></div>
-        <div className="v3-mobile-attention-main"><div><span className="v3-kicker">REQUIRES ATTENTION / READ ONLY</span><h1>{primaryIncident.serviceName || primaryIncident.title}</h1><p>{primaryIncident.host || primaryIncident.source} · {primaryIncident.type.replaceAll('-', ' ')}</p></div><span className={`v3-severity ${primaryIncident.severity}`}>{primaryIncident.severity.toUpperCase()}</span></div>
-        <div className="v3-mobile-attention-foot"><span>First seen {displayTime(primaryIncident.firstSeen)}</span><button className="v3-readonly-action" onClick={() => onSelectIncident(primaryIncident)}>View Diagnosis <ChevronRight size={14}/></button></div>
-      </> : serviceAttention.length ? <>
-        <div className="v3-mobile-attention-head"><AlertTriangle size={18}/><span>{health.label.toUpperCase()} · NO OPEN INCIDENT</span></div>
-        <div className="v3-mobile-attention-main"><div><span className="v3-kicker">CURRENT ATTENTION</span><h1>{serviceAttention.length} {serviceAttention.length === 1 ? 'service needs' : 'services need'} attention</h1>{serviceAttention.slice(0, 3).map((service) => <p key={service.id}>{service.name} · {service.status}</p>)}</div></div>
-        <div className="v3-mobile-attention-foot"><span>Reported by service status</span><button className="v3-readonly-action" onClick={() => onNavigate('Infrastructure')}>View services <ChevronRight size={14}/></button></div>
-      </> : <div className="v3-mobile-nominal"><ShieldCheck size={20}/><div><span className="v3-kicker">CURRENT ATTENTION</span><h1>System nominal</h1><p>No open operational incidents require attention.</p></div></div>}
-    </section>
+  const sitesOnline = overview.sites.filter((site) => site.status === 'online').length
+  const statusLine = !health.total
+    ? 'No services observed yet.'
+    : active.length
+      ? `${active.length} open incident${active.length === 1 ? '' : 's'}. ${health.online} of ${health.total} services online.`
+      : serviceAttention.length
+        ? `Core ops running. ${serviceAttention.length} service${serviceAttention.length === 1 ? '' : 's'} ${serviceAttention.length === 1 ? 'needs' : 'need'} attention.`
+        : health.online === health.total
+          ? 'Core ops normal. All services online.'
+          : `Core ops normal. ${health.total - health.online} in maintenance.`
+  const statusTone: Tone = active.length || serviceAttention.some((s) => s.status === 'offline') ? 'bad' : serviceAttention.length ? 'warn' : health.total ? 'ok' : 'muted'
 
-    <section className="v3-mobile-health" data-mobile-section="health" aria-label="System health summary">
-      <article><span>Health</span><strong>{health.percent === null ? '—' : `${health.percent}%`}</strong></article>
-      <article><span>Services</span><strong>{health.online}/{health.total}</strong></article>
-      <article><span>Incidents</span><strong>{active.length}</strong></article>
-      <article><span>Sites</span><strong>{overview.sites.length} {overview.sites.length === 1 ? 'site' : 'sites'}</strong></article>
-    </section>
-
-    <section className="v3-mobile-friday" data-mobile-section="friday">
-      <div className="v3-mobile-core" aria-hidden="true"><span/></div>
-      <div className="v3-mobile-command-copy"><span className="v3-kicker">FRIDAY / {overview.mode.toUpperCase()}</span><h2>Ask FRIDAY</h2><p>{connected ? `API connected · ${overview.mode} mode` : 'Local preview data · safe read-only interface'}</p></div>
-      <FridayConversation messages={messages} compact/>
+  return <div className="v3-mobile-home fx-m-home" data-testid="mobile-home">
+    <section className="v3-mobile-friday fx-m-hero" data-mobile-section="friday">
+      <h1>{greeting()}</h1>
+      <p className={`fx-m-status ${statusTone}`}><i aria-hidden="true"/>{statusLine}</p>
+      <h2 className="v3-visually-hidden">Ask FRIDAY</h2>
       <FridayComposer
         value={query}
         loading={loading}
@@ -93,17 +97,43 @@ export default function MobileHome({
         onChange={onQueryChange}
         onSubmit={onSubmit}
       />
+      <FridayConversation messages={messages} compact/>
+      <small className="fx-m-mode">{connected ? `API connected · ${overview.mode} mode` : 'Local preview data · safe read-only interface'}</small>
+    </section>
+
+    <section className="v3-mobile-health fx-m-stats" data-mobile-section="health" aria-label="System health summary">
+      <article><header><Layers size={16} aria-hidden="true"/><Tag tone={serviceAttention.length ? (serviceAttention.some((s) => s.status === 'offline') ? 'bad' : 'warn') : health.online === health.total ? 'ok' : 'muted'}>{serviceAttention.length ? 'Degraded' : health.online === health.total ? 'Online' : 'Maintenance'}</Tag></header><strong>{health.online}/{health.total}</strong><span>Services online</span></article>
+      <article><header><AlertTriangle size={16} aria-hidden="true"/><Tag tone={active.length ? 'bad' : 'ok'}>{active.length ? 'Open' : 'Clear'}</Tag></header><strong>{active.length}</strong><span>Incidents</span></article>
+      <article><header><Globe size={16} aria-hidden="true"/><Tag tone={sitesOnline === overview.sites.length ? 'ok' : 'warn'}>{sitesOnline === overview.sites.length ? 'Online' : 'Check'}</Tag></header><strong>{overview.sites.length} {overview.sites.length === 1 ? 'site' : 'sites'}</strong><span>Active sites</span></article>
+      <article><header><Activity size={16} aria-hidden="true"/><Tag tone={health.level === 'nominal' ? 'ok' : health.level === 'critical' ? 'bad' : health.level === 'unknown' ? 'muted' : 'warn'}>{health.label}</Tag></header><strong>{health.percent === null ? '—' : `${health.percent}%`}</strong><span>Health</span></article>
+    </section>
+
+    <section className={`v3-mobile-attention fx-m-attention ${primaryIncident ? primaryIncident.severity : serviceAttention.length ? health.level : 'nominal'}`} data-mobile-section="attention">
+      {primaryIncident ? <>
+        <div className="fx-m-section-head"><div><h2>Needs attention</h2><span className="fx-m-kicker">{active.length} {primaryIncident.severity.toUpperCase()} INCIDENT{active.length === 1 ? '' : 'S'}</span></div><button type="button" onClick={() => onNavigate('Incidents')}>View all</button></div>
+        <article className={`fx-m-alert ${primaryIncident.severity === 'high' ? 'bad' : 'warn'}`}>
+          <header><span className="fx-m-alert-icon"><AlertTriangle size={18} aria-hidden="true"/></span><div><h3>{primaryIncident.serviceName || primaryIncident.title}</h3><Tag tone={primaryIncident.severity === 'high' ? 'bad' : 'warn'}>{primaryIncident.severity}</Tag><small>{primaryIncident.host || primaryIncident.source} · {primaryIncident.type.replaceAll('-', ' ')}</small></div></header>
+          <pre>{primaryIncident.detail}</pre>
+          <footer><span>First seen {displayTime(primaryIncident.firstSeen)}</span><button className="v3-readonly-action" onClick={() => onSelectIncident(primaryIncident)}>View Diagnosis <ChevronRight size={14}/></button></footer>
+        </article>
+      </> : serviceAttention.length ? <>
+        <div className="fx-m-section-head"><div><h2>{serviceAttention.length} {serviceAttention.length === 1 ? 'service needs' : 'services need'} attention</h2><span className="fx-m-kicker">NO OPEN INCIDENT</span></div><button type="button" onClick={() => onNavigate('Infrastructure')}>View services</button></div>
+        {serviceAttention.slice(0, 3).map((service) => <article key={service.id} className={`fx-m-alert ${service.status === 'offline' ? 'bad' : 'warn'}`}>
+          <header><span className="fx-m-alert-icon"><Server size={18} aria-hidden="true"/></span><div><h3>{service.name}</h3><Tag tone={service.status === 'offline' ? 'bad' : 'warn'}>{service.status}</Tag><small>{service.host} · {service.updated}</small></div></header>
+          <pre>{service.detail}</pre>
+        </article>)}
+      </> : <div className="v3-mobile-nominal fx-m-nominal"><ShieldCheck size={20}/><div><h2>System nominal</h2><p>No open operational incidents require attention.</p></div></div>}
     </section>
 
     <section className="v3-mobile-infrastructure" data-mobile-section="infrastructure">
-      <div className="v3-mobile-section-head"><div><span className="v3-kicker">SYSTEM</span><h2>Infrastructure</h2></div><button onClick={() => onNavigate('Infrastructure')}>View topology</button></div>
+      <div className="fx-m-section-head"><h2>Infrastructure</h2><button type="button" onClick={() => onNavigate('Infrastructure')}>View topology</button></div>
       <div className="v3-mobile-infra-list">{infrastructure.map((service) => <article key={service.id}><Server size={16}/><span><b>{service.name}</b><small>{service.host} · {service.detail}</small></span><em className={service.status}>{service.status}</em></article>)}</div>
     </section>
 
     {activity}
 
     <section className="v3-mobile-services" data-mobile-section="services" data-testid="mobile-service-preview">
-      <div className="v3-mobile-section-head"><div><span className="v3-kicker">APPLICATIONS</span><h2>Service health</h2></div><button onClick={() => onNavigate('Applications')}>View all services</button></div>
+      <div className="fx-m-section-head"><h2>Service health</h2><button type="button" onClick={() => onNavigate('Applications')}>View all services</button></div>
       <div className="v3-mobile-service-list">{prioritizedServices.map((service) => <div className="v3-mobile-service-row" data-testid="mobile-service-row" key={service.id}><i className={service.status}/><span><b>{service.name}</b><small>{service.host}</small></span><em>{service.status}</em></div>)}</div>
     </section>
   </div>

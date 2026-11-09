@@ -46,7 +46,7 @@ test('reports integration posture as enabled/configured/credential presence', ()
   assert.equal(byId.endpoints.checks, 2)
   assert.equal(byId.docker.credentials, 'not-required')
   assert.equal(byId['uptime-kuma'].enabled, false)
-  assert.deepEqual(view.integrations.map(item => item.id), ['proxmox', 'vm100-observer', 'docker', 'endpoints', 'omada', 'adguard', 'prometheus', 'uptime-kuma', 'grafana', 'agent-registry'])
+  assert.deepEqual(view.integrations.map(item => item.id), ['proxmox', 'vm100-observer', 'docker', 'endpoints', 'omada', 'adguard', 'prometheus', 'uptime-kuma', 'grafana', 'aidesigner', 'agent-registry'])
 })
 
 test('AdGuard and Prometheus are configured only with URL, site and both credentials', () => {
@@ -129,4 +129,17 @@ test('GET /api/settings is read-only and behind verified identity', async () => 
   await withServer({config, accessGateImpl: async () => ({status: 403})}, async base => {
     assert.equal((await fetch(base + '/api/settings')).status, 403)
   })
+})
+
+test('service token expiry is reported as days remaining with a warning window, never the token', () => {
+  const now = Date.parse('2026-11-08T12:00:00Z')
+  const view = expiresAt => buildSettingsView(getConfig({FRIDAY_SERVICE_TOKEN_EXPIRES_AT: expiresAt, FRIDAY_AUTOMATION_SERVICE_TOKEN_IDS: 'secret-token.access'}), {now}).serviceToken
+  assert.equal(view(undefined), null)
+  assert.equal(view('not-a-date'), null)
+  assert.deepEqual(view('2026-12-31'), {expiresAt: '2026-12-31', daysRemaining: 53, state: 'ok'})
+  assert.deepEqual(view('2026-11-23'), {expiresAt: '2026-11-23', daysRemaining: 15, state: 'ok'})
+  assert.deepEqual(view('2026-11-22'), {expiresAt: '2026-11-22', daysRemaining: 14, state: 'warning'})
+  assert.deepEqual(view('2026-11-08'), {expiresAt: '2026-11-08', daysRemaining: 0, state: 'warning'})
+  assert.deepEqual(view('2026-11-07'), {expiresAt: '2026-11-07', daysRemaining: -1, state: 'expired'})
+  assert.ok(!JSON.stringify(view('2026-11-24')).includes('secret-token'))
 })

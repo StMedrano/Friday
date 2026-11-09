@@ -68,6 +68,16 @@ export function normalizeEndpointCheck(item) {
 }
 
 // Adapters without their own site data default to the original single-site label.
+// Optional calendar date (YYYY-MM-DD, or an ISO timestamp whose date part is
+// used). Anything else is ignored so a typo never stops Friday from starting.
+function calendarDate(value) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})(?:T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})?)?$/.exec(String(value ?? '').trim())
+  if (!match) return ''
+  const [, year, month, day] = match.map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day ? match[0].slice(0, 10) : ''
+}
+
 function siteLabel(value) {
   return String(value || '').trim() || 'Site A'
 }
@@ -128,6 +138,11 @@ export function getConfig(env = process.env) {
         serviceTokenIds: String(env.FRIDAY_AUTOMATION_SERVICE_TOKEN_IDS || '').split(',').map(x => x.trim()).filter(Boolean),
         operatorEmails: [],
       },
+    },
+    // Expiry date of the Cloudflare Access service token (friday-cloud-reader).
+    // A date only, never the token; shown as a renewal warning in Settings.
+    serviceToken: {
+      expiresAt: calendarDate(env.FRIDAY_SERVICE_TOKEN_EXPIRES_AT),
     },
     access: {
       // Live deployments MUST validate an Access JWT at the origin.
@@ -270,6 +285,14 @@ export function getConfig(env = process.env) {
       enabled: enabled(env.FRIDAY_APPROVALS_ENABLED),
       path: env.FRIDAY_APPROVALS_PATH || '/data/approvals.json',
       limit: Math.min(2000, Math.max(50, Math.floor(positiveNumber(env.FRIDAY_APPROVALS_LIMIT, 500)))),
+    },
+    // AIDesigner REST API for generating UI designs. The key stays server-side;
+    // generating spends AIDesigner credits, so it is operator-only and audited.
+    aidesigner: {
+      enabled: enabled(env.FRIDAY_AIDESIGNER_ENABLED),
+      apiKey: env.AIDESIGNER_API_KEY || '',
+      baseUrl: env.AIDESIGNER_BASE_URL || 'https://api.aidesigner.ai',
+      timeoutMs: Math.ceil(positiveNumber(env.FRIDAY_AIDESIGNER_TIMEOUT_MS, 180000)),
     },
     pushSubscriptions: {
       path: env.FRIDAY_PUSH_SUBSCRIPTIONS_PATH || '/data/push-subscriptions.json',
