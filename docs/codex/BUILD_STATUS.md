@@ -1,5 +1,46 @@
 # Friday Build Status
 
+## PR state reconciliation, 2026-11-07
+
+Sections below are dated records and keep the wording of their day, so some
+headings still say "draft", "open" or "source only". This table is the
+current state of every pull request named in this file, from `git log` on
+`main` at `42ace44` (#140) and the GitHub PR record. Deploy state comes only
+from the ledger (`FRIDAY_SHARED_MEMORY.md`): VM102 runs `7aac30d` (#130),
+deployed 2026-11-05.
+
+| PR | State | Commit on `main` |
+| --- | --- | --- |
+| #5 | merged 2026-08-20 | `0e1278c` |
+| #11 | merged 2026-08-24 | `979e55b` |
+| #12 | merged 2026-08-25 | `02e4ba3` |
+| #14 | merged 2026-08-26 | `32782ef` |
+| #19 | merged 2026-10-09 | `ecb0c9e` |
+| #41 | merged 2026-10-19 | `5cfeae3` |
+| #44 | merged 2026-10-26 | `460eba6` |
+| #45 | merged 2026-10-26 | `7b89228` |
+| #46 | merged 2026-10-27 | `c0e5024` |
+| #47 | merged 2026-10-26 | `68b976e` |
+| #48 | merged 2026-10-26 | `c1fb3e7` |
+| #49 | merged 2026-10-27 | `ec97553` |
+| #50 | merged 2026-10-26 into #49's branch; reached `main` with #49 | `ec97553` |
+| #73 | merged 2026-10-27 | `d13c276` |
+| #76 | merged 2026-10-27 | `f733cfd` |
+| #77 | merged 2026-10-27 | `a839a13` |
+| #88 | merged 2026-10-28 | `cd94dfc` |
+| #91 | merged 2026-10-28 | `0ee4f0a` |
+| #92 | merged 2026-10-28 | `407fd85` |
+| #109 | open; source branch only, do not merge whole | none |
+
+Issue #20 (repository-aware agent platform) is an issue, not a PR, and is
+still open.
+
+Merged since the 2026-11-05 deploy and not deployed: #123 (AIDesigner API),
+#131 (chat model routing), #132 (GitHub-only repositories), #133 (approvals
+queue), #134 (test only), #135 (e2e CI job), #136 and #137 (docs), #138 (New
+task), #139 (backlog), #140 (phone layout). The queue with the flag for each
+is in `docs/codex/NEXT_STEPS.md`.
+
 ## 2026-10-28 Grafana health and alert rule state (default off)
 
 `server/adapters/grafana.mjs` adds the last planned monitoring adapter. It
