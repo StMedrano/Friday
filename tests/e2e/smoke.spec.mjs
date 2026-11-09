@@ -41,3 +41,32 @@ test('phone navigation sheet opens, traps focus and closes on Escape', async ({ 
   await expect(page.getByRole('dialog', { name: 'More FRIDAY views' })).toBeHidden()
   await expect(bar.getByRole('button', { name: 'More' })).toHaveClass(/active/)
 })
+
+// Read-only: these open each screen and check what it shows. They never press
+// New task, Approve or Deny, and the mock server keeps every write flag off.
+test('Tasks screen renders its read-only state with no way to add a task', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 900 })
+  await page.goto('/')
+  const nav = page.getByRole('navigation', { name: 'Workspaces' })
+  await nav.getByRole('button', { name: 'Tasks' }).click()
+  await expect(nav.getByRole('button', { name: 'Tasks' })).toHaveAttribute('aria-current', 'page')
+
+  const tasks = page.getByRole('region', { name: 'Project tasks workspace' })
+  await expect(tasks).toBeVisible()
+  await expect(tasks.getByRole('status').filter({ hasText: 'Project tasks are not enabled on this controller.' })).toBeVisible()
+  await expect(tasks.getByRole('note', { name: 'New tasks: not connected' })).toBeVisible()
+  await expect(tasks.getByRole('button', { name: 'Add task' })).toHaveCount(0)
+})
+
+test('Approvals queue renders its not connected state with no decision buttons', async ({ page }) => {
+  await page.setViewportSize({ width: 1366, height: 900 })
+  await page.goto('/')
+  const nav = page.getByRole('navigation', { name: 'Workspaces' })
+  await nav.getByRole('button', { name: 'Approvals' }).click()
+  await expect(nav.getByRole('button', { name: 'Approvals' })).toHaveAttribute('aria-current', 'page')
+
+  const approvals = page.getByRole('region', { name: 'Approvals workspace' })
+  await expect(approvals).toBeVisible()
+  await expect(approvals.getByRole('note', { name: 'Approvals: not connected' })).toBeVisible()
+  await expect(approvals.getByRole('button', { name: /^(Approve|Deny)\b/ })).toHaveCount(0)
+})
