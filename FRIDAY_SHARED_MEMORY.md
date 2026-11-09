@@ -97,6 +97,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Uptime history for Applications | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/monitoring/uptime.mjs`, runtime/state, `/api/monitoring/uptime`, `FRIDAY_MONITORING_UPTIME_ENABLED`, `ApplicationsWorkspace.tsx`, docs | 2026-11-05 | 2026-11-05 | Merge after green CI; enable on VM102 in an approved deploy. |
 | Agent activity log (Live agent events) | Claude | `complete` | Branch `claude/project-thread-2sw5y6`: `server/agents/activity-log.mjs`, `/api/agents/activity`, ask handler, `FRIDAY_AGENT_ACTIVITY_*`, `AgentActivityPanel.tsx`, docs | 2026-11-05 | 2026-11-05 | Merge after green CI; enable on VM102 in an approved deploy. |
 | AIDesigner design generation API | Claude | `verification_needed` | Branch `claude/project-thread-u3n07g`: `server/adapters/aidesigner.mjs`, `/api/aidesigner/*`, `aidesigner` config, compose/.env.example/staging flag, `docs/integrations.md` | 2026-11-05 | 2026-11-05 | Open a PR; stays disabled until an operator sets `FRIDAY_AIDESIGNER_ENABLED` and `AIDESIGNER_API_KEY`. |
+| Setup links on Not connected placeholders (not-connected-setup-links) | Claude nightly builder | `verification_needed` | Branch `bot/nightly-not-connected-setup-links`: `src/components/NotConnected.tsx`, six callers and their tests, `src/theme.css` | 2026-11-08 | 2026-11-08 | Merge after CI. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -428,3 +429,9 @@ The ledger should normally be committed with the repository so every agent sees 
 - Next action: merge after CI. Owner, to switch on: apply the SQL on VM132, mint a `friday_work_writer` JWT into `FRIDAY_WORK_WRITE_KEY`, set `FRIDAY_WORK_WRITE_ENABLED=true`, redeploy.
 
 - 2026-11-06 (Claude, UI redesign thread): Phone Home, header and tab bar restyled to match the AIDesigner phone canvas (greeting + ask bar first, icon stat cards with status tags, "Needs attention" cards, Home/Chat/Infra/Alerts/More tabs with indicator). New `src/mobile-aid.css`; no backend or API changes. Verification: `make verify` passed (vitest 237). Next: deploy to VM102 with the user's OK.
+
+### 2026-11-08 19:09 CST — Claude nightly builder — Setup links on Not connected placeholders (not-connected-setup-links)
+- Status: verification_needed (PR open). Done at the owner's request to continue building on 2026-11-08.
+- Work performed: `NotConnected` takes an optional `setup` naming a `docs/integrations.md` section and shows a "How to connect" link to that heading of the repository doc (new tab, `rel=noreferrer`). Wired for Uptime history, Agent on duty (Self-hosted Supabase runtime registry), Live agent events (Agent activity log), Approvals (Approvals queue), New tasks (New tasks (Tasks write path)) and Pull requests and CI (GitHub pull requests, CI and last commit). New agents, Automated remediation, Open app and Repository configuration have no setup doc and keep their text. No routes or backend changes.
+- Verification: tests written first and failed (9), then passed: with and without a reference, anchor generation, every referenced section is a heading in `docs/integrations.md` (read in the test), and each caller shows its link. Checked the Approvals placeholder in the browser against the mock server. `make verify` (see PR).
+- Next action: merge after CI. The backlog has no `ready` items left after this one.

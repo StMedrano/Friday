@@ -165,7 +165,7 @@ export default function RepositoriesWorkspace() {
               {selectedGitHub?.state === 'ok' ? <PullRequestPanel summary={selectedGitHub.summary}/>
                 : selectedGitHub?.state === 'unsupported' ? <p className="v3-panel v3-repository-message">{selected?.name} has no GitHub remote, so there are no pull requests or checks to show.</p>
                   : selectedGitHub?.state === 'unavailable' ? <p className="v3-panel v3-repository-message" role="status">GitHub could not be reached for {selected?.name}. Try again later.</p>
-                    : <NotConnected title="Pull requests and CI" detail="Open PRs, check runs and recent PR activity need the GitHub read integration (FRIDAY_GITHUB_ENABLED) on the server." action="Connect GitHub"/>}
+                    : <NotConnected title="Pull requests and CI" detail="Open PRs, check runs and recent PR activity need the GitHub read integration (FRIDAY_GITHUB_ENABLED) on the server." action="Connect GitHub" setup="GitHub pull requests, CI and last commit"/>}
               <NotConnected title="Repository configuration" detail="Sync strategy, auto-merge and required approvals are managed on GitHub, not in Friday." action="Edit configuration"/>
             </aside>
 

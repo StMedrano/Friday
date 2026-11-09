@@ -34,7 +34,7 @@ export default function AgentActivityPanel({ refreshKey = 0 }: { refreshKey?: nu
   }, [refreshKey])
 
   if (!activity || activity.state === 'disabled') {
-    return <NotConnected title="Live agent events" detail="Agent questions are listed here once the agent activity log (FRIDAY_AGENT_ACTIVITY_ENABLED) is on."/>
+    return <NotConnected title="Live agent events" detail="Agent questions are listed here once the agent activity log (FRIDAY_AGENT_ACTIVITY_ENABLED) is on." setup="Agent activity log"/>
   }
   if (activity.state === 'unavailable') return <p className="fx-activity-note" role="status">Agent activity could not be loaded.</p>
   return <section className="fx-agent-activity" aria-label="Live agent events">

@@ -90,6 +90,8 @@ describe('ApplicationsWorkspace observed, read-only application inventory', () =
       vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'uptime-disabled' }), { status: 503 })))
       render(<ApplicationsWorkspace overview={example} connected />)
       expect(await screen.findByRole('note', { name: 'Uptime history: not connected' })).toBeInTheDocument()
+      expect(screen.getByRole('link', { name: 'How to connect: Uptime history' })).toBeInTheDocument()
+      expect(screen.getByRole('note', { name: 'Open app: not connected' })).not.toContainElement(screen.queryByRole('link', { name: /How to connect/ }))
     })
   })
 })

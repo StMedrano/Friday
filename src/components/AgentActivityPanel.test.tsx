@@ -27,6 +27,7 @@ describe('AgentActivityPanel', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'agent-activity-disabled' }), { status: 503 })))
     const { unmount } = render(<AgentActivityPanel/>)
     expect(await screen.findByRole('note', { name: 'Live agent events: not connected' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'How to connect: Agent activity log' })).toBeInTheDocument()
     unmount()
     vi.stubGlobal('fetch', vi.fn(async () => new Response('oops', { status: 500 })))
     render(<AgentActivityPanel/>)

@@ -119,7 +119,7 @@ anything, and do not turn on any write flag in the mock server.
 **Done when:** `npm run test:e2e` passes locally and in the `e2e` CI job, the
 two existing tests are unchanged, and `make verify` passes.
 
-## not-connected-setup-links — `ready`
+## not-connected-setup-links — `in-review`
 
 **Scope:** `src/components/NotConnected.tsx`, its callers, their tests.
 

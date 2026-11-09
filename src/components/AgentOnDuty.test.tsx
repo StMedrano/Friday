@@ -37,5 +37,6 @@ describe('AgentOnDuty', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ error: 'agent-registry-unavailable' }), { status: 503 })))
     render(<AgentOnDuty hosts={['VM 100']}/>)
     expect(await screen.findByRole('note', { name: 'Agent on duty: not connected' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'How to connect: Self-hosted Supabase runtime registry' })).toBeInTheDocument()
   })
 })

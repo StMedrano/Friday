@@ -41,7 +41,7 @@ export default function AgentOnDuty({ hosts }: { hosts: string[] }) {
     return () => controller.abort()
   }, [])
 
-  if (data.state !== 'ok') return <NotConnected title="Agent on duty" detail="Which agent watches this infrastructure appears once the agent registry is connected."/>
+  if (data.state !== 'ok') return <NotConnected title="Agent on duty" detail="Which agent watches this infrastructure appears once the agent registry is connected." setup="Self-hosted Supabase runtime registry"/>
   const onDuty = agentsOnDuty(data.agents, hosts)
   const lead = onDuty[0]
   const last = lead ? data.activity.find((event) => event.agentId === lead.id && event.outcome === 'answered') : undefined
