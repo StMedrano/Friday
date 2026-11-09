@@ -22,11 +22,26 @@ function auditPosture(config, actionAudit) {
   }
 }
 
+const DAY_MS = 24 * 60 * 60 * 1000
+export const SERVICE_TOKEN_WARNING_DAYS = 14
+
+// Whole calendar days (UTC) from today to the configured expiry date.
+function serviceTokenExpiry(config, now) {
+  const expiresAt = config.serviceToken?.expiresAt
+  if (!present(expiresAt) || !Number.isFinite(now)) return null
+  const expiry = Date.parse(`${expiresAt}T00:00:00Z`)
+  if (!Number.isFinite(expiry)) return null
+  const today = new Date(now)
+  const daysRemaining = Math.round((expiry - Date.UTC(today.getUTCFullYear(), today.getUTCMonth(), today.getUTCDate())) / DAY_MS)
+  const state = daysRemaining < 0 ? 'expired' : daysRemaining <= SERVICE_TOKEN_WARNING_DAYS ? 'warning' : 'ok'
+  return {expiresAt, daysRemaining, state}
+}
+
 function integration(id, name, section, {configured, credentials: creds, site = null, tls = null}) {
   return {id, name, enabled: section?.enabled === true, configured, credentials: creds, site: present(site) ? site : null, tls}
 }
 
-export function buildSettingsView(config, {actionAudit = null} = {}) {
+export function buildSettingsView(config, {actionAudit = null, now = Date.now()} = {}) {
   const {proxmox = {}, vm100Observer = {}, docker = {}, endpoints = {}, omada = {}, adguard = {}, prometheus = {}, uptimeKuma = {}, grafana = {}} = config
   const registry = config.agents?.registry || {}
   const endpointChecks = (endpoints.checks?.length || 0) + (endpoints.urls?.length || 0)
@@ -111,6 +126,7 @@ export function buildSettingsView(config, {actionAudit = null} = {}) {
       serviceTokens: Array.isArray(config.automation?.access?.serviceTokenIds) ? config.automation.access.serviceTokenIds.length : 0,
       readOnly: true,
     },
+    serviceToken: serviceTokenExpiry(config, now),
     audit: auditPosture(config, actionAudit),
     // Fixed facts about this build, not toggles.
     safety: {writableSettings: false, infrastructureActions: false, executor: false},

@@ -269,6 +269,22 @@ Friday can call the [AIDesigner REST API](https://www.aidesigner.ai/docs/api) to
 
 This is separate from the AIDesigner MCP server (`https://api.aidesigner.ai/api/v1/mcp`), which uses OAuth and is connected in the AI assistant, not in Friday.
 
+## Service token expiry
+
+Cloudflare Access service tokens expire, and Friday cannot see their expiry by
+itself. Set `FRIDAY_SERVICE_TOKEN_EXPIRES_AT` to the token's expiry date
+(`YYYY-MM-DD`; the `friday-cloud-reader` token expires `2026-11-24`) and
+Settings, Access & roles shows "Expires in N days". With 14 days or fewer left
+it shows a warning, and once the date has passed it shows the token as expired.
+
+- It is a date only, never the token, and `GET /api/settings` returns only
+  `serviceToken: { expiresAt, daysRemaining, state }` (`ok`, `warning` or
+  `expired`), or `null`.
+- Unset or not a valid date: nothing is shown and startup is unaffected.
+- Days are whole calendar days in UTC; on the expiry date itself it reads
+  "Expires today".
+- After renewing the token, update the date and redeploy.
+
 ## Adapter checklist
 
 Every integration must have explicit opt-in configuration, least-privilege credentials, timeouts, degraded-state handling, normalized/sanitized responses, automated tests without real credentials, server-side secrets, and a working credential-free mock/degraded mode where applicable.
