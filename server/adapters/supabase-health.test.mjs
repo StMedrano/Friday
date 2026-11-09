@@ -28,6 +28,49 @@ test('reports offline for server errors and failures, degraded for other statuse
   for (const service of [...failed, ...timedOut]) assert.doesNotMatch(JSON.stringify(service), /secret|example\.test|pg_filenode/)
 })
 
+test('confirms an outage with a second attempt so one lost request is not reported as a drop', async () => {
+  // The path to VM132 loses a single probe near the top of most hours. One lost
+  // probe used to write two state transitions, and three in 15 minutes opens a
+  // flapping incident, so the recovery must happen inside the same poll.
+  const outcomes = [() => { throw Object.assign(new Error('x'), {name: 'TimeoutError'}) }, () => new Response('[]', {status: 200})]
+  const calls = []
+  const services = await getSupabaseHealthServices(config, {fetchImpl: async (url, options) => { calls.push(url); return outcomes[calls.length - 1]() }})
+  assert.equal(calls.length, 2)
+  assert.equal(services[0].status, 'online')
+  assert.equal(services[0].detail, 'PostgREST and PostgreSQL answering')
+})
+
+test('reports a sustained outage on the same poll, within a bounded number of attempts', async () => {
+  let calls = 0
+  const services = await getSupabaseHealthServices(config, {fetchImpl: async () => { calls += 1; throw new Error('connect ECONNREFUSED') }})
+  assert.equal(calls, 2)
+  assert.equal(services[0].status, 'offline')
+  assert.equal(services[0].detail, 'Unreachable')
+})
+
+test('does not retry a stable configuration failure, and the attempts share the caller budget', async () => {
+  const rejected = []
+  await getSupabaseHealthServices(config, {fetchImpl: async (url, options) => { rejected.push(options.signal); return new Response('{}', {status: 401}) }})
+  assert.equal(rejected.length, 1, 'a 4xx answer is not worth asking twice')
+
+  // Both attempts come out of the caller's one budget, so a host that accepts
+  // the connection and then never answers cannot stall the poll for twice as long.
+  let hung = 0
+  const started = Date.now()
+  const keepAlive = setInterval(() => {}, 5) // AbortSignal.timeout does not hold the loop open on its own.
+  const services = await getSupabaseHealthServices(config, {
+    timeoutMs: 200,
+    fetchImpl: (url, options) => new Promise((resolve, reject) => {
+      hung += 1
+      options.signal.addEventListener('abort', () => reject(options.signal.reason))
+    }),
+  }).finally(() => clearInterval(keepAlive))
+  assert.equal(hung, 2)
+  assert.ok(Date.now() - started < 400, 'two attempts must fit inside the single budget')
+  assert.equal(services[0].status, 'offline')
+  assert.equal(services[0].detail, 'Timed out')
+})
+
 test('is skipped when disabled or unconfigured', async () => {
   const never = async () => { throw new Error('must not fetch') }
   assert.deepEqual(await getSupabaseHealthServices({...config, enabled: false}, {fetchImpl: never}), [])
