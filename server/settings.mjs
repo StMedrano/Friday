@@ -1,5 +1,6 @@
 import {ntfyTopicUrl} from './notifications/ntfy.mjs'
 import {vapidKeys} from './notifications/web-push.mjs'
+import {buildModelTargets} from './ai/model-registry.mjs'
 
 // Read-only projection of the server's effective configuration for operators.
 // Reports posture only: enabled flags, whether required fields are present and
@@ -39,6 +40,34 @@ function serviceTokenExpiry(config, now) {
 
 function integration(id, name, section, {configured, credentials: creds, site = null, tls = null}) {
   return {id, name, enabled: section?.enabled === true, configured, credentials: creds, site: present(site) ? site : null, tls}
+}
+
+function feature(id, name, enabled, configured, setup) {
+  return {id, name, enabled: enabled === true, configured: configured === true, setup}
+}
+
+// Opt-in features added after the first integrations list. `configured` says
+// whether the settings each one needs alongside its flag are present; `setup`
+// names the docs/integrations.md section that explains how to turn it on.
+function featureView(config) {
+  const work = config.work || {}
+  const supabaseUrl = config.agents?.registry?.supabaseUrl
+  const workRead = present(supabaseUrl) && present(work.readKey)
+  const webGrowth = config.webGrowth || {}
+  let modelTargets = 0
+  try { modelTargets = buildModelTargets(config.modelFabric || {}).length } catch { modelTargets = 0 }
+  return [
+    // The token is optional: public repositories can be read without one.
+    feature('github', 'GitHub pull requests and CI', config.github?.enabled, true, 'GitHub pull requests, CI and last commit'),
+    feature('uptime', 'Uptime history', config.monitoring?.uptimeEnabled, config.monitoring?.enabled === true, 'Uptime history'),
+    feature('agent-activity', 'Agent activity log', config.agentActivity?.enabled, true, 'Agent activity log'),
+    feature('approvals', 'Approvals queue', config.approvals?.enabled, true, 'Approvals queue'),
+    feature('work-read', 'Project tasks', work.enabled, workRead, 'Project tasks (read)'),
+    feature('work-write', 'New tasks', work.write?.enabled, work.enabled === true && workRead && present(work.write?.key), 'New tasks (Tasks write path)'),
+    feature('model-routing', 'Free model routing for chat', config.modelFabric?.enabled, modelTargets > 0, 'Free model routing'),
+    feature('web-growth', 'Web Growth leads', webGrowth.enabled,
+      present(webGrowth.baseUrl) && present(webGrowth.token) && Array.isArray(webGrowth.readerEmails) && webGrowth.readerEmails.length > 0, 'Web Growth leads'),
+  ]
 }
 
 export function buildSettingsView(config, {actionAudit = null, now = Date.now()} = {}) {
@@ -126,6 +155,7 @@ export function buildSettingsView(config, {actionAudit = null, now = Date.now()}
       serviceTokens: Array.isArray(config.automation?.access?.serviceTokenIds) ? config.automation.access.serviceTokenIds.length : 0,
       readOnly: true,
     },
+    features: featureView(config),
     serviceToken: serviceTokenExpiry(config, now),
     audit: auditPosture(config, actionAudit),
     // Fixed facts about this build, not toggles.

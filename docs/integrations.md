@@ -95,6 +95,12 @@ Registry sync is explicit and Git-owned. It is not an agent editor and cannot cr
 - A decision is a record only. Nothing is executed: every response carries `execution.performed: false`. Automated fixes are a separate, approval-gated change.
 - `GET /api/approvals` returns `pending` (oldest first) and the 20 most recent decisions. `POST /api/approvals/:incidentId/decision` with `{"decision":"approve"|"deny"}` is operator-only, JSON-only and refused cross-site. Errors: 503 `approvals-disabled` or `monitoring-disabled`, 400 `invalid-approval-decision`, 404 `approval-not-found` (the incident is no longer open), 409 `approval-already-decided`. Decisions on one proposal are serialized, so only the first wins.
 
+### Project tasks (read)
+
+- `FRIDAY_WORK_READ_ENABLED=false` by default. When on, the Tasks screen lists tasks for the projects a signed-in person is granted. It reads through `FRIDAY_SUPABASE_URL` with `FRIDAY_WORK_READ_KEY`, a SELECT-only database credential (never the service key); `FRIDAY_WORK_READ_GATEWAY_KEY` is the gateway key the Supabase gateway expects.
+- Who sees what comes from the grant file at `FRIDAY_WORK_GRANTS_PATH` (default `/data/work-grants.json`, mode 0600). Grants are re-read and expiry-checked on every request, so removing a person or project takes effect without a restart.
+- Settings shows it as configured when the Supabase URL and read key are present; a missing or expired grant file still shows no tasks. Background: `docs/shared-work-phase2b.md`.
+
 ### New tasks (Tasks write path)
 
 - `FRIDAY_WORK_WRITE_ENABLED=false` by default, and it only works when project task reads are on (`FRIDAY_WORK_READ_ENABLED=true` with a valid grant file). When both are on, the Tasks screen shows a "New task" form with a title and optional details.
@@ -269,6 +275,10 @@ Friday can call the [AIDesigner REST API](https://www.aidesigner.ai/docs/api) to
 
 This is separate from the AIDesigner MCP server (`https://api.aidesigner.ai/api/v1/mcp`), which uses OAuth and is connected in the AI assistant, not in Friday.
 
+## Opt-in features in Settings
+
+Settings, General lists each opt-in feature (GitHub, uptime history, agent activity, approvals, project tasks, new tasks, free model routing, Web Growth) as on or off, and whether the settings it needs next to its flag are present. It never shows the values. `GET /api/settings` returns them as `features: [{id, name, enabled, configured, setup}]`, where `setup` is the heading in this document that explains the feature.
+
 ## Service token expiry
 
 Cloudflare Access service tokens expire, and Friday cannot see their expiry by
@@ -284,6 +294,16 @@ it shows a warning, and once the date has passed it shows the token as expired.
 - Days are whole calendar days in UTC; on the expiry date itself it reads
   "Expires today".
 - After renewing the token, update the date and redeploy.
+
+## Free model routing
+
+- `FRIDAY_MODEL_FABRIC_ENABLED=false` by default. When on (with `FRIDAY_AI_ENABLED=true`), chat asks free models first and falls back to the normal provider order. It only has something to ask once at least one free target is configured: hosted NVIDIA (`FRIDAY_NVIDIA_ENABLED`, `NVIDIA_API_KEY`, `FRIDAY_NVIDIA_MODELS_JSON`) or local NIM (`FRIDAY_NVIDIA_LOCAL_ENABLED`, `FRIDAY_NVIDIA_LOCAL_MODELS_JSON`).
+- Settings shows it as configured when at least one enabled, free-class target exists. Policy, model list format and verification: `docs/model-fabric.md`.
+
+## Web Growth leads
+
+- `FRIDAY_WEB_GROWTH_ENABLED=false` by default. When on, the TechTactics group shows the Web Growth lead pipeline read from the isolated reader in `integrations/web-growth-reader/`, never from the Web Growth application itself.
+- Needs `FRIDAY_WEB_GROWTH_READER_URL`, `FRIDAY_WEB_GROWTH_READER_TOKEN` (the reader's bearer token) and `FRIDAY_WEB_GROWTH_READER_EMAILS` (comma-separated people allowed to see it). Settings shows it as configured when all three are present. Deploying the reader is a separate, owner-approved step; see its README.
 
 ## Adapter checklist
 

@@ -75,3 +75,36 @@ describe('SettingsWorkspace', () => {
     expect(await screen.findByRole('alert')).toHaveTextContent(/Settings are unavailable/)
   })
 })
+
+describe('SettingsWorkspace opt-in features', () => {
+  const features = [
+    { id: 'github', name: 'GitHub pull requests and CI', enabled: true, configured: true, setup: 'GitHub pull requests, CI and last commit' },
+    { id: 'uptime', name: 'Uptime history', enabled: true, configured: false, setup: 'Uptime history' },
+    { id: 'approvals', name: 'Approvals queue', enabled: false, configured: true, setup: 'Approvals queue' },
+    { id: 'future', name: 'Something new', enabled: false, configured: false, setup: 'Not a documented section' },
+  ]
+
+  it('lists each feature as on or off, flags one that is on but incomplete, and links its setup doc', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ...settings, features }), { status: 200 })))
+    render(<SettingsWorkspace />)
+    const panel = await screen.findByRole('region', { name: 'Features' })
+    expect(panel).toHaveTextContent('2 of 4 on')
+    const row = (name: string) => within(panel).getByText(name).closest('li') as HTMLElement
+    expect(row('GitHub pull requests and CI')).toHaveTextContent('On')
+    expect(row('GitHub pull requests and CI')).not.toHaveTextContent('Incomplete')
+    expect(row('Uptime history')).toHaveTextContent('Incomplete')
+    expect(row('Approvals queue')).toHaveTextContent('Off')
+    expect(row('Approvals queue')).not.toHaveTextContent('Incomplete')
+    expect(within(row('Uptime history')).getByRole('link', { name: 'How to turn on: Uptime history' }))
+      .toHaveAttribute('href', 'https://github.com/StMedrano/Friday/blob/main/docs/integrations.md#uptime-history')
+    // An unknown section is not linked.
+    expect(within(row('Something new')).queryByRole('link')).not.toBeInTheDocument()
+  })
+
+  it('shows no features panel when the server does not report features', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify(settings), { status: 200 })))
+    render(<SettingsWorkspace />)
+    await screen.findByRole('region', { name: 'Integrations' })
+    expect(screen.queryByRole('region', { name: 'Features' })).not.toBeInTheDocument()
+  })
+})

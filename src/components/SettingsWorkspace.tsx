@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
-import { Lock, Settings, ShieldCheck } from 'lucide-react'
-import { fetchFridaySettings, type FridayCredentialState, type FridaySettings } from '../lib/api'
+import { ExternalLink, Lock, Settings, ShieldCheck } from 'lucide-react'
+import { fetchFridaySettings, type FridayCredentialState, type FridaySettings, type FridaySettingsFeature } from '../lib/api'
+import { isSetupSection, setupDocUrl } from './NotConnected'
 import SiteSettingsPanel from './SiteSettingsPanel'
 import EndpointChecksPanel from './EndpointChecksPanel'
 import RepositorySettingsPanel from './RepositorySettingsPanel'
@@ -31,6 +32,21 @@ function serviceTokenText(token: NonNullable<FridaySettings['serviceToken']>) {
 function ServiceTokenExpiry({ token }: { token: NonNullable<FridaySettings['serviceToken']> }) {
   const tone = token.state === 'expired' ? 'error' : token.state === 'warning' ? 'warn' : 'off'
   return <span data-testid="service-token-expiry" className={`v3-settings-pill ${tone}`} role={token.state === 'ok' ? undefined : 'status'}>{serviceTokenText(token)}</span>
+}
+
+function FeaturesPanel({ features, hidden }: { features: FridaySettingsFeature[]; hidden: boolean }) {
+  return <section className="v3-panel v3-settings-wide" aria-label="Features" hidden={hidden}>
+    <div className="v3-section-head"><div><span className="v3-kicker">OPT-IN FEATURES</span><h2>{features.filter((item) => item.enabled).length} of {features.length} on</h2></div></div>
+    <ul className="v3-settings-list">
+      {features.map((item) => <li key={item.id}>
+        <span className="v3-settings-name"><b>{item.name}</b>
+          {isSetupSection(item.setup) && <small><a href={setupDocUrl(item.setup)} target="_blank" rel="noreferrer" aria-label={`How to turn on: ${item.setup}`}>How to turn on<ExternalLink size={11} aria-hidden="true"/></a></small>}
+        </span>
+        <span className={`v3-settings-pill ${item.enabled ? 'on' : 'off'}`}>{item.enabled ? 'On' : 'Off'}</span>
+        {item.enabled && !item.configured && <span className="v3-settings-pill warn" title="The flag is on but a setting it needs is missing">Incomplete</span>}
+      </li>)}
+    </ul>
+  </section>
 }
 
 export default function SettingsWorkspace() {
@@ -72,6 +88,8 @@ export default function SettingsWorkspace() {
               </li>)}
             </ul>
           </section>
+
+          {settings.features?.length ? <FeaturesPanel features={settings.features} hidden={tab !== 'General'}/> : null}
 
           <div className="fx-tab-group" hidden={tab !== 'Sites'}>
             <SiteSettingsPanel/>
