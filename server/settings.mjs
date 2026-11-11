@@ -1,6 +1,7 @@
 import {ntfyTopicUrl} from './notifications/ntfy.mjs'
 import {vapidKeys} from './notifications/web-push.mjs'
 import {buildModelTargets} from './ai/model-registry.mjs'
+import {rankEligibleModelTargets} from './ai/model-router.mjs'
 
 // Read-only projection of the server's effective configuration for operators.
 // Reports posture only: enabled flags, whether required fields are present and
@@ -54,17 +55,24 @@ function featureView(config) {
   const supabaseUrl = config.agents?.registry?.supabaseUrl
   const workRead = present(supabaseUrl) && present(work.readKey)
   const webGrowth = config.webGrowth || {}
+  // Count only targets the router would try: enabled, free-class, and (when
+  // hosted) with the API key the NVIDIA provider requires.
   let modelTargets = 0
-  try { modelTargets = buildModelTargets(config.modelFabric || {}).length } catch { modelTargets = 0 }
+  try {
+    const fabric = config.modelFabric || {}
+    modelTargets = rankEligibleModelTargets({targets: buildModelTargets(fabric), requirements: {capabilities: []}, policy: fabric.policy})
+      .filter(target => target.descriptor.deployment !== 'hosted' || present(target.providerConfig.apiKey)).length
+  } catch { modelTargets = 0 }
   return [
     // The token is optional: public repositories can be read without one.
     feature('github', 'GitHub pull requests and CI', config.github?.enabled, true, 'GitHub pull requests, CI and last commit'),
     feature('uptime', 'Uptime history', config.monitoring?.uptimeEnabled, config.monitoring?.enabled === true, 'Uptime history'),
     feature('agent-activity', 'Agent activity log', config.agentActivity?.enabled, true, 'Agent activity log'),
-    feature('approvals', 'Approvals queue', config.approvals?.enabled, true, 'Approvals queue'),
+    // Proposals come from open monitoring incidents; without monitoring the routes answer 503.
+    feature('approvals', 'Approvals queue', config.approvals?.enabled, config.monitoring?.enabled === true, 'Approvals queue'),
     feature('work-read', 'Project tasks', work.enabled, workRead, 'Project tasks (read)'),
     feature('work-write', 'New tasks', work.write?.enabled, work.enabled === true && workRead && present(work.write?.key), 'New tasks (Tasks write path)'),
-    feature('model-routing', 'Free model routing for chat', config.modelFabric?.enabled, modelTargets > 0, 'Free model routing'),
+    feature('model-routing', 'Free model routing for chat', config.modelFabric?.enabled, config.ai?.enabled === true && modelTargets > 0, 'Free model routing'),
     feature('web-growth', 'Web Growth leads', webGrowth.enabled,
       present(webGrowth.baseUrl) && present(webGrowth.token) && Array.isArray(webGrowth.readerEmails) && webGrowth.readerEmails.length > 0, 'Web Growth leads'),
   ]

@@ -277,7 +277,7 @@ This is separate from the AIDesigner MCP server (`https://api.aidesigner.ai/api/
 
 ## Opt-in features in Settings
 
-Settings, General lists each opt-in feature (GitHub, uptime history, agent activity, approvals, project tasks, new tasks, free model routing, Web Growth) as on or off, and whether the settings it needs next to its flag are present. It never shows the values. `GET /api/settings` returns them as `features: [{id, name, enabled, configured, setup}]`, where `setup` is the heading in this document that explains the feature.
+Settings, General lists each opt-in feature (GitHub, uptime history, agent activity, approvals, project tasks, new tasks, free model routing, Web Growth) as on or off, and whether the settings it needs next to its flag are present (for example, uptime history and the approvals queue both need `FRIDAY_MONITORING_ENABLED=true`). It never shows the values. `GET /api/settings` returns them as `features: [{id, name, enabled, configured, setup}]`, where `setup` is the heading in this document that explains the feature.
 
 ## Service token expiry
 
@@ -298,7 +298,7 @@ it shows a warning, and once the date has passed it shows the token as expired.
 ## Free model routing
 
 - `FRIDAY_MODEL_FABRIC_ENABLED=false` by default. When on (with `FRIDAY_AI_ENABLED=true`), chat asks free models first and falls back to the normal provider order. It only has something to ask once at least one free target is configured: hosted NVIDIA (`FRIDAY_NVIDIA_ENABLED`, `NVIDIA_API_KEY`, `FRIDAY_NVIDIA_MODELS_JSON`) or local NIM (`FRIDAY_NVIDIA_LOCAL_ENABLED`, `FRIDAY_NVIDIA_LOCAL_MODELS_JSON`).
-- Settings shows it as configured when at least one enabled, free-class target exists. Policy, model list format and verification: `docs/model-fabric.md`.
+- Settings shows it as configured when `FRIDAY_AI_ENABLED=true` and at least one target the router would try exists: enabled, free-class, and for hosted targets with `NVIDIA_API_KEY` set. Policy, model list format and verification: `docs/model-fabric.md`.
 
 ## Web Growth leads
 
