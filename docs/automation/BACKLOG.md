@@ -76,7 +76,7 @@ no tools.
 used, local first), and every provider failing (same safe error as today),
 and `make verify` passes.
 
-## refresh-docs-after-138 — `in-review`
+## refresh-docs-after-138 — `done`
 
 **Scope:** `docs/codex/NEXT_STEPS.md`, `docs/codex/BUILD_STATUS.md` and the
 Active work table in `FRIDAY_SHARED_MEMORY.md` only. Docs only.
@@ -91,7 +91,7 @@ evidence of it.
 **Done when:** every PR named in those files has the state `git log` shows,
 no "(this PR)" placeholder remains, and `make verify` passes.
 
-## service-token-expiry-warning — `in-review`
+## service-token-expiry-warning — `done`
 
 **Scope:** `server/config.mjs`, a read-only field on an existing status
 response, `compose.yaml`, `.env.example`, the Settings or Overview UI, tests,
@@ -107,7 +107,7 @@ and must not break startup. Never read or show the token itself.
 and expired; the variable is listed in `compose.yaml` and `.env.example`; and
 `make verify` passes.
 
-## e2e-tasks-approvals-smoke — `in-review`
+## e2e-tasks-approvals-smoke — `done`
 
 **Scope:** `tests/e2e/smoke.spec.mjs`, `tests/e2e/mock-server.mjs`.
 
@@ -119,7 +119,7 @@ anything, and do not turn on any write flag in the mock server.
 **Done when:** `npm run test:e2e` passes locally and in the `e2e` CI job, the
 two existing tests are unchanged, and `make verify` passes.
 
-## not-connected-setup-links — `in-review`
+## not-connected-setup-links — `done`
 
 **Scope:** `src/components/NotConnected.tsx`, its callers, their tests.
 
@@ -133,6 +133,62 @@ Placeholders with no setup doc keep today's text.
 **Done when:** tests cover a placeholder with and without a setup reference,
 every reference names a heading that exists in `docs/integrations.md`
 (checked in a test), and `make verify` passes.
+
+## settings-feature-flags — `in-review`
+
+**Scope:** `server/settings.mjs` (`features` on `GET /api/settings`),
+`SettingsWorkspace.tsx`, `NotConnected.tsx` setup sections, tests,
+`docs/integrations.md`, `docs/codex/API_CONTRACT.md`.
+
+Settings lists the older integrations but none of the opt-in flags added in
+#127 to #138 (GitHub, uptime, agent activity, approvals, project tasks, new
+tasks, model routing, Web Growth). Show each as on or off, warn when a flag
+is on but a setting it needs is missing, and link its setup section. Never
+show values.
+
+**Done when:** server and UI tests cover off, on but incomplete, and on and
+complete; no key, token, email or address is serialized; `make verify` passes.
+
+## env-check-script — `ready`
+
+**Scope:** a new `scripts/check-env.mjs`, its test, a `make env-check`
+target, `docs/integrations.md` or the deploy runbook. No server changes.
+
+The next VM102 deploy turns on several features at once, and `compose.yaml`
+lists every variable explicitly, so a setting added to `.env` but missing from
+`compose.yaml` (or a flag on without its companion key) fails silently. Add
+an offline script that reads an `.env` file path and `compose.yaml`, and
+prints: variables in `.env` that `compose.yaml` does not pass through,
+`*_ENABLED=true` flags whose companion settings are empty (reuse the rules
+from `server/settings.mjs` `features` where possible), and malformed lines.
+Print names only, never values. Exit non-zero only on a missing companion.
+
+**Done when:** tests cover each finding with fixture files containing fake
+secrets, and assert no value appears in output; `make verify` passes.
+
+## aidesigner-sessions-panel — `ready`
+
+**Scope:** a read-only panel (Settings or a Designs section) using the
+existing `GET /api/aidesigner/sessions` from #123, `src/lib/api.ts`, tests.
+
+#123 added the AIDesigner client with no UI. List design sessions (name,
+updated time, link if the API gives one) when `FRIDAY_AIDESIGNER_ENABLED` is
+on, and a Not connected note with its setup link when it is off. Do **not**
+add a Generate button: generating spends credits and needs owner approval.
+
+**Done when:** tests cover off (503), empty, and a list; no POST is sent;
+`make verify` passes.
+
+## refresh-codex-md — `ready`
+
+**Scope:** `CODEX.md` only. Docs only.
+
+`CODEX.md` still describes PR #9 as draft/open and other states that have
+changed. Check each PR, branch and file it names against GitHub and the tree,
+and correct or remove stale lines without changing its rules.
+
+**Done when:** every PR and file `CODEX.md` names has its current state, and
+`make verify` passes.
 
 ---
 
@@ -155,3 +211,14 @@ decision.
 
 Switching production to the `runtime-nonroot` image. Needs a VM102
 maintenance window; see `docs/controller-nonroot-migration.md`.
+
+## aidesigner-generate-ui — `needs-approval`
+
+A Generate design button in Friday using `POST /api/aidesigner/designs`.
+Each generation spends AIDesigner credits, so the owner decides whether the
+UI should offer it.
+
+## task-claim-and-move — `needs-approval`
+
+Claiming, moving or editing tasks from the Tasks screen. Only creating a
+task was approved (2026-11-06).

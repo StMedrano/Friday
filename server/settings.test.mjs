@@ -143,3 +143,66 @@ test('service token expiry is reported as days remaining with a warning window, 
   assert.deepEqual(view('2026-11-07'), {expiresAt: '2026-11-07', daysRemaining: -1, state: 'expired'})
   assert.ok(!JSON.stringify(view('2026-11-24')).includes('secret-token'))
 })
+
+test('features report each opt-in flag, whether its companion settings are present, and its setup section', () => {
+  const ids = ['github', 'uptime', 'agent-activity', 'approvals', 'work-read', 'work-write', 'model-routing', 'web-growth']
+  const off = buildSettingsView(getConfig({}))
+  assert.deepEqual(off.features.map(item => item.id), ids)
+  for (const item of off.features) {
+    assert.equal(item.enabled, false, item.id)
+    assert.equal(typeof item.name, 'string')
+    assert.equal(typeof item.setup, 'string')
+  }
+  const byId = view => Object.fromEntries(view.features.map(item => [item.id, item]))
+
+  // Turned on without what each one needs: enabled but not configured.
+  const partial = byId(buildSettingsView(getConfig({
+    FRIDAY_GITHUB_ENABLED: 'true', FRIDAY_MONITORING_UPTIME_ENABLED: 'true', FRIDAY_AGENT_ACTIVITY_ENABLED: 'true',
+    FRIDAY_APPROVALS_ENABLED: 'true', FRIDAY_WORK_READ_ENABLED: 'true', FRIDAY_WORK_WRITE_ENABLED: 'true',
+    FRIDAY_MODEL_FABRIC_ENABLED: 'true', FRIDAY_WEB_GROWTH_ENABLED: 'true',
+  })))
+  assert.deepEqual(partial.uptime, {id: 'uptime', name: 'Uptime history', enabled: true, configured: false, setup: 'Uptime history'})
+  for (const id of ['uptime', 'approvals', 'work-read', 'work-write', 'model-routing', 'web-growth']) assert.equal(partial[id].configured, false, id)
+  // These keep their records on the data volume (or, for GitHub, the token is
+  // optional for public repositories) and need nothing else.
+  assert.equal(partial.github.configured, true)
+  assert.equal(partial['agent-activity'].configured, true)
+
+  const full = byId(buildSettingsView(getConfig({
+    FRIDAY_GITHUB_ENABLED: 'true', FRIDAY_GITHUB_TOKEN: 'secret-github-token',
+    FRIDAY_MONITORING_ENABLED: 'true', FRIDAY_MONITORING_UPTIME_ENABLED: 'true',
+    FRIDAY_SUPABASE_URL: 'https://10.9.9.7', FRIDAY_WORK_READ_ENABLED: 'true', FRIDAY_WORK_READ_KEY: 'secret-read-key',
+    FRIDAY_WORK_WRITE_ENABLED: 'true', FRIDAY_WORK_WRITE_KEY: 'secret-write-key',
+    FRIDAY_AI_ENABLED: 'true', FRIDAY_MODEL_FABRIC_ENABLED: 'true', FRIDAY_NVIDIA_ENABLED: 'true', NVIDIA_API_KEY: 'secret-nvidia',
+    FRIDAY_NVIDIA_MODELS_JSON: JSON.stringify([{id: 'free-one', model: 'vendor/model', billingClass: 'free', capabilities: ['general'], supportsTools: false, supportsVision: false, maxTokens: 512}]),
+    FRIDAY_WEB_GROWTH_ENABLED: 'true', FRIDAY_WEB_GROWTH_READER_URL: 'https://10.9.9.11', FRIDAY_WEB_GROWTH_READER_TOKEN: 'secret-web-growth',
+    FRIDAY_WEB_GROWTH_READER_EMAILS: 'secret-reader@example.com',
+  })))
+  for (const id of ids) assert.equal(full[id].configured, true, id)
+
+  // Model routing counts only targets the router would actually try.
+  const model = {id: 'm', model: 'vendor/model', billingClass: 'free', capabilities: ['general'], supportsTools: false, supportsVision: false}
+  const routing = env => byId(buildSettingsView(getConfig({FRIDAY_AI_ENABLED: 'true', FRIDAY_MODEL_FABRIC_ENABLED: 'true', ...env})))['model-routing'].configured
+  const hosted = (models, extra = {}) => routing({FRIDAY_NVIDIA_ENABLED: 'true', NVIDIA_API_KEY: 'k', FRIDAY_NVIDIA_MODELS_JSON: JSON.stringify(models), ...extra})
+  assert.equal(hosted([model]), true)
+  assert.equal(hosted([model], {FRIDAY_NVIDIA_ENABLED: 'false'}), false, 'provider disabled')
+  assert.equal(hosted([{...model, enabled: false}]), false, 'model disabled')
+  assert.equal(hosted([{...model, billingClass: 'paid'}]), false, 'paid')
+  assert.equal(hosted([{...model, billingClass: 'unknown'}]), false, 'unknown billing')
+  assert.equal(hosted([model], {NVIDIA_API_KEY: ''}), false, 'hosted without key')
+  assert.equal(routing({FRIDAY_NVIDIA_LOCAL_ENABLED: 'true', FRIDAY_NVIDIA_LOCAL_MODELS_JSON: JSON.stringify([model])}), true, 'local needs no key')
+  assert.equal(hosted([model], {FRIDAY_AI_ENABLED: 'false'}), false, 'chat AI off')
+
+  // A write key alone is not enough: new tasks need task reads on.
+  assert.equal(byId(buildSettingsView(getConfig({FRIDAY_SUPABASE_URL: 'https://s', FRIDAY_WORK_WRITE_ENABLED: 'true', FRIDAY_WORK_WRITE_KEY: 'k'})))['work-write'].configured, false)
+})
+
+test('features never contain keys, tokens, reader emails or addresses', () => {
+  const serialized = JSON.stringify(buildSettingsView(getConfig({
+    FRIDAY_GITHUB_ENABLED: 'true', FRIDAY_GITHUB_TOKEN: 'secret-github-token', FRIDAY_WORK_READ_KEY: 'secret-read-key',
+    FRIDAY_WORK_WRITE_KEY: 'secret-write-key', NVIDIA_API_KEY: 'secret-nvidia', FRIDAY_WEB_GROWTH_READER_URL: 'https://10.9.9.11',
+    FRIDAY_WEB_GROWTH_READER_TOKEN: 'secret-web-growth', FRIDAY_WEB_GROWTH_READER_EMAILS: 'secret-reader@example.com',
+  })).features)
+  for (const value of ['secret-github-token', 'secret-read-key', 'secret-write-key', 'secret-nvidia', '10.9.9.', 'secret-web-growth', 'secret-reader'])
+    assert.ok(!serialized.includes(value), value)
+})

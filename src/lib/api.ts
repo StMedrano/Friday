@@ -198,6 +198,7 @@ export type FridaySettingsIntegration = {
   id: string; name: string; enabled: boolean; configured: boolean; credentials: FridayCredentialState
   site: string | null; tls: 'verified' | 'unverified' | null; checks?: number; error?: string | null
 }
+export type FridaySettingsFeature = { id: string; name: string; enabled: boolean; configured: boolean; setup: string | null }
 export type FridaySettings = {
   mode: 'live' | 'mock'
   access: { originVerification: boolean; configured: boolean; operators: number }
@@ -207,6 +208,7 @@ export type FridaySettings = {
   notifications?: { ntfy: boolean; webPush?: boolean }
   monitoring: { enabled: boolean; pollSeconds: number | null; offlineGraceSeconds: number | null; historyLimit: number | null; diagnostics: boolean }
   automationApi: { enabled: boolean; port: number | null; serviceTokens: number; readOnly: boolean }
+  features?: FridaySettingsFeature[]
   serviceToken?: { expiresAt: string; daysRemaining: number; state: 'ok' | 'warning' | 'expired' } | null
   audit: { enabled: boolean; integrity: 'verified' | 'broken' | 'unavailable' | null; events: number | null }
   safety: { writableSettings: boolean; infrastructureActions: boolean; executor: boolean }

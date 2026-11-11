@@ -10,8 +10,12 @@ export const SETUP_SECTIONS = [
   'Approvals queue',
   'New tasks (Tasks write path)',
   'GitHub pull requests, CI and last commit',
+  'Project tasks (read)',
+  'Free model routing',
+  'Web Growth leads',
 ] as const
 export type SetupSection = typeof SETUP_SECTIONS[number]
+export const isSetupSection = (value: unknown): value is SetupSection => SETUP_SECTIONS.includes(value as SetupSection)
 
 /** Link to a heading of the repository's integrations doc, using GitHub's anchor rules. */
 export function setupDocUrl(section: SetupSection) {
