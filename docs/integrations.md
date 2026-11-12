@@ -305,6 +305,35 @@ it shows a warning, and once the date has passed it shows the token as expired.
 - `FRIDAY_WEB_GROWTH_ENABLED=false` by default. When on, the TechTactics group shows the Web Growth lead pipeline read from the isolated reader in `integrations/web-growth-reader/`, never from the Web Growth application itself.
 - Needs `FRIDAY_WEB_GROWTH_READER_URL`, `FRIDAY_WEB_GROWTH_READER_TOKEN` (the reader's bearer token) and `FRIDAY_WEB_GROWTH_READER_EMAILS` (comma-separated people allowed to see it). Settings shows it as configured when all three are present. Deploying the reader is a separate, owner-approved step; see its README.
 
+## Checking .env before a deploy
+
+`compose.yaml` passes every variable to the container explicitly, so a setting
+added to `.env` but not to `compose.yaml`, or a flag turned on without the
+settings it needs, fails silently. Before a deploy, run on the controller:
+
+```bash
+make env-check                       # checks ./.env against compose.yaml
+make env-check ENV_FILE=/path/.env COMPOSE_FILES="compose.yaml compose.cloud-tunnel.yaml"
+```
+
+It is offline (no network, no Docker) and prints names and line numbers only,
+never values:
+
+- variables in `.env` that none of the given Compose files pass through
+  (they never reach Friday; harmless if another overlay uses them),
+- `*_ENABLED=true` flags whose companion settings are empty, using the same
+  rules as Settings (for example `FRIDAY_WORK_WRITE_ENABLED` needs
+  `FRIDAY_WORK_READ_ENABLED`, `FRIDAY_SUPABASE_URL`, `FRIDAY_WORK_READ_KEY`
+  and `FRIDAY_WORK_WRITE_KEY`); a companion set in `.env` but not passed
+  through counts as empty,
+- malformed lines and names set more than once.
+
+Values are read the way Compose reads them: double-quoted escapes are decoded
+and `${NAME}` / `${NAME:-default}` resolve from earlier `.env` lines (a name
+not set earlier counts as empty, because shell variables are not visible
+offline). It exits 1 only when a flag is missing a companion, and 2 when a file
+cannot be read.
+
 ## Adapter checklist
 
 Every integration must have explicit opt-in configuration, least-privilege credentials, timeouts, degraded-state handling, normalized/sanitized responses, automated tests without real credentials, server-side secrets, and a working credential-free mock/degraded mode where applicable.

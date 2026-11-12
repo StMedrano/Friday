@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help install test build verify preflight up live down logs health update clean
+.PHONY: help install test build verify env-check preflight up live down logs health update clean
 
 help:
 	@printf '%s\n' \
@@ -9,6 +9,7 @@ help:
 	  '  make test       Run frontend, controller, and observer tests' \
 	  '  make build      Type-check and build the production UI' \
 	  '  make verify     Run tests, build, and validate Compose files' \
+	  '  make env-check  Check an .env file against compose.yaml (names only; ENV_FILE=.env)' \
 	  '  make preflight  Check VM 102 controller prerequisites without changing anything' \
 	  '  make up         Start Friday using the base controller Compose configuration' \
 	  '  make live       Start Friday with explicit local Docker read-only override' \
@@ -35,6 +36,12 @@ verify: test build
 	FRIDAY_OBSERVER_TOKEN=verify-token FRIDAY_DOCKER_SOCKET_GID=999 docker compose -f observer/compose.yaml config >/dev/null
 	sh scripts/verify-friday-staging.sh
 	@echo 'Friday verification passed.'
+
+ENV_FILE ?= .env
+COMPOSE_FILES ?= compose.yaml
+
+env-check:
+	node scripts/check-env.mjs $(ENV_FILE) $(foreach file,$(COMPOSE_FILES),--compose $(file))
 
 preflight:
 	sh scripts/preflight-controller.sh
