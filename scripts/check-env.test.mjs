@@ -57,6 +57,52 @@ test('parses compose-style .env lines and reports malformed lines by number only
   assert.deepEqual(parsed.malformed, [8, 9, 10])
 })
 
+test('decodes escapes in double-quoted values and keeps single quotes literal', () => {
+  const parsed = parseEnvFile([
+    'FRIDAY_NVIDIA_LOCAL_MODELS_JSON="[{\\"id\\":\\"m\\"}]" # comment',
+    'A="back\\\\slash \\$NOT_SUBSTITUTED"',
+    "B='raw \\\"kept\\\" $NOT_SUBSTITUTED'",
+    'C="unterminated \\"',
+  ].join('\n'))
+  assert.deepEqual(parsed.entries.map(entry => [entry.name, entry.value]), [
+    ['FRIDAY_NVIDIA_LOCAL_MODELS_JSON', '[{"id":"m"}]'],
+    ['A', 'back\\slash $NOT_SUBSTITUTED'],
+    ['B', 'raw \\"kept\\" $NOT_SUBSTITUTED'],
+  ])
+  assert.deepEqual(parsed.malformed, [4])
+})
+
+test('resolves ${VAR} substitutions from earlier lines; unset ones are empty', () => {
+  const parsed = parseEnvFile([
+    'BASE=https://example.invalid',
+    'URL=${BASE}/v1',
+    'BARE=$BASE',
+    'DEFAULTED=${MISSING:-fallback}',
+    'UNSET=${MISSING}',
+    'QUOTED="${BASE}"',
+    "LITERAL='${BASE}'",
+  ].join('\n'))
+  assert.deepEqual(Object.fromEntries(parsed.entries.map(entry => [entry.name, entry.value])), {
+    BASE: 'https://example.invalid', URL: 'https://example.invalid/v1', BARE: 'https://example.invalid',
+    DEFAULTED: 'fallback', UNSET: '', QUOTED: 'https://example.invalid', LITERAL: '${BASE}',
+  })
+})
+
+test('a companion that substitutes to empty counts as missing; escaped JSON routing config is complete', () => {
+  const unset = checkEnv({ envText: 'FRIDAY_AIDESIGNER_ENABLED=true\nAIDESIGNER_API_KEY=${UNSET_KEY}\n', composeTexts: [repoCompose] })
+  assert.deepEqual(unset.missingCompanions.map(item => [item.flag, item.missing]), [['FRIDAY_AIDESIGNER_ENABLED', ['AIDESIGNER_API_KEY']]])
+  const routing = checkEnv({
+    envText: [
+      'FRIDAY_AI_ENABLED=true',
+      'FRIDAY_MODEL_FABRIC_ENABLED=true',
+      'FRIDAY_NVIDIA_LOCAL_ENABLED=true',
+      'FRIDAY_NVIDIA_LOCAL_MODELS_JSON="[{\\"id\\":\\"local-llama\\",\\"model\\":\\"meta/llama-3.1-8b-instruct\\",\\"billingClass\\":\\"free\\",\\"capabilities\\":[\\"chat\\"],\\"supportsTools\\":false,\\"supportsVision\\":false}]"',
+    ].join('\n'),
+    composeTexts: [repoCompose],
+  })
+  assert.deepEqual(routing.missingCompanions, [])
+})
+
 test('collects every variable compose.yaml interpolates', () => {
   const names = composeVariables('services:\n  a:\n    ports:\n      - "${PORT:-1}:1"\n    environment:\n      A: ${A:-}\n      B: $B\n      C: "$${NOT_A_VAR}"\n      # D: ${COMMENTED}\n      E: ${E:?required}\n')
   assert.deepEqual([...names].sort(), ['A', 'B', 'E', 'PORT'])

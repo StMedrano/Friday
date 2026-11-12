@@ -48,31 +48,66 @@ export const COMPANIONS = Object.freeze({
 // added in the UI, so neither has a companion that .env must provide.
 export const UNCHECKED = new Set(['docker', 'endpoints'])
 
-function unquote(raw) {
+const ESCAPES = { n: '\n', r: '\r', t: '\t', '"': '"', '\\': '\\', $: '$' }
+// Marks an escaped "$" so substitution leaves it alone; restored afterwards.
+const LITERAL_DOLLAR = '\u0000'
+
+// Compose-style substitution from earlier .env lines: ${NAME}, ${NAME:-default},
+// ${NAME-default} and $NAME. Names not set earlier resolve to empty, since a
+// shell variable cannot be seen offline.
+function substitute(value, known) {
+  return value.replace(/\$\{([A-Za-z_][A-Za-z0-9_]*)(?:(:?)([-?+])([^}]*))?\}|\$([A-Za-z_][A-Za-z0-9_]*)/g,
+    (match, braced, colon, operator, word, bare) => {
+      const name = braced || bare
+      const set = Object.hasOwn(known, name)
+      const current = set ? known[name] : ''
+      if (operator === '-') return (colon ? current !== '' : set) ? current : word
+      if (operator === '+') return (colon ? current !== '' : set) ? word : ''
+      return current
+    }).replaceAll(LITERAL_DOLLAR, '$')
+}
+
+// Returns the decoded value, or null when a quote is never closed.
+function unquote(raw, known) {
   const value = raw.trim()
   const quote = value[0]
-  if (quote === '"' || quote === "'") {
-    const end = value.indexOf(quote, 1)
-    if (end === -1) return null
-    return value.slice(1, end)
+  if (quote === "'") {
+    const end = value.indexOf("'", 1)
+    return end === -1 ? null : value.slice(1, end)
+  }
+  if (quote === '"') {
+    let decoded = ''
+    for (let index = 1; index < value.length; index++) {
+      const char = value[index]
+      if (char === '"') return substitute(decoded, known)
+      if (char === '\\' && index + 1 < value.length && Object.hasOwn(ESCAPES, value[index + 1])) {
+        const next = value[++index]
+        decoded += next === '$' ? LITERAL_DOLLAR : ESCAPES[next]
+      } else decoded += char
+    }
+    return null
   }
   // Unquoted: a " #" starts an inline comment, as in Compose.
   const comment = value.search(/\s#/)
-  return (comment === -1 ? value : value.slice(0, comment)).trim()
+  return substitute((comment === -1 ? value : value.slice(0, comment)).trim(), known)
 }
 
 export function parseEnvFile(text) {
   const entries = []
   const malformed = []
+  const known = {}
   String(text).split(/\r?\n/).forEach((rawLine, index) => {
     const line = rawLine.trim()
     if (line === '' || line.startsWith('#')) return
     const body = line.startsWith('export ') ? line.slice(7).trimStart() : line
     const equals = body.indexOf('=')
     const name = equals === -1 ? '' : body.slice(0, equals).trim()
-    const value = equals === -1 ? null : unquote(body.slice(equals + 1))
-    if (!NAME.test(name) || value === null) malformed.push(index + 1)
-    else entries.push({ name, value, line: index + 1 })
+    const value = equals === -1 || !NAME.test(name) ? null : unquote(body.slice(equals + 1), known)
+    if (value === null) malformed.push(index + 1)
+    else {
+      known[name] = value
+      entries.push({ name, value, line: index + 1 })
+    }
   })
   return { entries, malformed }
 }

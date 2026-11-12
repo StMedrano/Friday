@@ -328,8 +328,11 @@ never values:
   through counts as empty,
 - malformed lines and names set more than once.
 
-It exits 1 only when a flag is missing a companion, and 2 when a file cannot
-be read.
+Values are read the way Compose reads them: double-quoted escapes are decoded
+and `${NAME}` / `${NAME:-default}` resolve from earlier `.env` lines (a name
+not set earlier counts as empty, because shell variables are not visible
+offline). It exits 1 only when a flag is missing a companion, and 2 when a file
+cannot be read.
 
 ## Adapter checklist
 
