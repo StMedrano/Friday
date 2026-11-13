@@ -41,6 +41,16 @@ queue), #134 (test only), #135 (e2e CI job), #136 and #137 (docs), #138 (New
 task), #139 (backlog), #140 (phone layout). The queue with the flag for each
 is in `docs/codex/NEXT_STEPS.md`.
 
+## 2026-11-13 AIDesigner design sessions in Settings (read only)
+
+Settings, General has a **Design sessions** panel
+(`src/components/AiDesignerSessionsPanel.tsx`) that lists recent AIDesigner
+sessions from the existing `GET /api/aidesigner/sessions` (#123): name, last
+update, canvas count, editor and published links (https only). It sends a
+request only when the AIDesigner integration is enabled; otherwise it shows
+a Not connected note linking `docs/integrations.md`, AIDesigner design
+generation. No Generate button and no POST; no server changes.
+
 ## 2026-10-28 Grafana health and alert rule state (default off)
 
 `server/adapters/grafana.mjs` adds the last planned monitoring adapter. It
