@@ -66,6 +66,17 @@ test('every container route needs the token; only allowlisted operations run, on
   })
 })
 
+test('a malformed request target is refused and the executor keeps serving', async (t) => {
+  await withExecutor(t, async (base) => {
+    const { port } = new URL(base)
+    const status = await new Promise((resolve, reject) => {
+      http.request({ host: '127.0.0.1', port, path: '//[', method: 'GET' }, (response) => { response.resume(); resolve(response.statusCode) }).on('error', reject).end()
+    })
+    assert.equal(status, 400)
+    assert.equal((await fetch(`${base}/health`)).status, 200)
+  })
+})
+
 test('Docker failures are reported without detail', async (t) => {
   const engine = { state: async () => { throw Error('boom /var/run/docker.sock') }, act: async () => { throw Error('docker-refused') } }
   await withExecutor(t, async (base) => {

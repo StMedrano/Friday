@@ -90,7 +90,9 @@ export function createExecutorServer({ config, allowlist, engine, log = (line) =
   if (typeof config?.token !== 'string' || config.token.length < 32) throw Error('FRIDAY_EXECUTOR_TOKEN must be at least 32 characters')
   let busy = Promise.resolve()
   return http.createServer(async (request, response) => {
-    const url = new URL(request.url || '/', 'http://executor')
+    // A malformed request target must never crash the process.
+    let url
+    try { url = new URL(request.url || '/', 'http://executor') } catch { return json(response, 400, { ok: false, error: 'invalid-request' }) }
     if (request.method === 'GET' && url.pathname === '/health' && !url.search) return json(response, 200, { status: 'ok', service: 'friday-executor' })
     const match = url.pathname.match(/^\/v1\/containers\/([^/]+)(?:\/(start|stop|restart))?$/)
     if (!match || url.search) return json(response, 404, { ok: false, error: 'not-found' })
