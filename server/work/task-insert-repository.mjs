@@ -1,7 +1,8 @@
-// Server-only, insert-only PostgREST repository for Friday's "New task" path.
-// Its key must select the friday_work_writer role
+// Server-only PostgREST repository for Friday's "New task", "Claim" and "Move"
+// paths. Its key must select the friday_work_writer role
 // (supabase/migrations/202611060001_friday_work_writer.sql), which can add a
-// task and read tasks back, nothing else. NEVER pass the service key here.
+// task and read tasks back, plus, after 202611150001_friday_work_mover.sql,
+// call the one checked move function. NEVER pass the service key here.
 
 const DENY=()=>{throw Error('work-write-storage-denied')}
 const CONFLICT=()=>{const e=Error('work-write-conflict');e.code='conflict';throw e}
@@ -12,6 +13,12 @@ const FINGERPRINT=/^[a-f0-9]{64}$/
 const TASK_FIELDS=['id','project_id','title','status','version']
 const STATUSES=new Set(['ready','in_progress','blocked','review','completed','cancelled'])
 const MAX_BYTES=8192
+const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+const MOVE_ERRORS=Object.freeze({
+ 'version-conflict':'conflict','lease-conflict':'conflict','idempotency-conflict':'conflict',
+ 'invalid-transition':'invalid','invalid-input':'invalid','not-found':'denied',
+})
+const moveError=code=>{const e=Error('work-move-'+code);e.code=code;throw e}
 
 const exact=(row,fields)=>row!==null&&typeof row==='object'&&!Array.isArray(row)&&
  Object.keys(row).length===fields.length&&fields.every(k=>Object.hasOwn(row,k))
@@ -35,11 +42,11 @@ function validBaseUrl(value){
  * with different content is a conflict, never an overwrite.
  */
 export function createSupabaseTaskInsertRepository({
- baseUrl,writeKey,gatewayKey='',fetchImpl=globalThis.fetch,timeoutMs=5000,
+ baseUrl,writeKey,gatewayKey='',fetchImpl=globalThis.fetch,timeoutMs=5000,moveEnabled=false,
 }={}){
  const ready=validBaseUrl(baseUrl)&&typeof writeKey==='string'&&writeKey.length>0&&
   typeof fetchImpl==='function'&&Number.isSafeInteger(timeoutMs)&&timeoutMs>=100&&timeoutMs<=15000
- async function call(path,{method='GET',body,prefer}={}){
+ async function call(path,{method='GET',body,prefer,single=false}={}){
   if(!ready)DENY()
   let rows
   try{
@@ -59,6 +66,8 @@ export function createSupabaseTaskInsertRepository({
    if(typeof raw!=='string'||Buffer.byteLength(raw,'utf8')>MAX_BYTES)DENY()
    rows=JSON.parse(raw)
   }catch{DENY()}
+  // An RPC returning jsonb answers with one object, not a row array.
+  if(single)return rows!==null&&typeof rows==='object'&&!Array.isArray(rows)?rows:DENY()
   if(!Array.isArray(rows)||rows.length>1)DENY()
   return rows
  }
@@ -89,5 +98,28 @@ export function createSupabaseTaskInsertRepository({
   if(fingerprint!==input.inputFingerprint||row.project_id!==input.projectId)CONFLICT()
   return toTask(row)
  }
- return Object.freeze({enabled:ready,create})
+ /**
+  * Claim (next status 'in_progress'), release or move one task through
+  * friday_operator_move_task. The database checks the version, the project,
+  * the allowed transition and any live claim held by someone else.
+  */
+ async function move(input){
+  if(!canMove)DENY()
+  if(!exact(input,['workItemId','projectId','expectedVersion','principalId','status','requestId'])||
+     !UUID.test(String(input.workItemId))||!id(input.projectId)||
+     !Number.isSafeInteger(input.expectedVersion)||input.expectedVersion<1||
+     !PRINCIPAL.test(input.principalId)||!STATUSES.has(input.status)||!id(input.requestId))DENY()
+  const result=await call('/rest/v1/rpc/friday_operator_move_task',{method:'POST',single:true,body:{
+   work_id:input.workItemId,project_id:input.projectId,expected_version:input.expectedVersion,
+   principal_id:input.principalId,next_status:input.status,request_id:input.requestId,
+  }})
+  if(typeof result.error==='string')moveError(MOVE_ERRORS[result.error]||'unavailable')
+  const row=result.task
+  if(result.status!=='moved'||!validTask(row)||row.id!==input.workItemId||
+     row.project_id!==input.projectId||row.status!==input.status||
+     row.version!==input.expectedVersion+1)DENY()
+  return toTask(row)
+ }
+ const canMove=ready&&moveEnabled===true
+ return Object.freeze({enabled:ready,canMove,create,move})
 }

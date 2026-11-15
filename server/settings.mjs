@@ -72,6 +72,7 @@ function featureView(config) {
     feature('approvals', 'Approvals queue', config.approvals?.enabled, config.monitoring?.enabled === true, 'Approvals queue'),
     feature('work-read', 'Project tasks', work.enabled, workRead, 'Project tasks (read)'),
     feature('work-write', 'New tasks', work.write?.enabled, work.enabled === true && workRead && present(work.write?.key), 'New tasks (Tasks write path)'),
+    feature('work-move', 'Claim and move tasks', work.write?.moveEnabled, work.enabled === true && workRead && work.write?.enabled === true && present(work.write?.key), 'Claim and move tasks'),
     feature('model-routing', 'Free model routing for chat', config.modelFabric?.enabled, config.ai?.enabled === true && modelTargets > 0, 'Free model routing'),
     feature('web-growth', 'Web Growth leads', webGrowth.enabled,
       present(webGrowth.baseUrl) && present(webGrowth.token) && Array.isArray(webGrowth.readerEmails) && webGrowth.readerEmails.length > 0, 'Web Growth leads'),

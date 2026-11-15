@@ -1,7 +1,7 @@
 import NotConnected from './NotConnected'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { CheckCircle2 } from 'lucide-react'
-import { createProjectTask, fetchProjectTasks, FridayWorkError, type FridayTask } from '../lib/api'
+import { createProjectTask, fetchProjectTasks, FridayWorkError, moveProjectTask, type FridayTask } from '../lib/api'
 
 const PROJECTS = [
   { id: 'friday-ai-os', name: 'Friday AI OS' },
@@ -12,6 +12,15 @@ const PROJECTS = [
 const STATUS_LABELS: Record<FridayTask['status'], string> = {
   ready: 'Ready', in_progress: 'In progress', blocked: 'Blocked',
   review: 'In review', completed: 'Completed', cancelled: 'Cancelled',
+}
+// The same moves the database function allows (friday_operator_move_task).
+const MOVES: Record<FridayTask['status'], Array<{ to: FridayTask['status']; label: string }>> = {
+  ready: [{ to: 'in_progress', label: 'Claim' }, { to: 'blocked', label: 'Block' }, { to: 'cancelled', label: 'Cancel' }],
+  in_progress: [{ to: 'review', label: 'Send to review' }, { to: 'completed', label: 'Complete' }, { to: 'blocked', label: 'Block' }, { to: 'ready', label: 'Release' }],
+  blocked: [{ to: 'in_progress', label: 'Claim' }, { to: 'ready', label: 'Unblock' }, { to: 'cancelled', label: 'Cancel' }],
+  review: [{ to: 'completed', label: 'Complete' }, { to: 'in_progress', label: 'Claim' }, { to: 'ready', label: 'Back to ready' }],
+  completed: [],
+  cancelled: [],
 }
 const TITLE_MAX = 160
 const DETAIL_MAX = 4000
@@ -34,6 +43,17 @@ function createFailure(reason: unknown) {
   return 'The task could not be added. Try again.'
 }
 
+function moveFailure(reason: unknown) {
+  if (reason instanceof FridayWorkError) {
+    if (reason.status === 409) return 'Someone changed or is holding this task. The list was refreshed; try again.'
+    if (reason.status === 403) return 'Only an operator with access to this project can claim or move tasks.'
+    if (reason.status === 400) return 'That move is not allowed from the task’s current status.'
+    if (reason.status === 404) return 'Claiming and moving tasks is switched off on this controller.'
+    if (reason.code === 'audit-unavailable') return 'The action audit could not record this, so the task was not moved.'
+  }
+  return 'The task could not be moved. Try again.'
+}
+
 function newRequestId() {
   return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
@@ -44,6 +64,9 @@ export default function TasksWorkspace() {
   const [projectId, setProjectId] = useState(PROJECTS[0].id)
   const [tasks, setTasks] = useState<FridayTask[] | null>(null)
   const [canCreate, setCanCreate] = useState(false)
+  const [canMove, setCanMove] = useState(false)
+  const [moving, setMoving] = useState<string | null>(null)
+  const [reload, setReload] = useState(0)
   const [message, setMessage] = useState('')
   const [title, setTitle] = useState('')
   const [detail, setDetail] = useState('')
@@ -56,14 +79,30 @@ export default function TasksWorkspace() {
 
   useEffect(() => {
     const controller = new AbortController()
-    setTasks(null)
+    if (reload === 0) { setTasks(null); setNotice('') }
     setMessage('')
-    setNotice('')
     fetchProjectTasks(projectId, controller.signal)
-      .then((board) => { setTasks(board.tasks); setCanCreate(board.canCreate) })
-      .catch((reason) => { if (reason?.name !== 'AbortError') { setCanCreate(false); setMessage(failureMessage(reason)) } })
+      .then((board) => { setTasks(board.tasks); setCanCreate(board.canCreate); setCanMove(board.canMove) })
+      .catch((reason) => { if (reason?.name !== 'AbortError') { setCanCreate(false); setCanMove(false); setMessage(failureMessage(reason)) } })
     return () => controller.abort()
-  }, [projectId])
+  }, [projectId, reload])
+
+  const move = async (task: FridayTask, to: FridayTask['status'], label: string) => {
+    if (moving) return
+    setMoving(task.id)
+    setNotice('')
+    try {
+      const moved = await moveProjectTask(task, to, newRequestId())
+      if (selectedProject.current === moved.projectId)
+        setTasks((current) => (current || []).map((item) => item.id === moved.id ? moved : item))
+      setNotice(`${label}: “${moved.title}” is now ${STATUS_LABELS[moved.status].toLowerCase()}. Nothing was started.`)
+    } catch (reason) {
+      setNotice(moveFailure(reason))
+      if (reason instanceof FridayWorkError && reason.status === 409) setReload((value) => value + 1)
+    } finally {
+      setMoving(null)
+    }
+  }
 
   const project = PROJECTS.find((item) => item.id === projectId)
 
@@ -99,14 +138,16 @@ export default function TasksWorkspace() {
     <div className="v3-detail-hero">
       <div className="v3-node-icon large"><CheckCircle2/></div>
       <div><span className="v3-kicker">PROJECT WORK</span><h2>Tasks</h2>
-        <p>{canCreate
-          ? 'Project tasks from Friday’s work database. Operators can add a task; nothing here claims, moves or runs one.'
-          : 'Read-only project tasks from Friday’s work database. Nothing on this screen creates, claims or changes a task.'}</p></div>
+        <p>{canMove
+          ? 'Project tasks from Friday’s work database. Operators can add, claim and move tasks; nothing here runs one.'
+          : canCreate
+            ? 'Project tasks from Friday’s work database. Operators can add a task; nothing here claims, moves or runs one.'
+            : 'Read-only project tasks from Friday’s work database. Nothing on this screen creates, claims or changes a task.'}</p></div>
     </div>
 
     <div className="v3-settings-form">
       <label htmlFor="v3-task-project">Project
-        <select id="v3-task-project" value={projectId} disabled={saving} onChange={(event) => setProjectId(event.target.value)}>
+        <select id="v3-task-project" value={projectId} disabled={saving} onChange={(event) => { setReload(0); setProjectId(event.target.value) }}>
           {PROJECTS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
         </select>
       </label>
@@ -124,7 +165,7 @@ export default function TasksWorkspace() {
         </label>
         <button type="submit" disabled={saving || !title.trim()}>{saving ? 'Adding…' : 'Add task'}</button>
       </form>
-      : <NotConnected title="New tasks" detail="Adding tasks is off on this controller (FRIDAY_WORK_WRITE_ENABLED). Claiming and moving tasks are not built." setup="New tasks (Tasks write path)"/>}
+      : <NotConnected title="New tasks" detail="Adding tasks is off on this controller (FRIDAY_WORK_WRITE_ENABLED). Claiming and moving also need FRIDAY_WORK_MOVE_ENABLED." setup="New tasks (Tasks write path)"/>}
     {notice && <p role="status" className="v3-settings-message">{notice}</p>}
 
     {message ? <p role="status" className="v3-settings-message">{message}</p>
@@ -134,6 +175,10 @@ export default function TasksWorkspace() {
             {tasks.map((task) => <li key={task.id}>
               <span className="v3-settings-name"><b>{task.title}</b><small>{task.id} · version {task.version}</small></span>
               <span className={`v3-settings-pill ${task.status === 'completed' ? 'on' : task.status === 'blocked' ? 'warn' : 'off'}`}>{STATUS_LABELS[task.status]}</span>
+              {canMove && MOVES[task.status].length > 0 && <span className="fx-task-moves" role="group" aria-label={`Move ${task.title}`}>
+                {MOVES[task.status].map((option) => <button key={option.to} type="button" disabled={moving !== null}
+                  onClick={() => void move(task, option.to, option.label)}>{option.label}</button>)}
+              </span>}
             </li>)}
           </ul>}
   </section>

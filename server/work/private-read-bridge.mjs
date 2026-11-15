@@ -14,9 +14,9 @@ const id=s=>typeof s==='string'&&s.trim()===s&&s.length>=1&&s.length<=128&&
 const cleanString=(s,max)=>typeof s==='string'&&s.trim()!==''&&s.length<=max&&
  !forbidden.test(s)
 const int=(v,max)=>Number.isSafeInteger(v)&&v>=1&&v<=max
-const unused=Object.freeze({enabled:false,canCreateTasks:false,
+const unused=Object.freeze({enabled:false,canCreateTasks:false,canMoveTasks:false,
  listTasks:async()=>deny(),getTask:async()=>deny(),searchMemory:async()=>deny(),
- createTask:async()=>deny()})
+ createTask:async()=>deny(),moveTask:async()=>deny()})
 const writeError=code=>{const e=Error('work-write-'+code);e.code=code;return e}
 const TITLE_MAX=160,OBJECTIVE_MAX=4000
 
@@ -61,8 +61,9 @@ const checkedScopes=(scopes,actor)=>{
  * server-owned provisioner may return project/scope grants. Neither prompts,
  * client headers, nor caller-requested actor/roles can create permissions.
  * Returns bounded, redacted task/memory projections. No HTTP routes, Supabase
- * connection or account provisioning. Its only write is createTask, present
- * only when an insert-only taskWriter is injected (see task-insert-repository).
+ * connection or account provisioning. Its only writes are createTask and
+ * moveTask, present only when the writer repository is injected (see
+ * task-insert-repository) and, for moves, built with moveEnabled.
  */
 export function createPrivateWorkReadBridge({
  enabled=false,access,workService,memoryService,grantsForSubject,fetchKeys,taskWriter=null,
@@ -97,9 +98,40 @@ export function createPrivateWorkReadBridge({
   try{return await fn(await actorFor(request))}catch{deny()}
  }
  const canCreateTasks=taskWriter?.enabled===true&&typeof taskWriter.create==='function'
+ const canMoveTasks=canCreateTasks&&taskWriter.canMove===true&&typeof taskWriter.move==='function'
  return Object.freeze({
   enabled:true,
   canCreateTasks,
+  canMoveTasks,
+  /**
+   * Claim, release or move one task in a project the signed-in operator is
+   * granted. Needs an operator email AND a project grant. Claiming records
+   * the person as holding the task; Friday never starts or runs anything.
+   */
+  async moveTask(request,input){
+   if(!canMoveTasks)throw writeError('disabled')
+   let actor
+   try{actor=await actorFor(request,true)}catch{throw writeError('denied')}
+   if(!exact(input,['workItemId','projectId','expectedVersion','status','requestId'])||
+      !id(input.workItemId)||!id(input.projectId)||!id(input.requestId)||
+      !Number.isSafeInteger(input.expectedVersion)||input.expectedVersion<1||
+      !TASK_STATUSES.has(input.status))
+    throw writeError('invalid')
+   if(!actor.allowedProjectIds.includes(input.projectId))throw writeError('denied')
+   let row
+   try{
+    row=await taskWriter.move({workItemId:input.workItemId,projectId:input.projectId,
+     expectedVersion:input.expectedVersion,principalId:actor.principalId,
+     status:input.status,requestId:input.requestId})
+   }catch(error){
+    throw writeError(['conflict','invalid','denied'].includes(error?.code)?error.code:'unavailable')
+   }
+   try{
+    const task=safeTask(row,actor.allowedProjectIds,input.projectId)
+    if(task.id!==input.workItemId)throw Error('mismatch')
+    return task
+   }catch{throw writeError('unavailable')}
+  },
   /**
    * New task in a project the signed-in operator is granted. Needs an
    * operator email AND a project grant; the task starts as 'ready' and is

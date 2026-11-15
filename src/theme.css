@@ -687,6 +687,11 @@ code, kbd, pre, samp,
 .fx-task-board { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 10px; }
 .fx-task-board li { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); }
 .v3-tasks-workspace > .fx-not-connected { margin: 0 0 16px; }
+.fx-task-board li { flex-wrap: wrap; }
+.fx-task-moves { display: flex; flex-wrap: wrap; gap: 6px; flex-basis: 100%; }
+.fx-task-moves button { border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 12px; padding: 4px 10px; cursor: pointer; }
+.fx-task-moves button:hover:not(:disabled) { border-color: var(--line-strong); }
+.fx-task-moves button:disabled { opacity: .5; cursor: default; }
 
 @media (max-width: 1180px) {
   .fx-split, .fx-with-rail, .fx-shell .v3-repository-grid { grid-template-columns: minmax(0, 1fr); }
