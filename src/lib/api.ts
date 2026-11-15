@@ -173,10 +173,14 @@ export async function fetchFridayRepositoryGitHub(id: string, signal?: AbortSign
 export type FridayAiDesignerSession = {
   sessionId: string; title: string; editorUrl: string | null; canvasCount: number; publishedUrl: string | null; updatedAt: string | null
 }
-/** `signin`: the server lists sessions only for a person signed in through Cloudflare Access. */
+/**
+ * `signin`: the server lists sessions only for a person signed in through Cloudflare Access.
+ * `off`: FRIDAY_AIDESIGNER_ENABLED is not set. `generate` says whether the Generate button is switched on.
+ */
 export type FridayAiDesignerSessionsResult =
-  | { state: 'ok'; sessions: FridayAiDesignerSession[] }
+  | { state: 'ok'; sessions: FridayAiDesignerSession[]; generate: boolean }
   | { state: 'signin' }
+  | { state: 'off' }
   | { state: 'unavailable' }
 
 const httpsOrNull = (value: unknown) => typeof value === 'string' && /^https:\/\//i.test(value) ? value : null
@@ -200,10 +204,50 @@ export async function fetchFridayAiDesignerSessions(signal?: AbortSignal): Promi
   const body = await response.json().catch(() => null) as { error?: string; sessions?: unknown } | null
   if (response.ok) {
     if (!body || !Array.isArray(body.sessions)) return { state: 'unavailable' }
-    return { state: 'ok', sessions: body.sessions.map(aiDesignerSession).filter((item): item is FridayAiDesignerSession => item !== null) }
+    return {
+      state: 'ok',
+      sessions: body.sessions.map(aiDesignerSession).filter((item): item is FridayAiDesignerSession => item !== null),
+      generate: (body as { generate?: unknown }).generate === true,
+    }
   }
   if (body?.error === 'aidesigner-authentication-required') return { state: 'signin' }
+  if (body?.error === 'aidesigner-disabled') return { state: 'off' }
   return { state: 'unavailable' }
+}
+
+export type FridayAiDesignerDesign = { sessionId: string; editorUrl: string | null; replay: boolean }
+export type FridayAiDesignerDesignRequest = { prompt: string; viewport: 'desktop' | 'mobile'; sessionId: string | null; idempotencyKey: string }
+/**
+ * `lost`: no answer came back (network, gateway timeout). The design may still be
+ * generating, so a retry must reuse the same idempotency key.
+ */
+export type FridayAiDesignerDesignResult =
+  | { state: 'ok'; design: FridayAiDesignerDesign }
+  | { state: 'error'; error: string; retryAfter: number | null }
+  | { state: 'lost' }
+
+/**
+ * Generate one AIDesigner design. This spends AIDesigner credits: the caller
+ * must have shown the operator an explicit confirm step first. Operator only
+ * and audited on the server; only references come back, never HTML.
+ */
+export async function generateFridayAiDesign(input: FridayAiDesignerDesignRequest): Promise<FridayAiDesignerDesignResult> {
+  let response: Response
+  try {
+    response = await fetch('/api/aidesigner/designs', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input),
+    })
+  } catch { return { state: 'lost' } }
+  const body = await response.json().catch(() => null) as Record<string, unknown> | null
+  if (response.ok) {
+    if (!body || typeof body.sessionId !== 'string' || !body.sessionId) return { state: 'lost' }
+    return { state: 'ok', design: { sessionId: body.sessionId, editorUrl: httpsOrNull(body.editorUrl), replay: body.replay === true } }
+  }
+  const error = typeof body?.error === 'string' ? body.error : ''
+  // An answer that is not Friday's JSON (a gateway or edge timeout) means the request may still be running.
+  if (!error) return { state: 'lost' }
+  const retryAfter = Number(response.headers.get('retry-after'))
+  return { state: 'error', error, retryAfter: Number.isInteger(retryAfter) && retryAfter > 0 ? retryAfter : null }
 }
 
 export type FridayAuditEvent = {
