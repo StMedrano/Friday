@@ -5,7 +5,7 @@ import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { checkEnv, composeVariables, formatReport, parseEnvFile, COMPANIONS, UNCHECKED } from './check-env.mjs'
+import { checkEnv, composeVariables, formatReport, parseEnvFile, COMPANIONS, DEFAULT_COMPOSE_FILES, HOST_ONLY, UNCHECKED } from './check-env.mjs'
 import { getConfig } from '../server/config.mjs'
 import { buildSettingsView } from '../server/settings.mjs'
 
@@ -211,4 +211,36 @@ test('CLI refuses a missing .env path with a usage error', () => {
   const result = run([join(tmpdir(), 'friday-env-check-does-not-exist.env')])
   assert.equal(result.status, 2)
   assert.match(result.output, /Usage|cannot read/i)
+})
+
+test('.env.example checks clean against the default Compose files', () => {
+  const envText = readFileSync(new URL('../.env.example', import.meta.url), 'utf8')
+  const composeTexts = DEFAULT_COMPOSE_FILES.map(file => readFileSync(new URL(`../${file}`, import.meta.url), 'utf8'))
+  const result = checkEnv({ envText, composeTexts })
+  assert.deepEqual(result.notPassedThrough, [])
+  assert.deepEqual(result.malformed, [])
+  assert.deepEqual(result.duplicates, [])
+})
+
+test('host-only variables are not reported as missing from Compose', () => {
+  assert.ok(HOST_ONLY.has('FRIDAY_CONTROLLER_NONROOT'))
+  const result = checkEnv({ envText: 'FRIDAY_CONTROLLER_NONROOT=true\n', composeTexts: [repoCompose] })
+  assert.deepEqual(result.notPassedThrough, [])
+})
+
+test('every setting server/config.mjs reads is set or passed through by compose.yaml', () => {
+  const config = readFileSync(new URL('../server/config.mjs', import.meta.url), 'utf8')
+  const read = new Set([...config.matchAll(/\benv\.([A-Z][A-Z0-9_]+)/g)].map(match => match[1]))
+  assert.ok(read.size > 20)
+  const passed = composeVariables(repoCompose)
+  // Fixed values (FRIDAY_PORT: 3010) count as set.
+  const fixed = new Set([...repoCompose.matchAll(/^\s+([A-Z][A-Z0-9_]+):/gm)].map(match => match[1]))
+  assert.deepEqual([...read].filter(name => !passed.has(name) && !fixed.has(name)).sort(), [])
+})
+
+test('the script defaults to the base file and both overlays', () => {
+  const dir = tempFiles({ '.env': 'FRIDAY_TUNNEL_TOKEN_FILE=/x\nFRIDAY_CLOUDFLARED_UID=1000\n' })
+  const { status, output } = run([join(dir, '.env')])
+  assert.equal(status, 0)
+  assert.match(output, /Set in \.env but not passed through by Compose: none/)
 })

@@ -80,9 +80,10 @@ Compose files, and prints names only: variables Compose does not pass
 through, `*_ENABLED=true` flags missing companion settings (the rules of
 `server/settings.mjs` `features` and integrations), and malformed or
 duplicate lines. Offline, no server changes; exits 1 only on a missing
-companion. Run against `.env.example` and `compose.yaml` it reports
-`FRIDAY_AUDIT_MAX_BYTES` as not passed through (listed in `.env.example`, not
-in `compose.yaml`).
+companion. Since 2026-11-15 it checks `compose.yaml` plus the tunnel and
+non-root overlays by default, skips the host-only `FRIDAY_CONTROLLER_NONROOT`,
+and `compose.yaml` passes `FRIDAY_AUDIT_MAX_BYTES` through, so
+`.env.example` checks clean (guarded by a test).
 
 ## 2026-10-28 Grafana health and alert rule state (default off)
 

@@ -4,6 +4,9 @@
 //
 //   node scripts/check-env.mjs <path/to/.env> [--compose compose.yaml]...
 //
+// With no --compose, it checks against compose.yaml plus the overlays that
+// read the same .env on VM102 (DEFAULT_COMPOSE_FILES).
+//
 // Findings:
 //   - variables set in .env that no given Compose file interpolates (they
 //     never reach the container),
@@ -50,6 +53,16 @@ export const COMPANIONS = Object.freeze({
 // Local Docker always has a socket path, and endpoint checks can also be
 // added in the UI, so neither has a companion that .env must provide.
 export const UNCHECKED = new Set(['docker', 'endpoints'])
+
+// Compose files that read the VM102 .env: the base file, the optional
+// dedicated Cloudflare connector overlay and the non-root overlay.
+export const DEFAULT_COMPOSE_FILES = Object.freeze(['compose.yaml', 'compose.cloud-tunnel.yaml', 'compose.nonroot.yaml'])
+
+// Read from .env by host scripts, never by the container, so they are
+// expected to be absent from every Compose file.
+export const HOST_ONLY = Object.freeze(new Set([
+  'FRIDAY_CONTROLLER_NONROOT', // scripts/update-controller.sh picks compose.nonroot.yaml
+]))
 
 const ESCAPES = { n: '\n', r: '\r', t: '\t', '"': '"', '\\': '\\', $: '$' }
 // Marks an escaped "$" so substitution leaves it alone; restored afterwards.
@@ -141,7 +154,7 @@ export function checkEnv({ envText, composeTexts }) {
     // Only what Compose passes through reaches the container.
     if (passed.has(name)) env[name] = value
   }
-  const notPassedThrough = [...seen].filter(name => !passed.has(name)).sort()
+  const notPassedThrough = [...seen].filter(name => !passed.has(name) && !HOST_ONLY.has(name)).sort()
 
   const view = buildSettingsView(getConfig(env))
   const missingCompanions = []
@@ -188,7 +201,7 @@ function main(argv) {
     process.stderr.write(usage)
     return 2
   }
-  if (composeFiles.length === 0) composeFiles.push(join(repoRoot, 'compose.yaml'))
+  if (composeFiles.length === 0) for (const file of DEFAULT_COMPOSE_FILES) composeFiles.push(join(repoRoot, file))
   let envText
   const composeTexts = []
   try {
