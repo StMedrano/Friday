@@ -76,6 +76,9 @@ function featureView(config) {
     feature('model-routing', 'Free model routing for chat', config.modelFabric?.enabled, config.ai?.enabled === true && modelTargets > 0, 'Free model routing'),
     feature('web-growth', 'Web Growth leads', webGrowth.enabled,
       present(webGrowth.baseUrl) && present(webGrowth.token) && Array.isArray(webGrowth.readerEmails) && webGrowth.readerEmails.length > 0, 'Web Growth leads'),
+    // Generating spends AIDesigner credits; it needs the integration itself on with a key.
+    feature('aidesigner-generate', 'Website designs (AIDesigner Generate)', config.aidesigner?.generateEnabled,
+      config.aidesigner?.enabled === true && present(config.aidesigner?.apiKey), 'AIDesigner design generation'),
   ]
 }
 

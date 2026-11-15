@@ -27,6 +27,7 @@ by default unless noted.
 | #123 | Server-side AIDesigner REST client: list design sessions, generate a design (operator-only, audited, spends credits). No UI. | Add `AIDESIGNER_API_KEY` and set `FRIDAY_AIDESIGNER_ENABLED=true` (`docs/integrations.md`). |
 | #139 | Docs only: four `ready` items added to `docs/automation/BACKLOG.md`. | Nothing. |
 | #140 | Phone layout matches the AIDesigner phone design. Always on. | Nothing beyond the deploy. |
+| #150 | Web Growth, Website designs: AIDesigner design list plus Generate with a credit confirm step (operator only, audited). | With #123 set up, also set `FRIDAY_AIDESIGNER_GENERATE_ENABLED=true` (`docs/integrations.md`, AIDesigner design generation). |
 
 ## 2. Waiting on an owner decision (do not start)
 
