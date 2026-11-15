@@ -237,7 +237,8 @@ export type FridaySettingsIntegration = {
 export type FridaySettingsFeature = { id: string; name: string; enabled: boolean; configured: boolean; setup: string | null }
 export type FridaySettings = {
   mode: 'live' | 'mock'
-  access: { originVerification: boolean; configured: boolean; operators: number }
+  access: { originVerification: boolean; configured: boolean; operators: number
+    operatorProvider?: { state: 'required'; claim: string; value: string } | { state: 'invalid' } | null }
   integrations: FridaySettingsIntegration[]
   ai: { enabled: boolean; providerOrder: string[]; cloudTimeoutMs: number | null; localTimeoutMs: number | null
     providers: Array<{ id: string; inOrder: boolean; credentials: FridayCredentialState; model: string | null; enabled?: boolean }> }
@@ -251,6 +252,18 @@ export type FridaySettings = {
 }
 
 export type FridayWorkIdentity = { subjectHash: string; granted: boolean }
+
+export type FridayMyAccess = { signedIn: false } | { signedIn: true; email: string; operator: boolean; providerVerified?: boolean }
+
+/** Who the server sees: email, operator status and, if required, whether this sign-in used Authentik. */
+export async function fetchMyAccess(signal?: AbortSignal): Promise<FridayMyAccess> {
+  const response = await fetch('/api/settings/my-access', { method: 'GET', signal })
+  const body = await response.json().catch(() => null) as Record<string, unknown> | null
+  if (!response.ok || !body) throw new Error('my-access-unavailable')
+  if (body.signedIn !== true) return { signedIn: false }
+  return { signedIn: true, email: typeof body.email === 'string' ? body.email : '', operator: body.operator === true,
+    ...(typeof body.providerVerified === 'boolean' ? { providerVerified: body.providerVerified } : {}) }
+}
 
 export async function fetchWorkIdentity(signal?: AbortSignal): Promise<FridayWorkIdentity> {
   const response = await fetch('/api/settings/work-identity', { method: 'GET', signal })

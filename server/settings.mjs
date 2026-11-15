@@ -1,4 +1,5 @@
 import {ntfyTopicUrl} from './notifications/ntfy.mjs'
+import {operatorProviderRule} from './security/access.mjs'
 import {vapidKeys} from './notifications/web-push.mjs'
 import {buildModelTargets} from './ai/model-registry.mjs'
 import {rankEligibleModelTargets} from './ai/model-router.mjs'
@@ -93,6 +94,11 @@ export function buildSettingsView(config, {actionAudit = null, now = Date.now()}
       originVerification: access.enabled === true || (config.mode === 'live' && access.enabled !== false),
       configured: present(access.teamDomain) && present(access.audience),
       operators: Array.isArray(access.operatorEmails) ? access.operatorEmails.length : 0,
+      // Which identity provider operators must sign in with, if any (no secrets).
+      operatorProvider: (() => {
+        const rule = operatorProviderRule(access)
+        return rule === null ? null : rule === 'invalid' ? {state: 'invalid'} : {state: 'required', claim: rule.claim, value: rule.value}
+      })(),
     },
     integrations: [
       integration('proxmox', 'Proxmox VE', proxmox, {

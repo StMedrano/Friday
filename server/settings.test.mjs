@@ -86,7 +86,11 @@ test('reports access, monitoring, automation API and fixed safety posture', () =
     FRIDAY_AUTOMATION_ENABLED: 'true', FRIDAY_AUTOMATION_SERVICE_TOKEN_IDS: 'x.access',
   }))
   assert.equal(view.mode, 'live')
-  assert.deepEqual(view.access, {originVerification: true, configured: true, operators: 2})
+  assert.deepEqual(view.access, {originVerification: true, configured: true, operators: 2, operatorProvider: null})
+  const authentik = env => buildSettingsView(getConfig({FRIDAY_MODE: 'live', ...env})).access.operatorProvider
+  assert.deepEqual(authentik({FRIDAY_ACCESS_OPERATOR_IDP_CLAIM: 'custom.friday_auth_source', FRIDAY_ACCESS_OPERATOR_IDP_VALUE: 'authentik'}),
+    {state: 'required', claim: 'custom.friday_auth_source', value: 'authentik'})
+  assert.deepEqual(authentik({FRIDAY_ACCESS_OPERATOR_IDP_CLAIM: 'custom.friday_auth_source'}), {state: 'invalid'})
   assert.deepEqual(view.monitoring, {enabled: true, pollSeconds: 30, offlineGraceSeconds: 300, historyLimit: 2000, diagnostics: false})
   assert.deepEqual(view.automationApi, {enabled: true, port: 3011, serviceTokens: 1, readOnly: true})
   assert.deepEqual(view.safety, {writableSettings: false, infrastructureActions: false, executor: false})

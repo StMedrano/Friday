@@ -1,11 +1,10 @@
 # Friday authentication: Authentik login, Cloudflare break-glass
 
-> **Status on `main` (2026-11-05):** this is a runbook for a change the owner
-> has not approved yet (`authentik-primary-login` in
-> `docs/automation/BACKLOG.md`). Today Cloudflare Access is the only login
-> path. Ported from PR #109's branch and checked against `main`; the
-> Friday-side behaviour it relies on is already on `main` and covered by
-> `server/security/access-staging.test.mjs`.
+> **Status (2026-11-15):** approved by the owner and built on the Friday side,
+> off by default. The edge setup below (Authentik provider, Cloudflare Generic
+> OIDC, Access policy) is still the owner's to do; see "What only the owner
+> can provide". Until then Cloudflare Access with its current login methods is
+> the only login path.
 
 Friday sits behind a Cloudflare Access application and verifies Access's
 signed `Cf-Access-Jwt-Assertion` header at the origin
@@ -14,9 +13,10 @@ login provider *inside* Cloudflare Access (as a Generic OIDC identity
 provider), and to keep Cloudflare One-time PIN as an emergency provider that is
 enabled for the Friday application only during a confirmed Authentik outage.
 
-Nothing in Friday's code changes for this. Which identity provider a person
-used is decided at the Cloudflare edge; the origin only checks the signed
-Access JWT. Friday's own Authentik verifier (`server/security/authentik.mjs`,
+Which identity provider a person used is decided at the Cloudflare edge; the
+origin checks the signed Access JWT. Friday adds one optional, fail-closed
+rule on top (see "Operators must use Authentik" below): operator routes can
+require a signed claim showing the login came through Authentik. Friday's own Authentik verifier (`server/security/authentik.mjs`,
 `docs/authentik.md`) is a separate, opt-in gate for the `friday_control`
 scope and is not part of this login path.
 
@@ -56,6 +56,56 @@ show Cloudflare can reach its discovery, authorization, token and JWKS
 endpoints. Confirm a trusted public HTTPS URL and routing before creating the
 OIDC connection. Do not put Authentik's own login endpoints behind the Friday
 Access application, which would create a login loop.
+
+## Operators must use Authentik (Friday side, optional)
+
+Set both in VM102 `.env` and redeploy:
+
+```env
+FRIDAY_ACCESS_OPERATOR_IDP_CLAIM=custom.friday_auth_source
+FRIDAY_ACCESS_OPERATOR_IDP_VALUE=authentik
+```
+
+Then an email in `FRIDAY_ACCESS_OPERATOR_EMAILS` is an operator only when its
+signed Access JWT also carries that claim with that value. A One-time PIN
+login, even with an operator's address, can read Friday but gets 403 on every
+operator route. Setting only one of the two, or a malformed claim path, denies
+every operator route (reads keep working) and Settings, Access & roles says so.
+Nothing is read from request headers; only the verified JWT counts.
+
+Settings, Access & roles shows the rule and, for the signed-in person, whether
+they are an operator and whether this sign-in passed the check
+(`GET /api/settings/my-access`).
+
+Turning it on safely:
+
+1. Do the "Normal login" steps, including step 4 (the `friday_access` scope
+   mapping returning `{"friday_auth_source": "authentik"}` and the matching
+   OIDC claim in Cloudflare's Generic OIDC settings).
+2. Sign in through Authentik and open
+   `https://friday.mytechtactics.com/cdn-cgi/access/get-identity`. Confirm the
+   claim is there. Cloudflare places custom OIDC claims under `custom` in the
+   application token; if your JWT shows it elsewhere, use that dotted path
+   (up to three segments) instead.
+3. Set the two variables, redeploy, and check Settings, Access & roles shows
+   "Verified through authentik" for you. If it shows the sign-in did not come
+   through the required provider, remove the variables and recheck the claim;
+   operator actions stay denied until it matches.
+
+## What only the owner can provide
+
+- The public HTTPS URL of Authentik that Cloudflare can reach (today it is
+  recorded only at the private `10.1.60.10:9000` on VM120).
+- In Authentik: the Friday OAuth2/OIDC provider and application, its client
+  ID and client secret (the secret goes only into Cloudflare's IdP form, never
+  into Friday or Git), the `friday_access` scope mapping, MFA and the group of
+  people allowed in.
+- In Cloudflare Zero Trust: the Generic OIDC identity provider, the Friday
+  Access application's login methods and Allow policy.
+- The final choice of claim name and value, if different from the example.
+
+Friday needs no Authentik secret: the origin still only verifies Cloudflare's
+signed JWT.
 
 ## Authentik outage procedure
 
@@ -98,7 +148,9 @@ gets 403 on:
 - `PUT /api/settings/sites`
 - any non-GET request under `/api/settings/endpoints` and
   `/api/settings/repositories`
-- `POST /api/approvals/:incidentId/decision`
+- `POST /api/approvals/:incidentId/decision` and `POST /api/approvals/:incidentId/fix`
+- `POST /api/work/tasks` and `POST /api/work/tasks/:id/move`
+- `POST /api/aidesigner/designs`
 - `/api/audit/events`
 
 Every other `/api/` route is open to any valid signed identity, including

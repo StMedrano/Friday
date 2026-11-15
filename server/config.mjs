@@ -150,6 +150,10 @@ export function getConfig(env = process.env) {
       teamDomain: env.FRIDAY_ACCESS_TEAM_DOMAIN || '',
       audience: env.FRIDAY_ACCESS_AUD || '',
       operatorEmails: String(env.FRIDAY_ACCESS_OPERATOR_EMAILS || '').split(',').map(x=>x.trim()).filter(Boolean),
+      // Authentik as primary login: operator routes also need this signed
+      // claim (for example custom.friday_auth_source) to equal this value.
+      operatorProviderClaim: env.FRIDAY_ACCESS_OPERATOR_IDP_CLAIM || '',
+      operatorProviderValue: env.FRIDAY_ACCESS_OPERATOR_IDP_VALUE || '',
     },
     port: Number(env.FRIDAY_PORT || 3010),
     mode: env.FRIDAY_MODE === 'live' ? 'live' : 'mock',
