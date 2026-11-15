@@ -1,6 +1,6 @@
 # Running the Friday controller without root
 
-Status (2026-11-15): **ready for a maintenance window, not deployed.** The default image (`runtime` stage) still runs as root. The `runtime-nonroot` stage (UID/GID 10001) is built, smoke-tested and rehearsed in CI. `compose.nonroot.yaml` selects it, and `scripts/update-controller.sh` adds that overlay only when `.env` has `FRIDAY_CONTROLLER_NONROOT=true` and the copied volume `friday_data_nonroot` exists. `make env-check` lists `FRIDAY_CONTROLLER_NONROOT` as not passed through by Compose; that is expected, the updater reads it.
+Status (2026-11-15): **ready for a maintenance window, not deployed.** The default image (`runtime` stage) still runs as root. The `runtime-nonroot` stage (UID/GID 10001) is built, smoke-tested and rehearsed in CI. `compose.nonroot.yaml` selects it, and `scripts/update-controller.sh` adds that overlay only when `.env` has `FRIDAY_CONTROLLER_NONROOT=true` and the copied volume `friday_data_nonroot` exists. `make env-check` knows the updater reads `FRIDAY_CONTROLLER_NONROOT` on the host and does not report it.
 
 ## Why production cannot just switch
 

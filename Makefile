@@ -9,7 +9,7 @@ help:
 	  '  make test       Run frontend, controller, and observer tests' \
 	  '  make build      Type-check and build the production UI' \
 	  '  make verify     Run tests, build, and validate Compose files' \
-	  '  make env-check  Check an .env file against compose.yaml (names only; ENV_FILE=.env)' \
+	  '  make env-check  Check an .env file against the Compose files (names only; ENV_FILE=.env)' \
 	  '  make observer-prep  On VM100: check observer .env and socket group id (add --write-gid by hand)' \
 	  '  make preflight  Check VM 102 controller prerequisites without changing anything' \
 	  '  make up         Start Friday using the base controller Compose configuration' \
@@ -40,7 +40,7 @@ verify: test build
 	@echo 'Friday verification passed.'
 
 ENV_FILE ?= .env
-COMPOSE_FILES ?= compose.yaml
+COMPOSE_FILES ?= compose.yaml compose.cloud-tunnel.yaml compose.nonroot.yaml
 
 env-check:
 	node scripts/check-env.mjs $(ENV_FILE) $(foreach file,$(COMPOSE_FILES),--compose $(file))
