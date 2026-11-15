@@ -8,7 +8,7 @@ import {isAbsolute, join} from 'node:path'
 // the caller continues. No update, delete, rotate or repair API exists.
 const ACTIONS = new Set(['agents.registry.sync', 'incidents.diagnostics.rerun', 'approvals.decide', 'approvals.fix', 'settings.sites.update',
   'settings.endpoints.create', 'settings.endpoints.update', 'settings.endpoints.delete',
-  'settings.repositories.create', 'settings.repositories.update', 'settings.repositories.delete', 'work.tasks.create',
+  'settings.repositories.create', 'settings.repositories.update', 'settings.repositories.delete', 'work.tasks.create', 'work.tasks.move',
   'aidesigner.design.generate'])
 const PHASES = new Set(['requested', 'succeeded', 'failed', 'denied'])
 const ACTOR_KINDS = new Set(['human', 'service', 'unauthenticated'])

@@ -31,6 +31,7 @@ export const COMPANIONS = Object.freeze({
   'automated-fixes': { flag: 'FRIDAY_REMEDIATION_ENABLED', needs: ['FRIDAY_APPROVALS_ENABLED', 'FRIDAY_MONITORING_ENABLED'] },
   'work-read': { flag: 'FRIDAY_WORK_READ_ENABLED', needs: ['FRIDAY_SUPABASE_URL', 'FRIDAY_WORK_READ_KEY'] },
   'work-write': { flag: 'FRIDAY_WORK_WRITE_ENABLED', needs: ['FRIDAY_WORK_READ_ENABLED', 'FRIDAY_SUPABASE_URL', 'FRIDAY_WORK_READ_KEY', 'FRIDAY_WORK_WRITE_KEY'] },
+  'work-move': { flag: 'FRIDAY_WORK_MOVE_ENABLED', needs: ['FRIDAY_WORK_READ_ENABLED', 'FRIDAY_WORK_WRITE_ENABLED', 'FRIDAY_SUPABASE_URL', 'FRIDAY_WORK_READ_KEY', 'FRIDAY_WORK_WRITE_KEY'] },
   // Also needs one free model target; see docs/integrations.md, Free model routing.
   'model-routing': { flag: 'FRIDAY_MODEL_FABRIC_ENABLED', needs: ['FRIDAY_AI_ENABLED'] },
   'web-growth': { flag: 'FRIDAY_WEB_GROWTH_ENABLED', needs: ['FRIDAY_WEB_GROWTH_READER_URL', 'FRIDAY_WEB_GROWTH_READER_TOKEN', 'FRIDAY_WEB_GROWTH_READER_EMAILS'] },

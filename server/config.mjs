@@ -238,6 +238,8 @@ export function getConfig(env = process.env) {
       write: {
         enabled: enabled(env.FRIDAY_WORK_WRITE_ENABLED),
         key: env.FRIDAY_WORK_WRITE_KEY || '',
+        // Claim and move on the Tasks screen; same key, after the mover migration.
+        moveEnabled: enabled(env.FRIDAY_WORK_MOVE_ENABLED),
       },
     },
     // Internal free-only model fabric. Opt-in, never wired to a paid fallback.

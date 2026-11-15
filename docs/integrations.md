@@ -127,6 +127,15 @@ Registry sync is explicit and Git-owned. It is not an agent editor and cannot cr
 - Database role: apply `supabase/migrations/202611060001_friday_work_writer.sql` on VM132 (safe to re-run). It creates the NOLOGIN role `friday_work_writer` that may only insert those columns and read tasks back; RLS only accepts new `ready` rows from an `access:` principal. Mint a PostgREST JWT with `"role":"friday_work_writer"` and put it in `FRIDAY_WORK_WRITE_KEY`. Never use the service key. The gateway key (`FRIDAY_WORK_READ_GATEWAY_KEY`) is reused.
 - `POST /api/work/tasks` with `{"projectId","title","objective"?,"requestId"}` is operator-only, JSON-only, refused cross-site, and written to the action audit as `work.tasks.create` with the project as target. `requestId` makes retries safe: the same person and id return the first task; reusing the id with different content is 409 `work-task-request-reused`. Other errors: 400 `invalid-work-task`, 404 when the path is off, 503 `work-write-unavailable`. `GET /api/work/tasks` adds `"canCreate": true` only when the path is on.
 
+### Claim and move tasks
+
+- `FRIDAY_WORK_MOVE_ENABLED=false` by default. It needs the New tasks path on as well (`FRIDAY_WORK_READ_ENABLED`, `FRIDAY_WORK_WRITE_ENABLED` and `FRIDAY_WORK_WRITE_KEY`). When on, each task on the Tasks screen shows buttons for the moves its status allows.
+- Allowed moves: Ready to In progress (Claim), Blocked or Cancelled; In progress to In review, Completed, Blocked or back to Ready (Release); Blocked to In progress (Claim), Ready or Cancelled; In review to Completed, In progress (Claim) or Ready. Completed and Cancelled are final.
+- Claiming records you as holding the task for 8 hours (a `friday-operator` row in `friday_work_claims`), so agents cannot claim it meanwhile. Any later move releases your claim. A task held by a live claim from an agent or another person is never moved (409). Claiming starts nothing: Friday does not run tasks.
+- Who can move: the same people who can add tasks (an operator email **and** a project grant).
+- Database: apply `supabase/migrations/202611150001_friday_work_mover.sql` on VM132 after the writer migration (safe to re-run). It adds one `SECURITY DEFINER` function, `friday_operator_move_task`, executable only by `friday_work_writer`. The role still has no UPDATE or DELETE on any table. The same `FRIDAY_WORK_WRITE_KEY` is used.
+- `POST /api/work/tasks/:id/move` with `{"projectId","expectedVersion","status","requestId"}` is operator-only, JSON-only, refused cross-site, and audited as `work.tasks.move` with the task id as target. `expectedVersion` is the version on screen: if the task changed since, or someone else holds it, the answer is 409 `work-task-changed` and nothing moves. Other errors: 400 `invalid-work-task-move` (including a move the status does not allow), 403 `work-write-denied`, 404 when the path is off, 503 `work-write-unavailable`. `GET /api/work/tasks` adds `"canMove": true` only when the path is on.
+
 ### CT108 local Ollama agent inference
 
 Agent profiles are server-side and Ollama-only:

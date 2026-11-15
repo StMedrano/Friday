@@ -10,6 +10,7 @@ export const SETUP_SECTIONS = [
   'Approvals queue',
   'Automated fixes',
   'New tasks (Tasks write path)',
+  'Claim and move tasks',
   'GitHub pull requests, CI and last commit',
   'Project tasks (read)',
   'Free model routing',

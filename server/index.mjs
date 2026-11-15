@@ -116,6 +116,7 @@ if (config.work.enabled) {
       baseUrl: config.agents.registry.supabaseUrl,
       writeKey: config.work.write.key,
       gatewayKey: config.work.gatewayKey,
+      moveEnabled: config.work.write.moveEnabled,
     }) : null,
   })
   if (!workReadBridge?.enabled) console.warn('Friday work reads stayed disabled; check Access configuration, the work read key and the grant file')
@@ -123,6 +124,10 @@ if (config.work.enabled) {
   if (config.work.write.enabled) {
     if (workReadBridge?.canCreateTasks) console.log('Friday new tasks enabled')
     else console.warn('Friday new tasks stayed disabled; check FRIDAY_WORK_WRITE_KEY and that work reads are enabled')
+  }
+  if (config.work.write.moveEnabled) {
+    if (workReadBridge?.canMoveTasks) console.log('Friday task claim and move enabled')
+    else console.warn('Friday task claim and move stayed disabled; it also needs FRIDAY_WORK_WRITE_ENABLED and its key')
   }
 }
 
