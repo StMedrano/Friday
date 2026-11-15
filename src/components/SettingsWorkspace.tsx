@@ -8,6 +8,7 @@ import RepositorySettingsPanel from './RepositorySettingsPanel'
 import PushControls from './PushControls'
 import WorkIdentityPanel from './WorkIdentityPanel'
 import AuditWorkspace from './AuditWorkspace'
+import AiDesignerSessionsPanel from './AiDesignerSessionsPanel'
 
 const TABS = ['General', 'Notifications', 'Sites', 'Access & roles', 'Audit log'] as const
 type Tab = typeof TABS[number]
@@ -90,6 +91,8 @@ export default function SettingsWorkspace() {
           </section>
 
           {settings.features?.length ? <FeaturesPanel features={settings.features} hidden={tab !== 'General'}/> : null}
+
+          <AiDesignerSessionsPanel enabled={settings.integrations.some((item) => item.id === 'aidesigner' && item.enabled)} hidden={tab !== 'General'}/>
 
           <div className="fx-tab-group" hidden={tab !== 'Sites'}>
             <SiteSettingsPanel/>

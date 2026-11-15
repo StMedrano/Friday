@@ -170,6 +170,42 @@ export async function fetchFridayRepositoryGitHub(id: string, signal?: AbortSign
   return { state: 'unavailable' }
 }
 
+export type FridayAiDesignerSession = {
+  sessionId: string; title: string; editorUrl: string | null; canvasCount: number; publishedUrl: string | null; updatedAt: string | null
+}
+/** `signin`: the server lists sessions only for a person signed in through Cloudflare Access. */
+export type FridayAiDesignerSessionsResult =
+  | { state: 'ok'; sessions: FridayAiDesignerSession[] }
+  | { state: 'signin' }
+  | { state: 'unavailable' }
+
+const httpsOrNull = (value: unknown) => typeof value === 'string' && /^https:\/\//i.test(value) ? value : null
+
+function aiDesignerSession(value: unknown): FridayAiDesignerSession | null {
+  const item = value as Record<string, unknown> | null
+  if (!item || typeof item !== 'object' || typeof item.sessionId !== 'string' || !item.sessionId) return null
+  return {
+    sessionId: item.sessionId,
+    title: typeof item.title === 'string' && item.title ? item.title : 'Untitled',
+    editorUrl: httpsOrNull(item.editorUrl),
+    canvasCount: Number.isSafeInteger(item.canvasCount) && (item.canvasCount as number) >= 0 ? item.canvasCount as number : 0,
+    publishedUrl: httpsOrNull(item.publishedUrl),
+    updatedAt: typeof item.updatedAt === 'string' && !Number.isNaN(Date.parse(item.updatedAt)) ? item.updatedAt : null,
+  }
+}
+
+/** Recent AIDesigner design sessions (read only). Generating a design is not offered here. */
+export async function fetchFridayAiDesignerSessions(signal?: AbortSignal): Promise<FridayAiDesignerSessionsResult> {
+  const response = await fetch('/api/aidesigner/sessions', { method: 'GET', signal })
+  const body = await response.json().catch(() => null) as { error?: string; sessions?: unknown } | null
+  if (response.ok) {
+    if (!body || !Array.isArray(body.sessions)) return { state: 'unavailable' }
+    return { state: 'ok', sessions: body.sessions.map(aiDesignerSession).filter((item): item is FridayAiDesignerSession => item !== null) }
+  }
+  if (body?.error === 'aidesigner-authentication-required') return { state: 'signin' }
+  return { state: 'unavailable' }
+}
+
 export type FridayAuditEvent = {
   seq: number; requestId: string; at: string; action: string
   phase: 'requested' | 'succeeded' | 'failed' | 'denied'

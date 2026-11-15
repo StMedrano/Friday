@@ -107,4 +107,24 @@ describe('SettingsWorkspace opt-in features', () => {
     await screen.findByRole('region', { name: 'Integrations' })
     expect(screen.queryByRole('region', { name: 'Features' })).not.toBeInTheDocument()
   })
+  it('shows AIDesigner design sessions on the General tab only when AIDesigner is enabled', async () => {
+    const withAiDesigner = { ...settings, integrations: [...settings.integrations,
+      { id: 'aidesigner', name: 'AIDesigner', enabled: true, configured: true, credentials: 'present', site: null, tls: null }] }
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _options?: RequestInit) => String(input) === '/api/aidesigner/sessions'
+      ? new Response(JSON.stringify({ sessions: [{ sessionId: '155feecb-0000-4000-8000-000000000001', title: 'Friday dashboard', editorUrl: null, canvasCount: 2, publishedUrl: null, updatedAt: null }] }), { status: 200 })
+      : new Response(JSON.stringify(withAiDesigner), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<SettingsWorkspace />)
+    const panel = await screen.findByRole('region', { name: 'Design sessions' })
+    expect(await within(panel).findByText('Friday dashboard')).toBeInTheDocument()
+    expect(fetchMock.mock.calls.every(([, options]) => options?.method === 'GET')).toBe(true)
+  })
+
+  it('shows AIDesigner design sessions as not connected when AIDesigner is off, without asking for them', async () => {
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, _options?: RequestInit) => new Response(JSON.stringify(settings), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<SettingsWorkspace />)
+    expect(await screen.findByRole('note', { name: 'Design sessions: not connected' })).toBeInTheDocument()
+    expect(fetchMock.mock.calls.some(([input]) => String(input) === '/api/aidesigner/sessions')).toBe(false)
+  })
 })

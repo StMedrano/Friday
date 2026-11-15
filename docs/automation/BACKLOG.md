@@ -166,7 +166,7 @@ Print names only, never values. Exit non-zero only on a missing companion.
 **Done when:** tests cover each finding with fixture files containing fake
 secrets, and assert no value appears in output; `make verify` passes.
 
-## aidesigner-sessions-panel — `ready`
+## aidesigner-sessions-panel — `in-review`
 
 **Scope:** a read-only panel (Settings or a Designs section) using the
 existing `GET /api/aidesigner/sessions` from #123, `src/lib/api.ts`, tests.

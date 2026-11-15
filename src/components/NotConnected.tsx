@@ -13,6 +13,7 @@ export const SETUP_SECTIONS = [
   'Project tasks (read)',
   'Free model routing',
   'Web Growth leads',
+  'AIDesigner design generation',
 ] as const
 export type SetupSection = typeof SETUP_SECTIONS[number]
 export const isSetupSection = (value: unknown): value is SetupSection => SETUP_SECTIONS.includes(value as SetupSection)
