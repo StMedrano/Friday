@@ -23,7 +23,8 @@ const ID = /^[a-z0-9][a-z0-9-]{0,62}$/
 const NODE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,62}$/
 const CONTROL = /[\u0000-\u001f\u007f]/
 const UUID = /^[a-f0-9]{8}-[a-f0-9]{4}-4[a-f0-9]{3}-[89ab][a-f0-9]{3}-[a-f0-9]{12}$/
-const UPID = /^UPID:[A-Za-z0-9.:@_-]{1,240}$/
+// Includes token-qualified users such as friday-power@pve!actions.
+const UPID = /^UPID:[A-Za-z0-9.:@!_-]{1,240}$/
 const MAX_ACTIONS = 50
 const MAX_RUNS = 500
 const MAX_PLANS = 100
@@ -255,6 +256,13 @@ export async function createHomelabActions({
         const claimed = [...runs, pending].slice(-MAX_RUNS)
         try { await save(claimed) } catch { return { status: 503, body: { error: 'homelab-actions-unavailable' } } }
         runs = claimed
+        // Check the gate again right before dispatch: the owner may have revoked it,
+        // or its window ended, while the pending record was being written.
+        if (automationGate.isAllowed() !== true) {
+          const closed = runs.map((run) => run.id === record.id ? cleanRun({ ...record, state: 'failed', detail: 'automation-gate-closed' }) : run)
+          try { await save(closed); runs = closed } catch {}
+          return { status: 423, body: { error: 'automation-gate-closed' } }
+        }
         let outcome
         try { outcome = { ok: true, ...(await client.act(entry, plan.operation)) } }
         catch (error) { outcome = { ok: false, detail: /^proxmox-http-\d{3}$/.test(error?.message) ? error.message : 'proxmox-unavailable' } }

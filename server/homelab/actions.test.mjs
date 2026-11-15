@@ -18,7 +18,7 @@ function fakeClient(states = { 140: 'running', 108: 'running' }) {
     client: {
       ready: true,
       async status(guest) { calls.push(['status', guest.vmid]); return { status: states[guest.vmid] ?? 'unknown' } },
-      async act(guest, operation) { calls.push(['act', guest.vmid, operation]); return { upid: `UPID:home:0001:${operation}:${guest.vmid}:` } },
+      async act(guest, operation) { calls.push(['act', guest.vmid, operation]); return { upid: `UPID:home:0001:${operation}:${guest.vmid}:friday-power@pve!actions:` } },
     },
   }
 }
@@ -150,7 +150,7 @@ test('execute mode acts once, only while the gate is armed and the guest is stil
   assert.deepEqual(fake.calls.filter(([kind]) => kind === 'act'), [['act', 140, 'shutdown']])
   const stored = JSON.parse(await readFile(join(dir, 'runs.json'), 'utf8'))
   assert.equal(stored.runs[0].state, 'submitted')
-  assert.match(stored.runs[0].upid, /^UPID:/)
+  assert.match(stored.runs[0].upid, /friday-power@pve!actions:$/)
 
   // State drift between preview and approval stops the run.
   const second = await actions.preview({ actionId: 'ollama', operation: 'reboot', requestedBy: 'owner@example.com' })
@@ -179,4 +179,18 @@ test('a Proxmox refusal is recorded as failed without leaking the error text', a
   assert.equal(result.body.run.state, 'failed')
   assert.equal(result.body.execution.reason, 'proxmox-http-403')
   assert.equal((await actions.list()).recent[0].detail, 'proxmox-http-403')
+})
+
+test('a gate closed while the pending record is written stops the run', async () => {
+  let checks = 0
+  const dir = await mkdtemp(join(tmpdir(), 'friday-homelab-'))
+  const fake = fakeClient()
+  const actions = await createHomelabActions({ enabled: true, mode: 'execute', catalog: parseHomelabCatalog(catalogFile()), client: fake.client,
+    path: join(dir, 'runs.json'), automationGate: { isAllowed: () => ++checks === 1 } })
+  const planId = (await actions.preview({ actionId: 'development', operation: 'reboot', requestedBy: 'owner@example.com' })).body.preview.planId
+  const result = await actions.run({ planId, confirm: 'development', requestedBy: 'owner@example.com' })
+  assert.equal(result.status, 423)
+  assert.equal(fake.calls.some(([kind]) => kind === 'act'), false)
+  const stored = JSON.parse(await readFile(join(dir, 'runs.json'), 'utf8'))
+  assert.deepEqual([stored.runs[0].state, stored.runs[0].detail], ['failed', 'automation-gate-closed'])
 })
