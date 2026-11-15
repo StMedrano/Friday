@@ -20,9 +20,11 @@ function recorder(response) {
 }
 
 test('AIDesigner is disabled with no key by default', () => {
-  assert.deepEqual(getConfig({}).aidesigner, { enabled: false, apiKey: '', baseUrl: 'https://api.aidesigner.ai', timeoutMs: 180000 })
+  assert.deepEqual(getConfig({}).aidesigner, { enabled: false, generateEnabled: false, apiKey: '', baseUrl: 'https://api.aidesigner.ai', timeoutMs: 180000 })
   assert.equal(getConfig({ FRIDAY_AIDESIGNER_ENABLED: 'true', AIDESIGNER_API_KEY: KEY }).aidesigner.enabled, true)
   assert.equal(getConfig({ FRIDAY_AIDESIGNER_TIMEOUT_MS: '30000' }).aidesigner.timeoutMs, 30000)
+  assert.equal(getConfig({ FRIDAY_AIDESIGNER_ENABLED: 'true' }).aidesigner.generateEnabled, false)
+  assert.equal(getConfig({ FRIDAY_AIDESIGNER_GENERATE_ENABLED: 'true' }).aidesigner.generateEnabled, true)
 })
 
 test('an unusable configuration never contacts AIDesigner', async () => {

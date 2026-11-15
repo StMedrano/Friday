@@ -1,5 +1,6 @@
 import {useEffect,useState} from 'react'
 import {fetchWebGrowthSnapshot,type WebGrowthSnapshot} from '../lib/api'
+import WebGrowthDesigns from './WebGrowthDesigns'
 const formatDate=(value:string|null)=>value?new Date(value).toLocaleString():'Not reported'
 export default function WebGrowthWorkspace(){
  const [snapshot,setSnapshot]=useState<WebGrowthSnapshot|null>(null)
@@ -18,7 +19,7 @@ export default function WebGrowthWorkspace(){
  const lead=snapshot?.leads.find(item=>item.id===selected)
  const stages=snapshot?Object.entries(snapshot.leads.reduce<Record<string,number>>((counts,item)=>({...counts,[item.stage]:(counts[item.stage]||0)+1}),{})):[]
  return <section className="v3-agent-detail v3-web-growth" aria-label="Web Growth pipeline" aria-busy={loading}>
-  <div className="v3-agent-detail-head"><div><span className="v3-kicker">PRIVATE PROJECT · READ ONLY</span><h3>Web Growth pipeline</h3></div><button type="button" className="v3-agent-primary" disabled={loading} onClick={()=>setRefresh(value=>value+1)}>Refresh pipeline</button></div>
+  <div className="v3-agent-detail-head"><div><span className="v3-kicker">PRIVATE PROJECT · PIPELINE READ ONLY</span><h3>Web Growth pipeline</h3></div><button type="button" className="v3-agent-primary" disabled={loading} onClick={()=>setRefresh(value=>value+1)}>Refresh pipeline</button></div>
   {loading?<p role="status">Loading pipeline…</p>:error?<p role="status">{error}</p>:snapshot?<>
    <p>{snapshot.leads.length} leads · Read at {formatDate(snapshot.generatedAt)}</p>
    <div className="v3-web-growth-stages" aria-label="Pipeline stage counts">{stages.map(([stage,count])=><span key={stage}>{stage.replaceAll('_',' ')} <strong>{count}</strong></span>)}</div>
@@ -37,6 +38,7 @@ export default function WebGrowthWorkspace(){
    </dl><small>Record: {lead.id}</small></>:<p>Select a lead to inspect its recorded status.</p>}</div></div>
    <details><summary>Source evidence</summary><p>Reported source revision: {snapshot.sourceRevision}</p><p className="v3-web-growth-checksum">Store checksum: {snapshot.sourceChecksum}</p><p>The reader reports file evidence; this does not verify the deployed service revision or approval validity.</p></details>
   </>:null}
+  <WebGrowthDesigns leadName={lead?.businessName??null}/>
   <p className="v3-group-tools-note">Explicit project reader permission required. No sending, approval or stage changes. Private records are not sent to group advice.</p>
  </section>
 }

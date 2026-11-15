@@ -425,10 +425,13 @@ export function createFridayServer({
       const generate = url.pathname === '/api/aidesigner/designs'
       if (request.method !== (generate ? 'POST' : 'GET')) return json(response, 405, { error: 'method-not-allowed' })
       if (url.search) return json(response, 400, { error: 'unexpected-query' })
-      if (config.aidesigner?.enabled !== true) return json(response, 503, { error: 'aidesigner-unavailable' })
+      if (config.aidesigner?.enabled !== true) return json(response, 503, { error: 'aidesigner-disabled' })
+      // Generating has its own flag so the session list can be on while spending credits stays off.
+      const generateEnabled = config.aidesigner.generateEnabled === true
+      if (generate && !generateEnabled) return json(response, 503, { error: 'aidesigner-generate-disabled' })
       const client = aiDesignerImpl(config.aidesigner)
       if (!generate) {
-        try { return json(response, 200, { sessions: await client.listSessions() }) }
+        try { return json(response, 200, { sessions: await client.listSessions(), generate: generateEnabled }) }
         catch (error) { const failure = aiDesignerFailure(error); return json(response, failure.status, failure.body, failure.headers) }
       }
       let body
