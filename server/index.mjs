@@ -1,5 +1,7 @@
 import { createAgentActivityLog } from './agents/activity-log.mjs'
 import { createApprovalQueue } from './approvals/queue.mjs'
+import { createRemediationRunner, loadPlaybooks } from './remediation/fixes.mjs'
+import { createFileAutomationGate } from './security/automation-kill-switch.mjs'
 import { fileURLToPath } from 'node:url'
 import { getConfig } from './config.mjs'
 import { createFridayServer } from './http.mjs'
@@ -138,7 +140,30 @@ const approvalQueue = config.approvals.enabled
   ? await createApprovalQueue({ path: config.approvals.path, limit: config.approvals.limit })
   : null
 
-const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, endpointChecks, repositorySettings, pushSubscriptions, workReadBridge, agentActivity, approvalQueue })
+// Automated fixes need the approvals queue: a fix only ever follows an approval.
+let remediation = null
+if (config.remediation.enabled) {
+  const playbooks = await loadPlaybooks(config.remediation.playbooksPath)
+  if (!approvalQueue) console.warn('Friday automated fixes stayed disabled; they need FRIDAY_APPROVALS_ENABLED')
+  else if (!playbooks) console.warn('Friday automated fixes stayed disabled; the playbook file is missing, unsafe or invalid')
+  // Real execution needs signed-in operators and the durable action audit.
+  else if (config.remediation.mode === 'execute' && (config.mode !== 'live' || !actionAudit))
+    console.warn('Friday automated fixes stayed disabled; execute mode needs FRIDAY_MODE=live and FRIDAY_AUDIT_ENABLED=true')
+  else {
+    remediation = await createRemediationRunner({
+      enabled: true,
+      mode: config.remediation.mode,
+      playbooks,
+      path: config.remediation.runsPath,
+      executor: { url: config.remediation.executorUrl, token: config.remediation.executorToken },
+      automationGate: createFileAutomationGate({ filePath: config.remediation.automationGatePath }),
+    })
+    if (remediation.enabled) console.log(`Friday automated fixes enabled (${remediation.mode}, ${playbooks.length} playbooks)`)
+    else { console.warn('Friday automated fixes stayed disabled; execute mode needs an https executor URL and token'); remediation = null }
+  }
+}
+
+const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, endpointChecks, repositorySettings, pushSubscriptions, workReadBridge, agentActivity, approvalQueue, remediation })
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`Friday listening on 0.0.0.0:${config.port} (${config.mode} mode)`)
 })

@@ -104,6 +104,11 @@ export async function createApprovalQueue({ path, limit = 500, now = Date.now } 
     list(incidents) {
       return projectApprovals(incidents, decisions)
     },
+    /** The stored decision for an incident, or null. Used to gate automated fixes. */
+    decisionFor(incidentId) {
+      const entry = decisions.findLast((item) => item.incidentId === incidentId)
+      return entry ? { id: entry.id, incidentId: entry.incidentId, decision: entry.decision } : null
+    },
     /** Record approve/deny for a pending proposal. Serialized so a proposal is decided once. */
     decide({ incidents, incidentId, decision, decidedBy }) {
       const run = async () => {
