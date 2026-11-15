@@ -12,7 +12,7 @@ import { normalizeAssistantHistory, validateAssistantPrompt } from './assistant-
 import { validateAgentId, validateAgentPrompt, validateRegistrySyncBody } from './agents/input.mjs'
 import { createAccessGate } from './security/access.mjs'
 import { handleWorkReadHttp } from './work/http-reads.mjs'
-import { createWorkTask, isWorkTaskCreate, moveWorkTask, workTaskAuditTarget, workTaskMoveId } from './work/http-writes.mjs'
+import { createWorkTask, editWorkTask, isWorkTaskCreate, moveWorkTask, workTaskAuditTarget, workTaskEditId, workTaskMoveId } from './work/http-writes.mjs'
 import { auditActor } from './audit/action-audit.mjs'
 import { buildSettingsView } from './settings.mjs'
 import { getGroupWorkspace } from './agents/group-workspace.mjs'
@@ -356,7 +356,7 @@ export function createFridayServer({
       const groupAdvisory = request.method === 'POST' && url.pathname === '/api/group-advisory'
       const aiDesignerGenerate = request.method === 'POST' && url.pathname === '/api/aidesigner/designs'
       const approvalDecision = request.method === 'POST' && (Boolean(parseApprovalDecisionRoute(url.pathname)) || Boolean(parseApprovalFixRoute(url.pathname)))
-      const taskCreate = isWorkTaskCreate(request.method, url.pathname) || Boolean(workTaskMoveId(request.method, url.pathname))
+      const taskCreate = isWorkTaskCreate(request.method, url.pathname) || Boolean(workTaskMoveId(request.method, url.pathname)) || Boolean(workTaskEditId(request.method, url.pathname))
       const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || approvalDecision || taskCreate || aiDesignerGenerate || url.pathname === '/api/audit/events'
       let verdict
       try { verdict = await accessGate(request, operatorOnly) }
@@ -394,6 +394,18 @@ export function createFridayServer({
       try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid-work-task-move' }) }
       const result = await runAudited({ actionAudit, identity, action: 'work.tasks.move', target: moveTaskId },
         () => moveWorkTask({ request, url, taskId: moveTaskId, body, bridge: workReadBridge }))
+      return json(response, result.status, result.body)
+    }
+
+    // Change one task's title (and objective). Off unless the writer was built
+    // with edits enabled; the database checks version, closed tasks and live claims.
+    const editTaskId = workTaskEditId(request.method, url.pathname)
+    if (editTaskId) {
+      if (!workReadBridge?.canEditTasks) return json(response, 404, { error: 'not-found' })
+      let body
+      try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid-work-task-edit' }) }
+      const result = await runAudited({ actionAudit, identity, action: 'work.tasks.edit', target: editTaskId },
+        () => editWorkTask({ request, url, taskId: editTaskId, body, bridge: workReadBridge }))
       return json(response, result.status, result.body)
     }
 

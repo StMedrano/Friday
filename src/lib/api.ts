@@ -371,7 +371,7 @@ function parseTask(value: unknown, status: number): FridayTask {
   return task
 }
 
-export type FridayTaskBoard = { tasks: FridayTask[]; canCreate: boolean; canMove: boolean }
+export type FridayTaskBoard = { tasks: FridayTask[]; canCreate: boolean; canMove: boolean; canEdit: boolean }
 
 /** Read a project's tasks. Rejects a malformed payload rather than showing partial work. */
 export async function fetchProjectTasks(projectId: string, signal?: AbortSignal): Promise<FridayTaskBoard> {
@@ -380,7 +380,7 @@ export async function fetchProjectTasks(projectId: string, signal?: AbortSignal)
   if (!response.ok) throw new FridayWorkError(response.status)
   const body = await response.json().catch(() => null) as { tasks?: unknown; canCreate?: unknown } | null
   if (!body || !Array.isArray(body.tasks)) throw new FridayWorkError(response.status)
-  return { tasks: body.tasks.map((value) => parseTask(value, response.status)), canCreate: body.canCreate === true, canMove: (body as { canMove?: unknown }).canMove === true }
+  return { tasks: body.tasks.map((value) => parseTask(value, response.status)), canCreate: body.canCreate === true, canMove: (body as { canMove?: unknown }).canMove === true, canEdit: (body as { canEdit?: unknown }).canEdit === true }
 }
 
 /**
@@ -411,6 +411,23 @@ export async function moveProjectTask(task: FridayTask, status: FridayTask['stat
   const moved = parseTask(body?.task, response.status)
   if (moved.id !== task.id || moved.status !== status) throw new FridayWorkError(response.status)
   return moved
+}
+
+/**
+ * Change a task's title, and its objective when `objective` is not empty.
+ * `expectedVersion` is the version on screen: if someone changed the task
+ * since, the server answers 409 and nothing changes. Status never changes.
+ */
+export async function editProjectTask(task: FridayTask, title: string, objective?: string): Promise<FridayTask> {
+  const response = await fetch(`/api/work/tasks/${encodeURIComponent(task.id)}/edit`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId: task.projectId, expectedVersion: task.version, title, ...(objective ? { objective } : {}) }),
+  })
+  const body = await response.json().catch(() => null) as { task?: unknown; error?: unknown } | null
+  if (!response.ok) throw new FridayWorkError(response.status, typeof body?.error === 'string' ? body.error : '')
+  const edited = parseTask(body?.task, response.status)
+  if (edited.id !== task.id || edited.title !== title) throw new FridayWorkError(response.status)
+  return edited
 }
 
 export type FridayGroupAdvice = {

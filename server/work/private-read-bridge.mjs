@@ -14,9 +14,9 @@ const id=s=>typeof s==='string'&&s.trim()===s&&s.length>=1&&s.length<=128&&
 const cleanString=(s,max)=>typeof s==='string'&&s.trim()!==''&&s.length<=max&&
  !forbidden.test(s)
 const int=(v,max)=>Number.isSafeInteger(v)&&v>=1&&v<=max
-const unused=Object.freeze({enabled:false,canCreateTasks:false,canMoveTasks:false,
+const unused=Object.freeze({enabled:false,canCreateTasks:false,canMoveTasks:false,canEditTasks:false,
  listTasks:async()=>deny(),getTask:async()=>deny(),searchMemory:async()=>deny(),
- createTask:async()=>deny(),moveTask:async()=>deny()})
+ createTask:async()=>deny(),moveTask:async()=>deny(),editTask:async()=>deny()})
 const writeError=code=>{const e=Error('work-write-'+code);e.code=code;return e}
 const TITLE_MAX=160,OBJECTIVE_MAX=4000
 
@@ -61,9 +61,10 @@ const checkedScopes=(scopes,actor)=>{
  * server-owned provisioner may return project/scope grants. Neither prompts,
  * client headers, nor caller-requested actor/roles can create permissions.
  * Returns bounded, redacted task/memory projections. No HTTP routes, Supabase
- * connection or account provisioning. Its only writes are createTask and
- * moveTask, present only when the writer repository is injected (see
- * task-insert-repository) and, for moves, built with moveEnabled.
+ * connection or account provisioning. Its only writes are createTask,
+ * moveTask and editTask, present only when the writer repository is injected
+ * (see task-insert-repository) and, for moves and edits, built with
+ * moveEnabled or editEnabled.
  */
 export function createPrivateWorkReadBridge({
  enabled=false,access,workService,memoryService,grantsForSubject,fetchKeys,taskWriter=null,
@@ -99,10 +100,45 @@ export function createPrivateWorkReadBridge({
  }
  const canCreateTasks=taskWriter?.enabled===true&&typeof taskWriter.create==='function'
  const canMoveTasks=canCreateTasks&&taskWriter.canMove===true&&typeof taskWriter.move==='function'
+ const canEditTasks=canCreateTasks&&taskWriter.canEdit===true&&typeof taskWriter.edit==='function'
  return Object.freeze({
   enabled:true,
   canCreateTasks,
   canMoveTasks,
+  canEditTasks,
+  /**
+   * Change one task's title (and its objective, when given) in a project the
+   * signed-in operator is granted. Needs an operator email AND a project
+   * grant. Never changes status, claims or project; completed and cancelled
+   * tasks and tasks someone else holds are refused by the database.
+   */
+  async editTask(request,input){
+   if(!canEditTasks)throw writeError('disabled')
+   let actor
+   try{actor=await actorFor(request,true)}catch{throw writeError('denied')}
+   if(!exact(input,['workItemId','projectId','expectedVersion','title','objective'],['workItemId','projectId','expectedVersion','title'])||
+      !id(input.workItemId)||!id(input.projectId)||
+      !Number.isSafeInteger(input.expectedVersion)||input.expectedVersion<1||
+      !cleanString(input.title,TITLE_MAX)||
+      (input.objective!==undefined&&input.objective!==''&&!cleanString(input.objective,OBJECTIVE_MAX)))
+    throw writeError('invalid')
+   if(!actor.allowedProjectIds.includes(input.projectId))throw writeError('denied')
+   const title=input.title.trim()
+   const objective=typeof input.objective==='string'&&input.objective.trim()?input.objective.trim():null
+   if(title.length>TITLE_MAX)throw writeError('invalid')
+   let row
+   try{
+    row=await taskWriter.edit({workItemId:input.workItemId,projectId:input.projectId,
+     expectedVersion:input.expectedVersion,principalId:actor.principalId,title,objective})
+   }catch(error){
+    throw writeError(['conflict','invalid','denied','closed'].includes(error?.code)?error.code:'unavailable')
+   }
+   try{
+    const task=safeTask(row,actor.allowedProjectIds,input.projectId)
+    if(task.id!==input.workItemId||task.title!==title)throw Error('mismatch')
+    return task
+   }catch{throw writeError('unavailable')}
+  },
   /**
    * Claim, release or move one task in a project the signed-in operator is
    * granted. Needs an operator email AND a project grant. Claiming records

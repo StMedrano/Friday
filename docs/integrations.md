@@ -136,6 +136,14 @@ Registry sync is explicit and Git-owned. It is not an agent editor and cannot cr
 - Database: apply `supabase/migrations/202611150001_friday_work_mover.sql` on VM132 after the writer migration (safe to re-run). It adds one `SECURITY DEFINER` function, `friday_operator_move_task`, executable only by `friday_work_writer`. The role still has no UPDATE or DELETE on any table. The same `FRIDAY_WORK_WRITE_KEY` is used.
 - `POST /api/work/tasks/:id/move` with `{"projectId","expectedVersion","status","requestId"}` is operator-only, JSON-only, refused cross-site, and audited as `work.tasks.move` with the task id as target. `expectedVersion` is the version on screen: if the task changed since, or someone else holds it, the answer is 409 `work-task-changed` and nothing moves. Other errors: 400 `invalid-work-task-move` (including a move the status does not allow), 403 `work-write-denied`, 404 when the path is off, 503 `work-write-unavailable`. `GET /api/work/tasks` adds `"canMove": true` only when the path is on.
 
+### Edit task text
+
+- `FRIDAY_WORK_EDIT_ENABLED=false` by default. It needs the New tasks path on as well (`FRIDAY_WORK_READ_ENABLED`, `FRIDAY_WORK_WRITE_ENABLED` and `FRIDAY_WORK_WRITE_KEY`); it does not need claim and move. When on, each open task on the Tasks screen has an **Edit** button.
+- An edit changes the task's title and, only when you type new details, its objective. Status, claims, project and acceptance criteria never change. Completed and cancelled tasks cannot be edited (409 `work-task-closed`), and a task held by a live claim from an agent or another person is refused (409).
+- Who can edit: the same people who can add tasks (an operator email **and** a project grant).
+- Database: apply `supabase/migrations/202611150002_friday_work_editor.sql` on VM132 after the writer migration (safe to re-run). It adds one `SECURITY DEFINER` function, `friday_operator_edit_task`, executable only by `friday_work_writer`. The role still has no UPDATE or DELETE on any table. The same `FRIDAY_WORK_WRITE_KEY` is used.
+- `POST /api/work/tasks/:id/edit` with `{"projectId","expectedVersion","title","objective"?}` is operator-only, JSON-only, refused cross-site, and audited as `work.tasks.edit` with the task id as target. `expectedVersion` is the version on screen: if the task changed since, the answer is 409 `work-task-changed` and nothing changes. Other errors: 400 `invalid-work-task-edit` (empty or over 160 characters, objective over 4000, or text that looks like a secret), 403 `work-write-denied`, 404 when the path is off, 503 `work-write-unavailable`. `GET /api/work/tasks` adds `"canEdit": true` only when the path is on.
+
 ### CT108 local Ollama agent inference
 
 Agent profiles are server-side and Ollama-only:

@@ -111,3 +111,45 @@ test('rejects a reply for another task, status or version, and bad input before 
   await assert.rejects(r.move(bad))
  assert.equal(f.calls.length,0)
 })
+
+const editInput={workItemId:row.id,projectId:'friday-ai-os',expectedVersion:1,principalId:principal,title:'Write the release notes',objective:null}
+
+test('edit is unavailable unless editEnabled is set',async()=>{
+ const f=fake([])
+ const plain=repo(f.fetchImpl,{moveEnabled:true})
+ assert.equal(plain.canEdit,false)
+ await assert.rejects(plain.edit(editInput))
+ assert.equal(f.calls.length,0)
+})
+
+test('edits a task through the one checked RPC and returns the new version',async()=>{
+ const f=fake([{status:200,body:{status:'edited',task:{...row,title:'Write the release notes',version:2}}}])
+ const r=repo(f.fetchImpl,{editEnabled:true})
+ assert.equal(r.canEdit,true)
+ assert.deepEqual(await r.edit(editInput),{id:row.id,projectId:'friday-ai-os',title:'Write the release notes',status:'ready',version:2})
+ const {url,options}=f.calls[0]
+ assert.equal(url,'https://supabase.mytechtactics.com/rest/v1/rpc/friday_operator_edit_task')
+ assert.equal(options.method,'POST')
+ assert.equal(options.headers.authorization,'Bearer writer-jwt')
+ assert.deepEqual(JSON.parse(options.body),{work_id:row.id,project_id:'friday-ai-os',expected_version:1,
+  principal_id:principal,new_title:'Write the release notes',new_objective:null})
+})
+
+test('edit maps database refusals and rejects a reply for another task, title or version',async()=>{
+ for(const [error,code] of [['version-conflict','conflict'],['lease-conflict','conflict'],['task-closed','closed'],['invalid-input','invalid'],['not-found','denied']]){
+  const f=fake([{status:200,body:{error}}])
+  await assert.rejects(repo(f.fetchImpl,{editEnabled:true}).edit(editInput),e=>e.code===code)
+ }
+ for(const task of [{...row,id:'00000000-0000-4000-8000-000000000000',title:'Write the release notes',version:2},
+  {...row,title:'Something else',version:2},{...row,title:'Write the release notes',version:3}]){
+  const f=fake([{status:200,body:{status:'edited',task}}])
+  await assert.rejects(repo(f.fetchImpl,{editEnabled:true}).edit(editInput),/work-write-storage-denied/)
+ }
+ const f=fake([])
+ const r=repo(f.fetchImpl,{editEnabled:true})
+ for(const bad of [{...editInput,title:''},{...editInput,title:' padded'},{...editInput,title:'x'.repeat(161)},
+  {...editInput,objective:''},{...editInput,objective:'x'.repeat(4001)},{...editInput,workItemId:'nope'},
+  {...editInput,principalId:'runtime:x'},{...editInput,status:'ready'}])
+  await assert.rejects(r.edit(bad))
+ assert.equal(f.calls.length,0)
+})

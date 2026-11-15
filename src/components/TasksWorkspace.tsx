@@ -1,7 +1,7 @@
 import NotConnected from './NotConnected'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { CheckCircle2 } from 'lucide-react'
-import { createProjectTask, fetchProjectTasks, FridayWorkError, moveProjectTask, type FridayTask } from '../lib/api'
+import { createProjectTask, editProjectTask, fetchProjectTasks, FridayWorkError, moveProjectTask, type FridayTask } from '../lib/api'
 
 const PROJECTS = [
   { id: 'friday-ai-os', name: 'Friday AI OS' },
@@ -54,6 +54,20 @@ function moveFailure(reason: unknown) {
   return 'The task could not be moved. Try again.'
 }
 
+function editFailure(reason: unknown) {
+  if (reason instanceof FridayWorkError) {
+    if (reason.status === 409 && reason.code === 'work-task-closed') return 'Completed and cancelled tasks cannot be edited.'
+    if (reason.status === 409) return 'Someone changed or is holding this task. The list was refreshed; try again.'
+    if (reason.status === 403) return 'Only an operator with access to this project can edit tasks.'
+    if (reason.status === 400) return 'Check the title: it is required and up to 160 characters, with no secrets.'
+    if (reason.status === 404) return 'Editing tasks is switched off on this controller.'
+    if (reason.code === 'audit-unavailable') return 'The action audit could not record this, so the task was not changed.'
+  }
+  return 'The task could not be saved. Try again.'
+}
+
+const editable = (task: FridayTask) => task.status !== 'completed' && task.status !== 'cancelled'
+
 function newRequestId() {
   return typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
     ? crypto.randomUUID()
@@ -65,6 +79,11 @@ export default function TasksWorkspace() {
   const [tasks, setTasks] = useState<FridayTask[] | null>(null)
   const [canCreate, setCanCreate] = useState(false)
   const [canMove, setCanMove] = useState(false)
+  const [canEdit, setCanEdit] = useState(false)
+  const [editing, setEditing] = useState<string | null>(null)
+  const [editTitle, setEditTitle] = useState('')
+  const [editDetail, setEditDetail] = useState('')
+  const [editSaving, setEditSaving] = useState(false)
   const [moving, setMoving] = useState<string | null>(null)
   const [reload, setReload] = useState(0)
   const [message, setMessage] = useState('')
@@ -82,8 +101,8 @@ export default function TasksWorkspace() {
     if (reload === 0) { setTasks(null); setNotice('') }
     setMessage('')
     fetchProjectTasks(projectId, controller.signal)
-      .then((board) => { setTasks(board.tasks); setCanCreate(board.canCreate); setCanMove(board.canMove) })
-      .catch((reason) => { if (reason?.name !== 'AbortError') { setCanCreate(false); setCanMove(false); setMessage(failureMessage(reason)) } })
+      .then((board) => { setTasks(board.tasks); setCanCreate(board.canCreate); setCanMove(board.canMove); setCanEdit(board.canEdit) })
+      .catch((reason) => { if (reason?.name !== 'AbortError') { setCanCreate(false); setCanMove(false); setCanEdit(false); setMessage(failureMessage(reason)) } })
     return () => controller.abort()
   }, [projectId, reload])
 
@@ -101,6 +120,30 @@ export default function TasksWorkspace() {
       if (reason instanceof FridayWorkError && reason.status === 409) setReload((value) => value + 1)
     } finally {
       setMoving(null)
+    }
+  }
+
+  const startEdit = (task: FridayTask) => {
+    setEditing(task.id); setEditTitle(task.title); setEditDetail(''); setNotice('')
+  }
+
+  const saveEdit = async (event: FormEvent, task: FridayTask) => {
+    event.preventDefault()
+    const trimmed = editTitle.trim()
+    if (!trimmed || editSaving) return
+    setEditSaving(true)
+    setNotice('')
+    try {
+      const edited = await editProjectTask(task, trimmed, editDetail.trim() || undefined)
+      if (selectedProject.current === edited.projectId)
+        setTasks((current) => (current || []).map((item) => item.id === edited.id ? edited : item))
+      setEditing(null)
+      setNotice(`Saved “${edited.title}”. Its status did not change.`)
+    } catch (reason) {
+      setNotice(editFailure(reason))
+      if (reason instanceof FridayWorkError && reason.status === 409) { setEditing(null); setReload((value) => value + 1) }
+    } finally {
+      setEditSaving(false)
     }
   }
 
@@ -138,8 +181,8 @@ export default function TasksWorkspace() {
     <div className="v3-detail-hero">
       <div className="v3-node-icon large"><CheckCircle2/></div>
       <div><span className="v3-kicker">PROJECT WORK</span><h2>Tasks</h2>
-        <p>{canMove
-          ? 'Project tasks from Friday’s work database. Operators can add, claim and move tasks; nothing here runs one.'
+        <p>{canMove || canEdit
+          ? `Project tasks from Friday’s work database. Operators can add${canMove ? ', claim and move' : ''}${canEdit ? ' and edit' : ''} tasks; nothing here runs one.`
           : canCreate
             ? 'Project tasks from Friday’s work database. Operators can add a task; nothing here claims, moves or runs one.'
             : 'Read-only project tasks from Friday’s work database. Nothing on this screen creates, claims or changes a task.'}</p></div>
@@ -173,12 +216,24 @@ export default function TasksWorkspace() {
         : tasks.length === 0 ? <p role="status" className="v3-settings-message">No tasks recorded for {project?.name} yet.</p>
           : <ul className="v3-settings-list fx-task-board" aria-label={`${project?.name} tasks`}>
             {tasks.map((task) => <li key={task.id}>
-              <span className="v3-settings-name"><b>{task.title}</b><small>{task.id} · version {task.version}</small></span>
+              {editing === task.id
+                ? <form className="fx-task-edit" aria-label={`Edit ${task.title}`} onSubmit={(event) => void saveEdit(event, task)}>
+                  <label>Title<input value={editTitle} maxLength={TITLE_MAX} required onChange={(event) => setEditTitle(event.target.value)}/></label>
+                  <label>New details (optional, replaces the current ones)<input value={editDetail} maxLength={DETAIL_MAX}
+                    placeholder="Leave empty to keep the current details" onChange={(event) => setEditDetail(event.target.value)}/></label>
+                  <span className="fx-task-moves">
+                    <button type="submit" disabled={editSaving || !editTitle.trim()}>{editSaving ? 'Saving…' : 'Save'}</button>
+                    <button type="button" disabled={editSaving} onClick={() => setEditing(null)}>Cancel edit</button>
+                  </span>
+                </form>
+                : <span className="v3-settings-name"><b>{task.title}</b><small>{task.id} · version {task.version}</small></span>}
               <span className={`v3-settings-pill ${task.status === 'completed' ? 'on' : task.status === 'blocked' ? 'warn' : 'off'}`}>{STATUS_LABELS[task.status]}</span>
               {canMove && MOVES[task.status].length > 0 && <span className="fx-task-moves" role="group" aria-label={`Move ${task.title}`}>
                 {MOVES[task.status].map((option) => <button key={option.to} type="button" disabled={moving !== null}
                   onClick={() => void move(task, option.to, option.label)}>{option.label}</button>)}
               </span>}
+              {canEdit && editable(task) && editing !== task.id && <button type="button" className="fx-task-edit-button"
+                disabled={editing !== null || moving !== null} aria-label={`Edit ${task.title}`} onClick={() => startEdit(task)}>Edit</button>}
             </li>)}
           </ul>}
   </section>

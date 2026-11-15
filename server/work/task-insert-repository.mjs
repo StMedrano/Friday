@@ -2,7 +2,9 @@
 // paths. Its key must select the friday_work_writer role
 // (supabase/migrations/202611060001_friday_work_writer.sql), which can add a
 // task and read tasks back, plus, after 202611150001_friday_work_mover.sql,
-// call the one checked move function. NEVER pass the service key here.
+// call the one checked move function, and after
+// 202611150002_friday_work_editor.sql the one checked edit function.
+// NEVER pass the service key here.
 
 const DENY=()=>{throw Error('work-write-storage-denied')}
 const CONFLICT=()=>{const e=Error('work-write-conflict');e.code='conflict';throw e}
@@ -17,6 +19,10 @@ const UUID=/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 const MOVE_ERRORS=Object.freeze({
  'version-conflict':'conflict','lease-conflict':'conflict','idempotency-conflict':'conflict',
  'invalid-transition':'invalid','invalid-input':'invalid','not-found':'denied',
+})
+const EDIT_ERRORS=Object.freeze({
+ 'version-conflict':'conflict','lease-conflict':'conflict','task-closed':'closed',
+ 'invalid-input':'invalid','not-found':'denied',
 })
 const moveError=code=>{const e=Error('work-move-'+code);e.code=code;throw e}
 
@@ -42,7 +48,7 @@ function validBaseUrl(value){
  * with different content is a conflict, never an overwrite.
  */
 export function createSupabaseTaskInsertRepository({
- baseUrl,writeKey,gatewayKey='',fetchImpl=globalThis.fetch,timeoutMs=5000,moveEnabled=false,
+ baseUrl,writeKey,gatewayKey='',fetchImpl=globalThis.fetch,timeoutMs=5000,moveEnabled=false,editEnabled=false,
 }={}){
  const ready=validBaseUrl(baseUrl)&&typeof writeKey==='string'&&writeKey.length>0&&
   typeof fetchImpl==='function'&&Number.isSafeInteger(timeoutMs)&&timeoutMs>=100&&timeoutMs<=15000
@@ -120,6 +126,31 @@ export function createSupabaseTaskInsertRepository({
      row.version!==input.expectedVersion+1)DENY()
   return toTask(row)
  }
+ /**
+  * Change one task's title, and its objective when one is given, through
+  * friday_operator_edit_task. The database checks the version, the project,
+  * that the task is not completed or cancelled, and any live claim held by
+  * someone else. Status, claims and project never change here.
+  */
+ async function edit(input){
+  if(!canEdit)DENY()
+  if(!exact(input,['workItemId','projectId','expectedVersion','principalId','title','objective'])||
+     !UUID.test(String(input.workItemId))||!id(input.projectId)||
+     !Number.isSafeInteger(input.expectedVersion)||input.expectedVersion<1||
+     !PRINCIPAL.test(input.principalId)||!text(input.title,160)||
+     (input.objective!==null&&!text(input.objective,4000)))DENY()
+  const result=await call('/rest/v1/rpc/friday_operator_edit_task',{method:'POST',single:true,body:{
+   work_id:input.workItemId,project_id:input.projectId,expected_version:input.expectedVersion,
+   principal_id:input.principalId,new_title:input.title,new_objective:input.objective,
+  }})
+  if(typeof result.error==='string')moveError(EDIT_ERRORS[result.error]||'unavailable')
+  const row=result.task
+  if(result.status!=='edited'||!validTask(row)||row.id!==input.workItemId||
+     row.project_id!==input.projectId||row.title!==input.title||
+     row.version!==input.expectedVersion+1)DENY()
+  return toTask(row)
+ }
  const canMove=ready&&moveEnabled===true
- return Object.freeze({enabled:ready,canMove,create,move})
+ const canEdit=ready&&editEnabled===true
+ return Object.freeze({enabled:ready,canMove,canEdit,create,move,edit})
 }

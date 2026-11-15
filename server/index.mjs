@@ -118,6 +118,7 @@ if (config.work.enabled) {
       writeKey: config.work.write.key,
       gatewayKey: config.work.gatewayKey,
       moveEnabled: config.work.write.moveEnabled,
+      editEnabled: config.work.write.editEnabled,
     }) : null,
   })
   if (!workReadBridge?.enabled) console.warn('Friday work reads stayed disabled; check Access configuration, the work read key and the grant file')
@@ -129,6 +130,10 @@ if (config.work.enabled) {
   if (config.work.write.moveEnabled) {
     if (workReadBridge?.canMoveTasks) console.log('Friday task claim and move enabled')
     else console.warn('Friday task claim and move stayed disabled; it also needs FRIDAY_WORK_WRITE_ENABLED and its key')
+  }
+  if (config.work.write.editEnabled) {
+    if (workReadBridge?.canEditTasks) console.log('Friday task editing enabled')
+    else console.warn('Friday task editing stayed disabled; it also needs FRIDAY_WORK_WRITE_ENABLED and its key')
   }
 }
 
