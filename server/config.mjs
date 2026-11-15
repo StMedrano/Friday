@@ -290,6 +290,8 @@ export function getConfig(env = process.env) {
     // generating spends AIDesigner credits, so it is operator-only and audited.
     aidesigner: {
       enabled: enabled(env.FRIDAY_AIDESIGNER_ENABLED),
+      // Separate opt-in for the Generate button (spends credits); listing needs only `enabled`.
+      generateEnabled: enabled(env.FRIDAY_AIDESIGNER_GENERATE_ENABLED),
       apiKey: env.AIDESIGNER_API_KEY || '',
       baseUrl: env.AIDESIGNER_BASE_URL || 'https://api.aidesigner.ai',
       timeoutMs: Math.ceil(positiveNumber(env.FRIDAY_AIDESIGNER_TIMEOUT_MS, 180000)),

@@ -9,7 +9,7 @@ const SESSION = '1b8f3c2a-3d4e-4f5a-9b1c-8e7d6f5a4b3c'
 const operator = { subject: 'operator-sub', email: 'operator@example.test' }
 const liveConfig = (aidesigner = {}) => ({
   ...getConfig({ FRIDAY_MODE: 'live' }),
-  aidesigner: { enabled: true, apiKey: 'gp_' + 'k'.repeat(40), baseUrl: 'https://api.aidesigner.ai', timeoutMs: 1000, ...aidesigner },
+  aidesigner: { enabled: true, generateEnabled: true, apiKey: 'gp_' + 'k'.repeat(40), baseUrl: 'https://api.aidesigner.ai', timeoutMs: 1000, ...aidesigner },
 })
 const generated = { sessionId: SESSION, canvasId: null, runId: null, editorUrl: 'https://app.aidesigner.ai/editor/' + SESSION, canvasDelivery: 'appended', replay: false, htmlBytes: 10 }
 
@@ -40,7 +40,7 @@ test('a signed-in person can list AIDesigner sessions', async () => {
     const response = await fetch(base + '/api/aidesigner/sessions')
     assert.equal(response.status, 200)
     assert.equal(response.headers.get('cache-control'), 'no-store')
-    assert.deepEqual(await response.json(), { sessions: [{ sessionId: SESSION, title: 'Landing', editorUrl: null, canvasCount: 1, publishedUrl: null, updatedAt: null }] })
+    assert.deepEqual(await response.json(), { sessions: [{ sessionId: SESSION, title: 'Landing', editorUrl: null, canvasCount: 1, publishedUrl: null, updatedAt: null }], generate: true })
     assert.equal(calls.list, 1)
     assert.deepEqual(calls.gate, [false])
   })
@@ -149,4 +149,32 @@ test('generation is audited when an audit store is configured', async () => {
   assert.deepEqual(events.map(event => [event.action, event.phase, event.target]), [
     ['aidesigner.design.generate', 'requested', SESSION], ['aidesigner.design.generate', 'succeeded', SESSION],
   ])
+})
+
+test('the session list says whether generating is switched on', async () => {
+  await withServer({ config: liveConfig({ generateEnabled: false }) }, async (base) => {
+    assert.equal((await (await fetch(base + '/api/aidesigner/sessions')).json()).generate, false)
+  })
+})
+
+test('generation stays off until its own flag is set, even for an operator', async () => {
+  for (const generateEnabled of [false, undefined, 'true']) {
+    await withServer({ config: liveConfig({ generateEnabled }) }, async (base, calls) => {
+      const response = await post(base, { prompt: 'x' })
+      assert.equal(response.status, 503)
+      assert.deepEqual(await response.json(), { error: 'aidesigner-generate-disabled' })
+      assert.equal(calls.generate.length, 0)
+      assert.deepEqual(calls.gate, [true])
+    })
+  }
+})
+
+test('a switched-off integration says so, apart from an AIDesigner outage', async () => {
+  await withServer({ config: liveConfig({ enabled: false }) }, async (base, calls) => {
+    for (const response of [await fetch(base + '/api/aidesigner/sessions'), await post(base, { prompt: 'x' })]) {
+      assert.equal(response.status, 503)
+      assert.deepEqual(await response.json(), { error: 'aidesigner-disabled' })
+    }
+    assert.equal(calls.list + calls.generate.length, 0)
+  })
 })

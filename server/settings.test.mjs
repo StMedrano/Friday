@@ -145,7 +145,7 @@ test('service token expiry is reported as days remaining with a warning window, 
 })
 
 test('features report each opt-in flag, whether its companion settings are present, and its setup section', () => {
-  const ids = ['github', 'uptime', 'agent-activity', 'approvals', 'work-read', 'work-write', 'model-routing', 'web-growth']
+  const ids = ['github', 'uptime', 'agent-activity', 'approvals', 'work-read', 'work-write', 'model-routing', 'web-growth', 'aidesigner-generate']
   const off = buildSettingsView(getConfig({}))
   assert.deepEqual(off.features.map(item => item.id), ids)
   for (const item of off.features) {
@@ -159,10 +159,10 @@ test('features report each opt-in flag, whether its companion settings are prese
   const partial = byId(buildSettingsView(getConfig({
     FRIDAY_GITHUB_ENABLED: 'true', FRIDAY_MONITORING_UPTIME_ENABLED: 'true', FRIDAY_AGENT_ACTIVITY_ENABLED: 'true',
     FRIDAY_APPROVALS_ENABLED: 'true', FRIDAY_WORK_READ_ENABLED: 'true', FRIDAY_WORK_WRITE_ENABLED: 'true',
-    FRIDAY_MODEL_FABRIC_ENABLED: 'true', FRIDAY_WEB_GROWTH_ENABLED: 'true',
+    FRIDAY_MODEL_FABRIC_ENABLED: 'true', FRIDAY_WEB_GROWTH_ENABLED: 'true', FRIDAY_AIDESIGNER_GENERATE_ENABLED: 'true',
   })))
   assert.deepEqual(partial.uptime, {id: 'uptime', name: 'Uptime history', enabled: true, configured: false, setup: 'Uptime history'})
-  for (const id of ['uptime', 'approvals', 'work-read', 'work-write', 'model-routing', 'web-growth']) assert.equal(partial[id].configured, false, id)
+  for (const id of ['uptime', 'approvals', 'work-read', 'work-write', 'model-routing', 'web-growth', 'aidesigner-generate']) assert.equal(partial[id].configured, false, id)
   // These keep their records on the data volume (or, for GitHub, the token is
   // optional for public repositories) and need nothing else.
   assert.equal(partial.github.configured, true)
@@ -177,6 +177,7 @@ test('features report each opt-in flag, whether its companion settings are prese
     FRIDAY_NVIDIA_MODELS_JSON: JSON.stringify([{id: 'free-one', model: 'vendor/model', billingClass: 'free', capabilities: ['general'], supportsTools: false, supportsVision: false, maxTokens: 512}]),
     FRIDAY_WEB_GROWTH_ENABLED: 'true', FRIDAY_WEB_GROWTH_READER_URL: 'https://10.9.9.11', FRIDAY_WEB_GROWTH_READER_TOKEN: 'secret-web-growth',
     FRIDAY_WEB_GROWTH_READER_EMAILS: 'secret-reader@example.com',
+    FRIDAY_AIDESIGNER_ENABLED: 'true', AIDESIGNER_API_KEY: 'secret-aidesigner-key', FRIDAY_AIDESIGNER_GENERATE_ENABLED: 'true',
   })))
   for (const id of ids) assert.equal(full[id].configured, true, id)
 

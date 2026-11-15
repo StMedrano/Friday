@@ -212,11 +212,11 @@ decision.
 Switching production to the `runtime-nonroot` image. Needs a VM102
 maintenance window; see `docs/controller-nonroot-migration.md`.
 
-## aidesigner-generate-ui — `needs-approval`
+## aidesigner-generate-ui — `done`
 
-A Generate design button in Friday using `POST /api/aidesigner/designs`.
-Each generation spends AIDesigner credits, so the owner decides whether the
-UI should offer it.
+Approved by the owner 2026-11-15 and built by a project thread in Web
+Growth, Website designs (behind `FRIDAY_AIDESIGNER_GENERATE_ENABLED`, with a
+credit confirm step). Do not pick up.
 
 ## task-claim-and-move — `needs-approval`
 
