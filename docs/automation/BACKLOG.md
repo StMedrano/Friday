@@ -185,7 +185,9 @@ add a Generate button: generating spends credits and needs owner approval.
 **Done when:** tests cover off (503), empty, and a list; no POST is sent;
 `make verify` passes.
 
-## refresh-codex-md — `ready`
+## refresh-codex-md — `done`
+
+Merged with the 2026-11-15 queue refresh (PR #157).
 
 **Scope:** `CODEX.md` only. Docs only.
 

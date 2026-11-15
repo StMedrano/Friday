@@ -1,21 +1,26 @@
 # Friday — Ordered Finish Queue
 
-Last refreshed 2026-11-15 from `git log` on `main` (after #154) and
+Last refreshed 2026-11-15 from `git log` on `main` (after #156) and
 `FRIDAY_SHARED_MEMORY.md`.
 Earlier versions of this file (PWA staging, Tasks read path, four-project
 catalog) described work that has since merged; see `git log -- docs/codex/NEXT_STEPS.md`.
 
-Production is VM102. It runs `main` at `7aac30d` (#130), deployed by the owner
-on 2026-11-05 with `FRIDAY_GITHUB_ENABLED`, `FRIDAY_MONITORING_UPTIME_ENABLED`
-and `FRIDAY_AGENT_ACTIVITY_ENABLED` set to true (ledger, 2026-11-05).
+Production is VM102. On 2026-11-15 the owner deployed `main` as of #155
+(`39d6848`), which includes every PR in the table below (owner report in the
+project thread, 2026-11-15). The flags already on since 2026-11-05 are
+`FRIDAY_GITHUB_ENABLED`, `FRIDAY_MONITORING_UPTIME_ENABLED` and
+`FRIDAY_AGENT_ACTIVITY_ENABLED`; no other flag change is recorded. #156 merged
+after that deploy and ships with the next one.
 
-## 1. Merged, not deployed yet
+## 1. Deployed 2026-11-15, off until the owner turns them on
 
-Deploying needs the owner's go-ahead (`make preflight`, `make update`,
-`make health` in `/srv/infrastructure/apps/friday`). Every feature below is off
-by default unless noted.
+Every feature below is in production code and off by default unless noted.
+Turning one on is an `.env` change on VM102 followed by `make update` and
+`make health` in `/srv/infrastructure/apps/friday`. Run `make env-check`
+first: it lists names only and flags any feature turned on without its
+companion settings.
 
-| PR | What | To use it after deploy |
+| PR | What | To turn it on |
 | --- | --- | --- |
 | #131 | Chat asks the free-only model router first (`server/assistant.mjs`). | Set `FRIDAY_MODEL_FABRIC_ENABLED=true` and configure free NVIDIA models (`docs/model-fabric.md`). |
 | #132 | Repositories can be registered by GitHub URL with no checkout. Always available. | Settings, Repositories: add each repo by name and GitHub URL. |
@@ -28,7 +33,7 @@ by default unless noted.
 | #139 | Docs only: four `ready` items added to `docs/automation/BACKLOG.md`. | Nothing. |
 | #140 | Phone layout matches the AIDesigner phone design. Always on. | Nothing beyond the deploy. |
 | #150 | Web Growth, Website designs: AIDesigner design list plus Generate with a credit confirm step (operator only, audited). | With #123 set up, also set `FRIDAY_AIDESIGNER_GENERATE_ENABLED=true` (`docs/integrations.md`, AIDesigner design generation). |
-| #147 | `make env-check`: offline check of a VM102 `.env` against `compose.yaml`. | Run it on VM102 before the next deploy. |
+| #147, #156 | `make env-check`: offline check of a VM102 `.env` against `compose.yaml` and the tunnel and non-root overlays. #156 (not deployed yet) also passes `FRIDAY_AUDIT_MAX_BYTES` through Compose. | Run it on VM102 before each flag change. |
 | #148 | Settings, General lists AIDesigner design sessions, read only. | Same settings as #123. |
 | #149 | Claim and move tasks on the Tasks screen (operator plus project grant; a live claim held by someone else blocks the move). | Apply `supabase/migrations/202611150001_friday_work_mover.sql` on VM132 after the #138 migration, then set `FRIDAY_WORK_MOVE_ENABLED=true` (needs the #138 write path on). `docs/integrations.md`, Claim and move tasks. |
 | #151 | Automated fixes: after an approval, an operator presses Run fix; the action comes only from the owner's playbook file. Dry run by default. | `FRIDAY_APPROVALS_ENABLED=true`, `FRIDAY_REMEDIATION_ENABLED=true`, a playbook file. Execute mode also needs `FRIDAY_MODE=live`, the action audit, an owner-run https executor and an armed automation gate. `docs/integrations.md`, Automated fixes. |
@@ -53,14 +58,20 @@ Listed in `docs/automation/BACKLOG.md` under "Needs owner approval" or in the le
 
 ## 4. Next agent work (no approval needed)
 
-Taken in order by the nightly builder from `docs/automation/BACKLOG.md`.
+`docs/automation/BACKLOG.md` has no `ready` items left (refresh-codex-md
+merged with this refresh). The nightly builder idles until new items are
+added.
 
-1. `refresh-codex-md`: correct stale PR and branch states in `CODEX.md`.
-2. Keep this file current after each merge or deploy.
+1. Keep this file current after each merge or deploy.
+2. Not built and not approved: editing task text (only create, claim and move
+   were approved), creating agents from Friday, and Open app on Applications.
+   Each needs an owner decision before it goes into the backlog.
 
 #142 (service token expiry), #143 (Tasks and Approvals smoke test), #144
 (setup links on Not connected placeholders) and #145 (Supabase probe retry)
-merged on 2026-11-09 and are not deployed. Settings, General now lists every
+merged on 2026-11-09 and were deployed on 2026-11-15. Set
+`FRIDAY_SERVICE_TOKEN_EXPIRES_AT=2026-11-24` in the VM102 `.env` so the
+expiry warning shows. Settings, General now lists every
 opt-in feature as on or off (settings-feature-flags).
 
 The authentication docs from #109's branch are on `main`, corrected to what
