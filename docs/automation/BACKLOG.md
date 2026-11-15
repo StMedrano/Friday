@@ -149,7 +149,7 @@ show values.
 **Done when:** server and UI tests cover off, on but incomplete, and on and
 complete; no key, token, email or address is serialized; `make verify` passes.
 
-## env-check-script — `ready`
+## env-check-script — `in-review`
 
 **Scope:** a new `scripts/check-env.mjs`, its test, a `make env-check`
 target, `docs/integrations.md` or the deploy runbook. No server changes.

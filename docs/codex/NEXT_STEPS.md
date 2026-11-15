@@ -27,7 +27,7 @@ by default unless noted.
 | #123 | Server-side AIDesigner REST client: list design sessions, generate a design (operator-only, audited, spends credits). No UI. | Add `AIDESIGNER_API_KEY` and set `FRIDAY_AIDESIGNER_ENABLED=true` (`docs/integrations.md`). |
 | #139 | Docs only: four `ready` items added to `docs/automation/BACKLOG.md`. | Nothing. |
 | #140 | Phone layout matches the AIDesigner phone design. Always on. | Nothing beyond the deploy. |
-| this PR | Web Growth, Website designs: AIDesigner design list plus Generate with a credit confirm step (operator only, audited). | With #123 set up, also set `FRIDAY_AIDESIGNER_GENERATE_ENABLED=true` (`docs/integrations.md`, AIDesigner design generation). |
+| #150 | Web Growth, Website designs: AIDesigner design list plus Generate with a credit confirm step (operator only, audited). | With #123 set up, also set `FRIDAY_AIDESIGNER_GENERATE_ENABLED=true` (`docs/integrations.md`, AIDesigner design generation). |
 
 ## 2. Waiting on an owner decision (do not start)
 
@@ -51,8 +51,8 @@ Listed in `docs/automation/BACKLOG.md` under "Needs owner approval" or in the le
 
 Taken in order by the nightly builder from `docs/automation/BACKLOG.md`.
 
-1. `env-check-script`: offline check of a VM102 `.env` against `compose.yaml` before the next deploy.
-2. `aidesigner-sessions-panel` (in review on `bot/nightly-aidesigner-sessions-panel`): Settings, General lists AIDesigner design sessions, read only (no Generate button).
+1. `env-check-script` merged as #147: `make env-check` checks a VM102 `.env` against `compose.yaml` before the next deploy (`docs/integrations.md`, Checking .env before a deploy).
+2. `aidesigner-sessions-panel` merged as #148: Settings, General lists AIDesigner design sessions, read only (no Generate button).
 3. `refresh-codex-md`: correct stale PR and branch states in `CODEX.md`.
 4. Keep this file current after each merge or deploy.
 
