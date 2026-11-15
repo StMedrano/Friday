@@ -63,6 +63,10 @@ Returns bounded recent FRIDAY-owned monitoring events newest-first. History must
 
 Owner-written Open app links for Applications, off unless `FRIDAY_APP_LINKS_ENABLED=true` and the file at `FRIDAY_APP_LINKS_PATH` is valid at startup. Returns `{"links":[{"serviceId","url"}]}` (https only, no credentials in the URL) or 503 `app-links-disabled`; 400 `unexpected-query` with a query string. No write route. See `docs/integrations.md`, Open app links.
 
+### `GET /api/homelab/actions`, `POST /api/homelab/actions/preview`, `POST /api/homelab/actions/run`
+
+Homelab changes: start, shut down or reboot the Proxmox guests listed in the owner's file, off unless `FRIDAY_HOMELAB_ACTIONS_ENABLED=true`. GET lists `{mode, actions:[{id,name,guestType,vmid,node,operations,status}], recent, execution}`. Preview `{"actionId","operation"}` is a dry run that returns `{preview:{planId?,summary,allowed,confirmText,expiresAt,...}}` and changes nothing. Run `{"planId","confirm"}` needs the typed guest name, the same operator, a preview under 5 minutes old and, in execute mode, a human operator, the durable audit and the armed automation gate. Both POSTs are operator-only, JSON-only and audited. See `docs/integrations.md`, Homelab changes.
+
 ### `GET /api/incidents/:incidentId/diagnostics`
 
 Returns the persisted safe diagnostic report for one existing incident when diagnostics are supported/enabled.

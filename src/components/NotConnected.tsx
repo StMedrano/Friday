@@ -19,6 +19,7 @@ export const SETUP_SECTIONS = [
   'AIDesigner design generation',
   'Open app links',
   'New agents from Friday',
+  'Homelab changes',
 ] as const
 export type SetupSection = typeof SETUP_SECTIONS[number]
 export const isSetupSection = (value: unknown): value is SetupSection => SETUP_SECTIONS.includes(value as SetupSection)

@@ -82,6 +82,9 @@ function featureView(config) {
     feature('model-routing', 'Free model routing for chat', config.modelFabric?.enabled, config.ai?.enabled === true && modelTargets > 0, 'Free model routing'),
     feature('web-growth', 'Web Growth leads', webGrowth.enabled,
       present(webGrowth.baseUrl) && present(webGrowth.token) && Array.isArray(webGrowth.readerEmails) && webGrowth.readerEmails.length > 0, 'Web Growth leads'),
+    // Needs its own scoped Proxmox token; dry-run still reads live guest state with it.
+    feature('homelab-actions', 'Homelab changes (Proxmox power actions)', config.homelabActions?.enabled,
+      present(config.homelabActions?.proxmoxUrl) && present(config.homelabActions?.proxmoxTokenId) && present(config.homelabActions?.proxmoxTokenSecret), 'Homelab changes'),
     // Opens pull requests on GitHub; needs its own write token.
     feature('agent-proposals', 'New agents (pull requests)', config.agentProposals?.enabled,
       present(config.agentProposals?.token) && present(config.agentProposals?.repository), 'New agents from Friday'),

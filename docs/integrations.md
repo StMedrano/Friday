@@ -226,6 +226,50 @@ Every successful Phase 1 agent reply remains advisory and reports `execution.per
 - Use the smallest read-only role that can list nodes, VMs/CTs, and status.
 - Never reuse the root password or a broad administrator token.
 
+## Homelab changes
+
+Friday can start, shut down (clean, like the power button) or reboot the Proxmox VMs and containers the owner lists. Nothing else: no stop/reset, no create, delete, migrate, config, snapshot, network or shell. It is off by default (`FRIDAY_HOMELAB_ACTIONS_ENABLED=false`) and dry-run by default.
+
+How a change happens, every time:
+
+1. On **Infrastructure**, an operator presses Start, Shut down or Reboot on a listed guest. Friday reads the guest's live state and shows a **dry-run preview** ("VM 140 development is running. Approving will ask it to reboot cleanly."). Nothing changes. If the guest is not in the state the operation needs (start needs stopped; shutdown and reboot need running) there is nothing to approve.
+2. The same operator **approves** by typing the guest's name within 5 minutes. A preview approves one run, once.
+3. Right before acting Friday re-reads the guest's state (if it changed, nothing happens), then, in execute mode only, checks the automation gate and sends the one Proxmox call.
+
+Model text, chat and browser input never choose the guest or the operation: those come only from the owner's file. Every preview and run is written to the action audit (`homelab.actions.preview`, `homelab.actions.run`) and the run list at `FRIDAY_HOMELAB_RUNS_PATH` (default `/data/homelab-runs.json`, mode 0600).
+
+**The owner's action file** at `FRIDAY_HOMELAB_ACTIONS_PATH` (default `/data/homelab-actions.json`; must not be group- or world-writable or a symlink; any invalid entry keeps the feature off):
+
+```json
+{"schemaVersion": 1, "actions": [
+  {"id": "development", "name": "development", "node": "home", "guestType": "qemu", "vmid": 140,
+   "operations": ["start", "shutdown", "reboot"], "description": "Dev VM"},
+  {"id": "ollama", "name": "ollama", "node": "home", "guestType": "lxc", "vmid": 108, "operations": ["reboot"]}
+]}
+```
+
+`guestType` is `qemu` (VM) or `lxc` (container). `name` is what the operator types to approve. Think before listing VM102 (Friday itself; shutting it down stops Friday) or VM132 (Supabase).
+
+**A separate, scoped Proxmox token.** Never reuse the read-only monitoring token or root. On the Proxmox host, as root:
+
+```sh
+pveum role add FridayPower -privs "VM.Audit VM.PowerMgmt"
+pveum user add friday-power@pve --comment "Friday homelab changes"
+pveum user token add friday-power@pve actions --privsep 1   # shows the secret once
+# For each guest in the action file (example: 140):
+pveum acl modify /vms/140 --users friday-power@pve --roles FridayPower
+pveum acl modify /vms/140 --tokens 'friday-power@pve!actions' --roles FridayPower
+```
+
+Put `friday-power@pve!actions` in `FRIDAY_HOMELAB_PROXMOX_TOKEN_ID` and the secret in `FRIDAY_HOMELAB_PROXMOX_TOKEN_SECRET`. `FRIDAY_HOMELAB_PROXMOX_URL` defaults to `FRIDAY_PROXMOX_URL` (https only); `FRIDAY_PROXMOX_INSECURE` applies to both. Because the ACL lists only those guests and only power rights, Proxmox itself refuses anything else even if Friday were wrong.
+
+**Modes.**
+
+- `FRIDAY_HOMELAB_ACTIONS_MODE=dry-run` (default): approving records `dry-run` in the run list and changes nothing. The token is still used to read guest state.
+- `FRIDAY_HOMELAB_ACTIONS_MODE=execute`: approving sends the call. It also needs `FRIDAY_MODE=live` and `FRIDAY_AUDIT_ENABLED=true` (otherwise the feature stays off at startup), a signed-in human operator (never a service token), and the global automation gate armed: the file at `FRIDAY_AUTOMATION_GATE_PATH` (default `/data/automation-gate/state.json`, owner-only file and directory) must contain `{"schemaVersion":1,"state":"allow-approved-actions","expiresAt":<epoch ms at most 5 minutes ahead>}`. A closed gate answers 423 `automation-gate-closed` and nothing is sent. Friday writes a `pending` record before calling Proxmox, so a run is never sent twice; `submitted` means Proxmox accepted the task (its UPID is recorded), `failed` records the HTTP status only.
+
+**API.** `GET /api/homelab/actions` lists the guests with live state, the mode and the 20 latest runs (503 `homelab-actions-disabled` when off). `POST /api/homelab/actions/preview` with `{"actionId","operation"}` and `POST /api/homelab/actions/run` with `{"planId","confirm"}` are operator-only, JSON-only and refused cross-site. Errors: 404 `homelab-actions-disabled` or `homelab-action-not-found`, 403 `homelab-operation-not-allowed`, `homelab-preview-not-yours` or `access-denied`, 400 `homelab-confirm-mismatch` or `invalid-homelab-request`, 409 `homelab-preview-expired` or `homelab-state-changed`, 423 `automation-gate-closed`, 502 when Proxmox refuses, 503 `homelab-actions-unavailable` or `audit-unavailable`.
+
 ## HTTP endpoint checks
 
 - Adapter: `server/adapters/endpoints.mjs`

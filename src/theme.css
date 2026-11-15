@@ -743,3 +743,22 @@ code, kbd, pre, samp,
 .fx-new-agent p { margin: 0; font-size: 12px; }
 .fx-new-agent textarea { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; }
 .fx-new-agent > button { justify-self: start; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 12px; padding: 4px 10px; cursor: pointer; }
+
+/* Homelab changes (Infrastructure) */
+.fx-homelab { display: grid; gap: 10px; }
+.fx-homelab-note { margin: 4px 0 0; font-size: 12px; color: var(--muted); }
+.fx-homelab-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.fx-homelab-list li { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 10px; }
+.fx-homelab-list li > div { flex: 1 1 180px; min-width: 0; display: grid; gap: 2px; }
+.fx-homelab-list small { font-size: 12px; color: var(--muted); }
+.fx-homelab-ops { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.fx-homelab-preview { display: grid; gap: 8px; padding: 12px; border: 1px solid var(--line-strong); border-radius: 10px; background: var(--surface-2); }
+.fx-homelab-preview p { margin: 0; font-size: 13px; }
+.fx-homelab-preview form { display: flex; flex-wrap: wrap; align-items: end; gap: 8px; }
+.fx-homelab-preview label { display: grid; gap: 4px; font-size: 12px; color: var(--muted); }
+.fx-homelab-preview input { font: inherit; height: 32px; padding: 0 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; max-width: 100%; }
+.fx-homelab-preview small { flex-basis: 100%; font-size: 11px; color: var(--faint); }
+.fx-homelab-recent h3 { margin: 0 0 6px; font-size: 13px; }
+.fx-homelab-recent ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; font-size: 12px; }
+.fx-homelab-recent li { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.fx-homelab-recent small { color: var(--faint); }
