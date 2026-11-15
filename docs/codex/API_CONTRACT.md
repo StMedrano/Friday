@@ -65,7 +65,7 @@ Owner-written Open app links for Applications, off unless `FRIDAY_APP_LINKS_ENAB
 
 ### `GET /api/homelab/actions`, `POST /api/homelab/actions/preview`, `POST /api/homelab/actions/run`
 
-Homelab changes: start, shut down or reboot the Proxmox guests listed in the owner's file, off unless `FRIDAY_HOMELAB_ACTIONS_ENABLED=true`. GET lists `{mode, actions:[{id,name,guestType,vmid,node,operations,status}], recent, execution}`. Preview `{"actionId","operation"}` is a dry run that returns `{preview:{planId?,summary,allowed,confirmText,expiresAt,...}}` and changes nothing. Run `{"planId","confirm"}` needs the typed guest name, the same operator, a preview under 5 minutes old and, in execute mode, a human operator, the durable audit and the armed automation gate. Both POSTs are operator-only, JSON-only and audited. See `docs/integrations.md`, Homelab changes.
+Homelab changes: start, shut down or reboot the Proxmox guests, and start, stop or restart the Docker containers (through `executor/`), listed in the owner's file, off unless `FRIDAY_HOMELAB_ACTIONS_ENABLED=true`. GET lists `{mode, actions:[{id,kind,name,guestType?,vmid?,node?,host?,container?,operations,status}], recent, execution}`. Preview `{"actionId","operation"}` is a dry run that returns `{preview:{planId?,summary,allowed,confirmText,expiresAt,...}}` and changes nothing. Run `{"planId","confirm"}` needs the typed guest name, the same operator, a preview under 5 minutes old and, in execute mode, a human operator, the durable audit and the armed automation gate. Both POSTs are operator-only, JSON-only and audited. See `docs/integrations.md`, Homelab changes.
 
 ### `GET /api/incidents/:incidentId/diagnostics`
 

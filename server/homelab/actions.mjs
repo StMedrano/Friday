@@ -3,10 +3,12 @@ import { lstat, mkdir, readFile, rename, writeFile } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 import { dirname } from 'node:path'
 
-// Homelab changes from Friday: power actions on Proxmox guests the owner lists.
+// Homelab changes from Friday: power actions on the Proxmox guests and Docker
+// containers the owner lists.
 // A change happens only when all of these hold:
 //   1. FRIDAY_HOMELAB_ACTIONS_ENABLED is on and the owner's catalog file is valid,
-//   2. the catalog lists that guest and that operation (start, shutdown, reboot),
+//   2. the catalog lists that guest and that operation (Proxmox: start, shutdown,
+//      reboot; Docker containers: start, stop, restart),
 //   3. an operator asked for a dry-run preview, which read the guest's live state,
 //   4. the same operator approved that preview within five minutes by typing the
 //      guest's name (each preview approves one run, once),
@@ -14,11 +16,16 @@ import { dirname } from 'node:path'
 //   6. in execute mode, the automation gate file on the host is armed.
 // Nothing is ever chosen by model text. The Proxmox token is a separate,
 // owner-scoped token (VM.Audit + VM.PowerMgmt on the listed guests only), so
-// Proxmox itself refuses anything outside that scope. The default mode is
+// Proxmox itself refuses anything outside that scope. Containers go through the
+// owner-run executor (executor/), which keeps its own allowlist: Friday never
+// holds the Docker socket. The default mode is
 // dry-run: it records what would run and changes nothing.
 
 export const MODES = Object.freeze(['dry-run', 'execute'])
-export const OPERATIONS = Object.freeze(['start', 'shutdown', 'reboot'])
+export const PROXMOX_OPERATIONS = Object.freeze(['start', 'shutdown', 'reboot'])
+export const DOCKER_OPERATIONS = Object.freeze(['start', 'stop', 'restart'])
+export const OPERATIONS = Object.freeze(['start', 'shutdown', 'reboot', 'stop', 'restart'])
+const CONTAINER = /^[A-Za-z0-9][A-Za-z0-9_.-]{0,127}$/
 const ID = /^[a-z0-9][a-z0-9-]{0,62}$/
 const NODE = /^[A-Za-z0-9][A-Za-z0-9.-]{0,62}$/
 const CONTROL = /[\u0000-\u001f\u007f]/
@@ -32,11 +39,13 @@ export const PLAN_TTL_MS = 5 * 60 * 1000
 const STATES = ['dry-run', 'pending', 'submitted', 'failed']
 
 // What each operation needs, and what it does, in plain words.
-const NEEDS = Object.freeze({ start: 'stopped', shutdown: 'running', reboot: 'running' })
+const NEEDS = Object.freeze({ start: 'stopped', shutdown: 'running', reboot: 'running', stop: 'running', restart: 'running' })
 const VERB = Object.freeze({
   start: 'start it',
   shutdown: 'ask it to shut down cleanly (like pressing the power button)',
   reboot: 'ask it to reboot cleanly',
+  stop: 'stop it (Docker sends SIGTERM, then kills it after 30 seconds)',
+  restart: 'restart it',
 })
 
 const text = (value, max) => typeof value === 'string' && value.trim() === value && value.length > 0 && value.length <= max && !CONTROL.test(value)
@@ -50,18 +59,31 @@ export function parseHomelabCatalog(value) {
     || !Array.isArray(value.actions) || value.actions.length > MAX_ACTIONS) throw Error('invalid-homelab-catalog')
   const ids = new Set()
   const guests = new Set()
+  const validOps = (ops, allowed) => Array.isArray(ops) && ops.length > 0 && ops.length <= allowed.length
+    && new Set(ops).size === ops.length && ops.every((op) => allowed.includes(op))
   return Object.freeze(value.actions.map((entry) => {
-    if (!exactKeys(entry, ['id', 'name', 'node', 'guestType', 'vmid', 'operations'], ['description'])
-      || !ID.test(entry.id) || ids.has(entry.id) || !text(entry.name, 80) || !NODE.test(entry.node)
-      || !['qemu', 'lxc'].includes(entry.guestType) || !Number.isSafeInteger(entry.vmid) || entry.vmid < 100 || entry.vmid > 999999999
-      || !Array.isArray(entry.operations) || entry.operations.length === 0 || entry.operations.length > OPERATIONS.length
-      || new Set(entry.operations).size !== entry.operations.length || !entry.operations.every((op) => OPERATIONS.includes(op))
-      || (entry.description !== undefined && !text(entry.description, 200))) throw Error('invalid-homelab-catalog')
-    const guest = `${entry.node}/${entry.vmid}`
-    if (guests.has(guest)) throw Error('invalid-homelab-catalog')
+    let target
+    let allowed
+    if (entry?.kind === 'docker') {
+      // A container the owner's executor on that Docker host also allowlists.
+      if (!exactKeys(entry, ['kind', 'id', 'name', 'host', 'container', 'operations'], ['description'])
+        || !text(entry.host, 80) || !CONTAINER.test(entry.container)) throw Error('invalid-homelab-catalog')
+      target = `docker:${entry.host}/${entry.container}`
+      allowed = DOCKER_OPERATIONS
+    } else {
+      if (!exactKeys(entry, ['id', 'name', 'node', 'guestType', 'vmid', 'operations'], ['description', 'kind'])
+        || (entry.kind !== undefined && entry.kind !== 'proxmox') || !NODE.test(entry.node)
+        || !['qemu', 'lxc'].includes(entry.guestType) || !Number.isSafeInteger(entry.vmid) || entry.vmid < 100 || entry.vmid > 999999999)
+        throw Error('invalid-homelab-catalog')
+      target = `proxmox:${entry.node}/${entry.vmid}`
+      allowed = PROXMOX_OPERATIONS
+    }
+    if (!ID.test(entry.id) || ids.has(entry.id) || !text(entry.name, 80) || !validOps(entry.operations, allowed)
+      || (entry.description !== undefined && !text(entry.description, 200)) || guests.has(target)) throw Error('invalid-homelab-catalog')
     ids.add(entry.id)
-    guests.add(guest)
-    return Object.freeze({ ...entry, operations: Object.freeze(OPERATIONS.filter((op) => entry.operations.includes(op))) })
+    guests.add(target)
+    return Object.freeze({ ...entry, kind: entry.kind === 'docker' ? 'docker' : 'proxmox',
+      operations: Object.freeze(allowed.filter((op) => entry.operations.includes(op))) })
   }))
 }
 
@@ -124,9 +146,51 @@ export function createProxmoxPowerClient({ baseUrl, tokenId, tokenSecret, reject
       return { status: ['running', 'stopped', 'paused'].includes(status) ? status : 'unknown' }
     },
     async act(guest, operation) {
-      if (!OPERATIONS.includes(operation)) throw Error('operation-not-allowed')
+      if (!PROXMOX_OPERATIONS.includes(operation)) throw Error('operation-not-allowed')
       const upid = await requestImpl(config, 'POST', `${guestPath(guest)}/${operation}`)
       return { upid: typeof upid === 'string' && UPID.test(upid) ? upid : null }
+    },
+  })
+}
+
+/**
+ * Client for the owner-run homelab executor on a Docker host (executor/).
+ * Friday never holds the Docker socket: it asks the executor, which has its
+ * own allowlist, for one container's state or one start/stop/restart.
+ * https, or http to a LAN/private address or a Compose service name.
+ */
+export function createDockerExecutorClient({ url, token, fetchImpl = globalThis.fetch, timeoutMs = 45000 } = {}) {
+  const base = (() => {
+    try {
+      const parsed = new URL(url)
+      if (parsed.username || parsed.password || parsed.search || parsed.hash) return null
+      if (parsed.protocol !== 'https:' && parsed.protocol !== 'http:') return null
+      return parsed.href.replace(/\/$/, '')
+    } catch { return null }
+  })()
+  const ready = base !== null && text(token, 4096) && token.length >= 32 && typeof fetchImpl === 'function'
+  async function call(method, path, limitMs) {
+    const response = await fetchImpl(`${base}${path}`, { method, redirect: 'error',
+      headers: { accept: 'application/json', authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(limitMs) })
+    const raw = await response.text()
+    if (raw.length > 4096) throw Error('executor-unavailable')
+    if (!response.ok) throw Error(`executor-http-${response.status}`)
+    const reply = JSON.parse(raw)
+    if (reply?.ok !== true) throw Error('executor-refused')
+    return reply
+  }
+  return Object.freeze({
+    ready,
+    async status(entry) {
+      const reply = await call('GET', `/v1/containers/${encodeURIComponent(entry.container)}`, 8000)
+      // Docker: created/exited count as stopped; restarting/paused/dead are not a safe start point.
+      const state = { running: 'running', exited: 'stopped', created: 'stopped' }[reply.state]
+      return { status: state || 'unknown' }
+    },
+    async act(entry, operation) {
+      if (!DOCKER_OPERATIONS.includes(operation)) throw Error('operation-not-allowed')
+      await call('POST', `/v1/containers/${encodeURIComponent(entry.container)}/${operation}`, timeoutMs)
+      return { upid: null }
     },
   })
 }
@@ -143,16 +207,23 @@ function cleanRun(entry) {
   return run
 }
 
-const publicAction = (entry) => ({ id: entry.id, name: entry.name, guestType: entry.guestType, vmid: entry.vmid, node: entry.node,
+const publicAction = (entry) => ({ id: entry.id, kind: entry.kind, name: entry.name,
+  ...(entry.kind === 'docker' ? { host: entry.host, container: entry.container } : { guestType: entry.guestType, vmid: entry.vmid, node: entry.node }),
   operations: [...entry.operations], ...(entry.description ? { description: entry.description } : {}) })
+const describe = (entry) => entry.kind === 'docker'
+  ? `Container ${entry.container} on ${entry.host}`
+  : `${entry.guestType === 'lxc' ? 'CT' : 'VM'} ${entry.vmid} ${entry.name}`
+const usable = (client) => client?.ready === true && typeof client.status === 'function' && typeof client.act === 'function'
 
 export async function createHomelabActions({
-  enabled = false, mode = 'dry-run', catalog = [], client = null, automationGate = null, path,
+  enabled = false, mode = 'dry-run', catalog = [], client = null, dockerClient = null, automationGate = null, path,
   now = Date.now, planTtlMs = PLAN_TTL_MS,
 } = {}) {
   const executeMode = mode === 'execute'
-  const ready = enabled === true && MODES.includes(mode) && Array.isArray(catalog) && client?.ready === true
-    && typeof client.status === 'function' && typeof client.act === 'function'
+  // Each kind of entry in the catalog needs its own ready client.
+  const clientFor = (entry) => entry.kind === 'docker' ? dockerClient : client
+  const ready = enabled === true && MODES.includes(mode) && Array.isArray(catalog)
+    && (usable(client) || usable(dockerClient)) && catalog.every((entry) => usable(clientFor(entry)))
     && typeof path === 'string' && path.length > 0 && (!executeMode || typeof automationGate?.isAllowed === 'function')
   let runs = []
   if (ready) {
@@ -178,7 +249,7 @@ export async function createHomelabActions({
   }
 
   async function readStatus(entry) {
-    try { return (await client.status(entry)).status } catch { return 'unknown' }
+    try { return (await clientFor(entry).status(entry)).status } catch { return 'unknown' }
   }
 
   function prunePlans(at) {
@@ -204,7 +275,7 @@ export async function createHomelabActions({
         if (!entry.operations.includes(operation)) return { status: 403, body: { error: 'homelab-operation-not-allowed' } }
         const status = await readStatus(entry)
         const at = now()
-        const label = `${entry.guestType === 'lxc' ? 'CT' : 'VM'} ${entry.vmid} ${entry.name}`
+        const label = describe(entry)
         const allowed = status === NEEDS[operation]
         const summary = allowed
           ? `${label} is ${status}. Approving will ${VERB[operation]}.`
@@ -264,8 +335,8 @@ export async function createHomelabActions({
           return { status: 423, body: { error: 'automation-gate-closed' } }
         }
         let outcome
-        try { outcome = { ok: true, ...(await client.act(entry, plan.operation)) } }
-        catch (error) { outcome = { ok: false, detail: /^proxmox-http-\d{3}$/.test(error?.message) ? error.message : 'proxmox-unavailable' } }
+        try { outcome = { ok: true, ...(await clientFor(entry).act(entry, plan.operation)) } }
+        catch (error) { outcome = { ok: false, detail: /^(proxmox|executor)-(http-\d{3}|refused)$/.test(error?.message) ? error.message : `${entry.kind === 'docker' ? 'executor' : 'proxmox'}-unavailable` } }
         const stored = cleanRun({ ...record, state: outcome.ok ? 'submitted' : 'failed',
           ...(outcome.upid ? { upid: outcome.upid } : {}), ...(outcome.detail ? { detail: outcome.detail } : {}) })
         const next = runs.map((run) => run.id === record.id ? stored : run)

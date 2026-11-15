@@ -2,7 +2,7 @@ import { createAgentActivityLog } from './agents/activity-log.mjs'
 import { createApprovalQueue } from './approvals/queue.mjs'
 import { createRemediationRunner, loadPlaybooks } from './remediation/fixes.mjs'
 import { loadAppLinks } from './applications/app-links.mjs'
-import { createHomelabActions, createProxmoxPowerClient, loadHomelabCatalog } from './homelab/actions.mjs'
+import { createDockerExecutorClient, createHomelabActions, createProxmoxPowerClient, loadHomelabCatalog } from './homelab/actions.mjs'
 import { createFileAutomationGate } from './security/automation-kill-switch.mjs'
 import { fileURLToPath } from 'node:url'
 import { getConfig } from './config.mjs'
@@ -202,10 +202,11 @@ if (config.homelabActions.enabled) {
       path: settings.runsPath,
       client: createProxmoxPowerClient({ baseUrl: settings.proxmoxUrl, tokenId: settings.proxmoxTokenId,
         tokenSecret: settings.proxmoxTokenSecret, rejectUnauthorized: settings.rejectUnauthorized }),
+      dockerClient: createDockerExecutorClient({ url: settings.executorUrl, token: settings.executorToken }),
       automationGate: createFileAutomationGate({ filePath: settings.automationGatePath }),
     })
-    if (homelabActions.enabled) console.log(`Friday homelab changes enabled (${homelabActions.mode}, ${catalog.length} guests)`)
-    else { console.warn('Friday homelab changes stayed disabled; they need an https Proxmox URL and the FRIDAY_HOMELAB_PROXMOX_TOKEN_ID/SECRET token'); homelabActions = null }
+    if (homelabActions.enabled) console.log(`Friday homelab changes enabled (${homelabActions.mode}, ${catalog.length} guests and containers)`)
+    else { console.warn('Friday homelab changes stayed disabled; each Proxmox guest needs the FRIDAY_HOMELAB_PROXMOX_* token and each container needs FRIDAY_HOMELAB_EXECUTOR_URL and a 32+ character FRIDAY_HOMELAB_EXECUTOR_TOKEN'); homelabActions = null }
   }
 }
 

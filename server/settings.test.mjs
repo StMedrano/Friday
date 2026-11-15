@@ -184,7 +184,7 @@ test('features report each opt-in flag, whether its companion settings are prese
     FRIDAY_WEB_GROWTH_READER_EMAILS: 'secret-reader@example.com',
     FRIDAY_AIDESIGNER_ENABLED: 'true', AIDESIGNER_API_KEY: 'secret-aidesigner-key', FRIDAY_AIDESIGNER_GENERATE_ENABLED: 'true',
     FRIDAY_APP_LINKS_ENABLED: 'true', FRIDAY_AGENT_PROPOSALS_ENABLED: 'true', FRIDAY_AGENT_PROPOSALS_GITHUB_TOKEN: 'secret-proposals-token',
-    FRIDAY_HOMELAB_ACTIONS_ENABLED: 'true', FRIDAY_PROXMOX_URL: 'https://10.9.9.2:8006', FRIDAY_HOMELAB_PROXMOX_TOKEN_ID: 'friday-power@pve!actions', FRIDAY_HOMELAB_PROXMOX_TOKEN_SECRET: 'secret-power',
+    FRIDAY_HOMELAB_ACTIONS_ENABLED: 'true', FRIDAY_HOMELAB_EXECUTOR_URL: 'http://10.9.9.10:3198', FRIDAY_HOMELAB_EXECUTOR_TOKEN: 'secret-executor-token-secret-executor',
   })))
   for (const id of ids) assert.equal(full[id].configured, true, id)
 

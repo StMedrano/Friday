@@ -333,6 +333,9 @@ export function getConfig(env = process.env) {
       proxmoxTokenSecret: env.FRIDAY_HOMELAB_PROXMOX_TOKEN_SECRET || '',
       rejectUnauthorized: !enabled(env.FRIDAY_PROXMOX_INSECURE),
       automationGatePath: env.FRIDAY_AUTOMATION_GATE_PATH || '/data/automation-gate/state.json',
+      // Docker containers go through the owner-run executor (executor/), never a socket here.
+      executorUrl: env.FRIDAY_HOMELAB_EXECUTOR_URL || '',
+      executorToken: env.FRIDAY_HOMELAB_EXECUTOR_TOKEN || '',
     },
     // AIDesigner REST API for generating UI designs. The key stays server-side;
     // generating spends AIDesigner credits, so it is operator-only and audited.

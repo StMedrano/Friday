@@ -83,8 +83,10 @@ function featureView(config) {
     feature('web-growth', 'Web Growth leads', webGrowth.enabled,
       present(webGrowth.baseUrl) && present(webGrowth.token) && Array.isArray(webGrowth.readerEmails) && webGrowth.readerEmails.length > 0, 'Web Growth leads'),
     // Needs its own scoped Proxmox token; dry-run still reads live guest state with it.
-    feature('homelab-actions', 'Homelab changes (Proxmox power actions)', config.homelabActions?.enabled,
-      present(config.homelabActions?.proxmoxUrl) && present(config.homelabActions?.proxmoxTokenId) && present(config.homelabActions?.proxmoxTokenSecret), 'Homelab changes'),
+    // Proxmox guests need the scoped token; containers need the owner-run executor. Either one is enough to start.
+    feature('homelab-actions', 'Homelab changes (Proxmox and Docker)', config.homelabActions?.enabled,
+      (present(config.homelabActions?.proxmoxUrl) && present(config.homelabActions?.proxmoxTokenId) && present(config.homelabActions?.proxmoxTokenSecret))
+        || (present(config.homelabActions?.executorUrl) && present(config.homelabActions?.executorToken)), 'Homelab changes'),
     // Opens pull requests on GitHub; needs its own write token.
     feature('agent-proposals', 'New agents (pull requests)', config.agentProposals?.enabled,
       present(config.agentProposals?.token) && present(config.agentProposals?.repository), 'New agents from Friday'),
