@@ -232,10 +232,26 @@ credit confirm step). Do not pick up.
 ## task-claim-and-move — `done`
 
 Approved 2026-11-15. Claiming and moving merged as #149
-(`FRIDAY_WORK_MOVE_ENABLED`, off). Editing task text is not built. Do not
-pick up.
+(`FRIDAY_WORK_MOVE_ENABLED`, off). Editing task text came later as #159. Do
+not pick up.
 
 ## automated-fixes — `done`
 
 Approved 2026-11-15. Merged as #151 (`FRIDAY_REMEDIATION_ENABLED`, off,
 dry run by default; never unattended). Do not pick up.
+
+## edit-task-text — `done`
+
+Approved 2026-11-15 (second round). Merged as #159
+(`FRIDAY_WORK_EDIT_ENABLED`, off). Do not pick up.
+
+## open-app-links — `done`
+
+Approved 2026-11-15 (second round). Merged as #158
+(`FRIDAY_APP_LINKS_ENABLED`, off; owner-written link file). Do not pick up.
+
+## new-agents-from-friday — `done`
+
+Approved 2026-11-15 (second round). Merged as #160
+(`FRIDAY_AGENT_PROPOSALS_ENABLED`, off; opens a pull request, never writes
+the registry). Do not pick up.

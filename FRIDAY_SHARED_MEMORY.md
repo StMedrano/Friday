@@ -111,6 +111,9 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Non-root controller cutover tooling | Claude | `complete` | Branch `claude/controller-nonroot`: `compose.nonroot.yaml`, `scripts/migrate-friday-data-nonroot.sh`, `scripts/update-controller.sh`, `docs/controller-nonroot-migration.md` | 2026-11-15 | 2026-11-15 | Merged as #153. Cutover is the owner's, in a VM102 window. |
 | Authentik as primary login (operator claim rule) | Claude | `complete` | Branch `claude/authentik-primary-login`: `server/security/access.mjs`, `/api/settings/my-access`, `MyAccessPanel.tsx`, compose, `docs/friday-authentication-failover.md` | 2026-11-15 | 2026-11-15 | Merged as #154. Owner sets up Authentik OIDC in Cloudflare and verifies the claim first. |
 | Env passthrough fix and docs refresh after the 2026-11-15 deploy | Claude | `complete` | Branch `claude/project-thread-0z9xoa`: `compose.yaml` `FRIDAY_AUDIT_MAX_BYTES`, `scripts/check-env.mjs` default overlays and host-only names, Makefile; then `CODEX.md`, `docs/codex/NEXT_STEPS.md`, backlog, this ledger | 2026-11-15 | 2026-11-15 | #156 merged; docs pass #157. Backlog has no `ready` items left. |
+| Open app links | Claude | `complete` | `server/applications/app-links.mjs`, `GET /api/applications/links`, `ApplicationsWorkspace.tsx`, config/compose/docs | 2026-11-15 | 2026-11-15 | Merged as #158, not deployed. Owner writes `/data/app-links.json` and sets `FRIDAY_APP_LINKS_ENABLED`. |
+| Edit task text | Claude | `complete` | `supabase/migrations/202611150002_friday_work_editor.sql`, `tests/sql/shared-work-editor.sql`, `server/work/*`, `/api/work/tasks/:id/edit`, Tasks screen | 2026-11-15 | 2026-11-15 | Merged as #159, not deployed. Owner applies the migration on VM132 and sets `FRIDAY_WORK_EDIT_ENABLED`. |
+| New agents from Friday (pull requests) | Claude | `complete` | `server/agents/agent-proposals.mjs`, `/api/agents/proposals`, `NewAgentPanel.tsx`, config/compose/docs | 2026-11-15 | 2026-11-15 | Merged as #160, not deployed. Owner adds a fine-grained GitHub token and sets `FRIDAY_AGENT_PROPOSALS_ENABLED`. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -146,6 +149,17 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-11-15 14:50 CST — Claude — Open app, edit task text and new agents (#158 to #160)
+
+- Status: complete
+- Scope claimed: owner approval 2026-11-15 ("Yes", relayed by the coordinator) to build the three remaining items: editing a task's text, creating agents from Friday, Open app on Applications.
+- Work performed: #158 Open app links from an owner-written file (https only, keyed by service id). #159 Edit task text through one checked `SECURITY DEFINER` function for `friday_work_writer` (no table UPDATE right; refuses stale versions, closed tasks and other people's live claims). #160 New agent from Friday opens a GitHub pull request adding `agents/<id>.json` (never writes the registry, never overwrites, never merges); also closes an open edit form on project change (Codex finding on #159). Codex review on #160 found that `agents.propose` and `work.tasks.edit` were missing from the durable audit allowlist (both would answer 503 with `FRIDAY_AUDIT_ENABLED=true`); fixed in #160 with a guard test that every audited action in `server/http.mjs` is registered.
+- Verification: `make verify` passed locally on each branch; CI `verify` and `e2e` green before each merge; the editor migration and `tests/sql/shared-work-editor.sql` passed on a disposable local Postgres 16 after all earlier shared-work migrations.
+- Decisions: all three off by default; staging forces them off; nothing deployed; nothing touched on VM100, VM102 or VM132.
+- Blockers/risks: agent proposals need a GitHub token with write access to this repository; scope it to this repository only.
+- Next action: owner deploys and turns each on per NEXT_STEPS section 1b.
+- Rollback/recovery: revert the individual PR; the editor migration only adds a function (drop `public.friday_operator_edit_task` to remove it).
 
 ### 2026-11-15 10:55 CST — Claude — Env passthrough fix and docs refresh after the owner's deploy
 
