@@ -228,7 +228,7 @@ Every successful Phase 1 agent reply remains advisory and reports `execution.per
 
 ## Homelab changes
 
-Friday can start, shut down (clean, like the power button) or reboot the Proxmox VMs and containers the owner lists. Nothing else: no stop/reset, no create, delete, migrate, config, snapshot, network or shell. It is off by default (`FRIDAY_HOMELAB_ACTIONS_ENABLED=false`) and dry-run by default.
+Friday can start, shut down (clean, like the power button) or reboot the Proxmox VMs and containers the owner lists, and start, stop or restart the Docker containers the owner lists. Nothing else: no Proxmox stop/reset, no Docker exec/kill, no create, delete, migrate, config, snapshot, image, volume, network or shell. It is off by default (`FRIDAY_HOMELAB_ACTIONS_ENABLED=false`) and dry-run by default.
 
 How a change happens, every time:
 
@@ -248,6 +248,14 @@ Model text, chat and browser input never choose the guest or the operation: thos
 ]}
 ```
 
+Docker containers are entries with `"kind": "docker"`:
+
+```json
+{"kind": "docker", "id": "plex", "name": "plex", "host": "VM 100", "container": "plex", "operations": ["restart"]}
+```
+
+`operations` for containers are `start`, `stop` (SIGTERM, kill after 30 s) and `restart`; Friday treats Docker's `exited`/`created` as stopped and refuses to act while a container is `restarting` or `paused`.
+
 `guestType` is `qemu` (VM) or `lxc` (container). `name` is what the operator types to approve. Think before listing VM102 (Friday itself; shutting it down stops Friday) or VM132 (Supabase).
 
 **A separate, scoped Proxmox token.** Never reuse the read-only monitoring token or root. On the Proxmox host, as root:
@@ -263,10 +271,12 @@ pveum acl modify /vms/140 --tokens 'friday-power@pve!actions' --roles FridayPowe
 
 Put `friday-power@pve!actions` in `FRIDAY_HOMELAB_PROXMOX_TOKEN_ID` and the secret in `FRIDAY_HOMELAB_PROXMOX_TOKEN_SECRET`. `FRIDAY_HOMELAB_PROXMOX_URL` defaults to `FRIDAY_PROXMOX_URL` (https only); `FRIDAY_PROXMOX_INSECURE` applies to both. Because the ACL lists only those guests and only power rights, Proxmox itself refuses anything else even if Friday were wrong.
 
+**Docker containers go through the homelab executor**, never a Docker socket in Friday. The owner runs `executor/` on the Docker host (setup in `executor/README.md`); it keeps its own `allowlist.json`, so a container must be listed in both places. Set `FRIDAY_HOMELAB_EXECUTOR_URL` (https, or http to the executor's LAN address) and `FRIDAY_HOMELAB_EXECUTOR_TOKEN` (the executor's 32+ character token). A catalog with containers but no executor settings (or Proxmox guests but no Proxmox token) keeps the feature off at startup.
+
 **Modes.**
 
 - `FRIDAY_HOMELAB_ACTIONS_MODE=dry-run` (default): approving records `dry-run` in the run list and changes nothing. The token is still used to read guest state.
-- `FRIDAY_HOMELAB_ACTIONS_MODE=execute`: approving sends the call. It also needs `FRIDAY_MODE=live` and `FRIDAY_AUDIT_ENABLED=true` (otherwise the feature stays off at startup), a signed-in human operator (never a service token), and the global automation gate armed: the file at `FRIDAY_AUTOMATION_GATE_PATH` (default `/data/automation-gate/state.json`, owner-only file and directory) must contain `{"schemaVersion":1,"state":"allow-approved-actions","expiresAt":<epoch ms at most 5 minutes ahead>}`. A closed gate answers 423 `automation-gate-closed` and nothing is sent. Friday writes a `pending` record before calling Proxmox, so a run is never sent twice; `submitted` means Proxmox accepted the task (its UPID is recorded), `failed` records the HTTP status only.
+- `FRIDAY_HOMELAB_ACTIONS_MODE=execute`: approving sends the call. It also needs `FRIDAY_MODE=live` and `FRIDAY_AUDIT_ENABLED=true` (otherwise the feature stays off at startup), a signed-in human operator (never a service token), and the global automation gate armed: the file at `FRIDAY_AUTOMATION_GATE_PATH` (default `/data/automation-gate/state.json`, owner-only file and directory) must contain `{"schemaVersion":1,"state":"allow-approved-actions","expiresAt":<epoch ms at most 5 minutes ahead>}`. A closed gate answers 423 `automation-gate-closed` and nothing is sent. Friday writes a `pending` record before calling Proxmox, so a run is never sent twice; `submitted` means Proxmox accepted the task (its UPID is recorded) or the executor reported Docker accepted it; `failed` records only a short reason such as `proxmox-http-403` or `executor-refused`.
 
 **API.** `GET /api/homelab/actions` lists the guests with live state, the mode and the 20 latest runs (503 `homelab-actions-disabled` when off). `POST /api/homelab/actions/preview` with `{"actionId","operation"}` and `POST /api/homelab/actions/run` with `{"planId","confirm"}` are operator-only, JSON-only and refused cross-site. Errors: 404 `homelab-actions-disabled` or `homelab-action-not-found`, 403 `homelab-operation-not-allowed`, `homelab-preview-not-yours` or `access-denied`, 400 `homelab-confirm-mismatch` or `invalid-homelab-request`, 409 `homelab-preview-expired` or `homelab-state-changed`, 423 `automation-gate-closed`, 502 when Proxmox refuses, 503 `homelab-actions-unavailable` or `audit-unavailable`.
 

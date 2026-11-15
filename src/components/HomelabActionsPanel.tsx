@@ -2,27 +2,29 @@ import { FormEvent, useCallback, useEffect, useState } from 'react'
 import NotConnected from './NotConnected'
 import {
   fetchFridayHomelabActions, FridayHomelabError, previewFridayHomelabAction, runFridayHomelabAction,
-  type FridayHomelabActionsResult, type FridayHomelabOperation, type FridayHomelabPreview,
+  type FridayHomelabAction, type FridayHomelabActionsResult, type FridayHomelabOperation, type FridayHomelabPreview,
 } from '../lib/api'
 
-const OPERATION_LABEL: Record<FridayHomelabOperation, string> = { start: 'Start', shutdown: 'Shut down', reboot: 'Reboot' }
+const OPERATION_LABEL: Record<FridayHomelabOperation, string> = { start: 'Start', shutdown: 'Shut down', reboot: 'Reboot', stop: 'Stop', restart: 'Restart' }
 
 const ERRORS: Record<string, string> = {
   'homelab-confirm-mismatch': 'The name you typed does not match. Nothing was changed.',
   'homelab-preview-expired': 'That preview expired or was already used. Preview again.',
   'homelab-preview-not-yours': 'Only the operator who asked for the preview can approve it.',
-  'homelab-state-changed': 'The guest changed state since the preview, so nothing was done. Preview again.',
+  'homelab-state-changed': 'It changed state since the preview, so nothing was done. Preview again.',
   'automation-gate-closed': 'The automation gate on the Friday host is not armed, so nothing was changed.',
-  'homelab-operation-not-allowed': 'That operation is not allowed for this guest.',
+  'homelab-operation-not-allowed': 'That operation is not allowed here.',
   'access-denied': 'Only signed-in operators can make homelab changes.',
   'audit-unavailable': 'The action audit is unavailable, so nothing was changed.',
 }
 
-const guestLabel = (guestType: string, vmid: number) => `${guestType === 'lxc' ? 'CT' : 'VM'} ${vmid}`
+const where = (action: FridayHomelabAction) => action.kind === 'docker'
+  ? `Container ${action.container} on ${action.host}`
+  : `${action.guestType === 'lxc' ? 'CT' : 'VM'} ${action.vmid} on ${action.node}`
 
 /**
- * Homelab changes: the owner's listed Proxmox guests. Every change is a dry-run
- * preview first, then the operator types the guest's name to approve one run.
+ * Homelab changes: the owner's listed Proxmox guests and Docker containers. Every change is a dry-run
+ * preview first, then the operator types its name to approve one run.
  */
 export default function HomelabActionsPanel() {
   const [view, setView] = useState<FridayHomelabActionsResult | null>(null)
@@ -42,7 +44,7 @@ export default function HomelabActionsPanel() {
 
   if (!view) return <p className="v3-settings-message" role="status">Loading homelab changes…</p>
   if (view.state === 'disabled') return <NotConnected title="Homelab changes"
-    detail="Starting, shutting down or rebooting Proxmox guests needs the owner's action file and a scoped Proxmox token (FRIDAY_HOMELAB_ACTIONS_ENABLED) on the server."
+    detail="Starting, stopping or restarting Proxmox guests and Docker containers needs the owner's action file plus a scoped Proxmox token or the homelab executor (FRIDAY_HOMELAB_ACTIONS_ENABLED) on the server."
     action="Preview" setup="Homelab changes" />
   if (view.state === 'unavailable') return <p className="v3-settings-message" role="status">Homelab changes could not be loaded.</p>
 
@@ -61,13 +63,13 @@ export default function HomelabActionsPanel() {
       const result = await runFridayHomelabAction(preview.planId, confirm)
       const what = `${OPERATION_LABEL[result.run.operation]} ${result.run.name}`
       setNotice(result.execution.performed
-        ? `${what}: sent to Proxmox.`
+        ? `${what}: sent.`
         : `${what}: dry run recorded. Nothing was changed.`)
       setPreview(null); setConfirm('')
       load()
     } catch (error) {
       const code = error instanceof FridayHomelabError ? error.code : ''
-      setNotice(ERRORS[code] || 'The change failed. Check the run list and Proxmox before trying again.')
+      setNotice(ERRORS[code] || 'The change failed. Check the run list and the host before trying again.')
       if (code !== 'homelab-confirm-mismatch') setPreview(null)
       load()
     } finally { setBusy(false) }
@@ -77,15 +79,15 @@ export default function HomelabActionsPanel() {
   return <section className="v3-section fx-homelab" aria-label="Homelab changes">
     <div className="v3-section-head"><div>
       <span className="v3-kicker">HOMELAB CHANGES · {dryRun ? 'DRY RUN' : 'LIVE'}</span>
-      <h2>Proxmox guests</h2>
+      <h2>Guests and containers</h2>
       <p className="fx-homelab-note">{dryRun
         ? 'Dry-run mode: approving records what would happen and changes nothing.'
-        : 'Each change is previewed first and runs once after you type the guest name. The automation gate on the Friday host must be armed.'}</p>
+        : 'Each change is previewed first and runs once after you type its name. The automation gate on the Friday host must be armed.'}</p>
     </div></div>
     {view.actions.length === 0
-      ? <p className="v3-settings-message">The owner's action file lists no guests.</p>
+      ? <p className="v3-settings-message">The owner's action file lists nothing yet.</p>
       : <ul className="fx-homelab-list">{view.actions.map((action) => <li key={action.id}>
-        <div><b>{action.name}</b><small>{guestLabel(action.guestType, action.vmid)} on {action.node}{action.description ? ` · ${action.description}` : ''}</small></div>
+        <div><b>{action.name}</b><small>{where(action)}{action.description ? ` · ${action.description}` : ''}</small></div>
         <span className={`fx-status ${action.status === 'running' ? 'online' : action.status === 'stopped' ? 'offline' : 'unknown'}`}>{action.status}</span>
         <span className="fx-homelab-ops">{action.operations.map((operation) =>
           <button key={operation} type="button" className="fx-button" disabled={busy}

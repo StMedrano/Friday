@@ -115,6 +115,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Edit task text | Claude | `complete` | `supabase/migrations/202611150002_friday_work_editor.sql`, `tests/sql/shared-work-editor.sql`, `server/work/*`, `/api/work/tasks/:id/edit`, Tasks screen | 2026-11-15 | 2026-11-15 | Merged as #159, not deployed. Owner applies the migration on VM132 and sets `FRIDAY_WORK_EDIT_ENABLED`. |
 | New agents from Friday (pull requests) | Claude | `complete` | `server/agents/agent-proposals.mjs`, `/api/agents/proposals`, `NewAgentPanel.tsx`, config/compose/docs | 2026-11-15 | 2026-11-15 | Merged as #160, not deployed. Owner adds a fine-grained GitHub token and sets `FRIDAY_AGENT_PROPOSALS_ENABLED`. |
 | Homelab changes from Friday (Proxmox guest power actions), #162 | Claude | `complete` | Branch `claude/project-thread-d0u6ui`: `server/homelab/`, `/api/homelab/*`, Infrastructure screen panel, audit actions, config/compose/docs. No live host is touched. | 2026-11-15 | 2026-11-15 | Merged, not deployed. Owner creates the scoped Proxmox token and turns it on (NEXT_STEPS 1b). |
+| Homelab changes for Docker containers (executor), #163 | Claude | `complete` | Branch `claude/project-thread-d0u6ui`: `executor/` (new owner-run service), `server/homelab/actions.mjs` docker entries and executor client, config/compose/.env.example, Infrastructure panel, docs | 2026-11-15 | 2026-11-15 | Merged, not deployed. Owner runs the executor on the Docker host and sets the executor URL and token (NEXT_STEPS 1b). |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -150,6 +151,17 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-11-15 15:30 CST — Claude — Homelab changes for Docker containers (executor)
+
+- Status: complete (merged after CI; not deployed)
+- Scope claimed: second slice of the owner's 2026-11-15 ask to let Friday make homelab changes. `executor/`, `server/homelab/actions.mjs`, config/compose/.env.example/check-env/settings, `HomelabActionsPanel`, docs, Makefile verify.
+- Work performed: new owner-run executor service for a Docker host: bearer token (32+ chars, constant-time compare), its own owner-written allowlist, only start/stop/restart via the Docker Engine API, one change at a time, JSON-line log without the token, non-root, read-only, cap_drop ALL, bound to a LAN address. Friday's action file gains `"kind": "docker"` entries that go through the executor with the same preview, typed approval, audit, dry-run default and automation gate as Proxmox guests. Friday still holds no Docker socket.
+- Verification: `make verify` passed locally (new executor tests run against a fake Docker socket; executor Compose validates).
+- Decisions: Docker operations fixed to start/stop/restart (no kill, exec, create, delete). Both Friday's catalog and the executor allowlist must list a container.
+- Blockers/risks: none in code. Running the executor on a host is an owner step.
+- Next action: owner follows `executor/README.md` on the Docker host and sets `FRIDAY_HOMELAB_EXECUTOR_URL`/`_TOKEN` on VM102.
+- Rollback/recovery: `docker compose down` in `executor/` on the host removes all Docker change ability; or set `FRIDAY_HOMELAB_ACTIONS_ENABLED=false`.
 
 ### 2026-11-15 15:10 CST — Claude — Homelab changes from Friday (Proxmox guest power actions)
 

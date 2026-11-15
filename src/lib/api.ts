@@ -942,9 +942,10 @@ export async function fetchHomeLabEvidence(signal?: AbortSignal): Promise<HomeLa
   } catch { throw failure() }
 }
 
-export type FridayHomelabOperation = 'start' | 'shutdown' | 'reboot'
+export type FridayHomelabOperation = 'start' | 'shutdown' | 'reboot' | 'stop' | 'restart'
 export type FridayHomelabAction = {
-  id: string; name: string; guestType: 'qemu' | 'lxc'; vmid: number; node: string
+  id: string; kind: 'proxmox' | 'docker'; name: string
+  guestType?: 'qemu' | 'lxc'; vmid?: number; node?: string; host?: string; container?: string
   operations: FridayHomelabOperation[]; description?: string; status: string
 }
 export type FridayHomelabRun = {
@@ -961,7 +962,7 @@ export type FridayHomelabPreview = {
 }
 export type FridayHomelabRunResult = { run: { actionId: string; name: string; operation: FridayHomelabOperation; mode: string; state: string; at: string }; execution: { performed: boolean; succeeded?: boolean; reason?: string } }
 
-const HOMELAB_OPERATIONS = new Set(['start', 'shutdown', 'reboot'])
+const HOMELAB_OPERATIONS = new Set(['start', 'shutdown', 'reboot', 'stop', 'restart'])
 
 export class FridayHomelabError extends Error {
   constructor(readonly status: number, readonly code = '') { super(code || 'homelab-action-failed') }
@@ -974,7 +975,8 @@ export async function fetchFridayHomelabActions(signal?: AbortSignal): Promise<F
   if (response.ok && body && (body.mode === 'dry-run' || body.mode === 'execute') && Array.isArray(body.actions)) {
     const actions = body.actions.filter((item): item is FridayHomelabAction => {
       const entry = item as FridayHomelabAction | null
-      return !!entry && typeof entry.id === 'string' && typeof entry.name === 'string' && Number.isSafeInteger(entry.vmid)
+      return !!entry && typeof entry.id === 'string' && typeof entry.name === 'string'
+        && (entry.kind === 'docker' ? typeof entry.container === 'string' : Number.isSafeInteger(entry.vmid))
         && Array.isArray(entry.operations) && entry.operations.every((op) => HOMELAB_OPERATIONS.has(op)) && typeof entry.status === 'string'
     })
     const recent = (Array.isArray(body.recent) ? body.recent : []).filter((item): item is FridayHomelabRun => {

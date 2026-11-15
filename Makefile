@@ -36,6 +36,7 @@ verify: test build
 	FRIDAY_TUNNEL_TOKEN_FILE=/dev/null docker compose -f compose.yaml -f compose.cloud-tunnel.yaml config >/dev/null
 	FRIDAY_REPOSITORY_REGISTRY_FILE=repositories.example.json FRIDAY_REPOSITORY_ROOT=. docker compose -f compose.yaml -f compose.repositories.yaml config >/dev/null
 	FRIDAY_OBSERVER_TOKEN=verify-token FRIDAY_DOCKER_SOCKET_GID=999 docker compose -f observer/compose.yaml config >/dev/null
+	FRIDAY_EXECUTOR_TOKEN=verify-token-verify-token-verify-token FRIDAY_EXECUTOR_BIND_ADDRESS=127.0.0.1 FRIDAY_DOCKER_SOCKET_GID=999 docker compose -f executor/compose.yaml config >/dev/null
 	sh scripts/verify-friday-staging.sh
 	@echo 'Friday verification passed.'
 

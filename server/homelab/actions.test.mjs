@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { chmod, mkdtemp, readFile, symlink, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { createHomelabActions, createProxmoxPowerClient, loadHomelabCatalog, parseHomelabCatalog } from './actions.mjs'
+import { createDockerExecutorClient, createHomelabActions, createProxmoxPowerClient, loadHomelabCatalog, parseHomelabCatalog } from './actions.mjs'
 
 const catalogFile = () => ({ schemaVersion: 1, actions: [
   { id: 'development', name: 'development', node: 'home', guestType: 'qemu', vmid: 140, operations: ['start', 'shutdown', 'reboot'] },
@@ -193,4 +193,61 @@ test('a gate closed while the pending record is written stops the run', async ()
   assert.equal(fake.calls.some(([kind]) => kind === 'act'), false)
   const stored = JSON.parse(await readFile(join(dir, 'runs.json'), 'utf8'))
   assert.deepEqual([stored.runs[0].state, stored.runs[0].detail], ['failed', 'automation-gate-closed'])
+})
+
+const dockerEntry = { kind: 'docker', id: 'plex', name: 'plex', host: 'VM 100', container: 'plex', operations: ['restart', 'stop', 'start'] }
+
+test('docker entries allow only start, stop and restart of a named container', () => {
+  const parsed = parseHomelabCatalog({ schemaVersion: 1, actions: [dockerEntry] })
+  assert.deepEqual(parsed[0].operations, ['start', 'stop', 'restart'])
+  assert.equal(parsed[0].kind, 'docker')
+  const bad = (change) => assert.throws(() => parseHomelabCatalog({ schemaVersion: 1, actions: [{ ...dockerEntry, ...change }] }), /invalid-homelab-catalog/)
+  bad({ operations: ['reboot'] })
+  bad({ operations: ['kill'] })
+  bad({ container: '../plex' })
+  bad({ container: 'plex;rm' })
+  bad({ vmid: 100 })
+  bad({ kind: 'k8s' })
+  assert.throws(() => parseHomelabCatalog({ schemaVersion: 1, actions: [dockerEntry, { ...dockerEntry, id: 'plex-2' }] }), /invalid-homelab-catalog/)
+})
+
+test('the executor client sends the bearer token, maps Docker states, and refuses other operations', async () => {
+  const calls = []
+  const replies = { GET: { ok: true, state: 'exited' }, POST: { ok: true } }
+  const fetchImpl = async (url, options) => { calls.push([options.method, url, options.headers.authorization, options.redirect]); return new Response(JSON.stringify(replies[options.method])) }
+  const client = createDockerExecutorClient({ url: 'http://10.1.10.10:3198/', token: 't'.repeat(40), fetchImpl })
+  assert.equal(client.ready, true)
+  assert.deepEqual(await client.status(dockerEntry), { status: 'stopped' })
+  await client.act(dockerEntry, 'restart')
+  await assert.rejects(client.act(dockerEntry, 'kill'), /operation-not-allowed/)
+  assert.deepEqual(calls, [
+    ['GET', 'http://10.1.10.10:3198/v1/containers/plex', `Bearer ${'t'.repeat(40)}`, 'error'],
+    ['POST', 'http://10.1.10.10:3198/v1/containers/plex/restart', `Bearer ${'t'.repeat(40)}`, 'error']])
+  replies.GET = { ok: true, state: 'restarting' }
+  assert.deepEqual(await client.status(dockerEntry), { status: 'unknown' })
+  replies.POST = { ok: false, error: 'not-allowlisted' }
+  await assert.rejects(client.act(dockerEntry, 'stop'), /executor-refused/)
+  assert.equal(createDockerExecutorClient({ url: 'http://10.1.10.10:3198', token: 'short', fetchImpl }).ready, false)
+  assert.equal(createDockerExecutorClient({ url: 'ftp://10.1.10.10', token: 't'.repeat(40), fetchImpl }).ready, false)
+  assert.equal(createDockerExecutorClient({ url: 'http://user:pw@10.1.10.10', token: 't'.repeat(40), fetchImpl }).ready, false)
+})
+
+test('a catalog with containers needs the executor client; each entry uses its own client', async () => {
+  const dir = await mkdtemp(join(tmpdir(), 'friday-homelab-'))
+  const catalog = parseHomelabCatalog({ schemaVersion: 1, actions: [...catalogFile().actions, dockerEntry] })
+  const proxmox = fakeClient()
+  assert.equal((await createHomelabActions({ enabled: true, catalog, client: proxmox.client, path: join(dir, 'r.json') })).enabled, false)
+  const dockerCalls = []
+  const dockerClient = { ready: true, status: async () => ({ status: 'running' }), act: async (entry, op) => { dockerCalls.push([entry.container, op]); return { upid: null } } }
+  const actions = await createHomelabActions({ enabled: true, mode: 'execute', catalog, client: proxmox.client, dockerClient,
+    path: join(dir, 'r.json'), automationGate: { isAllowed: () => true } })
+  assert.equal(actions.enabled, true)
+  const preview = (await actions.preview({ actionId: 'plex', operation: 'restart', requestedBy: 'owner@example.com' })).body.preview
+  assert.match(preview.summary, /Container plex on VM 100 is running/)
+  const result = await actions.run({ planId: preview.planId, confirm: 'plex', requestedBy: 'owner@example.com' })
+  assert.equal(result.body.run.state, 'submitted')
+  assert.deepEqual(dockerCalls, [['plex', 'restart']])
+  assert.equal(proxmox.calls.some(([kind]) => kind === 'act'), false)
+  // A Docker-only catalog works without Proxmox.
+  assert.equal((await createHomelabActions({ enabled: true, catalog: parseHomelabCatalog({ schemaVersion: 1, actions: [dockerEntry] }), dockerClient, path: join(dir, 'd.json') })).enabled, true)
 })

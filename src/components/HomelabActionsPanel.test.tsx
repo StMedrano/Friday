@@ -6,7 +6,8 @@ afterEach(() => vi.unstubAllGlobals())
 
 const listed = (mode = 'dry-run', recent: unknown[] = []) => ({
   mode, recent, execution: { performed: false },
-  actions: [{ id: 'development', name: 'development', guestType: 'qemu', vmid: 140, node: 'home', operations: ['start', 'shutdown', 'reboot'], status: 'running' }],
+  actions: [{ id: 'plex', kind: 'docker', name: 'plex', host: 'VM 100', container: 'plex', operations: ['restart'], status: 'running' },
+    { id: 'development', kind: 'proxmox', name: 'development', guestType: 'qemu', vmid: 140, node: 'home', operations: ['start', 'shutdown', 'reboot'], status: 'running' }],
 })
 const preview = (mode = 'dry-run') => ({ preview: {
   planId: '6f1d3f7e-8a4b-4c55-9e0a-0d1c2b3a4f5e', actionId: 'development', name: 'development', operation: 'reboot', mode,
@@ -41,6 +42,8 @@ describe('HomelabActionsPanel', () => {
     })
     render(<HomelabActionsPanel/>)
     expect(await screen.findByText(/approving records what would happen and changes nothing/i)).toBeInTheDocument()
+    expect(screen.getByText('Container plex on VM 100')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Preview restart plex' })).toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Preview reboot development' }))
     const region = await screen.findByRole('region', { name: 'Change preview' })
     expect(within(region).getByText(/VM 140 development is running/)).toBeInTheDocument()
