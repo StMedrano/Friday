@@ -1,6 +1,6 @@
 # Friday — Ordered Finish Queue
 
-Last refreshed 2026-11-07 from `git log` on `main` (at `42ace44`, #140) and
+Last refreshed 2026-11-15 from `git log` on `main` (after #154) and
 `FRIDAY_SHARED_MEMORY.md`.
 Earlier versions of this file (PWA staging, Tasks read path, four-project
 catalog) described work that has since merged; see `git log -- docs/codex/NEXT_STEPS.md`.
@@ -28,15 +28,19 @@ by default unless noted.
 | #139 | Docs only: four `ready` items added to `docs/automation/BACKLOG.md`. | Nothing. |
 | #140 | Phone layout matches the AIDesigner phone design. Always on. | Nothing beyond the deploy. |
 | #150 | Web Growth, Website designs: AIDesigner design list plus Generate with a credit confirm step (operator only, audited). | With #123 set up, also set `FRIDAY_AIDESIGNER_GENERATE_ENABLED=true` (`docs/integrations.md`, AIDesigner design generation). |
+| #147 | `make env-check`: offline check of a VM102 `.env` against `compose.yaml`. | Run it on VM102 before the next deploy. |
+| #148 | Settings, General lists AIDesigner design sessions, read only. | Same settings as #123. |
+| #149 | Claim and move tasks on the Tasks screen (operator plus project grant; a live claim held by someone else blocks the move). | Apply `supabase/migrations/202611150001_friday_work_mover.sql` on VM132 after the #138 migration, then set `FRIDAY_WORK_MOVE_ENABLED=true` (needs the #138 write path on). `docs/integrations.md`, Claim and move tasks. |
+| #151 | Automated fixes: after an approval, an operator presses Run fix; the action comes only from the owner's playbook file. Dry run by default. | `FRIDAY_APPROVALS_ENABLED=true`, `FRIDAY_REMEDIATION_ENABLED=true`, a playbook file. Execute mode also needs `FRIDAY_MODE=live`, the action audit, an owner-run https executor and an armed automation gate. `docs/integrations.md`, Automated fixes. |
+| #152 | `make observer-prep` on VM100 checks the observer `.env` and (with `--write-gid`) sets `FRIDAY_DOCKER_SOCKET_GID`. | Run on VM100 before the observer redeploy (`observer/README.md`). |
+| #153 | Non-root controller cutover tooling: `compose.nonroot.yaml`, `scripts/migrate-friday-data-nonroot.sh --confirm`. Default stays root. | Maintenance window on VM102: `docs/controller-nonroot-migration.md`, then `FRIDAY_CONTROLLER_NONROOT=true`. Repoint the grants renewal timer to `friday_data_nonroot`. |
+| #154 | Authentik as primary login: operator routes can require a signed Access claim set only by the Authentik login. Settings shows your own access. | Owner sets up Authentik OIDC in Cloudflare, checks the claim at `/cdn-cgi/access/get-identity`, then sets `FRIDAY_ACCESS_OPERATOR_IDP_CLAIM` and `FRIDAY_ACCESS_OPERATOR_IDP_VALUE` (`docs/friday-authentication-failover.md`). |
 
 ## 2. Waiting on an owner decision (do not start)
 
 Listed in `docs/automation/BACKLOG.md` under "Needs owner approval" or in the ledger.
 
-- **Authentik as primary login** (`authentik-primary-login`). Authentik verification exists (`server/security/authentik.mjs`); Cloudflare Access is still primary. Runbook for the switch and the outage fallback: `docs/friday-authentication-failover.md`.
-- **Non-root controller cutover** (`controller-nonroot-cutover`). The candidate image is on `main` (#118); the cutover needs a VM102 data-volume ownership change in a maintenance window.
-- **Claiming, moving or editing tasks** from Friday: not built; only creating a task was approved (2026-11-06).
-- **Automated fixes**: acting on approved proposals from #133. Today an approval is a record only.
+- Authentik as primary login, the non-root cutover, claiming and moving tasks, and automated fixes were approved on 2026-11-15 and are built (#149, #151, #153, #154, all off by default). Turning each on is in the table above.
 - **Create agents from Friday** and **Open app** (Applications): still "Not connected" by design.
 - **Endpoint checks**: `FRIDAY_ENDPOINTS_ENABLED` stays off (owner's call, ledger 2026-10-29).
 
@@ -51,10 +55,8 @@ Listed in `docs/automation/BACKLOG.md` under "Needs owner approval" or in the le
 
 Taken in order by the nightly builder from `docs/automation/BACKLOG.md`.
 
-1. `env-check-script` merged as #147: `make env-check` checks a VM102 `.env` against `compose.yaml` before the next deploy (`docs/integrations.md`, Checking .env before a deploy).
-2. `aidesigner-sessions-panel` merged as #148: Settings, General lists AIDesigner design sessions, read only (no Generate button).
-3. `refresh-codex-md`: correct stale PR and branch states in `CODEX.md`.
-4. Keep this file current after each merge or deploy.
+1. `refresh-codex-md`: correct stale PR and branch states in `CODEX.md`.
+2. Keep this file current after each merge or deploy.
 
 #142 (service token expiry), #143 (Tasks and Approvals smoke test), #144
 (setup links on Not connected placeholders) and #145 (Supabase probe retry)

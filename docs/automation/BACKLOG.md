@@ -134,7 +134,9 @@ Placeholders with no setup doc keep today's text.
 every reference names a heading that exists in `docs/integrations.md`
 (checked in a test), and `make verify` passes.
 
-## settings-feature-flags — `in-review`
+## settings-feature-flags — `done`
+
+Merged as #146.
 
 **Scope:** `server/settings.mjs` (`features` on `GET /api/settings`),
 `SettingsWorkspace.tsx`, `NotConnected.tsx` setup sections, tests,
@@ -149,7 +151,9 @@ show values.
 **Done when:** server and UI tests cover off, on but incomplete, and on and
 complete; no key, token, email or address is serialized; `make verify` passes.
 
-## env-check-script — `in-review`
+## env-check-script — `done`
+
+Merged as #147.
 
 **Scope:** a new `scripts/check-env.mjs`, its test, a `make env-check`
 target, `docs/integrations.md` or the deploy runbook. No server changes.
@@ -166,7 +170,9 @@ Print names only, never values. Exit non-zero only on a missing companion.
 **Done when:** tests cover each finding with fixture files containing fake
 secrets, and assert no value appears in output; `make verify` passes.
 
-## aidesigner-sessions-panel — `in-review`
+## aidesigner-sessions-panel — `done`
+
+Merged as #148.
 
 **Scope:** a read-only panel (Settings or a Designs section) using the
 existing `GET /api/aidesigner/sessions` from #123, `src/lib/api.ts`, tests.
@@ -202,15 +208,18 @@ task form and `POST /api/work/tasks` behind `FRIDAY_WORK_WRITE_ENABLED`
 role. Merged as #138. Claiming, moving and editing tasks are not part of
 this approval.
 
-## authentik-primary-login — `needs-approval`
+## authentik-primary-login — `done`
 
-Making Authentik the primary login instead of Cloudflare Access. Owner
-decision.
+Approved 2026-11-15 ("Everything can be built"). Merged as #154: operator
+routes can require a signed Access claim from the Authentik login
+(`FRIDAY_ACCESS_OPERATOR_IDP_CLAIM`/`_VALUE`, off by default). Edge setup is
+the owner's. Do not pick up.
 
-## controller-nonroot-cutover — `needs-approval`
+## controller-nonroot-cutover — `done`
 
-Switching production to the `runtime-nonroot` image. Needs a VM102
-maintenance window; see `docs/controller-nonroot-migration.md`.
+Approved 2026-11-15. Tooling merged as #153 (default stays root). The cutover
+itself is the owner's, in a VM102 maintenance window; see
+`docs/controller-nonroot-migration.md`. Do not pick up.
 
 ## aidesigner-generate-ui — `done`
 
@@ -218,7 +227,13 @@ Approved by the owner 2026-11-15 and built by a project thread in Web
 Growth, Website designs (behind `FRIDAY_AIDESIGNER_GENERATE_ENABLED`, with a
 credit confirm step). Do not pick up.
 
-## task-claim-and-move — `needs-approval`
+## task-claim-and-move — `done`
 
-Claiming, moving or editing tasks from the Tasks screen. Only creating a
-task was approved (2026-11-06).
+Approved 2026-11-15. Claiming and moving merged as #149
+(`FRIDAY_WORK_MOVE_ENABLED`, off). Editing task text is not built. Do not
+pick up.
+
+## automated-fixes — `done`
+
+Approved 2026-11-15. Merged as #151 (`FRIDAY_REMEDIATION_ENABLED`, off,
+dry run by default; never unattended). Do not pick up.
