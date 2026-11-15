@@ -76,7 +76,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Verify VM102 port-3011 origin | Codex/ChatGPT | `complete` | Read-only VM102 container, listener, origin-health, and tracked-source inspection | 2026-10-29 | 2026-10-29 | Preserve the isolated listener and repeat origin checks after future reviewed deployments. |
 | Authenticated Cloudflare acceptance | unclaimed | `verification_needed` | Dedicated Access app and Friday read-only API; current managed-runtime rerun requires its existing hostname-scoped secret binding | 2026-10-29 | 2026-10-29 | Run `node scripts/check-cloud-connection.mjs` from the managed cloud runtime without copying credentials to VM102 or chat. |
 | Service-token renewal | Codex/ChatGPT | `planned` | `friday-cloud-reader`; coordinated Cloudflare rotation and managed-runtime binding update | 2026-10-29 | 2026-10-29 | After the exact production merge target is identified, rotate with a bounded overlap, update the secure caller binding without exposing the secret, rerun acceptance, then retire the prior secret. |
-| Production deployment after development merge | unclaimed | `planned` | Merged `main` revision and authoritative VM102 checkout | 2026-10-29 | 2026-10-29 | Identify the exact development PR/branch, require its merge and green exact-head verification, then inventory VM102, preserve `.env`, run preflight, deploy the merged `main`, and run health plus cloud acceptance. |
+| Production deployment after development merge | Owner | `verification_needed` | Merged `main` revision and authoritative VM102 checkout | 2026-10-29 | 2026-11-15 | Owner reported deploying `main` at `39d6848` (#155) to VM102 on 2026-11-15 (project thread; no agent evidence of health output). Cloud acceptance rerun still pending with the service-token renewal. |
 | Web Growth reader slice | Claude | `complete` | Branch `claude/friday-web-growth`: `server/adapters/web-growth*.mjs`, `/api/web-growth`, `integrations/web-growth-reader/`, Web Growth panel under the TechTactics group | 2026-10-31 | 2026-11-01 | Merged as #114. Stays disabled until an operator deploys the isolated reader and sets the reader URL, token and emails. |
 | Wire free model routing into chat | Claude | `complete` | `server/assistant.mjs`, `server/ai/model-fabric.mjs`, tests, `docs/model-fabric.md`, backlog | 2026-11-05 | 2026-11-05 | Merged as #131. Stays off until `FRIDAY_MODEL_FABRIC_ENABLED=true` and free NVIDIA models are configured. |
 | GitHub-only repositories | Claude | `complete` | `server/repositories/`, `RepositorySettingsPanel.tsx`, `RepositoriesWorkspace.tsx`, `src/lib/api.ts`, docs | 2026-11-05 | 2026-11-05 | Merged as #132. Owner redeploys VM102 and adds repos by GitHub URL in Settings. |
@@ -110,6 +110,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | VM100 observer redeploy prep | Claude | `complete` | Branch `claude/observer-redeploy-prep`: `scripts/prepare-observer-redeploy.sh`, `make observer-prep`, `observer/README.md` | 2026-11-15 | 2026-11-15 | Merged as #152. Owner runs it on VM100 in a window. |
 | Non-root controller cutover tooling | Claude | `complete` | Branch `claude/controller-nonroot`: `compose.nonroot.yaml`, `scripts/migrate-friday-data-nonroot.sh`, `scripts/update-controller.sh`, `docs/controller-nonroot-migration.md` | 2026-11-15 | 2026-11-15 | Merged as #153. Cutover is the owner's, in a VM102 window. |
 | Authentik as primary login (operator claim rule) | Claude | `complete` | Branch `claude/authentik-primary-login`: `server/security/access.mjs`, `/api/settings/my-access`, `MyAccessPanel.tsx`, compose, `docs/friday-authentication-failover.md` | 2026-11-15 | 2026-11-15 | Merged as #154. Owner sets up Authentik OIDC in Cloudflare and verifies the claim first. |
+| Env passthrough fix and docs refresh after the 2026-11-15 deploy | Claude | `complete` | Branch `claude/project-thread-0z9xoa`: `compose.yaml` `FRIDAY_AUDIT_MAX_BYTES`, `scripts/check-env.mjs` default overlays and host-only names, Makefile; then `CODEX.md`, `docs/codex/NEXT_STEPS.md`, backlog, this ledger | 2026-11-15 | 2026-11-15 | #156 merged; docs pass #157. Backlog has no `ready` items left. |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -145,6 +146,17 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-11-15 10:55 CST — Claude — Env passthrough fix and docs refresh after the owner's deploy
+
+- Status: complete
+- Scope claimed: owner, 2026-11-15, after deploying `main` (#131 to #155) to VM102: "continue with the build". Next backlog item (refresh-codex-md), code follow-ups, and recording the deploy.
+- Work performed: #156 passes `FRIDAY_AUDIT_MAX_BYTES` through `compose.yaml` (the audit size cap in `.env` was ignored), makes `make env-check` check the tunnel and non-root overlays by default and skip the host-only `FRIDAY_CONTROLLER_NONROOT`, and adds tests that `.env.example` checks clean and that every `env.X` in `server/config.mjs` is set or passed by `compose.yaml`. This docs pass: `CODEX.md` (PR #9 closed unmerged, Phase 1 live-accepted, current action paths), NEXT_STEPS records the deploy, backlog refresh-codex-md `done`.
+- Verification: `make verify` passed locally on both branches; CI `verify` and `e2e` green before each merge.
+- Decisions: deploy recorded from the owner's message only; no flag change is recorded beyond the three turned on 2026-11-05. Nothing touched on VM100, VM102 or VM132.
+- Blockers/risks: none for code. Backlog is empty; editing task text, creating agents and Open app need owner decisions.
+- Next action: owner sets `FRIDAY_SERVICE_TOKEN_EXPIRES_AT=2026-11-24` and turns on features per NEXT_STEPS section 1; service token renewal before 2026-11-24.
+- Rollback/recovery: revert #156 or #157; nothing deployed by agents.
 
 ### 2026-11-15 09:30 CST — Claude — Built the approved features (#147 to #154)
 

@@ -29,7 +29,9 @@ Friday is a real single-container control-plane MVP on VM102 with separate read-
 - Deterministic local analysis is the final non-AI fallback.
 - The AI policy requires exact preservation of service IDs, VM/LXC numbers, host names, and service-name mappings from normalized state.
 - Command preview is deterministic and does not execute infrastructure work.
-- No infrastructure mutation endpoint exists.
+- No AI-driven infrastructure mutation exists. The only action path is the approvals queue (#133) plus automated fixes (#151, `FRIDAY_REMEDIATION_ENABLED`, off and dry-run by default): an operator approves, then presses Run fix; the action comes only from the owner's playbook file and execute mode also needs `FRIDAY_MODE=live`, the action audit, an owner-run executor and an armed automation gate.
+- Shared-work writes (create a task #138, claim and move #149) are off by default and touch only VM132 Supabase rows through dedicated least-privilege roles.
+- Operator routes can additionally require the Authentik login claim (#154, off by default).
 
 ## Homelab environment
 - Proxmox `vmbr1` is a VLAN-aware bridge over `nic1` with VLANs 2, 10, 20, 30, 40, 50, 60, 70, and 99. It intentionally has no IP address or gateway. The verified management API remains the legacy vmbr0 path `192.168.1.211:8006`; proposed `10.1.2.211` is not live.
@@ -58,7 +60,9 @@ Friday is a real single-container control-plane MVP on VM102 with separate read-
 - Preserve the observer's fixed GET-only Docker boundary; never expose Docker's native TCP API.
 
 ## Pull request isolation
-PR #9 is the separate private-HTTPS routing foundation and remains draft/open. Do not merge, modify, close, or fold it into assistant/read-adapter work unless the owner explicitly requests that PR.
+PR #9 (private-HTTPS routing foundation) was closed without merging on 2026-10-19; its branch `feature/https-private-routing-20260821` remains for reference. Do not revive or fold it into other work unless the owner explicitly asks.
+
+PR #109 (`integration/friday-development-main-20261029`) stays open as a source branch for ported slices; do not merge it whole.
 
 ## Standard commands
 ```bash
@@ -109,7 +113,7 @@ make update
 Preserve the local `.env`; never overwrite production secrets from `.env.example`.
 
 ## Finish order
-Follow `docs/codex/NEXT_STEPS.md` exactly. The current next milestone is **Local Agent Platform Phase 1 live acceptance**. Keep all output advisory/read-only. CT108 nic1 validation is complete; finish registry migration/sync, shared-composer and Agents UI acceptance before merge readiness, then continue read-only adapters. Authentication/RBAC, durable action audit, approval workflow, and a global kill switch remain prerequisites for any future tightly allowlisted action work.
+Follow `docs/codex/NEXT_STEPS.md`, the ordered queue of what is merged, deployed, waiting on the owner, and next. Local Agent Platform Phase 1 was live-accepted on 2026-10-28 (`docs/codex/BUILD_STATUS.md`). Small agent work comes from `docs/automation/BACKLOG.md`. New features stay off by default behind a flag; deploying and turning flags on is the owner's step.
 
 ## Verification contract
 Before completing application changes:
