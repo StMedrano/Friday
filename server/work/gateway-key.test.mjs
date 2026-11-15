@@ -31,18 +31,18 @@ test('without a gateway key the read key is used for both headers', async () => 
 
 test('config reads the work bridge settings server-side and stays off by default', () => {
   assert.deepEqual(getConfig({}).work, { enabled: false, readKey: '', gatewayKey: '', grantsPath: '/data/work-grants.json',
-    write: { enabled: false, key: '' } })
+    write: { enabled: false, key: '', moveEnabled: false } })
   assert.deepEqual(getConfig({
     FRIDAY_WORK_READ_ENABLED: 'true', FRIDAY_WORK_READ_KEY: 'reader-jwt',
     FRIDAY_WORK_READ_GATEWAY_KEY: 'anon', FRIDAY_WORK_GRANTS_PATH: '/data/grants.json',
-    FRIDAY_WORK_WRITE_ENABLED: 'true', FRIDAY_WORK_WRITE_KEY: 'writer-jwt',
+    FRIDAY_WORK_WRITE_ENABLED: 'true', FRIDAY_WORK_WRITE_KEY: 'writer-jwt', FRIDAY_WORK_MOVE_ENABLED: 'true',
   }).work, { enabled: true, readKey: 'reader-jwt', gatewayKey: 'anon', grantsPath: '/data/grants.json',
-    write: { enabled: true, key: 'writer-jwt' } })
+    write: { enabled: true, key: 'writer-jwt', moveEnabled: true } })
 })
 
 test('compose passes every work setting through to the controller', async () => {
   const compose = await (await import('node:fs/promises')).readFile(new URL('../../compose.yaml', import.meta.url), 'utf8')
-  for (const key of ['FRIDAY_WORK_READ_ENABLED', 'FRIDAY_WORK_READ_KEY', 'FRIDAY_WORK_READ_GATEWAY_KEY', 'FRIDAY_WORK_GRANTS_PATH', 'FRIDAY_WORK_WRITE_ENABLED', 'FRIDAY_WORK_WRITE_KEY']) {
+  for (const key of ['FRIDAY_WORK_READ_ENABLED', 'FRIDAY_WORK_READ_KEY', 'FRIDAY_WORK_READ_GATEWAY_KEY', 'FRIDAY_WORK_GRANTS_PATH', 'FRIDAY_WORK_WRITE_ENABLED', 'FRIDAY_WORK_WRITE_KEY', 'FRIDAY_WORK_MOVE_ENABLED']) {
     assert.match(compose, new RegExp(`^\\s+${key}: \\$\\{${key}`, 'm'), key)
   }
 })

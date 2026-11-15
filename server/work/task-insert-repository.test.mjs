@@ -68,3 +68,46 @@ test('rejects storage errors and rows that are not a fresh ready task in the pro
  }
  await assert.rejects(repo(fake([Error('network down')]).fetchImpl).create(input))
 })
+
+const moveInput={workItemId:row.id,projectId:'friday-ai-os',expectedVersion:1,principalId:principal,status:'in_progress',requestId:'claim-1'}
+
+test('move is unavailable unless moveEnabled is set',async()=>{
+ const f=fake([])
+ const plain=repo(f.fetchImpl)
+ assert.equal(plain.canMove,false)
+ await assert.rejects(plain.move(moveInput))
+ assert.equal(f.calls.length,0)
+})
+
+test('claims a task through the one checked RPC and returns the new version',async()=>{
+ const f=fake([{status:200,body:{status:'moved',task:{...row,status:'in_progress',version:2}}}])
+ const r=repo(f.fetchImpl,{moveEnabled:true})
+ assert.equal(r.canMove,true)
+ assert.deepEqual(await r.move(moveInput),{id:row.id,projectId:'friday-ai-os',title:'Write release notes',status:'in_progress',version:2})
+ const {url,options}=f.calls[0]
+ assert.equal(url,'https://supabase.mytechtactics.com/rest/v1/rpc/friday_operator_move_task')
+ assert.equal(options.method,'POST')
+ assert.equal(options.headers.authorization,'Bearer writer-jwt')
+ assert.deepEqual(JSON.parse(options.body),{work_id:row.id,project_id:'friday-ai-os',expected_version:1,
+  principal_id:principal,next_status:'in_progress',request_id:'claim-1'})
+})
+
+test('maps database refusals to conflict, invalid and denied',async()=>{
+ for(const [error,code] of [['version-conflict','conflict'],['lease-conflict','conflict'],['invalid-transition','invalid'],['not-found','denied']]){
+  const f=fake([{status:200,body:{error}}])
+  await assert.rejects(repo(f.fetchImpl,{moveEnabled:true}).move(moveInput),e=>e.code===code)
+ }
+})
+
+test('rejects a reply for another task, status or version, and bad input before any call',async()=>{
+ for(const task of [{...row,id:'00000000-0000-4000-8000-000000000000',status:'in_progress',version:2},
+  {...row,status:'review',version:2},{...row,status:'in_progress',version:5}]){
+  const f=fake([{status:200,body:{status:'moved',task}}])
+  await assert.rejects(repo(f.fetchImpl,{moveEnabled:true}).move(moveInput),/work-write-storage-denied/)
+ }
+ const f=fake([])
+ const r=repo(f.fetchImpl,{moveEnabled:true})
+ for(const bad of [{...moveInput,status:'running'},{...moveInput,workItemId:'not-a-uuid'},{...moveInput,expectedVersion:0},{...moveInput,principalId:'runtime:x'},{...moveInput,extra:1}])
+  await assert.rejects(r.move(bad))
+ assert.equal(f.calls.length,0)
+})
