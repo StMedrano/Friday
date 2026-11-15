@@ -82,6 +82,40 @@ The service credential stays on the Friday server/container. It must never be ex
 
 Registry sync is explicit and Git-owned. It is not an agent editor and cannot create infrastructure actions, approvals, tasks, memory, or executor records.
 
+### New agents from Friday
+
+Agents stay defined in Git (`agents/*.json`). With
+`FRIDAY_AGENT_PROPOSALS_ENABLED=true`, the Agents screen's Action center has
+**Propose an agent**: Friday validates the form as Agent Spec v1.1 and opens a
+GitHub pull request that adds one new `agents/<id>.json` file on a new
+`friday/agent-<id>-…` branch. Nothing is written to the runtime registry. The
+agent exists only after the owner reviews and merges the pull request and
+presses Sync registry.
+
+- Settings: `FRIDAY_AGENT_PROPOSALS_GITHUB_TOKEN` (server-side only, never
+  shown or logged), `FRIDAY_AGENT_PROPOSALS_REPOSITORY` (default
+  `StMedrano/Friday`), `FRIDAY_AGENT_PROPOSALS_BASE_BRANCH` (default `main`).
+  The GitHub API URL is `FRIDAY_GITHUB_API_URL`. Use a **fine-grained token
+  for this one repository** with Contents: read and write and Pull requests:
+  read and write. Friday only creates a branch, adds one new file on it and
+  opens a pull request; it never pushes to the base branch, changes an
+  existing agent file or merges.
+- Form rules: id of 3 to 64 lowercase letters, numbers and dashes; a model
+  profile from `local-general` or `local-coder` (no provider, model or URL);
+  up to 20 tools and hosts; permissions as `action: mode` with mode `auto`,
+  `approval` or `forbidden`, where only reading-style actions (`inspect`,
+  `read_…`, `list_…`, `get_…`, `view_…`, `check_…`) may be `auto`; up to 20
+  instruction lines. Text that looks like a secret is refused. An id already
+  in Git is refused (409 `agent-exists`).
+- `GET /api/agents/proposals` returns `{repository, profiles}` or 503
+  `agent-proposals-disabled`. `POST /api/agents/proposals` is operator-only,
+  needs a signed-in human in live mode (403 otherwise), JSON-only, refused
+  cross-site, and audited as `agents.propose` with the agent id as target.
+  It answers 201 `{proposal: {number, url, branch, path}}`; errors: 400
+  `invalid-agent-proposal` with `field`, 409 `agent-exists` or
+  `github-rejected`, 502 `github-denied` (token refused), 503
+  `github-unavailable`.
+
 ### Agent activity log
 
 - `FRIDAY_AGENT_ACTIVITY_ENABLED=false` by default. When on, every `POST /api/agents/:id/ask` adds one entry to `FRIDAY_AGENT_ACTIVITY_PATH` (default `/data/agent-activity.json`, mode 0600, newest `FRIDAY_AGENT_ACTIVITY_LIMIT` entries, 50 to 2000, default 500): time, agent ID and name, outcome (`answered`, `unavailable`, `not-found`, `failed`), provider, model and profile when answered, `grounding-invalid` when the answer failed grounding, and duration.

@@ -82,6 +82,9 @@ function featureView(config) {
     feature('model-routing', 'Free model routing for chat', config.modelFabric?.enabled, config.ai?.enabled === true && modelTargets > 0, 'Free model routing'),
     feature('web-growth', 'Web Growth leads', webGrowth.enabled,
       present(webGrowth.baseUrl) && present(webGrowth.token) && Array.isArray(webGrowth.readerEmails) && webGrowth.readerEmails.length > 0, 'Web Growth leads'),
+    // Opens pull requests on GitHub; needs its own write token.
+    feature('agent-proposals', 'New agents (pull requests)', config.agentProposals?.enabled,
+      present(config.agentProposals?.token) && present(config.agentProposals?.repository), 'New agents from Friday'),
     // Links come from the owner's file; a missing or bad file leaves the feature off at startup.
     feature('app-links', 'Open app links', config.appLinks?.enabled, true, 'Open app links'),
     // Generating spends AIDesigner credits; it needs the integration itself on with a key.

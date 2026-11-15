@@ -38,6 +38,7 @@ export const COMPANIONS = Object.freeze({
   'work-edit': { flag: 'FRIDAY_WORK_EDIT_ENABLED', needs: ['FRIDAY_WORK_READ_ENABLED', 'FRIDAY_WORK_WRITE_ENABLED', 'FRIDAY_SUPABASE_URL', 'FRIDAY_WORK_READ_KEY', 'FRIDAY_WORK_WRITE_KEY'] },
   // Also needs one free model target; see docs/integrations.md, Free model routing.
   'model-routing': { flag: 'FRIDAY_MODEL_FABRIC_ENABLED', needs: ['FRIDAY_AI_ENABLED'] },
+  'agent-proposals': { flag: 'FRIDAY_AGENT_PROPOSALS_ENABLED', needs: ['FRIDAY_AGENT_PROPOSALS_GITHUB_TOKEN'] },
   'app-links': { flag: 'FRIDAY_APP_LINKS_ENABLED', needs: [] },
   'web-growth': { flag: 'FRIDAY_WEB_GROWTH_ENABLED', needs: ['FRIDAY_WEB_GROWTH_READER_URL', 'FRIDAY_WEB_GROWTH_READER_TOKEN', 'FRIDAY_WEB_GROWTH_READER_EMAILS'] },
   proxmox: { flag: 'FRIDAY_PROXMOX_ENABLED', needs: ['FRIDAY_PROXMOX_URL', 'FRIDAY_PROXMOX_TOKEN_ID', 'FRIDAY_PROXMOX_TOKEN_SECRET'] },
