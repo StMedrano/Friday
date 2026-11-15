@@ -295,13 +295,17 @@ Friday can call the [AIDesigner REST API](https://www.aidesigner.ai/docs/api) to
 
 - Enable with `FRIDAY_AIDESIGNER_ENABLED=true` and `AIDESIGNER_API_KEY` (created in AIDesigner under Settings, API Keys). `AIDESIGNER_BASE_URL` must be an `https` origin; `FRIDAY_AIDESIGNER_TIMEOUT_MS` (default 180000) bounds one generation.
 - Needs live mode with Cloudflare Access. Service tokens are refused.
-- `GET /api/aidesigner/sessions`: any signed-in person; returns up to 20 recent sessions (id, title, editor link, canvas count, published link, updated time).
+- Generating has its own flag, `FRIDAY_AIDESIGNER_GENERATE_ENABLED=true` (off by default). Without it the session list works and `POST /api/aidesigner/designs` answers 503 `aidesigner-generate-disabled`. When the integration itself is off, both routes answer 503 `aidesigner-disabled`.
+- `GET /api/aidesigner/sessions`: any signed-in person; returns up to 20 recent sessions (id, title, editor link, canvas count, published link, updated time) and `generate` (whether generating is switched on).
 - `POST /api/aidesigner/designs` with JSON `{ "prompt", "viewport"?: "desktop" | "mobile", "sessionId"?, "idempotencyKey"? }`: operator-only, audited as `aidesigner.design.generate`. It spends AIDesigner credits (1 per classic design). The design is written to a new session, or to `sessionId`, and Friday returns only the session, canvas and editor link, never the HTML. Unknown fields are refused, and the premium `ultradesign` mode is not exposed.
 - Provider errors are mapped without detail: 402 out of credits, 429 rate limited (with `Retry-After`), 404 unknown session, 409 canvas busy, 502 key rejected, 503 unavailable.
 - AIDesigner's own limits apply per account: 30 generations per minute and 4 at once.
-- Settings, General shows a read-only **Design sessions** panel: each session's name, last update, canvas count and links to its AIDesigner editor and published page. It asks for the list only when AIDesigner is enabled, and shows a Not connected note with a link here when it is off. It has no Generate button; generating spends credits and needs the owner's approval first.
+- Settings, General shows a read-only **Design sessions** panel: each session's name, last update, canvas count and links to its AIDesigner editor and published page. It asks for the list only when AIDesigner is enabled, and shows a Not connected note with a link here when it is off. It has no Generate button.
+- **Web Growth, Website designs** (Agents, TechTactics group, under the Web Growth pipeline) lists the same design projects and, when `FRIDAY_AIDESIGNER_GENERATE_ENABLED` is on, has the Generate form: a prompt (or **Start from** the selected lead, which only fills in an editable draft), desktop or phone, and a new or existing design project. **Generate design…** always opens a confirm step that says credits will be spent and shows the exact prompt sent to AIDesigner; nothing is sent until **Spend credits and generate**. The server still enforces operator-only and audits each request. If the answer is lost (for example a Cloudflare 100 second edge timeout during a long generation), the next try with the same prompt reuses the same idempotency key, so AIDesigner should replay the earlier design instead of charging again.
 
-This is separate from the AIDesigner MCP server (`https://api.aidesigner.ai/api/v1/mcp`), which uses OAuth and is connected in the AI assistant, not in Friday.
+Friday uses the REST API with a server-side key, not the MCP server: MCP needs an interactive OAuth sign-in per person, while the REST key lets Friday keep the credential on VM102, enforce operator-only, and audit every generation.
+
+The AIDesigner MCP server (`https://api.aidesigner.ai/api/v1/mcp`) is separate; it uses OAuth and is connected in the AI assistant, not in Friday.
 
 ## Opt-in features in Settings
 
@@ -332,35 +336,6 @@ it shows a warning, and once the date has passed it shows the token as expired.
 
 - `FRIDAY_WEB_GROWTH_ENABLED=false` by default. When on, the TechTactics group shows the Web Growth lead pipeline read from the isolated reader in `integrations/web-growth-reader/`, never from the Web Growth application itself.
 - Needs `FRIDAY_WEB_GROWTH_READER_URL`, `FRIDAY_WEB_GROWTH_READER_TOKEN` (the reader's bearer token) and `FRIDAY_WEB_GROWTH_READER_EMAILS` (comma-separated people allowed to see it). Settings shows it as configured when all three are present. Deploying the reader is a separate, owner-approved step; see its README.
-
-## Checking .env before a deploy
-
-`compose.yaml` passes every variable to the container explicitly, so a setting
-added to `.env` but not to `compose.yaml`, or a flag turned on without the
-settings it needs, fails silently. Before a deploy, run on the controller:
-
-```bash
-make env-check                       # checks ./.env against compose.yaml
-make env-check ENV_FILE=/path/.env COMPOSE_FILES="compose.yaml compose.cloud-tunnel.yaml"
-```
-
-It is offline (no network, no Docker) and prints names and line numbers only,
-never values:
-
-- variables in `.env` that none of the given Compose files pass through
-  (they never reach Friday; harmless if another overlay uses them),
-- `*_ENABLED=true` flags whose companion settings are empty, using the same
-  rules as Settings (for example `FRIDAY_WORK_WRITE_ENABLED` needs
-  `FRIDAY_WORK_READ_ENABLED`, `FRIDAY_SUPABASE_URL`, `FRIDAY_WORK_READ_KEY`
-  and `FRIDAY_WORK_WRITE_KEY`); a companion set in `.env` but not passed
-  through counts as empty,
-- malformed lines and names set more than once.
-
-Values are read the way Compose reads them: double-quoted escapes are decoded
-and `${NAME}` / `${NAME:-default}` resolve from earlier `.env` lines (a name
-not set earlier counts as empty, because shell variables are not visible
-offline). It exits 1 only when a flag is missing a companion, and 2 when a file
-cannot be read.
 
 ## Adapter checklist
 

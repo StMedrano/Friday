@@ -429,3 +429,22 @@
 .v3-group-incident { padding: 12px 0; border-top: 1px solid var(--line); overflow-wrap: anywhere; }
 .v3-group-incident span { margin-left: 8px; color: var(--amber); font-size: 12px; }
 .v3-group-incident p { color: var(--muted); font-size: 13px; }
+
+/* Web Growth: AIDesigner website designs */
+.v3-web-growth-designs { margin-top: 20px; padding-top: 16px; border-top: 1px solid var(--line); }
+.v3-web-growth-designs h4 { margin: 2px 0 0; }
+.v3-web-growth-design-list { display: grid; gap: 6px; margin: 12px 0; padding: 0; list-style: none; max-height: 18rem; overflow: auto; }
+.v3-web-growth-design-list li { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid var(--line); border-radius: 8px; font-size: 13px; }
+.v3-web-growth-design-list li > span { display: grid; gap: 2px; flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.v3-web-growth-design-list small { color: var(--muted); }
+.v3-web-growth-design-list a, .v3-web-growth-designs p a { display: inline-flex; align-items: center; gap: 4px; color: var(--cyan); white-space: nowrap; }
+.v3-web-growth-design-form { display: grid; gap: 10px; margin: 12px 0; }
+.v3-web-growth-design-form label { font-size: 13px; }
+.v3-web-growth-design-form textarea, .v3-web-growth-design-form select { width: 100%; box-sizing: border-box; padding: 10px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 14px; }
+.v3-web-growth-design-form select option { color: #111; }
+.v3-web-growth-design-options { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+.v3-web-growth-design-options label { display: grid; gap: 4px; }
+.v3-web-growth-design-lead, .v3-web-growth-design-actions button:not(.v3-agent-primary) { justify-self: start; min-height: 40px; padding: 0 12px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; cursor: pointer; font-size: 13px; }
+.v3-web-growth-design-confirm { margin: 12px 0; padding: 14px; border: 1px solid rgba(251, 191, 36, .5); border-radius: 10px; background: rgba(251, 191, 36, .08); font-size: 13px; }
+.v3-web-growth-design-confirm blockquote { margin: 10px 0; padding-left: 10px; border-left: 3px solid var(--line); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 10rem; overflow: auto; }
+.v3-web-growth-design-actions { display: flex; flex-wrap: wrap; gap: 8px; }
