@@ -93,3 +93,38 @@ test('service identity configuration fails closed and raw identity headers grant
  const {guard}=gate({identityMode:'service',serviceTokenIds:['reader.access']})
  assert.equal((await guard({headers:{'cf-access-client-id':'reader.access','cf-access-client-secret':'secret'}})).status,403)
 })
+
+test('with an Authentik provider rule, a listed email is an operator only when the signed claim matches',async()=>{
+ const {guard}=gate({operatorProviderClaim:'custom.friday_auth_source',operatorProviderValue:'authentik'})
+ const viaAuthentik={'cf-access-jwt-assertion':token({custom:{friday_auth_source:'authentik'}})}
+ const viaPin={'cf-access-jwt-assertion':token()}
+ const wrongValue={'cf-access-jwt-assertion':token({custom:{friday_auth_source:'otp'}})}
+ const unsignedHeader={'cf-access-jwt-assertion':token(),'x-friday-auth-source':'authentik'}
+ const ok=await guard({headers:viaAuthentik},true)
+ assert.equal(ok.status,200)
+ assert.deepEqual(ok.identity,{subject:'subject',email:'operator@example.test',operator:true,providerVerified:true})
+ for(const headers of [viaPin,wrongValue,unsignedHeader]){
+  assert.equal((await guard({headers},true)).status,403)
+  // Reads still work, without operator rights.
+  const read=await guard({headers},false)
+  assert.equal(read.status,200)
+  assert.equal(read.identity.operator,false)
+  assert.equal(read.identity.providerVerified,false)
+ }
+})
+
+test('a half-set or malformed provider rule denies every operator route but keeps reads',async()=>{
+ for(const overrides of [{operatorProviderClaim:'custom.friday_auth_source'},{operatorProviderValue:'authentik'},
+  {operatorProviderClaim:'custom["x"]',operatorProviderValue:'authentik'},{operatorProviderClaim:'a.b.c.d',operatorProviderValue:'authentik'}]){
+  const {guard}=gate(overrides)
+  const headers={'cf-access-jwt-assertion':token({custom:{friday_auth_source:'authentik'}})}
+  assert.equal((await guard({headers},true)).status,403,JSON.stringify(overrides))
+  assert.equal((await guard({headers},false)).status,200)
+ }
+})
+
+test('without a provider rule the identity reports operator status and no provider field',async()=>{
+ const {guard}=gate()
+ const result=await guard({headers:{'cf-access-jwt-assertion':token()}},false)
+ assert.deepEqual(result.identity,{subject:'subject',email:'operator@example.test',operator:true})
+})

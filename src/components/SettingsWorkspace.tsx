@@ -7,6 +7,7 @@ import EndpointChecksPanel from './EndpointChecksPanel'
 import RepositorySettingsPanel from './RepositorySettingsPanel'
 import PushControls from './PushControls'
 import WorkIdentityPanel from './WorkIdentityPanel'
+import MyAccessPanel from './MyAccessPanel'
 import AuditWorkspace from './AuditWorkspace'
 import AiDesignerSessionsPanel from './AiDesignerSessionsPanel'
 
@@ -134,6 +135,7 @@ export default function SettingsWorkspace() {
               <dt>Notifications</dt><dd>{[settings.notifications?.ntfy ? 'ntfy' : null, settings.notifications?.webPush ? 'browser push' : null].filter(Boolean).join(' · ') || 'Not configured'}</dd>
               <dt>Automation API</dt><dd>{onOff(settings.automationApi.enabled)} · port {settings.automationApi.port ?? '—'} · {settings.automationApi.serviceTokens} service tokens · read only</dd>
             </dl>
+            <MyAccessPanel provider={settings.access.operatorProvider}/>
             <WorkIdentityPanel/>
             <p className="v3-settings-safety"><ShieldCheck size={14} aria-hidden="true"/>Only site labels, endpoint checks and repositories are writable here. No infrastructure actions or executor exist in this build.</p>
           </section>

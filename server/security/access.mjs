@@ -6,6 +6,23 @@ const audienceTag=/^[A-Za-z0-9_-]{3,256}$/
 const email=/^[^\s@]+@[^\s@]+\.[^\s@]+$/
 const now=()=>Math.floor(Date.now()/1000)
 const decode=part=>JSON.parse(Buffer.from(part,'base64url').toString('utf8'))
+const claimPath=/^[A-Za-z_][A-Za-z0-9_]{0,63}(?:\.[A-Za-z_][A-Za-z0-9_]{0,63}){0,2}$/
+const providerValue=/^[A-Za-z0-9._:-]{1,64}$/
+
+/**
+ * Optional rule that operator routes need a signed claim naming the identity
+ * provider (for Authentik as primary login: a Cloudflare Access OIDC claim
+ * such as custom.friday_auth_source = authentik). Returns null when unset and
+ * 'invalid' when half-set or malformed, which denies every operator route.
+ */
+export function operatorProviderRule(config){
+ const claim=String(config?.operatorProviderClaim||'').trim()
+ const value=String(config?.operatorProviderValue||'').trim()
+ if(!claim&&!value)return null
+ if(!claimPath.test(claim)||!providerValue.test(value))return 'invalid'
+ return Object.freeze({path:claim.split('.'),claim,value})
+}
+const claimAt=(claims,path)=>path.reduce((node,key)=>node!==null&&typeof node==='object'&&!Array.isArray(node)&&Object.hasOwn(node,key)?node[key]:undefined,claims)
 
 /**
  * Server-side Cloudflare Access assertion validation. This MUST NOT trust
@@ -22,6 +39,7 @@ export function createAccessGate(config,{fetchImpl=fetch}={}){
   (!serviceOnly||(Array.isArray(serviceIds)&&serviceIds.length>0&&serviceIds.length<=16&&
    serviceIds.every(s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,128}\.access$/.test(s))))
  const allowedOperators=new Set(isConfigured?operators.map(x=>x.toLowerCase().trim()):[])
+ const providerRule=serviceOnly?null:operatorProviderRule(config)
  let cachedKeys=null
  let cacheDeadline=0
  async function getKey(kid){
@@ -65,8 +83,13 @@ export function createAccessGate(config,{fetchImpl=fetch}={}){
    }
    if(typeof claims.sub!=='string'||!claims.sub)return {status:403,error:'access-denied'}
    const userEmail=typeof claims.email==='string'?claims.email.toLowerCase().trim():''
-   if(operatorOnly&&!allowedOperators.has(userEmail))return {status:403,error:'access-denied'}
-   return {status:200,identity:{subject:claims.sub,email:userEmail}}
+   // With a provider rule, a listed email is an operator only when it signed
+   // in through that provider (Authentik), never through a break-glass PIN.
+   const providerVerified=providerRule===null?null:providerRule!=='invalid'&&claimAt(claims,providerRule.path)===providerRule.value
+   const operator=allowedOperators.has(userEmail)&&providerVerified!==false
+   if(operatorOnly&&!operator)return {status:403,error:'access-denied'}
+   return {status:200,identity:{subject:claims.sub,email:userEmail,operator,
+    ...(providerVerified===null?{}:{providerVerified})}}
   } catch {
    return {status:403,error:'access-denied'}
   }
