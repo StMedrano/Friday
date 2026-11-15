@@ -146,6 +146,9 @@ if (config.remediation.enabled) {
   const playbooks = await loadPlaybooks(config.remediation.playbooksPath)
   if (!approvalQueue) console.warn('Friday automated fixes stayed disabled; they need FRIDAY_APPROVALS_ENABLED')
   else if (!playbooks) console.warn('Friday automated fixes stayed disabled; the playbook file is missing, unsafe or invalid')
+  // Real execution needs signed-in operators and the durable action audit.
+  else if (config.remediation.mode === 'execute' && (config.mode !== 'live' || !actionAudit))
+    console.warn('Friday automated fixes stayed disabled; execute mode needs FRIDAY_MODE=live and FRIDAY_AUDIT_ENABLED=true')
   else {
     remediation = await createRemediationRunner({
       enabled: true,

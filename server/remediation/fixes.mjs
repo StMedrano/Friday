@@ -69,7 +69,7 @@ const publicPlan = (entry) => ({ playbookId: entry.id, action: entry.action, tar
 function cleanRun(entry) {
   if (!entry || typeof entry !== 'object' || !text(entry.id, 64) || !text(entry.incidentId, 200) || !text(entry.approvalId, 64)
     || !ID.test(entry.playbookId) || !MODES.includes(entry.mode)
-    || !['dry-run', 'succeeded', 'failed'].includes(entry.state) || !Number.isFinite(Date.parse(entry.at))) return null
+    || !['dry-run', 'pending', 'succeeded', 'failed'].includes(entry.state) || !Number.isFinite(Date.parse(entry.at))) return null
   const run = { id: entry.id, incidentId: entry.incidentId, approvalId: entry.approvalId, playbookId: entry.playbookId,
     mode: entry.mode, state: entry.state, at: entry.at }
   if (text(entry.action, 41)) run.action = entry.action
@@ -134,7 +134,8 @@ export async function createRemediationRunner({
       if (!ready) return null
       const entry = playbookFor(playbooks, incident)
       if (!entry) return null
-      const last = runs.findLast((run) => run.approvalId === approvalId)
+      // A dry run never counts against a real execution, and vice versa.
+      const last = runs.findLast((run) => run.approvalId === approvalId && run.mode === mode)
       return { ...publicPlan(entry), mode, ...(last ? { run: { state: last.state, at: last.at, mode: last.mode } } : {}) }
     },
     recent() {
@@ -153,27 +154,38 @@ export async function createRemediationRunner({
         if (!incident || incident.status !== 'open') return { status: 409, body: { error: 'incident-not-open' } }
         const entry = playbookFor(playbooks, incident)
         if (!entry) return { status: 404, body: { error: 'no-fix-for-service' } }
-        if (runs.some((run) => run.approvalId === approval.id && run.state !== 'failed'))
+        // Once per approval and mode. A 'pending' execution (sent, outcome not
+        // recorded) also blocks: it may have run, so it is never re-sent.
+        if (runs.some((run) => run.approvalId === approval.id && run.mode === mode && run.state !== 'failed'))
           return { status: 409, body: { error: 'fix-already-run' } }
         // The global automation kill switch is checked immediately before execution.
         if (executeMode && automationGate.isAllowed() !== true) return { status: 423, body: { error: 'automation-gate-closed' } }
         const record = { id: randomUUID(), incidentId, approvalId: approval.id, playbookId: entry.id,
           action: entry.action, target: entry.target, mode, at: new Date(now()).toISOString(),
           ...(text(requestedBy, 254) ? { requestedBy } : {}) }
-        let outcome = { ok: true }
-        if (executeMode) {
-          outcome = await callExecutor({ requestId: record.id, playbookId: entry.id, action: entry.action,
-            target: entry.target, incidentId })
+        if (!executeMode) {
+          const stored = cleanRun({ ...record, state: 'dry-run' })
+          const next = [...runs, stored].slice(-MAX_RUNS)
+          try { await save(next) } catch { return { status: 503, body: { error: 'remediation-unavailable' } } }
+          runs = next
+          return { status: 200, body: { fix: { ...publicPlan(entry), mode, state: stored.state, at: stored.at },
+            execution: { performed: false, reason: 'Dry run: recorded what would run; nothing was executed.' } } }
         }
-        const stored = cleanRun({ ...record, state: executeMode ? (outcome.ok ? 'succeeded' : 'failed') : 'dry-run',
-          ...(outcome.detail ? { detail: outcome.detail } : {}) })
-        const next = [...runs, stored].slice(-MAX_RUNS)
-        try { await save(next) } catch { return { status: 503, body: { error: 'remediation-unavailable' } } }
-        runs = next
-        const execution = executeMode
-          ? { performed: true, succeeded: outcome.ok, ...(outcome.detail ? { reason: outcome.detail } : {}) }
-          : { performed: false, reason: 'Dry run: recorded what would run; nothing was executed.' }
-        return { status: executeMode && !outcome.ok ? 502 : 200, body: { fix: { ...publicPlan(entry), mode, state: stored.state, at: stored.at }, execution } }
+        // Durably claim the execution BEFORE dispatch, so a crash or a failed
+        // final write can never let the same approval be sent twice.
+        const pending = cleanRun({ ...record, state: 'pending' })
+        const claimed = [...runs, pending].slice(-MAX_RUNS)
+        try { await save(claimed) } catch { return { status: 503, body: { error: 'remediation-unavailable' } } }
+        runs = claimed
+        const outcome = await callExecutor({ requestId: record.id, playbookId: entry.id, action: entry.action,
+          target: entry.target, incidentId })
+        const stored = cleanRun({ ...record, state: outcome.ok ? 'succeeded' : 'failed', ...(outcome.detail ? { detail: outcome.detail } : {}) })
+        const next = runs.map((run) => run.id === record.id ? stored : run)
+        let recorded = true
+        // If the outcome cannot be written, the run stays 'pending' (blocks a resend).
+        try { await save(next); runs = next } catch { recorded = false }
+        const execution = { performed: true, succeeded: outcome.ok, ...(outcome.detail ? { reason: outcome.detail } : {}), ...(recorded ? {} : { recorded: false }) }
+        return { status: outcome.ok ? 200 : 502, body: { fix: { ...publicPlan(entry), mode, state: recorded ? stored.state : 'pending', at: stored.at }, execution } }
       }
       const result = queue.then(attempt, attempt)
       queue = result.catch(() => {})

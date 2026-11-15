@@ -599,6 +599,11 @@ export function createFridayServer({
       if (approvalFixRoute.invalid) return json(response, 400, { error: 'invalid-incident-id' })
       if (url.search) return json(response, 400, { error: 'unexpected-query' })
       if (!approvalQueue || !remediation?.enabled) return json(response, 404, { error: 'remediation-disabled' })
+      // Real execution only for a verified human operator, with the durable audit on.
+      if (remediation.mode === 'execute') {
+        if (!accessGate || !identity || identity.kind === 'service') return json(response, 403, { error: 'access-denied' })
+        if (!actionAudit) return json(response, 503, { error: 'audit-unavailable' })
+      }
       if (config.monitoring?.enabled === false) return json(response, 503, { error: 'monitoring-disabled' })
       let body
       try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid-fix-request' }) }

@@ -20,12 +20,14 @@ const incidents = [
 const monitoringRuntime = {getIncidents: () => ({summary: {}, incidents})}
 const playbook = {id: 'restart-plex', serviceId: 'docker:plex', action: 'restart-container', target: 'plex', description: 'Restart the plex container'}
 
-async function withServer(t, {gate = operatorGate, remediation = true} = {}, fn) {
+async function withServer(t, {gate = operatorGate, remediation = true, execute = false, audit = true} = {}, fn) {
   const root = await mkdtemp(join(tmpdir(), 'friday-fixes-http-'))
   t.after(() => rm(root, {recursive: true, force: true}))
   const approvalQueue = await createApprovalQueue({path: join(root, 'approvals.json')})
-  const actionAudit = await createActionAudit({directory: join(root, 'audit')})
-  const runner = remediation ? await createRemediationRunner({enabled: true, playbooks: [playbook], path: join(root, 'runs.json')}) : null
+  const actionAudit = audit ? await createActionAudit({directory: join(root, 'audit')}) : null
+  const executeOptions = execute ? {mode: 'execute', executor: {url: 'https://executor.test/fix', token: 't'},
+    automationGate: {isAllowed: () => true}, fetchImpl: async () => { execute.calls++; return new Response('{"ok":true}') }} : {}
+  const runner = remediation ? await createRemediationRunner({enabled: true, playbooks: [playbook], path: join(root, 'runs.json'), ...executeOptions}) : null
   const server = createFridayServer({config: getConfig({FRIDAY_MODE: 'live', FRIDAY_MONITORING_ENABLED: 'true'}),
     monitoringRuntime, approvalQueue, actionAudit, remediation: runner, accessGateImpl: gate})
   server.listen(0, '127.0.0.1')
@@ -77,4 +79,32 @@ test('viewers cannot run a fix', async t => {
   await withServer(t, {gate: viewerGate}, async base => {
     assert.equal((await fix(base)).status, 403)
   })
+})
+
+test('real execution needs a signed-in human operator and the durable audit', async t => {
+  const approve = base => post(base, '/api/approvals/svc-offline-1/decision', {decision: 'approve'})
+  const serviceGate = async () => ({status: 200, identity: {kind: 'service', subject: 'svc'}})
+  const anonymousGate = async () => ({status: 200})
+  for (const gate of [serviceGate, anonymousGate]) {
+    const execute = {calls: 0}
+    await withServer(t, {gate, execute}, async base => {
+      await approve(base)
+      assert.equal((await fix(base)).status, 403)
+    })
+    assert.equal(execute.calls, 0)
+  }
+  const noAudit = {calls: 0}
+  await withServer(t, {execute: noAudit, audit: false}, async base => {
+    await approve(base)
+    assert.deepEqual(await (await fix(base)).json(), {error: 'audit-unavailable'})
+  })
+  assert.equal(noAudit.calls, 0)
+  const ok = {calls: 0}
+  await withServer(t, {execute: ok}, async base => {
+    await approve(base)
+    const ran = await fix(base)
+    assert.equal(ran.status, 200)
+    assert.equal((await ran.json()).execution.performed, true)
+  })
+  assert.equal(ok.calls, 1)
 })

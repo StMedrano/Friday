@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
-import {chmod, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises'
+import {chmod, mkdir, mkdtemp, readFile, rm, writeFile} from 'node:fs/promises'
 import {tmpdir} from 'node:os'
 import {join} from 'node:path'
 import {createRemediationRunner, loadPlaybooks, parsePlaybooks, playbookFor} from './fixes.mjs'
@@ -107,4 +107,52 @@ test('execute mode sends only the playbook action to the executor and records th
   assert.deepEqual(Object.keys(body).sort(), ['action', 'incidentId', 'playbookId', 'requestId', 'target'])
   assert.equal(body.action, 'restart-container')
   assert.ok(!JSON.stringify(await readFile(join(root, 'runs.json'), 'utf8')).includes('exec-token'))
+})
+
+test('execute mode durably claims the run before dispatch: no write, no call', async t => {
+  const root = await tempDir(t)
+  let calls = 0
+  // A directory where the runs file should be makes every save fail.
+  const blocked = join(root, 'runs-dir')
+  await mkdir(blocked)
+  const runner = await createRemediationRunner({enabled: true, mode: 'execute', playbooks: [playbook], path: blocked,
+    executor: {url: 'https://executor.test/fix', token: 't'}, automationGate: {isAllowed: () => true},
+    fetchImpl: async () => { calls++; return new Response('{"ok":true}') }})
+  const result = await runner.run({incidents: [incident], incidentId: 'inc-1', approval})
+  assert.equal(result.status, 503)
+  assert.equal(calls, 0)
+})
+
+test('an execution whose outcome cannot be recorded stays pending and is never re-sent', async t => {
+  const root = await tempDir(t)
+  const path = join(root, 'runs.json')
+  let calls = 0
+  const runner = await createRemediationRunner({enabled: true, mode: 'execute', playbooks: [playbook], path,
+    executor: {url: 'https://executor.test/fix', token: 't'}, automationGate: {isAllowed: () => true},
+    fetchImpl: async () => {
+      calls++
+      // Break the store after the pending claim was written.
+      await rm(path, {force: true}); await mkdir(path)
+      return new Response('{"ok":true}')
+    }})
+  const first = await runner.run({incidents: [incident], incidentId: 'inc-1', approval})
+  assert.equal(first.body.execution.recorded, false)
+  assert.equal(first.body.fix.state, 'pending')
+  assert.equal((await runner.run({incidents: [incident], incidentId: 'inc-1', approval})).body.error, 'fix-already-run')
+  assert.equal(calls, 1)
+  assert.equal(runner.describe(incident, 'appr-1').run.state, 'pending')
+})
+
+test('a dry run does not use up the real execution for the same approval', async t => {
+  const root = await tempDir(t)
+  const path = join(root, 'runs.json')
+  const dry = await createRemediationRunner({enabled: true, playbooks: [playbook], path})
+  assert.equal((await dry.run({incidents: [incident], incidentId: 'inc-1', approval})).status, 200)
+  let calls = 0
+  const live = await createRemediationRunner({enabled: true, mode: 'execute', playbooks: [playbook], path,
+    executor: {url: 'https://executor.test/fix', token: 't'}, automationGate: {isAllowed: () => true},
+    fetchImpl: async () => { calls++; return new Response('{"ok":true}') }})
+  assert.equal(live.describe(incident, 'appr-1').run, undefined)
+  assert.equal((await live.run({incidents: [incident], incidentId: 'inc-1', approval})).status, 200)
+  assert.equal(calls, 1)
 })
