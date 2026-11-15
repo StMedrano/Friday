@@ -70,6 +70,10 @@ function featureView(config) {
     feature('agent-activity', 'Agent activity log', config.agentActivity?.enabled, true, 'Agent activity log'),
     // Proposals come from open monitoring incidents; without monitoring the routes answer 503.
     feature('approvals', 'Approvals queue', config.approvals?.enabled, config.monitoring?.enabled === true, 'Approvals queue'),
+    // Dry-run needs only approvals; execute also needs the executor URL and token.
+    feature('automated-fixes', 'Automated fixes', config.remediation?.enabled,
+      config.approvals?.enabled === true && config.monitoring?.enabled === true
+        && (config.remediation?.mode !== 'execute' || (present(config.remediation?.executorUrl) && present(config.remediation?.executorToken))), 'Automated fixes'),
     feature('work-read', 'Project tasks', work.enabled, workRead, 'Project tasks (read)'),
     feature('work-write', 'New tasks', work.write?.enabled, work.enabled === true && workRead && present(work.write?.key), 'New tasks (Tasks write path)'),
     feature('work-move', 'Claim and move tasks', work.write?.moveEnabled, work.enabled === true && workRead && work.write?.enabled === true && present(work.write?.key), 'Claim and move tasks'),
