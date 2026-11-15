@@ -172,3 +172,11 @@ test('truncation to a record boundary or deletion is reported as broken while ru
   assert.equal((await other.audit.list()).integrity, 'broken')
   await assert.rejects(other.audit.record({action: 'agents.registry.sync', phase: 'requested', actor: human}), /audit-unavailable/)
 })
+
+test('every action the server audits is registered, so no audited route fails closed', async () => {
+  const {AUDIT_ACTIONS} = await import('./action-audit.mjs')
+  const source = await readFile(new URL('../http.mjs', import.meta.url), 'utf8')
+  const used = [...source.matchAll(/action: '([a-z]+\.[a-z.]+)'/g)].map(match => match[1])
+  assert.ok(used.includes('agents.propose') && used.includes('work.tasks.edit'))
+  for (const action of new Set(used)) assert.ok(AUDIT_ACTIONS.includes(action), action + ' is not registered')
+})

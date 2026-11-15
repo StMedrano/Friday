@@ -15,6 +15,8 @@ const ACTION_LABELS: Record<string, string> = {
   'settings.repositories.delete': 'Repository removed',
   'work.tasks.create': 'Task added',
   'work.tasks.move': 'Task claimed or moved',
+  'work.tasks.edit': 'Task text edited',
+  'agents.propose': 'New agent proposed',
   'aidesigner.design.generate': 'AIDesigner design generated',
 }
 const PHASE_LABELS: Record<string, string> = { requested: 'Requested', succeeded: 'Succeeded', failed: 'Failed', denied: 'Denied' }

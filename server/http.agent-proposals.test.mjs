@@ -103,3 +103,20 @@ test('GitHub refusals are mapped and sanitized', async () => {
     })
   }
 })
+
+test('a proposal is written to the real durable audit store', async (t) => {
+  const { mkdtemp, rm } = await import('node:fs/promises')
+  const { tmpdir } = await import('node:os')
+  const { join } = await import('node:path')
+  const { createActionAudit } = await import('./audit/action-audit.mjs')
+  const root = await mkdtemp(join(tmpdir(), 'friday-proposal-audit-'))
+  t.after(() => rm(root, { recursive: true, force: true }))
+  const actionAudit = await createActionAudit({ directory: join(root, 'audit') })
+  await run({ agentProposer: proposer(), actionAudit }, async (base) => {
+    assert.equal((await post(base)).status, 201)
+  })
+  const page = await actionAudit.list({ limit: 10 })
+  assert.equal(page.integrity, 'verified')
+  assert.deepEqual(page.events.map((event) => [event.action, event.phase, event.target]).reverse(),
+    [['agents.propose', 'requested', 'dns-watcher'], ['agents.propose', 'succeeded', 'dns-watcher']])
+})
