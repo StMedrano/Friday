@@ -41,6 +41,17 @@ queue), #134 (test only), #135 (e2e CI job), #136 and #137 (docs), #138 (New
 task), #139 (backlog), #140 (phone layout). The queue with the flag for each
 is in `docs/codex/NEXT_STEPS.md`.
 
+## 2026-11-15 approved builds: claim/move tasks, automated fixes, observer prep, non-root cutover tooling, Authentik operator rule
+
+All approved by the owner on 2026-11-15, all off by default, none deployed.
+
+- #149: claim and move tasks through one `SECURITY DEFINER` function, `friday_operator_move_task`, executable only by `friday_work_writer` (`FRIDAY_WORK_MOVE_ENABLED`).
+- #151: automated fixes behind the approvals queue (`FRIDAY_REMEDIATION_ENABLED`). Dry run by default. Execute mode needs live auth, a signed-in human operator, the action audit, an owner-run https executor and an armed automation gate; a `pending` record is written before dispatch and is never re-sent.
+- #152: `make observer-prep` for the VM100 observer redeploy (`FRIDAY_DOCKER_SOCKET_GID`).
+- #153: `compose.nonroot.yaml`, `scripts/migrate-friday-data-nonroot.sh --confirm` and `FRIDAY_CONTROLLER_NONROOT`; runbook `docs/controller-nonroot-migration.md`.
+- #154: `FRIDAY_ACCESS_OPERATOR_IDP_CLAIM`/`_VALUE` require a signed claim for operator routes; `GET /api/settings/my-access` and a Settings panel to check it.
+- Model routing into chat was already done by #131.
+
 ## 2026-11-15 AIDesigner website designs in Web Growth
 
 Web Growth (Agents, TechTactics group) has a **Website designs** section
