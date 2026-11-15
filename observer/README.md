@@ -149,4 +149,8 @@ Inventory and inspect are projected at the proxy, so environment variables, comm
 
 Both images pin the Node/Alpine patch release, run `apk upgrade`, remove the bundled npm/Yarn tooling and run as UID 10001.
 
-To roll out on VM100 (operator-approved maintenance window only): set `FRIDAY_DOCKER_SOCKET_GID=$(stat -c %g /var/run/docker.sock)` in the observer's private `.env` (Compose refuses to start without it), keep the current image and Compose file for rollback, then `docker compose up -d --build` and verify health, authenticated inventory, inspect and logs. Residual risk: the socket group is root-equivalent, so it is granted to the proxy alone; never add it to the observer or publish a Docker TCP port.
+To roll out on VM100 (operator-approved maintenance window only):
+
+1. Before the window, from the checkout root on VM100: `git pull`, then `sh scripts/prepare-observer-redeploy.sh` (or `make observer-prep`). It checks that `observer/.env` is mode 600 with a 64-hex token, finds the Docker socket's group id and validates the Compose file. It changes nothing unless you add `--write-gid`, which writes `FRIDAY_DOCKER_SOCKET_GID` into `.env` (Compose refuses to start without it). It also prints the running image ids; tag them for rollback, for example `docker tag <image id> friday-observer-rollback:observer`.
+2. In the window: `cd observer && docker compose up -d --build`, then verify `/health`, authenticated inventory, inspect and logs as in "Read-only validation" above.
+3. Rollback: retag the saved images to the Compose image names (or `git checkout` the previous commit) and `docker compose up -d`. Residual risk: the socket group is root-equivalent, so it is granted to the proxy alone; never add it to the observer or publish a Docker TCP port.
