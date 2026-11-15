@@ -472,6 +472,20 @@ export function createFridayServer({
       return json(response, 200, { subjectHash, granted })
     }
 
+    // The signed-in person's own access: email, whether they are an operator
+    // and, when operators must use Authentik, whether this session did.
+    if (request.method === 'GET' && url.pathname === '/api/settings/my-access') {
+      if (url.search) return json(response, 400, { error: 'unexpected-query' })
+      if (!identity) return json(response, 200, { signedIn: false })
+      if (identity.kind === 'service') return json(response, 403, { error: 'access-denied' })
+      return json(response, 200, {
+        signedIn: true,
+        email: typeof identity.email === 'string' ? identity.email : '',
+        operator: identity.operator === true,
+        ...(typeof identity.providerVerified === 'boolean' ? { providerVerified: identity.providerVerified } : {}),
+      })
+    }
+
     if (request.method === 'GET' && url.pathname === '/api/settings') {
       return json(response, 200, buildSettingsView(endpointChecks ? applyEndpointChecks(labelledConfig(), endpointChecks.get()) : labelledConfig(), { actionAudit }))
     }
