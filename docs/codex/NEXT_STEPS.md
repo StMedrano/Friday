@@ -1,6 +1,6 @@
 # Friday — Ordered Finish Queue
 
-Last refreshed 2026-11-15 from `git log` on `main` (after #156) and
+Last refreshed 2026-11-15 from `git log` on `main` (after #160) and
 `FRIDAY_SHARED_MEMORY.md`.
 Earlier versions of this file (PWA staging, Tasks read path, four-project
 catalog) described work that has since merged; see `git log -- docs/codex/NEXT_STEPS.md`.
@@ -9,8 +9,8 @@ Production is VM102. On 2026-11-15 the owner deployed `main` as of #155
 (`39d6848`), which includes every PR in the table below (owner report in the
 project thread, 2026-11-15). The flags already on since 2026-11-05 are
 `FRIDAY_GITHUB_ENABLED`, `FRIDAY_MONITORING_UPTIME_ENABLED` and
-`FRIDAY_AGENT_ACTIVITY_ENABLED`; no other flag change is recorded. #156 merged
-after that deploy and ships with the next one.
+`FRIDAY_AGENT_ACTIVITY_ENABLED`; no other flag change is recorded. #156 and
+#158 to #160 merged after that deploy and ship with the next one (section 1b).
 
 ## 1. Deployed 2026-11-15, off until the owner turns them on
 
@@ -41,12 +41,23 @@ companion settings.
 | #153 | Non-root controller cutover tooling: `compose.nonroot.yaml`, `scripts/migrate-friday-data-nonroot.sh --confirm`. Default stays root. | Maintenance window on VM102: `docs/controller-nonroot-migration.md`, then `FRIDAY_CONTROLLER_NONROOT=true`. Repoint the grants renewal timer to `friday_data_nonroot`. |
 | #154 | Authentik as primary login: operator routes can require a signed Access claim set only by the Authentik login. Settings shows your own access. | Owner sets up Authentik OIDC in Cloudflare, checks the claim at `/cdn-cgi/access/get-identity`, then sets `FRIDAY_ACCESS_OPERATOR_IDP_CLAIM` and `FRIDAY_ACCESS_OPERATOR_IDP_VALUE` (`docs/friday-authentication-failover.md`). |
 
+## 1b. Merged after the 2026-11-15 deploy (ship with the next `make update`)
+
+All off by default.
+
+| PR | What | To turn it on |
+| --- | --- | --- |
+| #156 | `compose.yaml` passes `FRIDAY_AUDIT_MAX_BYTES`; `make env-check` checks the tunnel and non-root overlays too. | Nothing. |
+| #158 | Open app on Applications: links only from the owner's file, https only. | Write `/data/app-links.json` (mode 0600/0644; format in `docs/integrations.md`, Open app links), set `FRIDAY_APP_LINKS_ENABLED=true`. |
+| #159 | Edit a task's title (and details) on the Tasks screen; never changes status; closed or someone else's claimed tasks are refused. | Apply `supabase/migrations/202611150002_friday_work_editor.sql` on VM132, set `FRIDAY_WORK_EDIT_ENABLED=true` (needs the #138 write path on). `docs/integrations.md`, Edit task text. |
+| #160 | New agent from Friday: opens a pull request adding `agents/<id>.json`; the agent exists only after you merge and press Sync registry. | Fine-grained GitHub token for this repository (Contents and Pull requests read/write) in `FRIDAY_AGENT_PROPOSALS_GITHUB_TOKEN`, set `FRIDAY_AGENT_PROPOSALS_ENABLED=true`. `docs/integrations.md`, New agents from Friday. |
+
 ## 2. Waiting on an owner decision (do not start)
 
 Listed in `docs/automation/BACKLOG.md` under "Needs owner approval" or in the ledger.
 
 - Authentik as primary login, the non-root cutover, claiming and moving tasks, and automated fixes were approved on 2026-11-15 and are built (#149, #151, #153, #154, all off by default). Turning each on is in the table above.
-- **Create agents from Friday** and **Open app** (Applications): still "Not connected" by design.
+- Editing task text, creating agents from Friday and Open app were approved on 2026-11-15 (second round) and are built (#158, #159, #160, all off by default).
 - **Endpoint checks**: `FRIDAY_ENDPOINTS_ENABLED` stays off (owner's call, ledger 2026-10-29).
 
 ## 3. Operations that need the owner or a maintenance window
@@ -63,9 +74,7 @@ merged with this refresh). The nightly builder idles until new items are
 added.
 
 1. Keep this file current after each merge or deploy.
-2. Not built and not approved: editing task text (only create, claim and move
-   were approved), creating agents from Friday, and Open app on Applications.
-   Each needs an owner decision before it goes into the backlog.
+2. Every approved feature is built. New work needs an owner decision first.
 
 #142 (service token expiry), #143 (Tasks and Approvals smoke test), #144
 (setup links on Not connected placeholders) and #145 (Supabase probe retry)
