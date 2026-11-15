@@ -149,7 +149,7 @@ test('service token expiry is reported as days remaining with a warning window, 
 })
 
 test('features report each opt-in flag, whether its companion settings are present, and its setup section', () => {
-  const ids = ['github', 'uptime', 'agent-activity', 'approvals', 'automated-fixes', 'work-read', 'work-write', 'work-move', 'model-routing', 'web-growth', 'aidesigner-generate']
+  const ids = ['github', 'uptime', 'agent-activity', 'approvals', 'automated-fixes', 'work-read', 'work-write', 'work-move', 'model-routing', 'web-growth', 'app-links', 'aidesigner-generate']
   const off = buildSettingsView(getConfig({}))
   assert.deepEqual(off.features.map(item => item.id), ids)
   for (const item of off.features) {
@@ -163,7 +163,7 @@ test('features report each opt-in flag, whether its companion settings are prese
   const partial = byId(buildSettingsView(getConfig({
     FRIDAY_GITHUB_ENABLED: 'true', FRIDAY_MONITORING_UPTIME_ENABLED: 'true', FRIDAY_AGENT_ACTIVITY_ENABLED: 'true',
     FRIDAY_APPROVALS_ENABLED: 'true', FRIDAY_REMEDIATION_ENABLED: 'true', FRIDAY_WORK_READ_ENABLED: 'true', FRIDAY_WORK_WRITE_ENABLED: 'true', FRIDAY_WORK_MOVE_ENABLED: 'true',
-    FRIDAY_MODEL_FABRIC_ENABLED: 'true', FRIDAY_WEB_GROWTH_ENABLED: 'true', FRIDAY_AIDESIGNER_GENERATE_ENABLED: 'true',
+    FRIDAY_MODEL_FABRIC_ENABLED: 'true', FRIDAY_WEB_GROWTH_ENABLED: 'true', FRIDAY_AIDESIGNER_GENERATE_ENABLED: 'true', FRIDAY_APP_LINKS_ENABLED: 'true',
   })))
   assert.deepEqual(partial.uptime, {id: 'uptime', name: 'Uptime history', enabled: true, configured: false, setup: 'Uptime history'})
   for (const id of ['uptime', 'approvals', 'automated-fixes', 'work-read', 'work-write', 'work-move', 'model-routing', 'web-growth', 'aidesigner-generate']) assert.equal(partial[id].configured, false, id)
@@ -171,6 +171,7 @@ test('features report each opt-in flag, whether its companion settings are prese
   // optional for public repositories) and need nothing else.
   assert.equal(partial.github.configured, true)
   assert.equal(partial['agent-activity'].configured, true)
+  assert.equal(partial['app-links'].configured, true)
 
   const full = byId(buildSettingsView(getConfig({
     FRIDAY_GITHUB_ENABLED: 'true', FRIDAY_GITHUB_TOKEN: 'secret-github-token',
@@ -182,6 +183,7 @@ test('features report each opt-in flag, whether its companion settings are prese
     FRIDAY_WEB_GROWTH_ENABLED: 'true', FRIDAY_WEB_GROWTH_READER_URL: 'https://10.9.9.11', FRIDAY_WEB_GROWTH_READER_TOKEN: 'secret-web-growth',
     FRIDAY_WEB_GROWTH_READER_EMAILS: 'secret-reader@example.com',
     FRIDAY_AIDESIGNER_ENABLED: 'true', AIDESIGNER_API_KEY: 'secret-aidesigner-key', FRIDAY_AIDESIGNER_GENERATE_ENABLED: 'true',
+    FRIDAY_APP_LINKS_ENABLED: 'true',
   })))
   for (const id of ids) assert.equal(full[id].configured, true, id)
 

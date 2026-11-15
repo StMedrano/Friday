@@ -1,7 +1,7 @@
 import NotConnected from './NotConnected'
 import { useEffect, useMemo, useState } from 'react'
-import { AppWindow, Search, ShieldCheck } from 'lucide-react'
-import { fetchFridayUptime, type FridayOverview, type FridayServiceUptime, type FridayUptimeResult } from '../lib/api'
+import { AppWindow, ExternalLink, Search, ShieldCheck } from 'lucide-react'
+import { fetchFridayAppLinks, fetchFridayUptime, type FridayAppLinksResult, type FridayOverview, type FridayServiceUptime, type FridayUptimeResult } from '../lib/api'
 import type { Service } from '../lib/infrastructure'
 
 type Props = { overview: FridayOverview; connected: boolean }
@@ -55,16 +55,36 @@ function observation(value: string) {
   return Number.isFinite(parsed.getTime()) ? parsed.toLocaleString() : 'Not reported'
 }
 
+/** Open app: only links from the owner's server-side file, never a typed or reported URL. */
+function OpenApp({ links, service }: { links: FridayAppLinksResult | null; service?: Service }) {
+  if (!links) return null
+  if (links.state === 'disabled') return <NotConnected title="Open app" detail="Open app needs the owner's link file (FRIDAY_APP_LINKS_ENABLED) on the server." action="Open" setup="Open app links" />
+  if (links.state === 'unavailable') return <p className="v3-applications-empty" role="status">Open app links could not be loaded.</p>
+  if (!service) return null
+  const url = links.links.get(service.id)
+  if (!url) return <p className="v3-applications-empty">No Open link is set for {service.name}.</p>
+  return <a className="fx-open-app" href={url} target="_blank" rel="noopener noreferrer"
+    aria-label={`Open ${service.name} in a new tab`}>Open {service.name}<ExternalLink size={13} aria-hidden="true"/></a>
+}
+
 /**
  * An inventory of observed application-related *services* (not a discovery
- * system or trusted application launcher). No user-entered URL is rendered,
- * and this component has no management or mutation methods.
+ * system). No user-entered URL is rendered; Open links come only from the
+ * owner's server-side file. This component has no management or mutation methods.
  */
 export default function ApplicationsWorkspace({ overview, connected }: Props) {
   const [search, setSearch] = useState('')
   const [filter, setFilter] = useState<Filter>('all')
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [uptime, setUptime] = useState<FridayUptimeResult | null>(null)
+  const [appLinks, setAppLinks] = useState<FridayAppLinksResult | null>(null)
+  useEffect(() => {
+    const controller = new AbortController()
+    fetchFridayAppLinks(controller.signal)
+      .then((result) => { if (!controller.signal.aborted) setAppLinks(result) })
+      .catch(() => { if (!controller.signal.aborted) setAppLinks({ state: 'unavailable' }) })
+    return () => controller.abort()
+  }, [])
   useEffect(() => {
     const controller = new AbortController()
     const load = () => fetchFridayUptime(controller.signal)
@@ -145,11 +165,11 @@ export default function ApplicationsWorkspace({ overview, connected }: Props) {
             <div><dt>Last observed</dt><dd>{observation(selected.updated)}</dd></div>
           </dl>
           <p>{selected.detail || 'No service detail provided.'}</p>
-        </> : <p>Select an observed service to inspect its status and evidence. App launching and management are not enabled.</p>}
+        </> : <p>Select an observed service to inspect its status and evidence. App management is not enabled.</p>}
         {uptime?.state === 'ok' ? (selected ? <UptimeDetail uptime={uptimeById.get(selected.id)} name={selected.name}/> : null)
           : uptime?.state === 'unavailable' ? <p className="v3-applications-empty" role="status">Uptime history could not be loaded.</p>
             : <NotConnected title="Uptime history" detail="Uptime percentages and trend lines need the monitoring uptime record (FRIDAY_MONITORING_UPTIME_ENABLED) on the server." setup="Uptime history" />}
-        <NotConnected title="Open app" detail="Launching apps from Friday is not enabled." action="Open" />
+        <OpenApp links={appLinks} service={selected}/>
       </aside>
     </div>
   </section>

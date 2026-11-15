@@ -319,6 +319,7 @@ export function createFridayServer({
   agentActivity = null,
   approvalQueue = null,
   remediation = null,
+  appLinks = null,
   aiDesignerImpl = createAiDesigner,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
@@ -673,6 +674,13 @@ export function createFridayServer({
       catch { return json(response, 503, { error: 'monitoring-history-unavailable' }) }
       try { return json(response, 200, projectMonitoringHistory(history)) }
       catch { return json(response, 502, { error: 'monitoring-history-invalid' }) }
+    }
+
+    if (request.method === 'GET' && url.pathname === '/api/applications/links') {
+      // Owner-written Open app links; off unless FRIDAY_APP_LINKS_ENABLED and a valid file.
+      if (url.search) return json(response, 400, { error: 'unexpected-query' })
+      if (!Array.isArray(appLinks)) return json(response, 503, { error: 'app-links-disabled' })
+      return json(response, 200, { links: appLinks.map(({ serviceId, url: link }) => ({ serviceId, url: link })) })
     }
 
     if (request.method === 'GET' && url.pathname === '/api/monitoring/uptime') {
