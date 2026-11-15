@@ -1,4 +1,5 @@
 import AgentOnDuty from './AgentOnDuty'
+import HomelabActionsPanel from './HomelabActionsPanel'
 import { useMemo, useState } from 'react'
 import { Network, Server, ShieldCheck } from 'lucide-react'
 import type { FridayOverview } from '../lib/api'
@@ -109,6 +110,8 @@ export default function InfrastructureWorkspace({ overview, connected }: {
         </article>)}
       </div>}
     </section>
+
+    <HomelabActionsPanel />
 
     {visible.length > 0 && <section className="v3-section" aria-label="Active services table">
       <div className="v3-section-head"><div><span className="v3-kicker">SERVICES</span><h2>Active services</h2></div></div>

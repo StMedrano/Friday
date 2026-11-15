@@ -114,6 +114,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | Open app links | Claude | `complete` | `server/applications/app-links.mjs`, `GET /api/applications/links`, `ApplicationsWorkspace.tsx`, config/compose/docs | 2026-11-15 | 2026-11-15 | Merged as #158, not deployed. Owner writes `/data/app-links.json` and sets `FRIDAY_APP_LINKS_ENABLED`. |
 | Edit task text | Claude | `complete` | `supabase/migrations/202611150002_friday_work_editor.sql`, `tests/sql/shared-work-editor.sql`, `server/work/*`, `/api/work/tasks/:id/edit`, Tasks screen | 2026-11-15 | 2026-11-15 | Merged as #159, not deployed. Owner applies the migration on VM132 and sets `FRIDAY_WORK_EDIT_ENABLED`. |
 | New agents from Friday (pull requests) | Claude | `complete` | `server/agents/agent-proposals.mjs`, `/api/agents/proposals`, `NewAgentPanel.tsx`, config/compose/docs | 2026-11-15 | 2026-11-15 | Merged as #160, not deployed. Owner adds a fine-grained GitHub token and sets `FRIDAY_AGENT_PROPOSALS_ENABLED`. |
+| Homelab changes from Friday (Proxmox guest power actions), #162 | Claude | `complete` | Branch `claude/project-thread-d0u6ui`: `server/homelab/`, `/api/homelab/*`, Infrastructure screen panel, audit actions, config/compose/docs. No live host is touched. | 2026-11-15 | 2026-11-15 | Merged, not deployed. Owner creates the scoped Proxmox token and turns it on (NEXT_STEPS 1b). |
 
 When claiming a task, replace `unclaimed`, set `in_progress`, record the exact scope, and add an Activity log entry. If an agent stops without completing it, release the claim or mark it `blocked` with a clear handoff.
 
@@ -149,6 +150,17 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-11-15 15:10 CST — Claude — Homelab changes from Friday (Proxmox guest power actions)
+
+- Status: complete (merged after CI; not deployed)
+- Scope claimed: owner asked 2026-11-15 to "continue building until Friday can make changes to the homelab". `server/homelab/`, `/api/homelab/*`, `HomelabActionsPanel` on Infrastructure, audit actions `homelab.actions.preview`/`homelab.actions.run`, config/compose/staging/.env.example/check-env/settings, docs.
+- Work performed: start, shutdown (clean) and reboot of Proxmox guests listed in the owner's file `/data/homelab-actions.json`. Each change is a dry-run preview of live state, then a typed-name approval by the same operator within 5 minutes, single use; state re-checked before acting. Execute mode needs live mode, durable audit, a human operator and the armed automation gate; a `pending` record is written before the Proxmox call. Uses a separate scoped Proxmox token (VM.Audit + VM.PowerMgmt ACL on listed guests only), never the monitoring token.
+- Verification: `make verify` passed locally (vitest 292, node tests, build, Compose, staging isolation). CI on the PR.
+- Decisions: operations fixed to start/shutdown/reboot (no hard stop, reset, create, delete, config). Off and dry-run by default; staging forces off. Nothing touched on any live host.
+- Blockers/risks: execute mode needs the owner to arm the gate file on VM102 (5-minute window) before each batch of changes.
+- Next action: owner creates the token, writes the action file and sets the flags in a deploy (NEXT_STEPS 1b). Docker container restarts are a separate slice (needs an owner-run executor on the Docker host).
+- Rollback/recovery: set `FRIDAY_HOMELAB_ACTIONS_ENABLED=false` and redeploy; delete the `friday-power@pve` user/token on Proxmox; or revert the PR.
 
 ### 2026-11-15 14:50 CST — Claude — Open app, edit task text and new agents (#158 to #160)
 

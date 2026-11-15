@@ -127,6 +127,8 @@ function parseIncidentDiagnosticRoute(pathname) {
   return { invalid: false, incidentId, kind: match[2] }
 }
 
+const HOMELAB_WRITE_PATHS = new Set(['/api/homelab/actions/preview', '/api/homelab/actions/run'])
+
 function parseApprovalDecisionRoute(pathname) {
   const match = String(pathname || '').match(/^\/api\/approvals\/([^/]+)\/decision$/)
   if (!match) return null
@@ -321,6 +323,7 @@ export function createFridayServer({
   approvalQueue = null,
   remediation = null,
   appLinks = null,
+  homelabActions = null,
   agentProposer = null,
   aiDesignerImpl = createAiDesigner,
 } = {}) {
@@ -362,7 +365,8 @@ export function createFridayServer({
       const approvalDecision = request.method === 'POST' && (Boolean(parseApprovalDecisionRoute(url.pathname)) || Boolean(parseApprovalFixRoute(url.pathname)))
       const taskCreate = isWorkTaskCreate(request.method, url.pathname) || Boolean(workTaskMoveId(request.method, url.pathname)) || Boolean(workTaskEditId(request.method, url.pathname))
       const agentProposal = request.method === 'POST' && url.pathname === '/api/agents/proposals'
-      const operatorOnly = agentProposal || registrySync || siteSettingsWrite || collectionWrite || approvalDecision || taskCreate || aiDesignerGenerate || url.pathname === '/api/audit/events'
+      const homelabWrite = request.method === 'POST' && HOMELAB_WRITE_PATHS.has(url.pathname)
+      const operatorOnly = homelabWrite || agentProposal || registrySync || siteSettingsWrite || collectionWrite || approvalDecision || taskCreate || aiDesignerGenerate || url.pathname === '/api/audit/events'
       let verdict
       try { verdict = await accessGate(request, operatorOnly) }
       catch { verdict = {status:503,error:'access-verification-unavailable'} }
@@ -375,7 +379,7 @@ export function createFridayServer({
       // for operational POST/PUT/DELETE handlers. Settings and registry writes with a body additionally require JSON.
       if (['POST', 'PUT', 'DELETE'].includes(request.method) && request.headers['sec-fetch-site'] === 'cross-site')
         return json(response, 403, {error:'access-denied'})
-      if ((agentProposal || registrySync || siteSettingsWrite || pushWrite || groupAdvisory || approvalDecision || taskCreate || aiDesignerGenerate || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
+      if ((homelabWrite || agentProposal || registrySync || siteSettingsWrite || pushWrite || groupAdvisory || approvalDecision || taskCreate || aiDesignerGenerate || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
         return json(response, 415, {error:'json-required'})
     }
 
@@ -691,6 +695,49 @@ export function createFridayServer({
       catch { return json(response, 503, { error: 'monitoring-history-unavailable' }) }
       try { return json(response, 200, projectMonitoringHistory(history)) }
       catch { return json(response, 502, { error: 'monitoring-history-invalid' }) }
+    }
+
+    // Homelab changes: the owner's listed Proxmox guests and their live state.
+    if (url.pathname === '/api/homelab/actions') {
+      if (request.method !== 'GET') return json(response, 405, { error: 'read-only-endpoint' })
+      if (url.search) return json(response, 400, { error: 'unexpected-query' })
+      if (!homelabActions?.enabled) return json(response, 503, { error: 'homelab-actions-disabled' })
+      try {
+        const view = await homelabActions.list()
+        return json(response, 200, { ...view, execution: homelabActions.mode === 'execute'
+          ? { performed: false, reason: 'A change runs only after a preview, your typed approval, and while the automation gate is armed.' }
+          : { performed: false, reason: 'Dry-run mode: approving records what would run and changes nothing.' } })
+      } catch { return json(response, 503, { error: 'homelab-actions-unavailable' }) }
+    }
+
+    // Preview (dry run) one listed operation, then approve that preview to run it once.
+    if (HOMELAB_WRITE_PATHS.has(url.pathname)) {
+      if (request.method !== 'POST') return json(response, 405, { error: 'method-not-allowed' })
+      if (url.search) return json(response, 400, { error: 'unexpected-query' })
+      if (!homelabActions?.enabled) return json(response, 404, { error: 'homelab-actions-disabled' })
+      // A real change only for a verified human operator, with the durable audit on.
+      if (homelabActions.mode === 'execute') {
+        if (!accessGate || !identity || identity.kind === 'service') return json(response, 403, { error: 'access-denied' })
+        if (!actionAudit) return json(response, 503, { error: 'audit-unavailable' })
+      }
+      let body
+      try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid-homelab-request' }) }
+      const isPreview = url.pathname === '/api/homelab/actions/preview'
+      const fields = isPreview ? ['actionId', 'operation'] : ['planId', 'confirm']
+      if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 2
+        || !fields.every((key) => typeof body[key] === 'string' && body[key].length > 0 && body[key].length <= 128))
+        return json(response, 400, { error: 'invalid-homelab-request' })
+      const requestedBy = auditActor(identity).label || undefined
+      try {
+        const result = isPreview
+          ? await runAudited({ actionAudit, identity, action: 'homelab.actions.preview', target: `${body.actionId}:${body.operation}`.slice(0, 256) },
+            () => homelabActions.preview({ actionId: body.actionId, operation: body.operation, requestedBy }))
+          : await runAudited({ actionAudit, identity, action: 'homelab.actions.run', target: body.planId },
+            () => homelabActions.run({ planId: body.planId, confirm: body.confirm, requestedBy }))
+        return json(response, result.status, result.body)
+      } catch {
+        return json(response, 503, { error: 'homelab-actions-unavailable' })
+      }
     }
 
     if (request.method === 'GET' && url.pathname === '/api/applications/links') {

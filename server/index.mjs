@@ -2,6 +2,7 @@ import { createAgentActivityLog } from './agents/activity-log.mjs'
 import { createApprovalQueue } from './approvals/queue.mjs'
 import { createRemediationRunner, loadPlaybooks } from './remediation/fixes.mjs'
 import { loadAppLinks } from './applications/app-links.mjs'
+import { createHomelabActions, createProxmoxPowerClient, loadHomelabCatalog } from './homelab/actions.mjs'
 import { createFileAutomationGate } from './security/automation-kill-switch.mjs'
 import { fileURLToPath } from 'node:url'
 import { getConfig } from './config.mjs'
@@ -183,7 +184,32 @@ if (config.appLinks.enabled) {
   else console.warn('Friday Open app links stayed disabled; the link file is missing, unsafe or invalid')
 }
 
-const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, endpointChecks, repositorySettings, pushSubscriptions, workReadBridge, agentActivity, approvalQueue, remediation, appLinks })
+// Default off. Power actions on the Proxmox guests the owner lists, with their own
+// scoped token. Dry-run unless execute mode; execute also needs live mode, the
+// durable audit and the armed automation gate file.
+let homelabActions = null
+if (config.homelabActions.enabled) {
+  const settings = config.homelabActions
+  const catalog = await loadHomelabCatalog(settings.catalogPath)
+  if (!catalog) console.warn('Friday homelab changes stayed disabled; the action file is missing, unsafe or invalid')
+  else if (settings.mode === 'execute' && (config.mode !== 'live' || !actionAudit))
+    console.warn('Friday homelab changes stayed disabled; execute mode needs FRIDAY_MODE=live and FRIDAY_AUDIT_ENABLED=true')
+  else {
+    homelabActions = await createHomelabActions({
+      enabled: true,
+      mode: settings.mode,
+      catalog,
+      path: settings.runsPath,
+      client: createProxmoxPowerClient({ baseUrl: settings.proxmoxUrl, tokenId: settings.proxmoxTokenId,
+        tokenSecret: settings.proxmoxTokenSecret, rejectUnauthorized: settings.rejectUnauthorized }),
+      automationGate: createFileAutomationGate({ filePath: settings.automationGatePath }),
+    })
+    if (homelabActions.enabled) console.log(`Friday homelab changes enabled (${homelabActions.mode}, ${catalog.length} guests)`)
+    else { console.warn('Friday homelab changes stayed disabled; they need an https Proxmox URL and the FRIDAY_HOMELAB_PROXMOX_TOKEN_ID/SECRET token'); homelabActions = null }
+  }
+}
+
+const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, endpointChecks, repositorySettings, pushSubscriptions, workReadBridge, agentActivity, approvalQueue, remediation, appLinks, homelabActions })
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`Friday listening on 0.0.0.0:${config.port} (${config.mode} mode)`)
 })

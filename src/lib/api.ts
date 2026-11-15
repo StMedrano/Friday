@@ -941,3 +941,69 @@ export async function fetchHomeLabEvidence(signal?: AbortSignal): Promise<HomeLa
     return { mode: body.mode, generatedAt: body.generatedAt, services, incidents }
   } catch { throw failure() }
 }
+
+export type FridayHomelabOperation = 'start' | 'shutdown' | 'reboot'
+export type FridayHomelabAction = {
+  id: string; name: string; guestType: 'qemu' | 'lxc'; vmid: number; node: string
+  operations: FridayHomelabOperation[]; description?: string; status: string
+}
+export type FridayHomelabRun = {
+  id: string; actionId: string; name?: string; operation: FridayHomelabOperation; mode: 'dry-run' | 'execute'
+  state: 'dry-run' | 'pending' | 'submitted' | 'failed'; at: string; requestedBy?: string; detail?: string
+}
+export type FridayHomelabActionsResult =
+  | { state: 'ok'; mode: 'dry-run' | 'execute'; actions: FridayHomelabAction[]; recent: FridayHomelabRun[] }
+  | { state: 'disabled' }
+  | { state: 'unavailable' }
+export type FridayHomelabPreview = {
+  planId?: string; actionId: string; name: string; operation: FridayHomelabOperation; mode: 'dry-run' | 'execute'
+  currentStatus: string; allowed: boolean; summary: string; confirmText: string; expiresAt: string
+}
+export type FridayHomelabRunResult = { run: { actionId: string; name: string; operation: FridayHomelabOperation; mode: string; state: string; at: string }; execution: { performed: boolean; succeeded?: boolean; reason?: string } }
+
+const HOMELAB_OPERATIONS = new Set(['start', 'shutdown', 'reboot'])
+
+export class FridayHomelabError extends Error {
+  constructor(readonly status: number, readonly code = '') { super(code || 'homelab-action-failed') }
+}
+
+/** The owner's listed Proxmox guests with their live state. */
+export async function fetchFridayHomelabActions(signal?: AbortSignal): Promise<FridayHomelabActionsResult> {
+  const response = await fetch('/api/homelab/actions', { method: 'GET', signal })
+  const body = await response.json().catch(() => null) as { error?: string; mode?: unknown; actions?: unknown; recent?: unknown } | null
+  if (response.ok && body && (body.mode === 'dry-run' || body.mode === 'execute') && Array.isArray(body.actions)) {
+    const actions = body.actions.filter((item): item is FridayHomelabAction => {
+      const entry = item as FridayHomelabAction | null
+      return !!entry && typeof entry.id === 'string' && typeof entry.name === 'string' && Number.isSafeInteger(entry.vmid)
+        && Array.isArray(entry.operations) && entry.operations.every((op) => HOMELAB_OPERATIONS.has(op)) && typeof entry.status === 'string'
+    })
+    const recent = (Array.isArray(body.recent) ? body.recent : []).filter((item): item is FridayHomelabRun => {
+      const run = item as FridayHomelabRun | null
+      return !!run && typeof run.id === 'string' && typeof run.state === 'string' && typeof run.at === 'string' && HOMELAB_OPERATIONS.has(run.operation)
+    })
+    return { state: 'ok', mode: body.mode, actions, recent }
+  }
+  if (body?.error === 'homelab-actions-disabled') return { state: 'disabled' }
+  return { state: 'unavailable' }
+}
+
+async function postHomelab<T>(path: string, input: Record<string, string>): Promise<T> {
+  const response = await fetch(path, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input) })
+  const body = await response.json().catch(() => null) as ({ error?: string } & T) | null
+  if (!response.ok || !body) throw new FridayHomelabError(response.status, typeof body?.error === 'string' ? body.error : '')
+  return body
+}
+
+/** Dry run: what the operation would do to this guest right now. Changes nothing. */
+export async function previewFridayHomelabAction(actionId: string, operation: FridayHomelabOperation): Promise<FridayHomelabPreview> {
+  const body = await postHomelab<{ preview?: FridayHomelabPreview }>('/api/homelab/actions/preview', { actionId, operation })
+  if (!body.preview || typeof body.preview.summary !== 'string') throw new FridayHomelabError(200, 'invalid-response')
+  return body.preview
+}
+
+/** Approve one preview by typing the guest's name. */
+export async function runFridayHomelabAction(planId: string, confirm: string): Promise<FridayHomelabRunResult> {
+  const body = await postHomelab<FridayHomelabRunResult>('/api/homelab/actions/run', { planId, confirm })
+  if (!body.run || !body.execution) throw new FridayHomelabError(200, 'invalid-response')
+  return body
+}

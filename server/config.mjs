@@ -319,6 +319,21 @@ export function getConfig(env = process.env) {
       executorToken: env.FRIDAY_REMEDIATION_EXECUTOR_TOKEN || '',
       automationGatePath: env.FRIDAY_AUTOMATION_GATE_PATH || '/data/automation-gate/state.json',
     },
+    // Homelab changes: power actions (start, shutdown, reboot) on the Proxmox
+    // guests the owner lists. Off by default; dry-run unless
+    // FRIDAY_HOMELAB_ACTIONS_MODE=execute. Uses its own scoped Proxmox token,
+    // never the read-only monitoring token. Never unattended.
+    homelabActions: {
+      enabled: enabled(env.FRIDAY_HOMELAB_ACTIONS_ENABLED),
+      mode: env.FRIDAY_HOMELAB_ACTIONS_MODE === 'execute' ? 'execute' : 'dry-run',
+      catalogPath: env.FRIDAY_HOMELAB_ACTIONS_PATH || '/data/homelab-actions.json',
+      runsPath: env.FRIDAY_HOMELAB_RUNS_PATH || '/data/homelab-runs.json',
+      proxmoxUrl: env.FRIDAY_HOMELAB_PROXMOX_URL || env.FRIDAY_PROXMOX_URL || '',
+      proxmoxTokenId: env.FRIDAY_HOMELAB_PROXMOX_TOKEN_ID || '',
+      proxmoxTokenSecret: env.FRIDAY_HOMELAB_PROXMOX_TOKEN_SECRET || '',
+      rejectUnauthorized: !enabled(env.FRIDAY_PROXMOX_INSECURE),
+      automationGatePath: env.FRIDAY_AUTOMATION_GATE_PATH || '/data/automation-gate/state.json',
+    },
     // AIDesigner REST API for generating UI designs. The key stays server-side;
     // generating spends AIDesigner credits, so it is operator-only and audited.
     aidesigner: {
