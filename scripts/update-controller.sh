@@ -33,6 +33,12 @@ if [ "$NONROOT" = 'true' ]; then
   echo 'Running the controller as UID 10001 (compose.nonroot.yaml).'
 fi
 
+READER_CA=$(grep '^FRIDAY_WEB_GROWTH_READER_CA_FILE=' .env 2>/dev/null | tail -1 | cut -d= -f2- || true)
+if [ -n "$READER_CA" ]; then
+  [ -f "$READER_CA" ] || { echo 'Web Growth reader public certificate is missing; refusing to drop TLS trust.' >&2; exit 1; }
+  EXTRA="$EXTRA -f compose.web-growth-tls.yaml"
+fi
+
 printf '%s\n' 'Fetching Friday updates...'
 git fetch origin main
 printf '%s\n' 'Fast-forwarding main...'

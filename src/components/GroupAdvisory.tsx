@@ -13,6 +13,7 @@ export default function GroupAdvisory({ groupId, groupName }: { groupId: string;
   const [loading, setLoading] = useState(false)
   const [advice, setAdvice] = useState<FridayGroupAdvice | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [useProject, setUseProject] = useState(false)
   const pending = useRef<AbortController | null>(null)
 
   useEffect(() => () => pending.current?.abort(), [])
@@ -26,7 +27,7 @@ export default function GroupAdvisory({ groupId, groupName }: { groupId: string;
     setError(null)
     setAdvice(null)
     try {
-      const reply = await askFridayGroup(groupId, prompt.trim(), controller.signal)
+      const reply = await askFridayGroup(groupId, prompt.trim(), controller.signal, groupId === 'techtactics' && useProject)
       if (!controller.signal.aborted) setAdvice(reply)
     } catch (failure) {
       if (!controller.signal.aborted) setError(failure instanceof Error ? failure.message : 'Group advice is unavailable.')
@@ -44,6 +45,10 @@ export default function GroupAdvisory({ groupId, groupName }: { groupId: string;
           placeholder={EXAMPLES[groupId] || 'Describe a task for Friday to advise on.'}
           onChange={(event) => setPrompt(event.target.value)}/>
       </label>
+      {groupId === 'techtactics' && <>
+        <label className="v3-project-context-toggle"><input type="checkbox" checked={useProject} disabled={loading} onChange={event => setUseProject(event.target.checked)}/>Use my Web Growth project and pipeline</label>
+        <p className="v3-settings-message">Uses project goals and current lead statuses to answer questions and plan work. Project access is required. Selected lead details are shared with Friday’s configured AI provider; contact details, notes and messages stay private.</p>
+      </>}
       <button type="button" disabled={loading} onClick={() => setPrompt(EXAMPLES[groupId] || '')}>Use example</button>
       <button type="submit" disabled={loading || !prompt.trim()}>{loading ? 'Generating…' : 'Generate proposal'}</button>
     </form>
@@ -52,5 +57,6 @@ export default function GroupAdvisory({ groupId, groupName }: { groupId: string;
       model: advice?.model, fallbackUsed: advice?.fallbackUsed, attempts: advice?.attempts,
     }}/>}
     {advice && <p className="v3-settings-message">Proposal only · nothing was executed · not saved to Friday</p>}
+    {advice?.projectContext && <p className="v3-settings-message">Web Growth project · {advice.projectContext.includedLeads} of {advice.projectContext.totalLeads} lead records included; stage counts cover all leads. Read at {new Date(advice.projectContext.generatedAt).toLocaleString()} · source {advice.projectContext.sourceRevision}.</p>}
   </section>
 }

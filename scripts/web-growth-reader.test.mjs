@@ -1,7 +1,9 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { once } from 'node:events'
-import { mkdtemp,writeFile,readFile,rm,mkdir } from 'node:fs/promises'
+import { mkdtemp,writeFile,readFile,rm,mkdir,rename } from 'node:fs/promises'
+import https from 'node:https'
+import { execFileSync } from 'node:child_process'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { createHash } from 'node:crypto'
@@ -46,4 +48,27 @@ test('regular source remains byte-identical and checksum is exact; missing/malfo
 test('configuration fails closed',()=>{
  for(const bad of ['', 'short', ' '.repeat(40),'x'.repeat(32)+' ']) assert.throws(()=>createWebGrowthReader({token:bad,sourceRevision}))
  assert.throws(()=>createWebGrowthReader({token,sourceRevision:'bad-revision'}))
+})
+
+test('private TLS reader authenticates requests and follows atomic lead-file replacements', async t => {
+ const dir=await mkdtemp(join(tmpdir(),'friday-tls-reader-'));t.after(()=>rm(dir,{recursive:true,force:true}))
+ const keyPath=join(dir,'key.pem'), certPath=join(dir,'cert.pem'), filePath=join(dir,'leads.json')
+ execFileSync('openssl',['req','-x509','-newkey','rsa:2048','-nodes','-keyout',keyPath,'-out',certPath,'-days','1','-subj','/CN=localhost','-addext','subjectAltName=IP:127.0.0.1'],{stdio:'ignore'})
+ const cert=await readFile(certPath)
+ await writeFile(filePath,JSON.stringify(store))
+ const server=createWebGrowthReader({token,sourceRevision,filePath,tls:{key:await readFile(keyPath),cert}})
+ server.listen(0,'127.0.0.1');await once(server,'listening')
+ t.after(()=>new Promise(resolve=>server.close(resolve)))
+ const request=(authorized=true,trust=true)=>new Promise((resolve,reject)=>{
+  https.get({hostname:'127.0.0.1',port:server.address().port,path:'/v1/friday/web-growth',...(trust?{ca:cert}:{}),headers:authorized?{authorization:'Bearer '+token}:{}},response=>{
+   let raw='';response.on('data',chunk=>raw+=chunk);response.on('end',()=>resolve({status:response.statusCode,body:JSON.parse(raw)}))
+  }).on('error',reject)
+ })
+ await assert.rejects(request(true,false))
+ assert.equal((await request(false)).status,401)
+ const before=await request();assert.equal(before.status,200)
+ await writeFile(join(dir,'new.json'),JSON.stringify(store)+'\n')
+ await rename(join(dir,'new.json'),filePath)
+ const after=await request();assert.equal(after.status,200)
+ assert.notEqual(before.body.sourceChecksum,after.body.sourceChecksum)
 })

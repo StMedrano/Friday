@@ -1,4 +1,4 @@
-FROM node:22-alpine
+FROM node:22.23.2-alpine3.23
 WORKDIR /app
 COPY --chown=10001:10001 server/adapters/web-growth-schema.mjs ./server/adapters/web-growth-schema.mjs
 COPY --chown=10001:10001 integrations/web-growth-reader/server.mjs ./integrations/web-growth-reader/server.mjs

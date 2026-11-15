@@ -39,6 +39,6 @@ export default function WebGrowthWorkspace(){
    <details><summary>Source evidence</summary><p>Reported source revision: {snapshot.sourceRevision}</p><p className="v3-web-growth-checksum">Store checksum: {snapshot.sourceChecksum}</p><p>The reader reports file evidence; this does not verify the deployed service revision or approval validity.</p></details>
   </>:null}
   <WebGrowthDesigns leadName={lead?.businessName??null}/>
-  <p className="v3-group-tools-note">Explicit project reader permission required. No sending, approval or stage changes. Private records are not sent to group advice.</p>
+  <p className="v3-group-tools-note">Explicit project reader permission required. No sending, approval or stage changes. Select “Use my Web Growth project and pipeline” in the planning form to include projected lead details in advice.</p>
  </section>
 }

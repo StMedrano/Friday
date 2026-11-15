@@ -13,3 +13,11 @@ Before any separately approved deployment, the owner must verify the actual abso
 Compose requires `WEB_GROWTH_READER_TOKEN`, `WEB_GROWTH_READER_REVISION`, and `WEB_GROWTH_READER_SOURCE_FILE`; no values are committed. It mounts one explicit file read-only, uses UID/GID 10001, a read-only root filesystem, drops all capabilities and has no Docker socket. Build context is the Friday repository root. Configuration validation does not start services.
 
 Tests: `node --test server/adapters/web-growth-schema.test.mjs scripts/web-growth-reader.test.mjs`. Fixtures contain no real customer data. No deployment command is included or executed.
+
+## Private TLS deployment option
+
+`compose.private-tls.yaml` is a separate stack, not an override for the original Compose file. It requires an explicit private-interface bind address and serves HTTPS on host port 4319. TLS 1.2+ and the existing fixed-route bearer check are both required. It mounts a dedicated secrets directory containing `reader-key.pem`, `reader-cert.pem` and `reader-token`; the CLI reads only those fixed paths when `WEB_GROWTH_READER_TLS=true`. Keys/tokens must be readable by UID 10001 and inaccessible to other host users. Invalid configuration fails without logging credential values.
+
+This stack mounts the verified lead-store **directory** read-only, because Web Growth writes a temporary file and renames it over `leads.json`. A single-file mount would continue reading the old inode. The server still opens only `/data/leads.json`, refuses symlinks, and has no file-list or arbitrary-path route. Verify the directory contains only the intended lead data/backups, never application credentials. Mount only that directory, never the repository or a parent containing `.env`.
+
+The controller trusts only the dedicated reader public certificate through `compose.web-growth-tls.yaml`. Use a certificate whose IP SAN matches the configured reader URL; never disable TLS verification. Renew before certificate expiry and restart/recreate the reader and controller after replacing their certificate mounts. See `docs/web-growth-connection.md` for the concrete proposed deployment and acceptance gates. No live connection is established merely by merging these files.

@@ -11,6 +11,30 @@ const advice = {
 }
 
 describe('GroupAdvisory', () => {
+  it('only shares Web Growth evidence after an explicit opt-in and shows the source', async () => {
+    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ ...advice, groupId: 'techtactics',
+      projectContext: { projectId: 'techtactics-web-growth', generatedAt: '2026-11-15T12:00:00Z', sourceRevision: 'abcdef0', sourceChecksum: 'a'.repeat(64), totalLeads: 30, includedLeads: 25 },
+    })))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<GroupAdvisory groupId="techtactics" groupName="TechTactics"/>)
+    const checkbox = screen.getByRole('checkbox', { name: 'Use my Web Growth project and pipeline' })
+    expect(checkbox).not.toBeChecked()
+    fireEvent.click(checkbox)
+    fireEvent.change(screen.getByLabelText('Describe the task'), { target: { value: 'Which leads should I work on?' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Generate proposal' }))
+    expect(await screen.findByText(/25 of 30 lead records/)).toBeInTheDocument()
+    expect(screen.getByText(/abcdef0/)).toBeInTheDocument()
+    expect(JSON.parse(String((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body)).useProject).toBe(true)
+  })
+  it('does not present generic advice as a project-backed answer', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ ...advice, groupId: 'techtactics' }))))
+    render(<GroupAdvisory groupId="techtactics" groupName="TechTactics"/>)
+    fireEvent.click(screen.getByRole('checkbox', { name: 'Use my Web Growth project and pipeline' }))
+    fireEvent.change(screen.getByLabelText('Describe the task'), { target: { value: 'Prioritize leads.' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Generate proposal' }))
+    expect(await screen.findByText('Web Growth project evidence is unavailable.')).toBeInTheDocument()
+    expect(screen.queryByText(advice.text)).not.toBeInTheDocument()
+  })
   it('sends the brief to the group advisory endpoint and shows the proposal', async () => {
     const fetchMock = vi.fn(async (_input: RequestInfo | URL, options?: RequestInit) => new Response(JSON.stringify(advice), { status: 200, headers: { 'x-sent': String(options?.method ?? '') } }))
     vi.stubGlobal('fetch', fetchMock)

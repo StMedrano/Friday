@@ -861,3 +861,10 @@ Friday has a server-side AIDesigner REST client (`server/adapters/aidesigner.mjs
 ## Service token expiry warning, 2026-11-08
 
 Optional `FRIDAY_SERVICE_TOKEN_EXPIRES_AT` (a date only). `GET /api/settings` reports `serviceToken` with days remaining and `ok`/`warning`/`expired`; Settings, Access & roles shows it, warning at 14 days or fewer. Unset or invalid shows nothing. Not deployed; see `docs/integrations.md`, Service token expiry.
+
+
+## Web Growth project advice and private reader transport — prepared 2026-11-15
+
+The TechTactics planning form can explicitly include Web Growth project goals, planning roles and a fresh authorized pipeline projection. Project advice uses the existing human-reader allowlist, rejects unavailable/stale data before AI, includes full stage counts and up to 25 individual records, and returns source metadata with `execution.performed=false`. It grants no worker execution, repository file access or outreach permissions.
+
+A separate private TLS reader stack follows atomic lead-file replacement through a read-only data-directory mount. The controller trusts its dedicated public certificate through an optional Compose overlay preserved by `make update`. This is source preparation only, not a live connection. Verified source/target, rollout, acceptance and rollback are in `docs/web-growth-connection.md`.

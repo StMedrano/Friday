@@ -1,0 +1,34 @@
+# Separate private-LAN reader. Do not combine with compose.yaml in this directory.
+services:
+  web-growth-reader:
+    build:
+      context: ../..
+      dockerfile: integrations/web-growth-reader/Dockerfile
+    restart: unless-stopped
+    user: "10001:10001"
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    pids_limit: 64
+    mem_limit: 192m
+    environment:
+      WEB_GROWTH_READER_TLS: "true"
+      WEB_GROWTH_READER_REVISION: ${WEB_GROWTH_READER_REVISION:?Verified source revision required}
+    ports:
+      - "${WEB_GROWTH_READER_BIND_IP:?Explicit private interface IP required}:4319:4318"
+    volumes:
+      # The producer replaces leads.json atomically. Mount its data directory so
+      # every request sees the current inode; the server still opens one fixed file.
+      - type: bind
+        source: ${WEB_GROWTH_READER_SOURCE_DIR:?Explicit lead-store directory required}
+        target: /data
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${WEB_GROWTH_READER_SECRET_DIR:?Owner-managed reader secrets directory required}
+        target: /run/secrets
+        read_only: true
+        bind: {create_host_path: false}
+    logging:
+      driver: json-file
+      options: {max-size: 5m, max-file: "2"}

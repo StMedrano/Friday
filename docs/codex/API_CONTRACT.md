@@ -334,3 +334,10 @@ separately before application to homelab production. This does not change
 the local-Ollama-only matched-agent contract or introduce an executor.
 
 See `docs/shared-work-phase2b.md`.
+
+
+### Web Growth context in group advice
+
+`POST /api/group-advisory` accepts `{groupId, prompt, useProject?: boolean}`. `useProject:true` is valid only for `techtactics` and requires a verified human in `FRIDAY_WEB_GROWTH_READER_EMAILS`, live mode and an enabled reader. Context is fetched server-side; caller-supplied context, extra fields and query parameters are rejected. Denied access returns 403. Disabled, malformed, stale (over five minutes) or unavailable evidence returns 503 before any model call. Generic advice (`useProject` absent/false) never reads project records.
+
+Successful project advice adds `projectContext: {projectId, generatedAt, sourceRevision, sourceChecksum, totalLeads, includedLeads}`. All stage totals are included in model context, with at most 25 highest-scored projected records; full source/contact/message fields are never forwarded. The result remains `execution.performed:false`. `generatedAt` records retrieval time, not last business activity. The existing configured sequential AI provider chain is unchanged.

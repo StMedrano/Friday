@@ -17,6 +17,7 @@ import { auditActor } from './audit/action-audit.mjs'
 import { buildSettingsView } from './settings.mjs'
 import { getGroupWorkspace } from './agents/group-workspace.mjs'
 import { groupAdvisoryPolicy } from './agents/group-advisory.mjs'
+import { webGrowthContext, webGrowthAdvicePolicy } from './agents/web-growth-context.mjs'
 import { workSubjectHash } from './work/file-subject-grants.mjs'
 import { readWebGrowth } from './adapters/web-growth.mjs'
 import { createGitHubReader } from './adapters/github.mjs'
@@ -703,15 +704,31 @@ export function createFridayServer({
       const invalid = () => json(response, 400, { available: false, error: 'invalid-brief', execution })
       let body
       try { body = await readBody(request) } catch { return invalid() }
-      if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 2 ||
+      if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).some(key => !['groupId', 'prompt', 'useProject'].includes(key)) ||
+        (Object.hasOwn(body, 'useProject') && typeof body.useProject !== 'boolean') ||
+        (body.useProject === true && body.groupId !== 'techtactics') ||
         typeof body.groupId !== 'string' || typeof body.prompt !== 'string') return invalid()
-      const systemPrompt = groupAdvisoryPolicy(body.groupId)
+      if (url.search) return invalid()
+      let systemPrompt = groupAdvisoryPolicy(body.groupId)
       const validated = validateAssistantPrompt(body.prompt)
       if (!systemPrompt || !validated.ok) return invalid()
+      let project = null
+      if (body.useProject === true) {
+        const email = identity?.kind === 'service' ? '' : String(identity?.email || '')
+        if (!email || config.mode !== 'live') return json(response, 403, { available: false, reason: 'Sign in to use Web Growth project context.', execution })
+        if (!config.webGrowth?.readerEmails?.includes(email)) return json(response, 403, { available: false, reason: 'Reader permission is required for Web Growth project context.', execution })
+        try {
+          if (config.webGrowth.enabled !== true) throw new Error('Disabled')
+          project = webGrowthContext(await readWebGrowthImpl(config.webGrowth))
+        } catch {
+          return json(response, 503, { available: false, reason: 'Web Growth project data is unavailable. No project advice was generated.', execution })
+        }
+        systemPrompt = webGrowthAdvicePolicy
+      }
       try {
         const overview = body.groupId === 'homelab'
           ? await currentOverview({ config, monitoringRuntime, buildOverviewImpl: buildEffectiveOverview })
-          : {}
+          : project ? { webGrowth: project } : {}
         const result = await answerAssistantImpl({ config, prompt: validated.prompt, overview, systemPrompt })
         // Friday's offline summariser cannot honour a group policy, so it is not advice.
         if (!result?.available || result.mode === 'local-analysis') {
@@ -725,6 +742,9 @@ export function createFridayServer({
           available: true, groupId: body.groupId, text: result.text, mode: result.mode,
           provider: result.provider, model: result.model, fallbackUsed: result.fallbackUsed,
           attempts: result.attempts, execution,
+          ...(project ? { projectContext: { projectId: project.projectId, generatedAt: project.generatedAt,
+            sourceRevision: project.sourceRevision, sourceChecksum: project.sourceChecksum,
+            totalLeads: project.totalLeads, includedLeads: project.includedLeads } } : {}),
         })
       } catch {
         return json(response, 502, { available: false, error: 'group-advice-unavailable', execution })

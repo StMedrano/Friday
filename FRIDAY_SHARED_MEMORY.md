@@ -71,6 +71,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 
 | Task | Owner | Status | Scope / files / resources | Started | Last update | Next action |
 | --- | --- | --- | --- | --- | --- | --- |
+| Connect Web Growth project inside Friday | Codex | `verification_needed` | Project advice HTTP/UI, normalized context, private TLS reader stack, updater trust overlay, tests and rollout docs | 2026-11-15 10:34 CST | 2026-11-15 10:48 CST | Source verified; review PR, then merge and activate the private reader plus controller connection. |
 | Install shared ledger in current Friday repo | Codex/ChatGPT | `complete` | Repository root, `AGENTS.md`, `CLAUDE.md`, `FRIDAY_SHARED_MEMORY.md` | 2026-10-29 | 2026-10-29 | Pull the tracked branch before each task and keep this ledger current. |
 | Publish shared ledger for `main` review | Codex/ChatGPT | `complete` | Docs-only branch `docs/shared-agent-memory-20261029`; repository-root coordination files only | 2026-10-29 | 2026-10-29 | Review and merge PR #105 through the normal repository workflow; then update VM102 only through a separately reviewed deployment. |
 | Verify VM102 port-3011 origin | Codex/ChatGPT | `complete` | Read-only VM102 container, listener, origin-health, and tracked-source inspection | 2026-10-29 | 2026-10-29 | Preserve the isolated listener and repeat origin checks after future reviewed deployments. |
@@ -145,6 +146,19 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-11-15 10:48 CST — Codex — Connect Web Growth pipeline and project advice
+
+- Status: `verification_needed`
+- Scope claimed: `server/agents/web-growth-context*`, group advisory HTTP/API/UI and tests, Web Growth reader TLS runtime/Compose, updater overlay preservation, docs and ledger. No overlap with earlier completed Settings work.
+- Work performed: Owner clarified Friday means the app and requested both live lead visibility and project-backed questions/planning. Read-only inspection found the source on VM100 and healthy VM102 at `39d6848`. Validated the source schema: 14 leads (9 audited, 4 qualified, 1 demo_ready), source revision `5218579b7fad32c02f718233407eb545ef77fe23`. Web Growth is off on the controller, URL/token/readers are missing, and one operator identity exists. Private port 4319 is free on VM100. The producer uses atomic rename, requiring a read-only directory mount to follow updates.
+- Changes made: Explicit per-request project context opt-in under existing human reader permissions; bounded projected evidence and source metadata; private TLS reader and controller public-certificate trust overlay; update-path preservation; concrete rollout/rollback in `docs/web-growth-connection.md`. No live credentials, flags, services, repository registrations, customer records or infrastructure settings changed.
+- Verification: Test-first failures reproduced missing project context, TLS and update-overlay behavior; focused server/UI/TLS/update checks passed. Node 22.23.4 final `make verify` passed: 277 frontend tests, 983 Node tests, production build, nine Compose configurations and the staging isolation validator. `git diff --check` passed. Real lead schema read succeeded without exposing customer data.
+- Decisions: Use existing configured Friday AI providers, no new provider/key or autonomous roles. Keep Approve and Send separate. Prepare a dedicated private reader instead of proxying the write-capable source application. Production remains on reviewed main until the new PR is merged.
+- Blockers/risks: Production activation and real signed-in browser/provider acceptance remain pending. The private TLS certificate/token must be generated on the source host during rollout, never in chat or Git.
+- Next action: Open the review PR and obtain merge/release authorization for the concrete deployment; run all live acceptance gates after activation.
+- Rollback/recovery: Source-only changes can be reverted. Live rollback is documented; original lead store and app must remain unchanged.
+
 
 ### 2026-11-15 09:30 CST — Claude — Built the approved features (#147 to #154)
 

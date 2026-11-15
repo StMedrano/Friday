@@ -1,0 +1,12 @@
+# Trust only the reader's dedicated public certificate. No private key or
+# Web Growth source files belong on the Friday controller.
+services:
+  friday:
+    environment:
+      NODE_EXTRA_CA_CERTS: /run/friday/web-growth-reader-cert.pem
+    volumes:
+      - type: bind
+        source: ${FRIDAY_WEB_GROWTH_READER_CA_FILE:?Reader public certificate required}
+        target: /run/friday/web-growth-reader-cert.pem
+        read_only: true
+        bind: {create_host_path: false}

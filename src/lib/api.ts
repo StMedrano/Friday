@@ -387,13 +387,14 @@ export type FridayGroupAdvice = {
   mode: FridayAssistantMode; provider?: string; model?: string | null
   fallbackUsed?: boolean; attempts?: FridayAssistantAttempt[]
   execution: { performed: false; reason?: string }
+  projectContext?: { projectId: 'techtactics-web-growth'; generatedAt: string; sourceRevision: string; sourceChecksum: string; totalLeads: number; includedLeads: number }
 }
 
 /** Ask a declared group for advice. Advisory only: Friday executes nothing. */
-export async function askFridayGroup(groupId: string, prompt: string, signal?: AbortSignal): Promise<FridayGroupAdvice> {
+export async function askFridayGroup(groupId: string, prompt: string, signal?: AbortSignal, useProject = false): Promise<FridayGroupAdvice> {
   const response = await fetch('/api/group-advisory', {
     method: 'POST', headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ groupId, prompt }), signal,
+    body: JSON.stringify({ groupId, prompt, ...(useProject ? { useProject: true } : {}) }), signal,
   })
   const body = await response.json().catch(() => null) as (FridayGroupAdvice & { reason?: string; error?: string }) | null
   if (!response.ok || !body?.available) {
@@ -401,6 +402,16 @@ export async function askFridayGroup(groupId: string, prompt: string, signal?: A
   }
   if (typeof body.text !== 'string' || !body.text.trim() || body.execution?.performed !== false) {
     throw new Error('Group advice is unavailable.')
+  }
+  if (useProject) {
+    const context = body.projectContext
+    if (body.groupId !== groupId || context?.projectId !== 'techtactics-web-growth' ||
+      !Number.isFinite(Date.parse(context.generatedAt)) || !/^[a-f0-9]{7,40}$/.test(context.sourceRevision) ||
+      !/^[a-f0-9]{64}$/.test(context.sourceChecksum) || !Number.isInteger(context.totalLeads) ||
+      !Number.isInteger(context.includedLeads) || context.totalLeads < 0 || context.totalLeads > 1000 ||
+      context.includedLeads < 0 || context.includedLeads > 25 || context.includedLeads > context.totalLeads) {
+      throw new Error('Web Growth project evidence is unavailable.')
+    }
   }
   return body
 }

@@ -33,6 +33,8 @@ verify: test build
 	docker compose -f compose.yaml -f compose.live.yaml config >/dev/null
 	docker compose -f compose.yaml -f compose.automation.yaml config >/dev/null
 	docker compose -f compose.yaml -f compose.nonroot.yaml config >/dev/null
+	FRIDAY_WEB_GROWTH_READER_CA_FILE=/dev/null docker compose -f compose.yaml -f compose.web-growth-tls.yaml config >/dev/null
+	WEB_GROWTH_READER_BIND_IP=127.0.0.1 WEB_GROWTH_READER_REVISION=abcdef0 WEB_GROWTH_READER_SOURCE_DIR=/tmp WEB_GROWTH_READER_SECRET_DIR=/tmp docker compose -f integrations/web-growth-reader/compose.private-tls.yaml config >/dev/null
 	FRIDAY_TUNNEL_TOKEN_FILE=/dev/null docker compose -f compose.yaml -f compose.cloud-tunnel.yaml config >/dev/null
 	FRIDAY_REPOSITORY_REGISTRY_FILE=repositories.example.json FRIDAY_REPOSITORY_ROOT=. docker compose -f compose.yaml -f compose.repositories.yaml config >/dev/null
 	FRIDAY_OBSERVER_TOKEN=verify-token FRIDAY_DOCKER_SOCKET_GID=999 docker compose -f observer/compose.yaml config >/dev/null

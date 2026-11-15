@@ -103,3 +103,90 @@ test('the HomeLab group receives current infrastructure evidence and others do n
     assert.deepEqual(calls[1], {})
   })
 })
+
+const projectSnapshot = () => ({ schemaVersion: '1', projectId: 'techtactics-web-growth', generatedAt: new Date().toISOString(), sourceRevision: 'abcdef0', sourceChecksum: 'a'.repeat(64), leads: [] })
+const projectConfig = () => ({ ...getConfig({ FRIDAY_MODE: 'live' }), webGrowth: { enabled: true, readerEmails: ['owner@example.test'] } })
+
+test('explicit project advice fetches fresh authorized evidence and reports its provenance', async () => {
+  const calls = []
+  const snapshot = projectSnapshot()
+  await withServer({ config: projectConfig(), accessGateImpl: gate,
+    readWebGrowthImpl: async () => snapshot,
+    answerAssistantImpl: async options => { calls.push(options); return advice },
+  }, async base => {
+    const response = await post(base, { groupId: 'techtactics', prompt: 'Plan the next work.', useProject: true })
+    assert.equal(response.status, 200)
+    const body = await response.json()
+    assert.equal(body.projectContext.sourceChecksum, snapshot.sourceChecksum)
+    assert.equal(body.execution.performed, false)
+    assert.equal(calls[0].overview.webGrowth.totalLeads, 0)
+    assert.match(calls[0].overview.webGrowth.repository, /StMedrano\/TechTactics/)
+    assert.match(calls[0].systemPrompt, /untrusted data/i)
+    assert.match(calls[0].systemPrompt, /Approve and Send are separate/i)
+  })
+})
+
+test('project advice requires a live human reader and fails before data or AI access', async () => {
+  for (const options of [
+    { accessGateImpl: async () => ({ status: 200, identity: { email: 'other@example.test' } }) },
+    { accessGateImpl: async () => ({ status: 200, identity: { kind: 'service', email: 'owner@example.test' } }) },
+    { accessGateImpl: null, config: { ...projectConfig(), access: { enabled: false } } },
+    { config: { ...projectConfig(), mode: 'mock' } },
+    { config: { ...projectConfig(), webGrowth: { enabled: false, readerEmails: ['owner@example.test'] } } },
+  ]) {
+    let reads = 0, answers = 0
+    await withServer({ config: projectConfig(), accessGateImpl: gate,
+      readWebGrowthImpl: async () => { reads++; return projectSnapshot() },
+      answerAssistantImpl: async () => { answers++; return advice }, ...options,
+    }, async base => {
+      const response = await post(base, { groupId: 'techtactics', prompt: 'Plan.', useProject: true })
+      assert.ok([403, 503].includes(response.status))
+      assert.equal(reads, 0); assert.equal(answers, 0)
+    })
+  }
+})
+
+test('bad, stale or unavailable project evidence never reaches AI or falls back to generic advice', async () => {
+  for (const readWebGrowthImpl of [
+    async () => { throw Error('private token') },
+    async () => ({ ...projectSnapshot(), secret: 'private token' }),
+    async () => ({ ...projectSnapshot(), generatedAt: '2000-01-01T00:00:00Z' }),
+  ]) {
+    let answers = 0
+    await withServer({ config: projectConfig(), accessGateImpl: gate, readWebGrowthImpl,
+      answerAssistantImpl: async () => { answers++; return advice },
+    }, async base => {
+      const response = await post(base, { groupId: 'techtactics', prompt: 'Plan.', useProject: true })
+      assert.equal(response.status, 503)
+      assert.doesNotMatch(await response.text(), /private token/)
+      assert.equal(answers, 0)
+    })
+  }
+})
+
+test('project opt-in cannot be applied to another group or spoof context', async () => {
+  await withServer({ config: projectConfig(), accessGateImpl: gate }, async base => {
+    for (const body of [
+      { groupId: 'homelab', prompt: 'Plan.', useProject: true },
+      { groupId: 'techtactics', prompt: 'Plan.', useProject: 'true' },
+      { groupId: 'techtactics', prompt: 'Plan.', useProject: true, projectContext: {} },
+    ]) assert.equal((await post(base, body)).status, 400)
+  })
+})
+
+test('generic group advice never fetches or shares project records', async () => {
+  let reads = 0
+  const calls = []
+  await withServer({ config: projectConfig(), accessGateImpl: gate,
+    readWebGrowthImpl: async () => { reads++; return projectSnapshot() },
+    answerAssistantImpl: async options => { calls.push(options); return advice },
+  }, async base => {
+    for (const extra of [{}, { useProject: false }]) {
+      const response = await post(base, { groupId: 'techtactics', prompt: 'Plan.', ...extra })
+      assert.equal(response.status, 200)
+      assert.equal((await response.json()).projectContext, undefined)
+    }
+    assert.equal(reads, 0)
+    assert.ok(calls.every(call => Object.keys(call.overview).length === 0))
+  })
+})
