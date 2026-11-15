@@ -41,6 +41,17 @@ queue), #134 (test only), #135 (e2e CI job), #136 and #137 (docs), #138 (New
 task), #139 (backlog), #140 (phone layout). The queue with the flag for each
 is in `docs/codex/NEXT_STEPS.md`.
 
+## 2026-11-15 AIDesigner website designs in Web Growth
+
+Web Growth (Agents, TechTactics group) has a **Website designs** section
+(`src/components/WebGrowthDesigns.tsx`): recent AIDesigner design projects
+and, when `FRIDAY_AIDESIGNER_GENERATE_ENABLED` is on (new flag, default off),
+a Generate form that can start from the selected lead. Every generation goes
+through an explicit confirm step that says credits will be spent and shows
+the exact prompt. The server keeps generation operator-only and audited, and
+now answers `aidesigner-disabled` / `aidesigner-generate-disabled` so the UI
+can tell "off" from an outage. Uses the REST client from #123, not MCP.
+
 ## 2026-11-13 AIDesigner design sessions in Settings (read only)
 
 Settings, General has a **Design sessions** panel

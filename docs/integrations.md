@@ -92,8 +92,26 @@ Registry sync is explicit and Git-owned. It is not an agent editor and cannot cr
 
 - `FRIDAY_APPROVALS_ENABLED=false` by default. When on, each open monitoring incident that carries a recommended action is a pending proposal. An operator approves or denies it on the Approvals page or in the Agents action center.
 - Decisions go to `FRIDAY_APPROVALS_PATH` (default `/data/approvals.json`, mode 0600, newest `FRIDAY_APPROVALS_LIMIT` decisions, 50 to 2000, default 500) with the incident's title, service, severity and recommended action, the time, and the operator's email. Each decision is also written to the action audit as `approvals.decide` when the audit is on.
-- A decision is a record only. Nothing is executed: every response carries `execution.performed: false`. Automated fixes are a separate, approval-gated change.
+- A decision is a record only. Nothing is executed: every response carries `execution.performed: false`. Running a fix after approval is the separate Automated fixes feature below.
 - `GET /api/approvals` returns `pending` (oldest first) and the 20 most recent decisions. `POST /api/approvals/:incidentId/decision` with `{"decision":"approve"|"deny"}` is operator-only, JSON-only and refused cross-site. Errors: 503 `approvals-disabled` or `monitoring-disabled`, 400 `invalid-approval-decision`, 404 `approval-not-found` (the incident is no longer open), 409 `approval-already-decided`. Decisions on one proposal are serialized, so only the first wins.
+
+### Automated fixes
+
+- `FRIDAY_REMEDIATION_ENABLED=false` by default and needs the approvals queue (`FRIDAY_APPROVALS_ENABLED=true`, monitoring on). Nothing ever runs on its own: a fix runs only when an operator approves an incident's proposal **and then** presses the fix button on that approval. It runs at most once per approval in each mode (a failed run may be retried; a dry run never uses up the real execution).
+- What can run comes only from the owner's playbook file at `FRIDAY_REMEDIATION_PLAYBOOKS_PATH` (default `/data/remediation-playbooks.json`; must not be group- or world-writable; any invalid entry disables the feature). Browser input and model text never choose the action or target. Format:
+
+  ```json
+  {"schemaVersion": 1, "playbooks": [
+    {"id": "restart-plex", "serviceId": "docker:plex", "action": "restart-container", "target": "plex",
+     "description": "Restart the plex container", "incidentTypes": ["service-offline"]}
+  ]}
+  ```
+
+  `serviceId` must equal the incident's service id; `incidentTypes` is optional. The first matching playbook is used.
+- `FRIDAY_REMEDIATION_MODE=dry-run` (default) records what would have run in `FRIDAY_REMEDIATION_RUNS_PATH` (default `/data/remediation-runs.json`, mode 0600) and executes nothing.
+- `FRIDAY_REMEDIATION_MODE=execute` makes Friday POST `{"requestId","playbookId","action","target","incidentId"}` with `Authorization: Bearer FRIDAY_REMEDIATION_EXECUTOR_TOKEN` to `FRIDAY_REMEDIATION_EXECUTOR_URL` (https only, no redirects, 10 s timeout). Friday itself holds no Docker, Proxmox or shell privilege; the owner runs and secures the executor, which must answer `{"ok": true}` on success. Each run also needs the global automation gate: the file at `FRIDAY_AUTOMATION_GATE_PATH` (default `/data/automation-gate/state.json`, owner-only file and directory) must contain `{"schemaVersion":1,"state":"allow-approved-actions","expiresAt":<epoch ms at most 5 minutes ahead>}`. A missing, stale or loose-permission file closes the gate (423 `automation-gate-closed`). Execute mode also requires `FRIDAY_MODE=live` and `FRIDAY_AUDIT_ENABLED=true` (otherwise the feature stays off at startup), and only a signed-in human operator can run a fix (never a service token). Before calling the executor Friday writes a `pending` record; if that write fails nothing is sent. A run whose outcome could not be recorded stays `pending` and is never sent again: check the executor's own log before acting on it.
+- `GET /api/approvals` adds `fixes: {enabled, mode}` and, on approved still-open incidents with a playbook, `fix: {playbookId, action, target, description, mode, run?}`.
+- `POST /api/approvals/:incidentId/fix` with `{"confirm": "<incidentId>"}` is operator-only, JSON-only, refused cross-site, and audited as `approvals.fix`. Errors: 404 `remediation-disabled` or `no-fix-for-service`, 409 `fix-not-approved`, `incident-not-open` or `fix-already-run`, 423 `automation-gate-closed`, 403 `access-denied` in execute mode without a signed-in human operator, 502 when the executor reports failure, 503 `remediation-unavailable` or `audit-unavailable`.
 
 ### Project tasks (read)
 
@@ -277,13 +295,17 @@ Friday can call the [AIDesigner REST API](https://www.aidesigner.ai/docs/api) to
 
 - Enable with `FRIDAY_AIDESIGNER_ENABLED=true` and `AIDESIGNER_API_KEY` (created in AIDesigner under Settings, API Keys). `AIDESIGNER_BASE_URL` must be an `https` origin; `FRIDAY_AIDESIGNER_TIMEOUT_MS` (default 180000) bounds one generation.
 - Needs live mode with Cloudflare Access. Service tokens are refused.
-- `GET /api/aidesigner/sessions`: any signed-in person; returns up to 20 recent sessions (id, title, editor link, canvas count, published link, updated time).
+- Generating has its own flag, `FRIDAY_AIDESIGNER_GENERATE_ENABLED=true` (off by default). Without it the session list works and `POST /api/aidesigner/designs` answers 503 `aidesigner-generate-disabled`. When the integration itself is off, both routes answer 503 `aidesigner-disabled`.
+- `GET /api/aidesigner/sessions`: any signed-in person; returns up to 20 recent sessions (id, title, editor link, canvas count, published link, updated time) and `generate` (whether generating is switched on).
 - `POST /api/aidesigner/designs` with JSON `{ "prompt", "viewport"?: "desktop" | "mobile", "sessionId"?, "idempotencyKey"? }`: operator-only, audited as `aidesigner.design.generate`. It spends AIDesigner credits (1 per classic design). The design is written to a new session, or to `sessionId`, and Friday returns only the session, canvas and editor link, never the HTML. Unknown fields are refused, and the premium `ultradesign` mode is not exposed.
 - Provider errors are mapped without detail: 402 out of credits, 429 rate limited (with `Retry-After`), 404 unknown session, 409 canvas busy, 502 key rejected, 503 unavailable.
 - AIDesigner's own limits apply per account: 30 generations per minute and 4 at once.
-- Settings, General shows a read-only **Design sessions** panel: each session's name, last update, canvas count and links to its AIDesigner editor and published page. It asks for the list only when AIDesigner is enabled, and shows a Not connected note with a link here when it is off. It has no Generate button; generating spends credits and needs the owner's approval first.
+- Settings, General shows a read-only **Design sessions** panel: each session's name, last update, canvas count and links to its AIDesigner editor and published page. It asks for the list only when AIDesigner is enabled, and shows a Not connected note with a link here when it is off. It has no Generate button.
+- **Web Growth, Website designs** (Agents, TechTactics group, under the Web Growth pipeline) lists the same design projects and, when `FRIDAY_AIDESIGNER_GENERATE_ENABLED` is on, has the Generate form: a prompt (or **Start from** the selected lead, which only fills in an editable draft), desktop or phone, and a new or existing design project. **Generate design…** always opens a confirm step that says credits will be spent and shows the exact prompt sent to AIDesigner; nothing is sent until **Spend credits and generate**. The server still enforces operator-only and audits each request. If the answer is lost (for example a Cloudflare 100 second edge timeout during a long generation), the next try with the same prompt reuses the same idempotency key, so AIDesigner should replay the earlier design instead of charging again.
 
-This is separate from the AIDesigner MCP server (`https://api.aidesigner.ai/api/v1/mcp`), which uses OAuth and is connected in the AI assistant, not in Friday.
+Friday uses the REST API with a server-side key, not the MCP server: MCP needs an interactive OAuth sign-in per person, while the REST key lets Friday keep the credential on VM102, enforce operator-only, and audit every generation.
+
+The AIDesigner MCP server (`https://api.aidesigner.ai/api/v1/mcp`) is separate; it uses OAuth and is connected in the AI assistant, not in Friday.
 
 ## Opt-in features in Settings
 
@@ -314,35 +336,6 @@ it shows a warning, and once the date has passed it shows the token as expired.
 
 - `FRIDAY_WEB_GROWTH_ENABLED=false` by default. When on, the TechTactics group shows the Web Growth lead pipeline read from the isolated reader in `integrations/web-growth-reader/`, never from the Web Growth application itself.
 - Needs `FRIDAY_WEB_GROWTH_READER_URL`, `FRIDAY_WEB_GROWTH_READER_TOKEN` (the reader's bearer token) and `FRIDAY_WEB_GROWTH_READER_EMAILS` (comma-separated people allowed to see it). Settings shows it as configured when all three are present. Deploying the reader is a separate, owner-approved step; see its README.
-
-## Checking .env before a deploy
-
-`compose.yaml` passes every variable to the container explicitly, so a setting
-added to `.env` but not to `compose.yaml`, or a flag turned on without the
-settings it needs, fails silently. Before a deploy, run on the controller:
-
-```bash
-make env-check                       # checks ./.env against compose.yaml
-make env-check ENV_FILE=/path/.env COMPOSE_FILES="compose.yaml compose.cloud-tunnel.yaml"
-```
-
-It is offline (no network, no Docker) and prints names and line numbers only,
-never values:
-
-- variables in `.env` that none of the given Compose files pass through
-  (they never reach Friday; harmless if another overlay uses them),
-- `*_ENABLED=true` flags whose companion settings are empty, using the same
-  rules as Settings (for example `FRIDAY_WORK_WRITE_ENABLED` needs
-  `FRIDAY_WORK_READ_ENABLED`, `FRIDAY_SUPABASE_URL`, `FRIDAY_WORK_READ_KEY`
-  and `FRIDAY_WORK_WRITE_KEY`); a companion set in `.env` but not passed
-  through counts as empty,
-- malformed lines and names set more than once.
-
-Values are read the way Compose reads them: double-quoted escapes are decoded
-and `${NAME}` / `${NAME:-default}` resolve from earlier `.env` lines (a name
-not set earlier counts as empty, because shell variables are not visible
-offline). It exits 1 only when a flag is missing a companion, and 2 when a file
-cannot be read.
 
 ## Adapter checklist
 

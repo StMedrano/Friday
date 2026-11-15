@@ -292,10 +292,24 @@ export function getConfig(env = process.env) {
       path: env.FRIDAY_APPROVALS_PATH || '/data/approvals.json',
       limit: Math.min(2000, Math.max(50, Math.floor(positiveNumber(env.FRIDAY_APPROVALS_LIMIT, 500)))),
     },
+    // Automated fixes for approved proposals. Off by default; dry-run unless
+    // FRIDAY_REMEDIATION_MODE=execute, which also needs an owner-run executor
+    // and the armed automation gate file. Never unattended.
+    remediation: {
+      enabled: enabled(env.FRIDAY_REMEDIATION_ENABLED),
+      mode: env.FRIDAY_REMEDIATION_MODE === 'execute' ? 'execute' : 'dry-run',
+      playbooksPath: env.FRIDAY_REMEDIATION_PLAYBOOKS_PATH || '/data/remediation-playbooks.json',
+      runsPath: env.FRIDAY_REMEDIATION_RUNS_PATH || '/data/remediation-runs.json',
+      executorUrl: env.FRIDAY_REMEDIATION_EXECUTOR_URL || '',
+      executorToken: env.FRIDAY_REMEDIATION_EXECUTOR_TOKEN || '',
+      automationGatePath: env.FRIDAY_AUTOMATION_GATE_PATH || '/data/automation-gate/state.json',
+    },
     // AIDesigner REST API for generating UI designs. The key stays server-side;
     // generating spends AIDesigner credits, so it is operator-only and audited.
     aidesigner: {
       enabled: enabled(env.FRIDAY_AIDESIGNER_ENABLED),
+      // Separate opt-in for the Generate button (spends credits); listing needs only `enabled`.
+      generateEnabled: enabled(env.FRIDAY_AIDESIGNER_GENERATE_ENABLED),
       apiKey: env.AIDESIGNER_API_KEY || '',
       baseUrl: env.AIDESIGNER_BASE_URL || 'https://api.aidesigner.ai',
       timeoutMs: Math.ceil(positiveNumber(env.FRIDAY_AIDESIGNER_TIMEOUT_MS, 180000)),

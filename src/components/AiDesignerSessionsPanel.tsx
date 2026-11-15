@@ -11,7 +11,7 @@ function updated(value: string | null) {
 
 /**
  * Read-only list of recent AIDesigner design sessions from GET /api/aidesigner/sessions.
- * It never generates a design: that spends AIDesigner credits and is not offered here.
+ * It never generates a design: that spends credits and lives in Web Growth (WebGrowthDesigns).
  * `enabled` is the AIDesigner integration state from Settings; when it is off no request is sent.
  */
 export default function AiDesignerSessionsPanel({ enabled, hidden = false }: { enabled: boolean; hidden?: boolean }) {
@@ -30,7 +30,7 @@ export default function AiDesignerSessionsPanel({ enabled, hidden = false }: { e
     {!enabled ? <NotConnected title="Design sessions" detail="AIDesigner sessions are listed here once FRIDAY_AIDESIGNER_ENABLED and AIDESIGNER_API_KEY are set." setup="AIDesigner design generation"/>
       : !result ? <p role="status" className="v3-settings-message">Loading design sessions…</p>
       : result.state === 'signin' ? <p role="status" className="v3-settings-message">Sign in through Cloudflare Access (live mode) to list design sessions.</p>
-      : result.state === 'unavailable' ? <p role="status" className="v3-settings-message">Design sessions could not be loaded.</p>
+      : result.state !== 'ok' ? <p role="status" className="v3-settings-message">Design sessions could not be loaded.</p>
       : result.sessions.length === 0 ? <p className="v3-settings-message">No design sessions yet.</p>
       : <ul className="v3-settings-list">
         {result.sessions.map((session) => <li key={session.sessionId}>
@@ -41,6 +41,6 @@ export default function AiDesignerSessionsPanel({ enabled, hidden = false }: { e
           {session.publishedUrl && <a href={session.publishedUrl} target="_blank" rel="noreferrer" aria-label={`Published page for ${session.title}`}>Published<ExternalLink size={11} aria-hidden="true"/></a>}
         </li>)}
       </ul>}
-    {enabled && <p className="v3-settings-message">Read only. Generating a design spends AIDesigner credits and is not available from Friday.</p>}
+    {enabled && <p className="v3-settings-message">Read only here. Operators generate designs from Web Growth, under Website designs, when FRIDAY_AIDESIGNER_GENERATE_ENABLED is on.</p>}
   </section>
 }

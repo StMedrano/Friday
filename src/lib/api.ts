@@ -173,10 +173,14 @@ export async function fetchFridayRepositoryGitHub(id: string, signal?: AbortSign
 export type FridayAiDesignerSession = {
   sessionId: string; title: string; editorUrl: string | null; canvasCount: number; publishedUrl: string | null; updatedAt: string | null
 }
-/** `signin`: the server lists sessions only for a person signed in through Cloudflare Access. */
+/**
+ * `signin`: the server lists sessions only for a person signed in through Cloudflare Access.
+ * `off`: FRIDAY_AIDESIGNER_ENABLED is not set. `generate` says whether the Generate button is switched on.
+ */
 export type FridayAiDesignerSessionsResult =
-  | { state: 'ok'; sessions: FridayAiDesignerSession[] }
+  | { state: 'ok'; sessions: FridayAiDesignerSession[]; generate: boolean }
   | { state: 'signin' }
+  | { state: 'off' }
   | { state: 'unavailable' }
 
 const httpsOrNull = (value: unknown) => typeof value === 'string' && /^https:\/\//i.test(value) ? value : null
@@ -200,10 +204,50 @@ export async function fetchFridayAiDesignerSessions(signal?: AbortSignal): Promi
   const body = await response.json().catch(() => null) as { error?: string; sessions?: unknown } | null
   if (response.ok) {
     if (!body || !Array.isArray(body.sessions)) return { state: 'unavailable' }
-    return { state: 'ok', sessions: body.sessions.map(aiDesignerSession).filter((item): item is FridayAiDesignerSession => item !== null) }
+    return {
+      state: 'ok',
+      sessions: body.sessions.map(aiDesignerSession).filter((item): item is FridayAiDesignerSession => item !== null),
+      generate: (body as { generate?: unknown }).generate === true,
+    }
   }
   if (body?.error === 'aidesigner-authentication-required') return { state: 'signin' }
+  if (body?.error === 'aidesigner-disabled') return { state: 'off' }
   return { state: 'unavailable' }
+}
+
+export type FridayAiDesignerDesign = { sessionId: string; editorUrl: string | null; replay: boolean }
+export type FridayAiDesignerDesignRequest = { prompt: string; viewport: 'desktop' | 'mobile'; sessionId: string | null; idempotencyKey: string }
+/**
+ * `lost`: no answer came back (network, gateway timeout). The design may still be
+ * generating, so a retry must reuse the same idempotency key.
+ */
+export type FridayAiDesignerDesignResult =
+  | { state: 'ok'; design: FridayAiDesignerDesign }
+  | { state: 'error'; error: string; retryAfter: number | null }
+  | { state: 'lost' }
+
+/**
+ * Generate one AIDesigner design. This spends AIDesigner credits: the caller
+ * must have shown the operator an explicit confirm step first. Operator only
+ * and audited on the server; only references come back, never HTML.
+ */
+export async function generateFridayAiDesign(input: FridayAiDesignerDesignRequest): Promise<FridayAiDesignerDesignResult> {
+  let response: Response
+  try {
+    response = await fetch('/api/aidesigner/designs', {
+      method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input),
+    })
+  } catch { return { state: 'lost' } }
+  const body = await response.json().catch(() => null) as Record<string, unknown> | null
+  if (response.ok) {
+    if (!body || typeof body.sessionId !== 'string' || !body.sessionId) return { state: 'lost' }
+    return { state: 'ok', design: { sessionId: body.sessionId, editorUrl: httpsOrNull(body.editorUrl), replay: body.replay === true } }
+  }
+  const error = typeof body?.error === 'string' ? body.error : ''
+  // An answer that is not Friday's JSON (a gateway or edge timeout) means the request may still be running.
+  if (!error) return { state: 'lost' }
+  const retryAfter = Number(response.headers.get('retry-after'))
+  return { state: 'error', error, retryAfter: Number.isInteger(retryAfter) && retryAfter > 0 ? retryAfter : null }
 }
 
 export type FridayAuditEvent = {
@@ -631,8 +675,14 @@ export type FridayApprovalItem = {
   id: string; incidentId: string; state: 'pending' | 'approved' | 'denied'
   title: string; detail?: string; serviceName?: string; host?: string; severity?: 'high' | 'warning' | 'info'
   recommendedAction?: string; openedAt?: string; decidedAt?: string; decidedBy?: string; incidentStatus?: 'open' | 'resolved'
+  fix?: FridayApprovalFix
 }
-export type FridayApprovals = { pending: FridayApprovalItem[]; recent: FridayApprovalItem[] }
+/** The owner's playbook fix for an approved, still-open incident, and its last run if any. */
+export type FridayApprovalFix = {
+  playbookId: string; action: string; target: string; description: string; mode: 'dry-run' | 'execute'
+  run?: { state: 'dry-run' | 'succeeded' | 'failed'; at: string; mode: 'dry-run' | 'execute' }
+}
+export type FridayApprovals = { pending: FridayApprovalItem[]; recent: FridayApprovalItem[]; fixes?: { enabled: true; mode: 'dry-run' | 'execute' } }
 export type FridayApprovalsResult = { state: 'ok'; approvals: FridayApprovals } | { state: 'disabled' } | { state: 'unavailable' }
 
 const approvalItems = (value: unknown): FridayApprovalItem[] => Array.isArray(value)
@@ -646,7 +696,9 @@ export async function fetchFridayApprovals(signal?: AbortSignal): Promise<Friday
   const response = await fetch('/api/approvals', { method: 'GET', signal })
   const body = await response.json().catch(() => null) as { error?: string; pending?: unknown; recent?: unknown } | null
   if (response.ok && body && Array.isArray(body.pending) && Array.isArray(body.recent)) {
-    return { state: 'ok', approvals: { pending: approvalItems(body.pending), recent: approvalItems(body.recent) } }
+    const fixes = (body as { fixes?: { enabled?: unknown; mode?: unknown } }).fixes
+    return { state: 'ok', approvals: { pending: approvalItems(body.pending), recent: approvalItems(body.recent),
+      ...(fixes?.enabled === true && (fixes.mode === 'dry-run' || fixes.mode === 'execute') ? { fixes: { enabled: true as const, mode: fixes.mode } } : {}) } }
   }
   return body?.error === 'approvals-disabled' ? { state: 'disabled' } : { state: 'unavailable' }
 }
@@ -663,6 +715,19 @@ export async function decideFridayApproval(incidentId: string, decision: 'approv
   const body = await response.json().catch(() => null) as { error?: string; approval?: FridayApprovalItem } | null
   if (!response.ok || !body?.approval) throw new FridayApprovalError(body?.error || 'approvals-unavailable', response.status)
   return body.approval
+}
+
+export type FridayFixResult = { state: string; mode: 'dry-run' | 'execute'; performed: boolean; succeeded?: boolean }
+
+/** Run the owner's fix for an approved incident. Operator only, audited, once per approval. */
+export async function runFridayApprovedFix(incidentId: string, signal?: AbortSignal): Promise<FridayFixResult> {
+  const response = await fetch(`/api/approvals/${encodeURIComponent(incidentId)}/fix`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirm: incidentId }), signal,
+  })
+  const body = await response.json().catch(() => null) as { error?: string; fix?: { state?: string; mode?: string }; execution?: { performed?: boolean; succeeded?: boolean } } | null
+  if (!body?.fix || (!response.ok && response.status !== 502)) throw new FridayApprovalError(body?.error || 'remediation-unavailable', response.status)
+  return { state: String(body.fix.state), mode: body.fix.mode === 'execute' ? 'execute' : 'dry-run',
+    performed: body.execution?.performed === true, ...(typeof body.execution?.succeeded === 'boolean' ? { succeeded: body.execution.succeeded } : {}) }
 }
 
 export async function askFridayAgent(agentId: string, prompt: string, signal?: AbortSignal): Promise<FridayAgentResponse> {
