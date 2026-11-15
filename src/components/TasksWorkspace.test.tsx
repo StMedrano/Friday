@@ -112,3 +112,45 @@ describe('TasksWorkspace', () => {
     expect(screen.getByLabelText('Project')).not.toBeDisabled()
   })
 })
+
+describe('TasksWorkspace claim and move', () => {
+  it('shows no move buttons unless the controller allows moves', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ tasks, canCreate: true }), { status: 200 })))
+    render(<TasksWorkspace />)
+    await screen.findByRole('list', { name: 'Friday AI OS tasks' })
+    expect(screen.queryByRole('button', { name: 'Claim' })).not.toBeInTheDocument()
+  })
+
+  it('claims a ready task with its on-screen version and shows the new status', async () => {
+    const claimed = { ...tasks[0], status: 'in_progress', version: 2 }
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, options?: RequestInit) => options?.method === 'POST'
+      ? new Response(JSON.stringify({ task: claimed }), { status: 200 })
+      : new Response(JSON.stringify({ tasks, canCreate: true, canMove: true }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<TasksWorkspace />)
+    const group = await screen.findByRole('group', { name: 'Move Wire the work bridge' })
+    expect(within(group).getAllByRole('button').map((button) => button.textContent)).toEqual(['Claim', 'Block', 'Cancel'])
+    fireEvent.click(within(group).getByRole('button', { name: 'Claim' }))
+    expect(await screen.findByText(/Claim: “Wire the work bridge” is now in progress. Nothing was started./)).toBeInTheDocument()
+    const post = fetchMock.mock.calls.find(([, options]) => options?.method === 'POST')!
+    expect(String(post[0])).toBe('/api/work/tasks/task-1/move')
+    expect(JSON.parse(String(post[1]?.body))).toMatchObject({ projectId: 'friday-ai-os', expectedVersion: 1, status: 'in_progress' })
+    const moved = screen.getByRole('group', { name: 'Move Wire the work bridge' })
+    expect(within(moved).getAllByRole('button').map((button) => button.textContent)).toEqual(['Send to review', 'Complete', 'Block', 'Release'])
+  })
+
+  it('refreshes the list when the task changed underneath', async () => {
+    let reads = 0
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, options?: RequestInit) => {
+      if (options?.method === 'POST') return new Response(JSON.stringify({ error: 'work-task-changed' }), { status: 409 })
+      reads += 1
+      return new Response(JSON.stringify({ tasks, canMove: true }), { status: 200 })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    render(<TasksWorkspace />)
+    const group = await screen.findByRole('group', { name: 'Move Review the rollout' })
+    fireEvent.click(within(group).getByRole('button', { name: 'Unblock' }))
+    expect(await screen.findByText(/Someone changed or is holding this task/)).toBeInTheDocument()
+    await vi.waitFor(() => expect(reads).toBe(2))
+  })
+})
