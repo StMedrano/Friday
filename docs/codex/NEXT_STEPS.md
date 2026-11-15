@@ -50,7 +50,7 @@ Listed in `docs/automation/BACKLOG.md` under "Needs owner approval" or in the le
 
 Taken in order by the nightly builder from `docs/automation/BACKLOG.md`.
 
-1. `env-check-script`: offline check of a VM102 `.env` against `compose.yaml` before the next deploy.
+1. `env-check-script` (in review on `bot/nightly-env-check-script`): `make env-check` checks a VM102 `.env` against `compose.yaml` before the next deploy (`docs/integrations.md`, Checking .env before a deploy).
 2. `aidesigner-sessions-panel`: read-only list of AIDesigner design sessions (no Generate button).
 3. `refresh-codex-md`: correct stale PR and branch states in `CODEX.md`.
 4. Keep this file current after each merge or deploy.

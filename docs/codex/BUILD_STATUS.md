@@ -41,6 +41,17 @@ queue), #134 (test only), #135 (e2e CI job), #136 and #137 (docs), #138 (New
 task), #139 (backlog), #140 (phone layout). The queue with the flag for each
 is in `docs/codex/NEXT_STEPS.md`.
 
+## 2026-11-12 offline .env check before deploys
+
+`scripts/check-env.mjs` (`make env-check`) reads an `.env` file and the
+Compose files, and prints names only: variables Compose does not pass
+through, `*_ENABLED=true` flags missing companion settings (the rules of
+`server/settings.mjs` `features` and integrations), and malformed or
+duplicate lines. Offline, no server changes; exits 1 only on a missing
+companion. Run against `.env.example` and `compose.yaml` it reports
+`FRIDAY_AUDIT_MAX_BYTES` as not passed through (listed in `.env.example`, not
+in `compose.yaml`).
+
 ## 2026-10-28 Grafana health and alert rule state (default off)
 
 `server/adapters/grafana.mjs` adds the last planned monitoring adapter. It
