@@ -92,8 +92,26 @@ Registry sync is explicit and Git-owned. It is not an agent editor and cannot cr
 
 - `FRIDAY_APPROVALS_ENABLED=false` by default. When on, each open monitoring incident that carries a recommended action is a pending proposal. An operator approves or denies it on the Approvals page or in the Agents action center.
 - Decisions go to `FRIDAY_APPROVALS_PATH` (default `/data/approvals.json`, mode 0600, newest `FRIDAY_APPROVALS_LIMIT` decisions, 50 to 2000, default 500) with the incident's title, service, severity and recommended action, the time, and the operator's email. Each decision is also written to the action audit as `approvals.decide` when the audit is on.
-- A decision is a record only. Nothing is executed: every response carries `execution.performed: false`. Automated fixes are a separate, approval-gated change.
+- A decision is a record only. Nothing is executed: every response carries `execution.performed: false`. Running a fix after approval is the separate Automated fixes feature below.
 - `GET /api/approvals` returns `pending` (oldest first) and the 20 most recent decisions. `POST /api/approvals/:incidentId/decision` with `{"decision":"approve"|"deny"}` is operator-only, JSON-only and refused cross-site. Errors: 503 `approvals-disabled` or `monitoring-disabled`, 400 `invalid-approval-decision`, 404 `approval-not-found` (the incident is no longer open), 409 `approval-already-decided`. Decisions on one proposal are serialized, so only the first wins.
+
+### Automated fixes
+
+- `FRIDAY_REMEDIATION_ENABLED=false` by default and needs the approvals queue (`FRIDAY_APPROVALS_ENABLED=true`, monitoring on). Nothing ever runs on its own: a fix runs only when an operator approves an incident's proposal **and then** presses the fix button on that approval. It runs at most once per approval (a failed run may be retried).
+- What can run comes only from the owner's playbook file at `FRIDAY_REMEDIATION_PLAYBOOKS_PATH` (default `/data/remediation-playbooks.json`; must not be group- or world-writable; any invalid entry disables the feature). Browser input and model text never choose the action or target. Format:
+
+  ```json
+  {"schemaVersion": 1, "playbooks": [
+    {"id": "restart-plex", "serviceId": "docker:plex", "action": "restart-container", "target": "plex",
+     "description": "Restart the plex container", "incidentTypes": ["service-offline"]}
+  ]}
+  ```
+
+  `serviceId` must equal the incident's service id; `incidentTypes` is optional. The first matching playbook is used.
+- `FRIDAY_REMEDIATION_MODE=dry-run` (default) records what would have run in `FRIDAY_REMEDIATION_RUNS_PATH` (default `/data/remediation-runs.json`, mode 0600) and executes nothing.
+- `FRIDAY_REMEDIATION_MODE=execute` makes Friday POST `{"requestId","playbookId","action","target","incidentId"}` with `Authorization: Bearer FRIDAY_REMEDIATION_EXECUTOR_TOKEN` to `FRIDAY_REMEDIATION_EXECUTOR_URL` (https only, no redirects, 10 s timeout). Friday itself holds no Docker, Proxmox or shell privilege; the owner runs and secures the executor, which must answer `{"ok": true}` on success. Each run also needs the global automation gate: the file at `FRIDAY_AUTOMATION_GATE_PATH` (default `/data/automation-gate/state.json`, owner-only file and directory) must contain `{"schemaVersion":1,"state":"allow-approved-actions","expiresAt":<epoch ms at most 5 minutes ahead>}`. A missing, stale or loose-permission file closes the gate (423 `automation-gate-closed`).
+- `GET /api/approvals` adds `fixes: {enabled, mode}` and, on approved still-open incidents with a playbook, `fix: {playbookId, action, target, description, mode, run?}`.
+- `POST /api/approvals/:incidentId/fix` with `{"confirm": "<incidentId>"}` is operator-only, JSON-only, refused cross-site, and audited as `approvals.fix`. Errors: 404 `remediation-disabled` or `no-fix-for-service`, 409 `fix-not-approved`, `incident-not-open` or `fix-already-run`, 423 `automation-gate-closed`, 502 when the executor reports failure, 503 `remediation-unavailable`.
 
 ### Project tasks (read)
 

@@ -145,7 +145,7 @@ test('service token expiry is reported as days remaining with a warning window, 
 })
 
 test('features report each opt-in flag, whether its companion settings are present, and its setup section', () => {
-  const ids = ['github', 'uptime', 'agent-activity', 'approvals', 'work-read', 'work-write', 'model-routing', 'web-growth']
+  const ids = ['github', 'uptime', 'agent-activity', 'approvals', 'automated-fixes', 'work-read', 'work-write', 'model-routing', 'web-growth']
   const off = buildSettingsView(getConfig({}))
   assert.deepEqual(off.features.map(item => item.id), ids)
   for (const item of off.features) {
@@ -158,11 +158,11 @@ test('features report each opt-in flag, whether its companion settings are prese
   // Turned on without what each one needs: enabled but not configured.
   const partial = byId(buildSettingsView(getConfig({
     FRIDAY_GITHUB_ENABLED: 'true', FRIDAY_MONITORING_UPTIME_ENABLED: 'true', FRIDAY_AGENT_ACTIVITY_ENABLED: 'true',
-    FRIDAY_APPROVALS_ENABLED: 'true', FRIDAY_WORK_READ_ENABLED: 'true', FRIDAY_WORK_WRITE_ENABLED: 'true',
+    FRIDAY_APPROVALS_ENABLED: 'true', FRIDAY_REMEDIATION_ENABLED: 'true', FRIDAY_WORK_READ_ENABLED: 'true', FRIDAY_WORK_WRITE_ENABLED: 'true',
     FRIDAY_MODEL_FABRIC_ENABLED: 'true', FRIDAY_WEB_GROWTH_ENABLED: 'true',
   })))
   assert.deepEqual(partial.uptime, {id: 'uptime', name: 'Uptime history', enabled: true, configured: false, setup: 'Uptime history'})
-  for (const id of ['uptime', 'approvals', 'work-read', 'work-write', 'model-routing', 'web-growth']) assert.equal(partial[id].configured, false, id)
+  for (const id of ['uptime', 'approvals', 'automated-fixes', 'work-read', 'work-write', 'model-routing', 'web-growth']) assert.equal(partial[id].configured, false, id)
   // These keep their records on the data volume (or, for GitHub, the token is
   // optional for public repositories) and need nothing else.
   assert.equal(partial.github.configured, true)
@@ -170,7 +170,7 @@ test('features report each opt-in flag, whether its companion settings are prese
 
   const full = byId(buildSettingsView(getConfig({
     FRIDAY_GITHUB_ENABLED: 'true', FRIDAY_GITHUB_TOKEN: 'secret-github-token',
-    FRIDAY_MONITORING_ENABLED: 'true', FRIDAY_MONITORING_UPTIME_ENABLED: 'true',
+    FRIDAY_MONITORING_ENABLED: 'true', FRIDAY_MONITORING_UPTIME_ENABLED: 'true', FRIDAY_APPROVALS_ENABLED: 'true', FRIDAY_REMEDIATION_ENABLED: 'true',
     FRIDAY_SUPABASE_URL: 'https://10.9.9.7', FRIDAY_WORK_READ_ENABLED: 'true', FRIDAY_WORK_READ_KEY: 'secret-read-key',
     FRIDAY_WORK_WRITE_ENABLED: 'true', FRIDAY_WORK_WRITE_KEY: 'secret-write-key',
     FRIDAY_AI_ENABLED: 'true', FRIDAY_MODEL_FABRIC_ENABLED: 'true', FRIDAY_NVIDIA_ENABLED: 'true', NVIDIA_API_KEY: 'secret-nvidia',
@@ -192,6 +192,12 @@ test('features report each opt-in flag, whether its companion settings are prese
   assert.equal(hosted([model], {NVIDIA_API_KEY: ''}), false, 'hosted without key')
   assert.equal(routing({FRIDAY_NVIDIA_LOCAL_ENABLED: 'true', FRIDAY_NVIDIA_LOCAL_MODELS_JSON: JSON.stringify([model])}), true, 'local needs no key')
   assert.equal(hosted([model], {FRIDAY_AI_ENABLED: 'false'}), false, 'chat AI off')
+
+  // Execute mode also needs the executor URL and token.
+  const fixes = env => byId(buildSettingsView(getConfig({FRIDAY_MONITORING_ENABLED: 'true', FRIDAY_APPROVALS_ENABLED: 'true', FRIDAY_REMEDIATION_ENABLED: 'true', ...env})))['automated-fixes'].configured
+  assert.equal(fixes({}), true, 'dry-run')
+  assert.equal(fixes({FRIDAY_REMEDIATION_MODE: 'execute'}), false, 'execute without executor')
+  assert.equal(fixes({FRIDAY_REMEDIATION_MODE: 'execute', FRIDAY_REMEDIATION_EXECUTOR_URL: 'https://x', FRIDAY_REMEDIATION_EXECUTOR_TOKEN: 't'}), true, 'execute')
 
   // A write key alone is not enough: new tasks need task reads on.
   assert.equal(byId(buildSettingsView(getConfig({FRIDAY_SUPABASE_URL: 'https://s', FRIDAY_WORK_WRITE_ENABLED: 'true', FRIDAY_WORK_WRITE_KEY: 'k'})))['work-write'].configured, false)

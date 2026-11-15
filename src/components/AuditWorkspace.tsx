@@ -5,6 +5,7 @@ import { fetchFridayAuditEvents, FridayAuditError, type FridayAuditEvent } from 
 const ACTION_LABELS: Record<string, string> = {
   'agents.registry.sync': 'Registry sync',
   'incidents.diagnostics.rerun': 'Diagnostic rerun',
+  'approvals.fix': 'Approved fix run',
   'settings.sites.update': 'Site settings update',
   'settings.endpoints.create': 'Endpoint check created',
   'settings.endpoints.update': 'Endpoint check edited',

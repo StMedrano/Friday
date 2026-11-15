@@ -601,8 +601,14 @@ export type FridayApprovalItem = {
   id: string; incidentId: string; state: 'pending' | 'approved' | 'denied'
   title: string; detail?: string; serviceName?: string; host?: string; severity?: 'high' | 'warning' | 'info'
   recommendedAction?: string; openedAt?: string; decidedAt?: string; decidedBy?: string; incidentStatus?: 'open' | 'resolved'
+  fix?: FridayApprovalFix
 }
-export type FridayApprovals = { pending: FridayApprovalItem[]; recent: FridayApprovalItem[] }
+/** The owner's playbook fix for an approved, still-open incident, and its last run if any. */
+export type FridayApprovalFix = {
+  playbookId: string; action: string; target: string; description: string; mode: 'dry-run' | 'execute'
+  run?: { state: 'dry-run' | 'succeeded' | 'failed'; at: string; mode: 'dry-run' | 'execute' }
+}
+export type FridayApprovals = { pending: FridayApprovalItem[]; recent: FridayApprovalItem[]; fixes?: { enabled: true; mode: 'dry-run' | 'execute' } }
 export type FridayApprovalsResult = { state: 'ok'; approvals: FridayApprovals } | { state: 'disabled' } | { state: 'unavailable' }
 
 const approvalItems = (value: unknown): FridayApprovalItem[] => Array.isArray(value)
@@ -616,7 +622,9 @@ export async function fetchFridayApprovals(signal?: AbortSignal): Promise<Friday
   const response = await fetch('/api/approvals', { method: 'GET', signal })
   const body = await response.json().catch(() => null) as { error?: string; pending?: unknown; recent?: unknown } | null
   if (response.ok && body && Array.isArray(body.pending) && Array.isArray(body.recent)) {
-    return { state: 'ok', approvals: { pending: approvalItems(body.pending), recent: approvalItems(body.recent) } }
+    const fixes = (body as { fixes?: { enabled?: unknown; mode?: unknown } }).fixes
+    return { state: 'ok', approvals: { pending: approvalItems(body.pending), recent: approvalItems(body.recent),
+      ...(fixes?.enabled === true && (fixes.mode === 'dry-run' || fixes.mode === 'execute') ? { fixes: { enabled: true as const, mode: fixes.mode } } : {}) } }
   }
   return body?.error === 'approvals-disabled' ? { state: 'disabled' } : { state: 'unavailable' }
 }
@@ -633,6 +641,19 @@ export async function decideFridayApproval(incidentId: string, decision: 'approv
   const body = await response.json().catch(() => null) as { error?: string; approval?: FridayApprovalItem } | null
   if (!response.ok || !body?.approval) throw new FridayApprovalError(body?.error || 'approvals-unavailable', response.status)
   return body.approval
+}
+
+export type FridayFixResult = { state: string; mode: 'dry-run' | 'execute'; performed: boolean; succeeded?: boolean }
+
+/** Run the owner's fix for an approved incident. Operator only, audited, once per approval. */
+export async function runFridayApprovedFix(incidentId: string, signal?: AbortSignal): Promise<FridayFixResult> {
+  const response = await fetch(`/api/approvals/${encodeURIComponent(incidentId)}/fix`, {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ confirm: incidentId }), signal,
+  })
+  const body = await response.json().catch(() => null) as { error?: string; fix?: { state?: string; mode?: string }; execution?: { performed?: boolean; succeeded?: boolean } } | null
+  if (!body?.fix || (!response.ok && response.status !== 502)) throw new FridayApprovalError(body?.error || 'remediation-unavailable', response.status)
+  return { state: String(body.fix.state), mode: body.fix.mode === 'execute' ? 'execute' : 'dry-run',
+    performed: body.execution?.performed === true, ...(typeof body.execution?.succeeded === 'boolean' ? { succeeded: body.execution.succeeded } : {}) }
 }
 
 export async function askFridayAgent(agentId: string, prompt: string, signal?: AbortSignal): Promise<FridayAgentResponse> {

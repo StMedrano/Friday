@@ -8,6 +8,7 @@ export const SETUP_SECTIONS = [
   'Self-hosted Supabase runtime registry',
   'Agent activity log',
   'Approvals queue',
+  'Automated fixes',
   'New tasks (Tasks write path)',
   'GitHub pull requests, CI and last commit',
   'Project tasks (read)',
