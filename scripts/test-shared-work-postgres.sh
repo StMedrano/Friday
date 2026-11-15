@@ -33,6 +33,9 @@ docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shar
 # Claim and move: one checked function for the writer role, no new table rights.
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < supabase/migrations/202611150001_friday_work_mover.sql >/dev/null
 docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work-mover.sql >/dev/null
+# Edit task text: one checked function for the writer role, no new table rights.
+docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < supabase/migrations/202611150002_friday_work_editor.sql >/dev/null
+docker exec -i "$container" psql -U postgres -v ON_ERROR_STOP=1 < tests/sql/shared-work-editor.sql >/dev/null
 FRIDAY_TEST_PG_CONTAINER="$container" sh tests/sql/shared-work-concurrency.sh
 # Private website-login session migration is isolated from Friday shared work.
 # Never direct this test at a live Supabase/Postgres service.

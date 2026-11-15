@@ -11,6 +11,7 @@ export const SETUP_SECTIONS = [
   'Automated fixes',
   'New tasks (Tasks write path)',
   'Claim and move tasks',
+  'Edit task text',
   'GitHub pull requests, CI and last commit',
   'Project tasks (read)',
   'Free model routing',

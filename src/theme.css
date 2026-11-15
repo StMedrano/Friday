@@ -730,3 +730,9 @@ code, kbd, pre, samp,
 /* Open app: owner-configured https link for the selected service. */
 .fx-open-app { display: inline-flex; align-items: center; gap: 6px; margin-top: 12px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; color: inherit; text-decoration: none; font-weight: 600; }
 .fx-open-app:hover, .fx-open-app:focus-visible { border-color: currentColor; }
+
+/* Edit task text: inline form in a task row. */
+.fx-task-edit { display: grid; gap: 8px; flex: 1 1 100%; }
+.fx-task-edit label { display: grid; gap: 4px; font-size: 12px; }
+.fx-task-edit input { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; }
+.fx-task-edit-button { border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 12px; padding: 4px 10px; cursor: pointer; }

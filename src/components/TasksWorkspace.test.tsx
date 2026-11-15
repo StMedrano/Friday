@@ -153,4 +153,52 @@ describe('TasksWorkspace claim and move', () => {
     expect(await screen.findByText(/Someone changed or is holding this task/)).toBeInTheDocument()
     await vi.waitFor(() => expect(reads).toBe(2))
   })
+
+  it('shows no Edit button unless the controller allows edits', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ tasks, canCreate: true, canMove: true }), { status: 200 })))
+    render(<TasksWorkspace />)
+    await screen.findByRole('list', { name: 'Friday AI OS tasks' })
+    expect(screen.queryByRole('button', { name: /^Edit / })).not.toBeInTheDocument()
+  })
+
+  it('edits a task title with its on-screen version, keeps details unless given, and never offers Edit on closed tasks', async () => {
+    const withDone = [...tasks, { id: 'task-3', projectId: 'friday-ai-os', title: 'Shipped', status: 'completed', version: 4 }]
+    const edited = { ...tasks[0], title: 'Wire the shared work bridge', version: 2 }
+    const fetchMock = vi.fn(async (_input: RequestInfo | URL, options?: RequestInit) => options?.method === 'POST'
+      ? new Response(JSON.stringify({ task: edited }), { status: 200 })
+      : new Response(JSON.stringify({ tasks: withDone, canEdit: true }), { status: 200 }))
+    vi.stubGlobal('fetch', fetchMock)
+    render(<TasksWorkspace />)
+    await screen.findByRole('list', { name: 'Friday AI OS tasks' })
+    expect(screen.queryByRole('button', { name: 'Edit Shipped' })).not.toBeInTheDocument()
+    expect(screen.getByText(/Operators can add and edit tasks; nothing here runs one/)).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Edit Wire the work bridge' }))
+    const form = screen.getByRole('form', { name: 'Edit Wire the work bridge' })
+    fireEvent.change(within(form).getByLabelText('Title'), { target: { value: '  Wire the shared work bridge ' } })
+    fireEvent.click(within(form).getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText('Saved “Wire the shared work bridge”. Its status did not change.')).toBeInTheDocument()
+    const post = fetchMock.mock.calls.find(([, options]) => options?.method === 'POST')!
+    expect(String(post[0])).toBe('/api/work/tasks/task-1/edit')
+    expect(JSON.parse(String(post[1]?.body))).toEqual({ projectId: 'friday-ai-os', expectedVersion: 1, title: 'Wire the shared work bridge' })
+    expect(screen.getByText('Wire the shared work bridge').closest('li')).toHaveTextContent('version 2')
+  })
+
+  it('explains a closed task and refreshes after a conflicting edit', async () => {
+    let reads = 0
+    let answer = { error: 'work-task-closed' }
+    vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, options?: RequestInit) => {
+      if (options?.method === 'POST') return new Response(JSON.stringify(answer), { status: 409 })
+      reads += 1
+      return new Response(JSON.stringify({ tasks, canEdit: true }), { status: 200 })
+    }))
+    render(<TasksWorkspace />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Review the rollout' }))
+    fireEvent.click(within(screen.getByRole('form', { name: 'Edit Review the rollout' })).getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText('Completed and cancelled tasks cannot be edited.')).toBeInTheDocument()
+    answer = { error: 'work-task-changed' }
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Review the rollout' }))
+    fireEvent.click(within(screen.getByRole('form', { name: 'Edit Review the rollout' })).getByRole('button', { name: 'Save' }))
+    expect(await screen.findByText(/Someone changed or is holding this task/)).toBeInTheDocument()
+    await vi.waitFor(() => expect(reads).toBe(3))
+  })
 })

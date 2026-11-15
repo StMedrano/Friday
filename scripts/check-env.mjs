@@ -35,6 +35,7 @@ export const COMPANIONS = Object.freeze({
   'work-read': { flag: 'FRIDAY_WORK_READ_ENABLED', needs: ['FRIDAY_SUPABASE_URL', 'FRIDAY_WORK_READ_KEY'] },
   'work-write': { flag: 'FRIDAY_WORK_WRITE_ENABLED', needs: ['FRIDAY_WORK_READ_ENABLED', 'FRIDAY_SUPABASE_URL', 'FRIDAY_WORK_READ_KEY', 'FRIDAY_WORK_WRITE_KEY'] },
   'work-move': { flag: 'FRIDAY_WORK_MOVE_ENABLED', needs: ['FRIDAY_WORK_READ_ENABLED', 'FRIDAY_WORK_WRITE_ENABLED', 'FRIDAY_SUPABASE_URL', 'FRIDAY_WORK_READ_KEY', 'FRIDAY_WORK_WRITE_KEY'] },
+  'work-edit': { flag: 'FRIDAY_WORK_EDIT_ENABLED', needs: ['FRIDAY_WORK_READ_ENABLED', 'FRIDAY_WORK_WRITE_ENABLED', 'FRIDAY_SUPABASE_URL', 'FRIDAY_WORK_READ_KEY', 'FRIDAY_WORK_WRITE_KEY'] },
   // Also needs one free model target; see docs/integrations.md, Free model routing.
   'model-routing': { flag: 'FRIDAY_MODEL_FABRIC_ENABLED', needs: ['FRIDAY_AI_ENABLED'] },
   'app-links': { flag: 'FRIDAY_APP_LINKS_ENABLED', needs: [] },
