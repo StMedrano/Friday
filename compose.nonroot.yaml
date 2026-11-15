@@ -1,0 +1,25 @@
+# Run the Friday controller as UID/GID 10001 instead of root.
+# Use ONLY after scripts/migrate-friday-data-nonroot.sh has copied friday_data
+# into friday_data_nonroot in an approved maintenance window. The volume is
+# external, so Compose refuses to start rather than create an empty one.
+# scripts/update-controller.sh adds this file when .env has
+# FRIDAY_CONTROLLER_NONROOT=true. Rollback: set it false and run make update;
+# the original root-owned friday_data volume is never modified.
+services:
+  friday:
+    build:
+      target: runtime-nonroot
+    user: "10001:10001"
+    read_only: true
+    cap_drop:
+      - ALL
+    pids_limit: 256
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,nodev,uid=10001,gid=10001,size=64m
+    volumes:
+      - friday_data_nonroot:/data
+
+volumes:
+  friday_data_nonroot:
+    name: friday_data_nonroot
+    external: true

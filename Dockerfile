@@ -36,9 +36,9 @@ EXPOSE 3010
 HEALTHCHECK --interval=30s --timeout=4s --start-period=10s --retries=3 CMD wget -qO- http://127.0.0.1:3010/healthz >/dev/null 2>&1 || exit 1
 CMD ["node", "server/index.mjs"]
 
-# Non-root candidate (UID/GID 10001). Built and rehearsed in CI only; no
-# Compose file selects it until VM102's root-owned friday_data volume has been
-# copied to a 10001-owned volume in an approved maintenance window.
+# Non-root image (UID/GID 10001). Selected only by compose.nonroot.yaml, after
+# VM102's root-owned friday_data volume has been copied to friday_data_nonroot
+# (scripts/migrate-friday-data-nonroot.sh) in an approved maintenance window.
 FROM runtime-base AS runtime-nonroot
 ENV HOME=/tmp
 RUN addgroup -S -g 10001 friday && adduser -S -D -H -u 10001 -G friday friday \
