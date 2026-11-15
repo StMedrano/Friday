@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import NotConnected from './NotConnected'
 import {
-  decideFridayApproval, fetchFridayApprovals, FridayApprovalError,
+  decideFridayApproval, fetchFridayApprovals, FridayApprovalError, runFridayApprovedFix,
   type FridayApprovalItem, type FridayApprovalsResult,
 } from '../lib/api'
 
@@ -11,6 +11,20 @@ const ERRORS: Record<string, string> = {
   'approval-already-decided': 'Someone already decided this proposal.',
   'approval-not-found': 'This incident is no longer open.',
   'audit-unavailable': 'The action audit could not record this decision, so it was not saved.',
+  'fix-already-run': 'This fix already ran for this approval.',
+  'fix-not-approved': 'Approve the proposal before running its fix.',
+  'incident-not-open': 'This incident is no longer open, so its fix was not run.',
+  'no-fix-for-service': 'No playbook covers this service.',
+  'automation-gate-closed': 'The automation gate is closed. Arm it on the controller, then try again within five minutes.',
+}
+
+function fixError(reason: unknown) {
+  if (reason instanceof FridayApprovalError) {
+    if (reason.status === 403) return 'Operator access is required to run a fix.'
+    if (reason.code === 'audit-unavailable') return 'The action audit could not record this, so the fix did not run.'
+    return ERRORS[reason.code] || 'The fix could not be run.'
+  }
+  return 'The fix could not be run.'
 }
 
 function when(value?: string) {
@@ -62,6 +76,23 @@ export default function ApprovalsQueue({ compact = false }: { compact?: boolean 
     }
   }
 
+  const runFix = async (item: FridayApprovalItem) => {
+    setBusy(item.incidentId)
+    setMessage('')
+    try {
+      const outcome = await runFridayApprovedFix(item.incidentId)
+      const name = item.serviceName || item.title
+      setMessage(outcome.mode === 'dry-run'
+        ? `Dry run for ${name}: recorded what would run. Nothing was executed.`
+        : outcome.succeeded ? `Fix for ${name} ran and the executor reported success.` : `Fix for ${name} was sent but the executor reported a failure.`)
+    } catch (reason) {
+      setMessage(fixError(reason))
+    } finally {
+      setBusy('')
+      await load()
+    }
+  }
+
   if (!result || result.state === 'disabled') {
     return <NotConnected title="Approvals" detail="Remediation proposals from open incidents queue here once the approvals queue (FRIDAY_APPROVALS_ENABLED) is on." setup="Approvals queue"/>
   }
@@ -96,8 +127,19 @@ export default function ApprovalsQueue({ compact = false }: { compact?: boolean 
             <span className={`fx-status ${item.state === 'approved' ? '' : 'warning'}`}>{item.state}</span>
           </span>
           <small>{when(item.decidedAt)}{item.decidedBy ? ` · ${item.decidedBy}` : ''} · incident {item.incidentStatus === 'open' ? 'still open' : 'resolved'}</small>
+          {item.fix && <>
+            <small>Fix: {item.fix.description} ({item.fix.action} {item.fix.target}){item.fix.run ? ` · last run ${item.fix.run.state} ${when(item.fix.run.at)}` : ''}</small>
+            {(!item.fix.run || item.fix.run.state === 'failed') && <span className="fx-approvals-actions">
+              <button type="button" disabled={Boolean(busy)} onClick={() => void runFix(item)}
+                aria-label={`${item.fix.mode === 'dry-run' ? 'Dry run' : 'Run'} fix for ${item.serviceName || item.title}`}>{item.fix.mode === 'dry-run' ? 'Dry run fix' : 'Run fix'}</button>
+            </span>}
+          </>}
         </li>)}</ul>}
     </>}
-    <p className="fx-activity-note">Approval is recorded and audited only. Automated fixes are not connected, so nothing runs.</p>
+    <p className="fx-activity-note">{!result.approvals.fixes
+      ? 'Approval is recorded and audited only. Automated fixes are not connected, so nothing runs.'
+      : result.approvals.fixes.mode === 'dry-run'
+        ? 'Automated fixes are in dry-run mode: an approved fix records what would run and executes nothing.'
+        : 'An approved fix runs only when an operator presses Run fix and the automation gate is armed. Nothing runs on its own.'}</p>
   </section>
 }

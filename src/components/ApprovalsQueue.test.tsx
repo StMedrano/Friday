@@ -52,4 +52,27 @@ describe('ApprovalsQueue', () => {
     expect(await screen.findByLabelText('Approvals: not connected')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'How to connect: Approvals queue' })).toBeInTheDocument()
   })
+
+  it('offers a dry-run fix for an approved incident that has a playbook, and runs it once', async () => {
+    let ran = false
+    const approved = { ...pending, state: 'approved', decidedAt: '2026-11-05T19:00:00.000Z', incidentStatus: 'open',
+      fix: { playbookId: 'restart-plex', action: 'restart-container', target: 'plex', description: 'Restart the plex container', mode: 'dry-run' } }
+    const fetchMock = vi.fn(async (input: RequestInfo | URL, _options?: RequestInit) => {
+      if (String(input).endsWith('/fix')) {
+        ran = true
+        return reply({ fix: { ...approved.fix, state: 'dry-run', at: '2026-11-05T19:05:00.000Z' }, execution: { performed: false } })
+      }
+      return reply({ pending: [], recent: [ran ? { ...approved, fix: { ...approved.fix, run: { state: 'dry-run', at: '2026-11-05T19:05:00.000Z', mode: 'dry-run' } } } : approved],
+        fixes: { enabled: true, mode: 'dry-run' }, execution: { performed: false } })
+    })
+    vi.stubGlobal('fetch', fetchMock)
+    const user = userEvent.setup()
+    render(<ApprovalsQueue/>)
+    expect(await screen.findByText(/Automated fixes are in dry-run mode/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Dry run fix for plex' }))
+    expect(await screen.findByText(/Dry run for plex: recorded what would run. Nothing was executed./)).toBeInTheDocument()
+    const post = fetchMock.mock.calls.find(([input]) => String(input).endsWith('/fix'))!
+    expect(JSON.parse(String(post[1]?.body))).toEqual({ confirm: 'i1' })
+    expect(screen.queryByRole('button', { name: 'Dry run fix for plex' })).not.toBeInTheDocument()
+  })
 })

@@ -135,6 +135,15 @@ function parseApprovalDecisionRoute(pathname) {
   return { invalid: false, incidentId }
 }
 
+function parseApprovalFixRoute(pathname) {
+  const match = String(pathname || '').match(/^\/api\/approvals\/([^/]+)\/fix$/)
+  if (!match) return null
+  let incidentId
+  try { incidentId = decodeURIComponent(match[1]) } catch { return { invalid: true } }
+  if (!SAFE_INCIDENT_ID.test(incidentId)) return { invalid: true }
+  return { invalid: false, incidentId }
+}
+
 function parseIncidentDiagnosticRerunRoute(pathname) {
   const match = String(pathname || '').match(/^\/api\/incidents\/([^/]+)\/diagnostics\/rerun$/)
   if (!match) return null
@@ -309,6 +318,7 @@ export function createFridayServer({
   githubReader = null,
   agentActivity = null,
   approvalQueue = null,
+  remediation = null,
   aiDesignerImpl = createAiDesigner,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
@@ -344,7 +354,7 @@ export function createFridayServer({
       const pushWrite = (request.method === 'POST' || request.method === 'DELETE') && url.pathname === '/api/notifications/web-push'
       const groupAdvisory = request.method === 'POST' && url.pathname === '/api/group-advisory'
       const aiDesignerGenerate = request.method === 'POST' && url.pathname === '/api/aidesigner/designs'
-      const approvalDecision = request.method === 'POST' && Boolean(parseApprovalDecisionRoute(url.pathname))
+      const approvalDecision = request.method === 'POST' && (Boolean(parseApprovalDecisionRoute(url.pathname)) || Boolean(parseApprovalFixRoute(url.pathname)))
       const taskCreate = isWorkTaskCreate(request.method, url.pathname) || Boolean(workTaskMoveId(request.method, url.pathname))
       const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || approvalDecision || taskCreate || aiDesignerGenerate || url.pathname === '/api/audit/events'
       let verdict
@@ -560,8 +570,58 @@ export function createFridayServer({
       if (url.search) return json(response, 400, { error: 'unexpected-query' })
       if (!approvalQueue) return json(response, 503, { error: 'approvals-disabled' })
       if (config.monitoring?.enabled === false) return json(response, 503, { error: 'monitoring-disabled' })
-      try { return json(response, 200, approvalQueue.list(monitoringRuntime?.getIncidents?.().incidents || [])) }
+      try {
+        const incidents = monitoringRuntime?.getIncidents?.().incidents || []
+        const view = approvalQueue.list(incidents)
+        if (remediation?.enabled) {
+          // Show the owner's fix for each approved, still-open incident.
+          const byId = new Map(incidents.map((incident) => [incident?.id, incident]))
+          view.recent = view.recent.map((item) => {
+            const incident = byId.get(item.incidentId)
+            if (item.state !== 'approved' || incident?.status !== 'open') return item
+            const fix = remediation.describe(incident, item.id)
+            return fix ? { ...item, fix } : item
+          })
+          view.fixes = { enabled: true, mode: remediation.mode }
+          view.execution = remediation.mode === 'execute'
+            ? { performed: false, reason: 'An approved fix runs only when an operator presses Run fix and the automation gate is armed.' }
+            : { performed: false, reason: 'Automated fixes are in dry-run mode: Run fix records what would run and executes nothing.' }
+        }
+        return json(response, 200, view)
+      }
       catch { return json(response, 503, { error: 'approvals-unavailable' }) }
+    }
+
+    // Run the owner's fix for an approved incident, once, on an operator's request.
+    const approvalFixRoute = parseApprovalFixRoute(url.pathname)
+    if (approvalFixRoute) {
+      if (request.method !== 'POST') return json(response, 405, { error: 'method-not-allowed' })
+      if (approvalFixRoute.invalid) return json(response, 400, { error: 'invalid-incident-id' })
+      if (url.search) return json(response, 400, { error: 'unexpected-query' })
+      if (!approvalQueue || !remediation?.enabled) return json(response, 404, { error: 'remediation-disabled' })
+      // Real execution only for a verified human operator, with the durable audit on.
+      if (remediation.mode === 'execute') {
+        if (!accessGate || !identity || identity.kind === 'service') return json(response, 403, { error: 'access-denied' })
+        if (!actionAudit) return json(response, 503, { error: 'audit-unavailable' })
+      }
+      if (config.monitoring?.enabled === false) return json(response, 503, { error: 'monitoring-disabled' })
+      let body
+      try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid-fix-request' }) }
+      // The body must repeat the incident id, so a stray request cannot run a different fix.
+      if (!body || typeof body !== 'object' || Array.isArray(body) || Object.keys(body).length !== 1 || body.confirm !== approvalFixRoute.incidentId)
+        return json(response, 400, { error: 'invalid-fix-request' })
+      try {
+        const result = await runAudited({ actionAudit, identity, action: 'approvals.fix', target: approvalFixRoute.incidentId },
+          () => remediation.run({
+            incidents: monitoringRuntime?.getIncidents?.().incidents || [],
+            incidentId: approvalFixRoute.incidentId,
+            approval: approvalQueue.decisionFor(approvalFixRoute.incidentId),
+            requestedBy: auditActor(identity).label || undefined,
+          }))
+        return json(response, result.status, result.body)
+      } catch {
+        return json(response, 503, { error: 'remediation-unavailable' })
+      }
     }
 
     const approvalDecisionRoute = parseApprovalDecisionRoute(url.pathname)
