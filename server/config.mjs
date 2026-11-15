@@ -292,6 +292,11 @@ export function getConfig(env = process.env) {
       path: env.FRIDAY_APPROVALS_PATH || '/data/approvals.json',
       limit: Math.min(2000, Math.max(50, Math.floor(positiveNumber(env.FRIDAY_APPROVALS_LIMIT, 500)))),
     },
+    // Open app links on Applications: owner-written https links keyed by service id.
+    appLinks: {
+      enabled: enabled(env.FRIDAY_APP_LINKS_ENABLED),
+      path: env.FRIDAY_APP_LINKS_PATH || '/data/app-links.json',
+    },
     // Automated fixes for approved proposals. Off by default; dry-run unless
     // FRIDAY_REMEDIATION_MODE=execute, which also needs an owner-run executor
     // and the armed automation gate file. Never unattended.

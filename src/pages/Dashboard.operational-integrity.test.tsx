@@ -13,6 +13,7 @@ vi.mock('../lib/api', () => ({
   } }),
   fetchMonitoringHistory: vi.fn(async () => []),
   fetchFridayUptime: vi.fn(async () => ({ state: 'disabled' })),
+  fetchFridayAppLinks: vi.fn(async () => ({ state: 'disabled' })),
   fetchFridayApprovals: vi.fn(async () => ({ state: 'disabled' })),
   decideFridayApproval: vi.fn(),
   FridayApprovalError: class extends Error {},

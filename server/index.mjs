@@ -1,6 +1,7 @@
 import { createAgentActivityLog } from './agents/activity-log.mjs'
 import { createApprovalQueue } from './approvals/queue.mjs'
 import { createRemediationRunner, loadPlaybooks } from './remediation/fixes.mjs'
+import { loadAppLinks } from './applications/app-links.mjs'
 import { createFileAutomationGate } from './security/automation-kill-switch.mjs'
 import { fileURLToPath } from 'node:url'
 import { getConfig } from './config.mjs'
@@ -163,7 +164,15 @@ if (config.remediation.enabled) {
   }
 }
 
-const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, endpointChecks, repositorySettings, pushSubscriptions, workReadBridge, agentActivity, approvalQueue, remediation })
+// Default off. Owner-written https links for Open app on Applications.
+let appLinks = null
+if (config.appLinks.enabled) {
+  appLinks = await loadAppLinks(config.appLinks.path)
+  if (appLinks) console.log(`Friday Open app links enabled (${appLinks.length} links)`)
+  else console.warn('Friday Open app links stayed disabled; the link file is missing, unsafe or invalid')
+}
+
+const server = createFridayServer({ config, monitoringRuntime, agentRegistryService, agentService, repositoryRegistry, actionAudit, siteSettings, endpointChecks, repositorySettings, pushSubscriptions, workReadBridge, agentActivity, approvalQueue, remediation, appLinks })
 server.listen(config.port, '0.0.0.0', () => {
   console.log(`Friday listening on 0.0.0.0:${config.port} (${config.mode} mode)`)
 })

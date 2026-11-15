@@ -307,6 +307,35 @@ Friday uses the REST API with a server-side key, not the MCP server: MCP needs a
 
 The AIDesigner MCP server (`https://api.aidesigner.ai/api/v1/mcp`) is separate; it uses OAuth and is connected in the AI assistant, not in Friday.
 
+## Open app links
+
+Applications can show an **Open** link for a service. Off by default
+(`FRIDAY_APP_LINKS_ENABLED=false`); when it is off the panel says Not connected.
+
+- Links come only from the owner's file at `FRIDAY_APP_LINKS_PATH` (default
+  `/data/app-links.json`). Nothing typed in the browser and nothing an
+  integration reports ever becomes a link. Format:
+
+  ```json
+  {"schemaVersion": 1, "links": [
+    {"serviceId": "vm110:nextcloud", "url": "https://cloud.example.com/"}
+  ]}
+  ```
+
+  `serviceId` must equal the service id shown on Applications (Service ID in
+  the detail panel). Only `https://` URLs without a username or password; at
+  most 200 links; each service once.
+- The file must be a regular file that is not group- or world-writable (mode
+  0600 or 0644, not a symlink). Friday reads it at startup: after editing it,
+  run `make update` (or restart the container). A missing, unsafe or invalid
+  file keeps the feature off and logs a warning; one bad entry rejects the
+  whole file.
+- `GET /api/applications/links` returns `{"links": [{"serviceId", "url"}]}`
+  to any verified viewer, or 503 `app-links-disabled`. Read only; there is no
+  write route. The browser re-checks every URL and opens it in a new tab with
+  `rel="noopener noreferrer"`. Opening a link does not sign you in to the
+  app or bypass its own login.
+
 ## Opt-in features in Settings
 
 Settings, General lists each opt-in feature (GitHub, uptime history, agent activity, approvals, project tasks, new tasks, free model routing, Web Growth) as on or off, and whether the settings it needs next to its flag are present (for example, uptime history and the approvals queue both need `FRIDAY_MONITORING_ENABLED=true`). It never shows the values. `GET /api/settings` returns them as `features: [{id, name, enabled, configured, setup}]`, where `setup` is the heading in this document that explains the feature.

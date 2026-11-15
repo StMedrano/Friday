@@ -137,6 +137,37 @@ export async function fetchFridayUptime(signal?: AbortSignal): Promise<FridayUpt
   return { state: 'unavailable' }
 }
 
+export type FridayAppLinksResult =
+  | { state: 'ok'; links: Map<string, string> }
+  | { state: 'disabled' }
+  | { state: 'unavailable' }
+
+/** A plain https URL with no credentials, or null. Mirrors server/applications/app-links.mjs. */
+export function safeAppUrl(value: unknown): string | null {
+  if (typeof value !== 'string' || value.length > 2048 || value.trim() !== value) return null
+  try {
+    const url = new URL(value)
+    return url.protocol === 'https:' && !url.username && !url.password && url.hostname ? url.href : null
+  } catch { return null }
+}
+
+/** Owner-written Open app links, keyed by service id. Bad entries are dropped. */
+export async function fetchFridayAppLinks(signal?: AbortSignal): Promise<FridayAppLinksResult> {
+  const response = await fetch('/api/applications/links', { method: 'GET', signal })
+  const body = await response.json().catch(() => null) as { error?: string; links?: unknown } | null
+  if (response.ok && body && Array.isArray(body.links)) {
+    const links = new Map<string, string>()
+    for (const item of body.links) {
+      const entry = item as { serviceId?: unknown; url?: unknown } | null
+      const url = safeAppUrl(entry?.url)
+      if (entry && typeof entry.serviceId === 'string' && url) links.set(entry.serviceId, url)
+    }
+    return { state: 'ok', links }
+  }
+  if (body?.error === 'app-links-disabled') return { state: 'disabled' }
+  return { state: 'unavailable' }
+}
+
 export type FridayGitHubPullRequest = { number: number; title: string; author: string; draft: boolean; updatedAt?: string; url?: string }
 export type FridayGitHubSummary = {
   repository: string

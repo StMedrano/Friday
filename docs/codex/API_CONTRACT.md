@@ -59,6 +59,10 @@ Returns FRIDAY-owned monitoring incidents. There is no incident mutation endpoin
 
 Returns bounded recent FRIDAY-owned monitoring events newest-first. History must not contain provider credentials, authorization headers, or raw application logs.
 
+### `GET /api/applications/links`
+
+Owner-written Open app links for Applications, off unless `FRIDAY_APP_LINKS_ENABLED=true` and the file at `FRIDAY_APP_LINKS_PATH` is valid at startup. Returns `{"links":[{"serviceId","url"}]}` (https only, no credentials in the URL) or 503 `app-links-disabled`; 400 `unexpected-query` with a query string. No write route. See `docs/integrations.md`, Open app links.
+
 ### `GET /api/incidents/:incidentId/diagnostics`
 
 Returns the persisted safe diagnostic report for one existing incident when diagnostics are supported/enabled.

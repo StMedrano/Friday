@@ -37,6 +37,7 @@ export const COMPANIONS = Object.freeze({
   'work-move': { flag: 'FRIDAY_WORK_MOVE_ENABLED', needs: ['FRIDAY_WORK_READ_ENABLED', 'FRIDAY_WORK_WRITE_ENABLED', 'FRIDAY_SUPABASE_URL', 'FRIDAY_WORK_READ_KEY', 'FRIDAY_WORK_WRITE_KEY'] },
   // Also needs one free model target; see docs/integrations.md, Free model routing.
   'model-routing': { flag: 'FRIDAY_MODEL_FABRIC_ENABLED', needs: ['FRIDAY_AI_ENABLED'] },
+  'app-links': { flag: 'FRIDAY_APP_LINKS_ENABLED', needs: [] },
   'web-growth': { flag: 'FRIDAY_WEB_GROWTH_ENABLED', needs: ['FRIDAY_WEB_GROWTH_READER_URL', 'FRIDAY_WEB_GROWTH_READER_TOKEN', 'FRIDAY_WEB_GROWTH_READER_EMAILS'] },
   proxmox: { flag: 'FRIDAY_PROXMOX_ENABLED', needs: ['FRIDAY_PROXMOX_URL', 'FRIDAY_PROXMOX_TOKEN_ID', 'FRIDAY_PROXMOX_TOKEN_SECRET'] },
   'vm100-observer': { flag: 'FRIDAY_VM100_OBSERVER_ENABLED', needs: ['FRIDAY_VM100_OBSERVER_URL', 'FRIDAY_VM100_OBSERVER_TOKEN'] },

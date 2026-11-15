@@ -91,7 +91,48 @@ describe('ApplicationsWorkspace observed, read-only application inventory', () =
       render(<ApplicationsWorkspace overview={example} connected />)
       expect(await screen.findByRole('note', { name: 'Uptime history: not connected' })).toBeInTheDocument()
       expect(screen.getByRole('link', { name: 'How to connect: Uptime history' })).toBeInTheDocument()
-      expect(screen.getByRole('note', { name: 'Open app: not connected' })).not.toContainElement(screen.queryByRole('link', { name: /How to connect/ }))
+    })
+  })
+
+  describe('Open app', () => {
+    afterEach(() => vi.unstubAllGlobals())
+    const respond = (links: unknown, status = 200) => vi.fn(async (input: RequestInfo | URL) => String(input) === '/api/applications/links'
+      ? new Response(JSON.stringify(links), { status })
+      : new Response(JSON.stringify({ error: 'uptime-disabled' }), { status: 503 }))
+
+    it('shows Not connected with its setup link when the feature is off', async () => {
+      vi.stubGlobal('fetch', respond({ error: 'app-links-disabled' }, 503))
+      render(<ApplicationsWorkspace overview={example} connected />)
+      const note = await screen.findByRole('note', { name: 'Open app: not connected' })
+      expect(within(note).getByRole('link', { name: 'How to connect: Open app links' })).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /in a new tab/ })).not.toBeInTheDocument()
+    })
+
+    it('opens only the owner-configured https link for the selected service', async () => {
+      vi.stubGlobal('fetch', respond({ links: [
+        { serviceId: 'emby', url: 'https://emby.example.com/web/' },
+        { serviceId: 'nextcloud', url: 'javascript:alert(1)' },
+        { serviceId: 'infra-container', url: 'http://homepage.example.com/' },
+      ] }))
+      const user = userEvent.setup()
+      render(<ApplicationsWorkspace overview={example} connected />)
+      const inventory = screen.getByRole('region', { name: 'Observed application services' })
+      await user.click(within(inventory).getByRole('button', { name: /Emby/i }))
+      const link = await screen.findByRole('link', { name: 'Open Emby in a new tab' })
+      expect(link).toHaveAttribute('href', 'https://emby.example.com/web/')
+      expect(link).toHaveAttribute('target', '_blank')
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer')
+      await user.click(within(inventory).getByRole('button', { name: /Nextcloud/i }))
+      expect(screen.getByText('No Open link is set for Nextcloud.')).toBeInTheDocument()
+      await user.click(within(inventory).getByRole('button', { name: /Homepage/i }))
+      expect(screen.getByText('No Open link is set for Homepage.')).toBeInTheDocument()
+      expect(screen.queryByRole('link', { name: /in a new tab/ })).not.toBeInTheDocument()
+    })
+
+    it('says so when the links cannot be loaded', async () => {
+      vi.stubGlobal('fetch', respond({ error: 'boom' }, 500))
+      render(<ApplicationsWorkspace overview={example} connected />)
+      expect(await screen.findByText('Open app links could not be loaded.')).toBeInTheDocument()
     })
   })
 })
