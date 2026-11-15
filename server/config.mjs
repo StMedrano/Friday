@@ -294,6 +294,14 @@ export function getConfig(env = process.env) {
       path: env.FRIDAY_APPROVALS_PATH || '/data/approvals.json',
       limit: Math.min(2000, Math.max(50, Math.floor(positiveNumber(env.FRIDAY_APPROVALS_LIMIT, 500)))),
     },
+    // New agent from Friday: opens a pull request adding agents/<id>.json. The
+    // token is server-side only; Git stays authoritative and the owner merges.
+    agentProposals: {
+      enabled: enabled(env.FRIDAY_AGENT_PROPOSALS_ENABLED),
+      token: env.FRIDAY_AGENT_PROPOSALS_GITHUB_TOKEN || '',
+      repository: env.FRIDAY_AGENT_PROPOSALS_REPOSITORY || 'StMedrano/Friday',
+      baseBranch: env.FRIDAY_AGENT_PROPOSALS_BASE_BRANCH || 'main',
+    },
     // Open app links on Applications: owner-written https links keyed by service id.
     appLinks: {
       enabled: enabled(env.FRIDAY_APP_LINKS_ENABLED),

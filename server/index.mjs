@@ -169,6 +169,12 @@ if (config.remediation.enabled) {
   }
 }
 
+// Default off. New agents are proposed as GitHub pull requests; the token stays server-side.
+if (config.agentProposals.enabled) {
+  if (config.agentProposals.token) console.log(`Friday new-agent pull requests enabled (${config.agentProposals.repository})`)
+  else console.warn('Friday new-agent pull requests stayed disabled; FRIDAY_AGENT_PROPOSALS_GITHUB_TOKEN is empty')
+}
+
 // Default off. Owner-written https links for Open app on Applications.
 let appLinks = null
 if (config.appLinks.enabled) {

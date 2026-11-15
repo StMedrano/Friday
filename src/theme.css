@@ -736,3 +736,10 @@ code, kbd, pre, samp,
 .fx-task-edit label { display: grid; gap: 4px; font-size: 12px; }
 .fx-task-edit input { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; }
 .fx-task-edit-button { border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 12px; padding: 4px 10px; cursor: pointer; }
+
+/* New agent: proposes a pull request adding agents/<id>.json. */
+.fx-new-agent { display: grid; gap: 8px; }
+.fx-new-agent h3 { margin: 0; font-size: 14px; }
+.fx-new-agent p { margin: 0; font-size: 12px; }
+.fx-new-agent textarea { font: inherit; padding: 6px 8px; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; }
+.fx-new-agent > button { justify-self: start; border: 1px solid var(--line); border-radius: 8px; background: transparent; color: inherit; font: inherit; font-size: 12px; padding: 4px 10px; cursor: pointer; }

@@ -25,6 +25,7 @@ import { applySiteSettings, siteSettingsView } from './site-settings.mjs'
 import { applyEndpointChecks, endpointChecksView, environmentEndpointChecks } from './endpoint-checks.mjs'
 import { normalizeSubscription, vapidKeys } from './notifications/web-push.mjs'
 import { createAiDesigner } from './adapters/aidesigner.mjs'
+import { buildAgentDefinition, createAgentProposer } from './agents/agent-proposals.mjs'
 import { randomUUID } from 'node:crypto'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
@@ -320,10 +321,13 @@ export function createFridayServer({
   approvalQueue = null,
   remediation = null,
   appLinks = null,
+  agentProposer = null,
   aiDesignerImpl = createAiDesigner,
 } = {}) {
   if (!config) throw new Error('Friday server config is required')
   const github = githubReader || createGitHubReader(config.github)
+  const proposer = agentProposer || createAgentProposer({ ...(config.agentProposals || {}), apiUrl: config.github?.apiUrl || 'https://api.github.com' })
+  const proposalProfiles = Object.keys(config.agents?.modelProfiles || {}).filter((id) => id !== 'local-router')
   const labelledConfig = (effectiveConfig = config) =>
     siteSettings ? applySiteSettings(effectiveConfig, siteSettings.get()) : effectiveConfig
   const buildEffectiveOverview = (effectiveConfig) => {
@@ -357,7 +361,8 @@ export function createFridayServer({
       const aiDesignerGenerate = request.method === 'POST' && url.pathname === '/api/aidesigner/designs'
       const approvalDecision = request.method === 'POST' && (Boolean(parseApprovalDecisionRoute(url.pathname)) || Boolean(parseApprovalFixRoute(url.pathname)))
       const taskCreate = isWorkTaskCreate(request.method, url.pathname) || Boolean(workTaskMoveId(request.method, url.pathname)) || Boolean(workTaskEditId(request.method, url.pathname))
-      const operatorOnly = registrySync || siteSettingsWrite || collectionWrite || approvalDecision || taskCreate || aiDesignerGenerate || url.pathname === '/api/audit/events'
+      const agentProposal = request.method === 'POST' && url.pathname === '/api/agents/proposals'
+      const operatorOnly = agentProposal || registrySync || siteSettingsWrite || collectionWrite || approvalDecision || taskCreate || aiDesignerGenerate || url.pathname === '/api/audit/events'
       let verdict
       try { verdict = await accessGate(request, operatorOnly) }
       catch { verdict = {status:503,error:'access-verification-unavailable'} }
@@ -370,7 +375,7 @@ export function createFridayServer({
       // for operational POST/PUT/DELETE handlers. Settings and registry writes with a body additionally require JSON.
       if (['POST', 'PUT', 'DELETE'].includes(request.method) && request.headers['sec-fetch-site'] === 'cross-site')
         return json(response, 403, {error:'access-denied'})
-      if ((registrySync || siteSettingsWrite || pushWrite || groupAdvisory || approvalDecision || taskCreate || aiDesignerGenerate || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
+      if ((agentProposal || registrySync || siteSettingsWrite || pushWrite || groupAdvisory || approvalDecision || taskCreate || aiDesignerGenerate || (collectionWrite && request.method !== 'DELETE')) && !/^application\/json(?:\s*;|\s*$)/i.test(String(request.headers['content-type']||'')))
         return json(response, 415, {error:'json-required'})
     }
 
@@ -759,6 +764,32 @@ export function createFridayServer({
       } catch {
         return json(response, 503, { error: 'group-workspace-unavailable' })
       }
+    }
+
+    // New agent from Friday: opens a pull request adding agents/<id>.json.
+    // Nothing is written to the registry; the owner reviews, merges and syncs.
+    if (url.pathname === '/api/agents/proposals') {
+      if (request.method !== 'GET' && request.method !== 'POST') return json(response, 405, { error: 'method-not-allowed' })
+      if (url.search) return json(response, 400, { error: 'unexpected-query' })
+      if (!proposer.enabled) return json(response, 503, { error: 'agent-proposals-disabled' })
+      if (request.method === 'GET')
+        return json(response, 200, { repository: proposer.repository, profiles: proposalProfiles })
+      // Opening a pull request speaks for the owner on GitHub: a signed-in human operator only.
+      const human = identity && identity.kind !== 'service' && typeof identity.subject === 'string' && identity.subject
+      if (!human || config.mode !== 'live') return json(response, 403, { error: 'access-denied' })
+      let body
+      try { body = await readBody(request) } catch { return json(response, 400, { error: 'invalid-agent-proposal' }) }
+      let definition
+      try { definition = buildAgentDefinition(body, { profiles: proposalProfiles }) }
+      catch (error) { return json(response, 400, { error: 'invalid-agent-proposal', ...(typeof error?.field === 'string' ? { field: error.field } : {}) }) }
+      const result = await runAudited({ actionAudit, identity, action: 'agents.propose', target: definition.id }, async () => {
+        try { return { status: 201, body: { proposal: await proposer.propose(definition) } } }
+        catch (error) {
+          const code = error?.code === 'exists' ? 'agent-exists' : ['github-denied', 'github-rejected'].includes(error?.code) ? error.code : 'github-unavailable'
+          return { status: code === 'agent-exists' ? 409 : code === 'github-denied' ? 502 : code === 'github-rejected' ? 409 : 503, body: { error: code } }
+        }
+      })
+      return json(response, result.status, result.body)
     }
 
     if (request.method === 'GET' && url.pathname === '/api/agents') {

@@ -692,6 +692,40 @@ export async function syncFridayAgentRegistry(signal?: AbortSignal): Promise<Fri
   return body as FridayAgentRegistryStatus
 }
 
+export type FridayAgentProposalSetup = { state: 'ok'; repository: string; profiles: string[] } | { state: 'disabled' } | { state: 'unavailable' }
+export type FridayAgentProposalInput = {
+  id: string; name: string; description: string; profile: string; hosts: string[]; tools: string[]
+  permissions: Record<string, 'auto' | 'approval' | 'forbidden'>; instructions: string[]; enabled: boolean
+}
+export type FridayAgentProposal = { number: number; url: string; branch: string; path: string }
+
+export class FridayAgentProposalError extends Error {
+  constructor(readonly status: number, readonly code = '', readonly field = '') { super(code || 'agent-proposal-failed') }
+}
+
+/** Whether New agent is on, the repository it opens pull requests on, and the allowed model profiles. */
+export async function fetchFridayAgentProposalSetup(signal?: AbortSignal): Promise<FridayAgentProposalSetup> {
+  const response = await fetch('/api/agents/proposals', { method: 'GET', signal })
+  const body = await response.json().catch(() => null) as { error?: string; repository?: unknown; profiles?: unknown } | null
+  if (response.ok && body && typeof body.repository === 'string' && Array.isArray(body.profiles))
+    return { state: 'ok', repository: body.repository, profiles: body.profiles.filter((item): item is string => typeof item === 'string') }
+  if (body?.error === 'agent-proposals-disabled') return { state: 'disabled' }
+  return { state: 'unavailable' }
+}
+
+/** Open a pull request that adds the agent definition. Nothing runs until the owner merges and syncs. */
+export async function proposeFridayAgent(input: FridayAgentProposalInput): Promise<FridayAgentProposal> {
+  const response = await fetch('/api/agents/proposals', {
+    method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(input),
+  })
+  const body = await response.json().catch(() => null) as { error?: string; field?: string; proposal?: FridayAgentProposal } | null
+  if (!response.ok) throw new FridayAgentProposalError(response.status, typeof body?.error === 'string' ? body.error : '', typeof body?.field === 'string' ? body.field : '')
+  const proposal = body?.proposal
+  if (!proposal || !Number.isSafeInteger(proposal.number) || typeof proposal.url !== 'string' || !proposal.url.startsWith('https://github.com/'))
+    throw new FridayAgentProposalError(response.status, 'invalid-response')
+  return proposal
+}
+
 export async function routeFridayAgent(prompt: string, signal?: AbortSignal): Promise<FridayAgentRouteResponse> {
   const response = await fetch('/api/agents/route', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ prompt }), signal })
   const body = await response.json() as FridayAgentRouteResponse

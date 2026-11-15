@@ -98,7 +98,7 @@ export default function TasksWorkspace() {
 
   useEffect(() => {
     const controller = new AbortController()
-    if (reload === 0) { setTasks(null); setNotice('') }
+    if (reload === 0) { setTasks(null); setNotice(''); setEditing(null) }
     setMessage('')
     fetchProjectTasks(projectId, controller.signal)
       .then((board) => { setTasks(board.tasks); setCanCreate(board.canCreate); setCanMove(board.canMove); setCanEdit(board.canEdit) })

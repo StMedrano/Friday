@@ -201,4 +201,17 @@ describe('TasksWorkspace claim and move', () => {
     expect(await screen.findByText(/Someone changed or is holding this task/)).toBeInTheDocument()
     await vi.waitFor(() => expect(reads).toBe(3))
   })
+
+  it('closes an open edit form when the project changes', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      const projectId = new URL(String(input), 'http://x').searchParams.get('projectId')
+      const list = projectId === 'techtactics' ? [{ ...tasks[0], id: 'task-9', projectId, title: 'Other project task' }] : tasks
+      return new Response(JSON.stringify({ tasks: list, canEdit: true }), { status: 200 })
+    }))
+    render(<TasksWorkspace />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Edit Wire the work bridge' }))
+    fireEvent.change(screen.getByLabelText('Project'), { target: { value: 'techtactics' } })
+    const edit = await screen.findByRole('button', { name: 'Edit Other project task' })
+    expect(edit).toBeEnabled()
+  })
 })
