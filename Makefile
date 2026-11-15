@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help install test build verify env-check preflight up live down logs health update clean
+.PHONY: help install test build verify env-check observer-prep preflight up live down logs health update clean
 
 help:
 	@printf '%s\n' \
@@ -10,6 +10,7 @@ help:
 	  '  make build      Type-check and build the production UI' \
 	  '  make verify     Run tests, build, and validate Compose files' \
 	  '  make env-check  Check an .env file against compose.yaml (names only; ENV_FILE=.env)' \
+	  '  make observer-prep  On VM100: check observer .env and socket group id (add --write-gid by hand)' \
 	  '  make preflight  Check VM 102 controller prerequisites without changing anything' \
 	  '  make up         Start Friday using the base controller Compose configuration' \
 	  '  make live       Start Friday with explicit local Docker read-only override' \
@@ -31,6 +32,7 @@ verify: test build
 	docker compose config >/dev/null
 	docker compose -f compose.yaml -f compose.live.yaml config >/dev/null
 	docker compose -f compose.yaml -f compose.automation.yaml config >/dev/null
+	docker compose -f compose.yaml -f compose.nonroot.yaml config >/dev/null
 	FRIDAY_TUNNEL_TOKEN_FILE=/dev/null docker compose -f compose.yaml -f compose.cloud-tunnel.yaml config >/dev/null
 	FRIDAY_REPOSITORY_REGISTRY_FILE=repositories.example.json FRIDAY_REPOSITORY_ROOT=. docker compose -f compose.yaml -f compose.repositories.yaml config >/dev/null
 	FRIDAY_OBSERVER_TOKEN=verify-token FRIDAY_DOCKER_SOCKET_GID=999 docker compose -f observer/compose.yaml config >/dev/null
@@ -42,6 +44,9 @@ COMPOSE_FILES ?= compose.yaml
 
 env-check:
 	node scripts/check-env.mjs $(ENV_FILE) $(foreach file,$(COMPOSE_FILES),--compose $(file))
+
+observer-prep:
+	sh scripts/prepare-observer-redeploy.sh
 
 preflight:
 	sh scripts/preflight-controller.sh

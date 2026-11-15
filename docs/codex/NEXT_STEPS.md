@@ -44,7 +44,7 @@ Listed in `docs/automation/BACKLOG.md` under "Needs owner approval" or in the le
 
 - **Service-token renewal**: `friday-cloud-reader` expires **2026-11-24** (ledger, Service identity). Rotate with an overlap, update the managed-runtime binding, rerun acceptance.
 - **Authenticated Cloudflare acceptance** (ledger, `verification_needed`): rerun `node scripts/check-cloud-connection.mjs` from the managed runtime.
-- **VM100 observer redeploy** needs `FRIDAY_DOCKER_SOCKET_GID` (#116).
+- **VM100 observer redeploy** needs `FRIDAY_DOCKER_SOCKET_GID` (#116). `make observer-prep` on VM100 checks the `.env` and, with `sh scripts/prepare-observer-redeploy.sh --write-gid`, sets it; see `observer/README.md`.
 - **Grants renewal timer** on VM102 is host configuration only and is lost on a VM102 rebuild (ledger, 2026-11-01).
 
 ## 4. Next agent work (no approval needed)
