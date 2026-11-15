@@ -16,6 +16,8 @@ test('the migration copies from a read-only source into a new volume and never c
   assert.match(script, /already exists/)
   assert.match(script, /is running/)
   assert.match(script, /chown -R 10001:10001 \/new/)
+  // The container root is read-only; the verification listing needs a writable /tmp.
+  assert.match(script, /--read-only --tmpfs \/tmp:rw,noexec,nosuid/)
   assert.doesNotMatch(commands, /chown[^\n]*\/old|docker volume (rm|prune)|docker compose (up|down|stop)|docker (restart|stop|kill|rm)\b/)
   assert.doesNotMatch(script, /source=\$SOURCE,target=\/old"/)
 })

@@ -27,7 +27,7 @@ docker volume create "$TARGET" >/dev/null
 echo "Created $TARGET. Copying $SOURCE (read only) into it..."
 
 # Source read only; ownership changes apply to the NEW volume alone.
-docker run --rm --network none --read-only --user 0:0 \
+docker run --rm --network none --read-only --tmpfs /tmp:rw,noexec,nosuid,size=16m --user 0:0 \
   --cap-drop ALL --cap-add CHOWN --cap-add FOWNER --cap-add DAC_OVERRIDE \
   --security-opt no-new-privileges \
   --mount "type=volume,source=$SOURCE,target=/old,readonly" \
