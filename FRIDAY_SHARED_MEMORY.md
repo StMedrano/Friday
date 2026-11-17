@@ -152,6 +152,17 @@ Copy this block into the Activity log and fill every field:
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
 
+### 2026-11-17 09:45 CST — Claude — Homelab changes deployed and switched to execute mode
+
+- Status: verification_needed (execute switch done by the owner; no agent evidence of its log line)
+- Scope claimed: owner-approved (in the project thread, 2026-11-16) setup of Homelab changes on Proxmox and VM102.
+- Work performed: 2026-11-16, from the owner's desktop: created Proxmox role `FridayPower` (VM.Audit, VM.PowerMgmt), user `friday-power@pve` and privilege-separated token `actions`, with user and token ACLs on /vms/100, 101, 104, 105, 106, 108, 120, 132, 140, 151 (node `home`). Moved the token secret directly into VM102 `.env` (never displayed) with `FRIDAY_HOMELAB_ACTIONS_ENABLED=true` and the token ID. Wrote `/data/homelab-actions.json` (10 entries; start, shutdown, reboot). `make env-check`, `make update`, `make health` passed; VM102 moved from `39d6848` (#155) to `168f3d7` (#163), so #156 to #163 are deployed (off unless their flags are set). Log: "Friday homelab changes enabled (dry-run, 10 guests and containers)". 2026-11-17 the owner reported adding `FRIDAY_HOMELAB_ACTIONS_MODE=execute` and redeploying themselves.
+- Verification: dry-run deploy verified from the desktop session (health and log line). Execute mode: owner report only.
+- Decisions: automation gate is armed by the owner per round of changes; the Docker executor is not set up.
+- Blockers/risks: VM132 (supabase-prod) is on the list by the owner's choice. From the desktop, VM102 answers on 192.168.1.64, not 10.1.10.11.
+- Next action: owner confirms `docker logs friday | grep -i homelab` shows execute mode.
+- Rollback/recovery: remove the FRIDAY_HOMELAB_ lines and `make update`; `pveum user delete friday-power@pve` removes the user and token.
+
 ### 2026-11-15 15:30 CST — Claude — Homelab changes for Docker containers (executor)
 
 - Status: complete (merged after CI; not deployed)
