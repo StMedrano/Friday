@@ -10,7 +10,7 @@ Production is VM102. On 2026-11-15 the owner deployed `main` as of #155
 project thread, 2026-11-15). The flags already on since 2026-11-05 are
 `FRIDAY_GITHUB_ENABLED`, `FRIDAY_MONITORING_UPTIME_ENABLED` and
 `FRIDAY_AGENT_ACTIVITY_ENABLED`; no other flag change is recorded. #156 and
-#158 to #160 merged after that deploy and ship with the next one (section 1b).
+#158 to #163 merged after that deploy. On 2026-11-16 VM102 was updated to `168f3d7` (#163), so section 1b is now deployed too; only Homelab changes (#162) was switched on (dry run, then execute mode on 2026-11-17 by the owner).
 
 ## 1. Deployed 2026-11-15, off until the owner turns them on
 
