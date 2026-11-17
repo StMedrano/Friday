@@ -1,6 +1,11 @@
 import { appendHistory, createEmptyMonitoringState } from './state.mjs'
 
 const FLAP_WINDOW_MS = 15 * 60 * 1000
+// A reported status must hold for this many consecutive polls before it counts
+// as a change. One bad poll is not an outage: the network path to a service can
+// swallow a whole poll and answer normally on the next one, and treating that as
+// a change wrote two transitions, which was enough to open a flapping incident.
+const CONFIRM_POLLS = 2
 
 function iso(value) {
   const date = value instanceof Date ? value : new Date(value)
@@ -113,6 +118,7 @@ function observeService(state, config, service, now) {
       statusChangedAt: now,
       consecutive: 1,
       transitions: [],
+      pending: null,
     }
     return
   }
@@ -122,24 +128,37 @@ function observeService(state, config, service, now) {
   prior.lastObservedAt = now
   prior.transitions = Array.isArray(prior.transitions) ? prior.transitions : []
 
-  if (prior.status !== service.status) {
-    const previousStatus = prior.status
-    prior.status = String(service.status || 'unknown')
-    prior.statusChangedAt = now
-    prior.consecutive = 1
-    prior.transitions.push(now)
-    addHistory(state, config, {
-      id: eventId('service-status-changed', key, now),
-      type: 'service-status-changed',
-      at: now,
-      source: 'monitoring',
-      host: prior.host,
-      serviceId: key,
-      serviceName: prior.serviceName,
-      detail: `${previousStatus} -> ${prior.status}`,
-    })
-  } else {
+  const reported = String(service.status || 'unknown')
+  if (prior.status === reported) {
+    // Whatever was brewing did not hold, so it was never a change.
+    prior.pending = null
     prior.consecutive = Number(prior.consecutive || 0) + 1
+  } else {
+    const pending = prior.pending?.status === reported ? prior.pending : { status: reported, since: now, polls: 0 }
+    pending.polls += 1
+    if (pending.polls < CONFIRM_POLLS) {
+      prior.pending = pending
+    } else {
+      const previousStatus = prior.status
+      prior.status = reported
+      // Dated from the first poll that saw it, so the offline grace window and any
+      // incident it opens still start when the service actually changed, not when
+      // Friday finished confirming it.
+      prior.statusChangedAt = pending.since
+      prior.consecutive = pending.polls
+      prior.pending = null
+      prior.transitions.push(now)
+      addHistory(state, config, {
+        id: eventId('service-status-changed', key, now),
+        type: 'service-status-changed',
+        at: now,
+        source: 'monitoring',
+        host: prior.host,
+        serviceId: key,
+        serviceName: prior.serviceName,
+        detail: `${previousStatus} -> ${prior.status}`,
+      })
+    }
   }
 
   prior.transitions = prior.transitions.filter((timestamp) => nowMs - new Date(timestamp).getTime() <= FLAP_WINDOW_MS)
@@ -149,6 +168,9 @@ function evaluateService(state, config, service, now) {
   const serviceId = String(service.id || '')
   const observation = state.observations[serviceId]
   if (!observation) return false
+  // The confirmed status, not the latest poll: a status only lands here once it
+  // has held for CONFIRM_POLLS, so one swallowed poll cannot open an incident.
+  const observed = String(observation.status || service.status || 'unknown')
   const graceMs = Math.max(0, Number(config.offlineGraceSeconds ?? 300)) * 1000
   const unhealthyForMs = new Date(now).getTime() - new Date(observation.statusChangedAt).getTime()
   let changed = false
@@ -157,7 +179,7 @@ function evaluateService(state, config, service, now) {
   const degradedFingerprint = `service-degraded:${serviceId}`
   const flappingFingerprint = `service-flapping:${serviceId}`
 
-  if (service.status === 'offline' && unhealthyForMs >= graceMs) {
+  if (observed === 'offline' && unhealthyForMs >= graceMs) {
     const { opened } = openIncident(state, config, now, {
       fingerprint: offlineFingerprint,
       type: 'service-offline',
@@ -175,7 +197,7 @@ function evaluateService(state, config, service, now) {
     changed ||= opened
   }
 
-  if (service.status === 'degraded' && unhealthyForMs >= graceMs) {
+  if (observed === 'degraded' && unhealthyForMs >= graceMs) {
     const { opened } = openIncident(state, config, now, {
       fingerprint: degradedFingerprint,
       type: 'service-degraded',
@@ -194,7 +216,7 @@ function evaluateService(state, config, service, now) {
   }
 
   // A guest stopped on purpose is no longer an outage, so maintenance clears it too.
-  if (service.status === 'online' || service.status === 'maintenance') {
+  if (observed === 'online' || observed === 'maintenance') {
     changed = resolveFingerprint(state, config, offlineFingerprint, now) || changed
     changed = resolveFingerprint(state, config, degradedFingerprint, now) || changed
   }

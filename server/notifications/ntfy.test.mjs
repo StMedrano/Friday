@@ -64,6 +64,7 @@ test('monitoring runtime notifies when a poll opens an incident and never fails 
   await runtime.poll()
   status = 'offline'
   await runtime.poll()
+  await runtime.poll() // the offline status is confirmed on the second poll
   await new Promise(resolve => setImmediate(resolve))
   const opened = seen.flatMap(changes => changes.opened)
   assert.equal(opened.length, 1)

@@ -31,6 +31,12 @@ FRIDAY_MONITORING_STATE_PATH=/data/monitoring-state.json
 FRIDAY_MONITORING_HISTORY_LIMIT=2000
 ```
 
+A service's status must hold for two consecutive polls before monitoring treats
+it as changed, so a single swallowed poll is not an outage and does not count
+towards the flapping warning. The change is dated from the first poll that saw
+it, so `FRIDAY_MONITORING_OFFLINE_GRACE_SECONDS` still runs from the moment the
+service actually changed and a real outage opens no later than before.
+
 Use base `compose.yaml` and keep `FRIDAY_DOCKER_ENABLED=false` for the normal VM100-observer architecture. Monitoring state is persisted in FRIDAY's existing `/data` volume.
 
 ## Incident Diagnostics validation

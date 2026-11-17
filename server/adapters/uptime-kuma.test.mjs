@@ -167,7 +167,9 @@ test('monitor outages use existing grace/recovery while maintenance creates no o
   state = evaluateMonitoring({ state, overview: { services }, config: settings, now: '2026-10-25T16:05:01Z' }).state
   assert.equal(state.incidents[0].serviceId, 'uptime-kuma-7')
   assert.equal(state.incidents[0].type, 'service-offline')
-  state = evaluateMonitoring({ state, overview: { services: await read(config()) }, config: settings, now: '2026-10-25T16:06:00Z' }).state
+  const recovered = await read(config())
+  state = evaluateMonitoring({ state, overview: { services: recovered }, config: settings, now: '2026-10-25T16:06:00Z' }).state
+  state = evaluateMonitoring({ state, overview: { services: recovered }, config: settings, now: '2026-10-25T16:06:30Z' }).state
   assert.equal(state.incidents[0].status, 'resolved')
   const maintenance = evaluateMonitoring({ overview: { services: await read(config()) }, config: { ...settings, offlineGraceSeconds: 0 }, now: '2026-10-25T16:07:00Z' }).state
   assert.equal(maintenance.incidents.length, 0)

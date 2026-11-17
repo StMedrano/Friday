@@ -333,7 +333,7 @@ test('a resolved incident diagnostic remains while a later recurrence receives a
     serviceId: diagnosticServiceId,
     serviceName: 'nginx-proxy-manager',
     host: 'VM 100',
-    status: 'online',
+    status: 'offline',
     firstObservedAt: '2026-08-20T00:00:00.000Z',
     lastObservedAt: '2026-08-20T00:30:00.000Z',
     statusChangedAt: '2026-08-20T00:30:00.000Z',

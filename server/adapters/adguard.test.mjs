@@ -143,6 +143,8 @@ test('stopped DNS enters the existing incident grace period and resolves after r
   state = evaluateMonitoring({ state, overview: { services }, config: settings, now: '2026-10-25T14:05:01Z' }).state
   assert.equal(state.incidents[0].type, 'service-offline')
   assert.equal(state.incidents[0].serviceId, 'adguard')
-  state = evaluateMonitoring({ state, overview: { services: await read(config()) }, config: settings, now: '2026-10-25T14:06:00Z' }).state
+  const recovered = await read(config())
+  state = evaluateMonitoring({ state, overview: { services: recovered }, config: settings, now: '2026-10-25T14:06:00Z' }).state
+  state = evaluateMonitoring({ state, overview: { services: recovered }, config: settings, now: '2026-10-25T14:06:30Z' }).state
   assert.equal(state.incidents[0].status, 'resolved')
 })

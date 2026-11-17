@@ -170,6 +170,8 @@ test('scrape failures enter monitoring grace periods and resolve under the same 
   assert.equal(state.incidents[0].type, 'service-offline')
   assert.match(state.incidents[0].serviceName, /^Prometheus ·/)
   assert.ok(state.incidents[0].evidence.some(value => value.includes('Scrape failed')))
-  state = evaluateMonitoring({ state, overview: { services: await read(config()) }, config: settings, now: '2026-10-25T15:36:00Z' }).state
+  const recovered = await read(config())
+  state = evaluateMonitoring({ state, overview: { services: recovered }, config: settings, now: '2026-10-25T15:36:00Z' }).state
+  state = evaluateMonitoring({ state, overview: { services: recovered }, config: settings, now: '2026-10-25T15:36:30Z' }).state
   assert.equal(state.incidents[0].status, 'resolved')
 })

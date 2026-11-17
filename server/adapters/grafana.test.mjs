@@ -160,6 +160,8 @@ test('firing rules become warning incidents after the grace period and resolve u
   state = evaluateMonitoring({ state, overview: { services }, config: settings, now: '2026-10-28T12:05:01Z' }).state
   assert.equal(state.incidents[0].type, 'service-degraded')
   assert.equal(state.incidents[0].severity, 'warning')
-  state = evaluateMonitoring({ state, overview: { services: await read(config()) }, config: settings, now: '2026-10-28T12:06:00Z' }).state
+  const recovered = await read(config())
+  state = evaluateMonitoring({ state, overview: { services: recovered }, config: settings, now: '2026-10-28T12:06:00Z' }).state
+  state = evaluateMonitoring({ state, overview: { services: recovered }, config: settings, now: '2026-10-28T12:06:30Z' }).state
   assert.equal(state.incidents[0].status, 'resolved')
 })
