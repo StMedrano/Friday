@@ -163,10 +163,14 @@ if (config.remediation.enabled) {
       playbooks,
       path: config.remediation.runsPath,
       executor: { url: config.remediation.executorUrl, token: config.remediation.executorToken },
+      // Without a fix executor URL, execute mode uses the homelab Docker executor.
+      dockerExecutor: config.homelabActions.executorUrl
+        ? createDockerExecutorClient({ url: config.homelabActions.executorUrl, token: config.homelabActions.executorToken })
+        : null,
       automationGate: createFileAutomationGate({ filePath: config.remediation.automationGatePath }),
     })
-    if (remediation.enabled) console.log(`Friday automated fixes enabled (${remediation.mode}, ${playbooks.length} playbooks)`)
-    else { console.warn('Friday automated fixes stayed disabled; execute mode needs an https executor URL and token'); remediation = null }
+    if (remediation.enabled) console.log(`Friday automated fixes enabled (${remediation.mode}${remediation.executor ? ` via ${remediation.executor}` : ''}, ${playbooks.length} playbooks)`)
+    else { console.warn('Friday automated fixes stayed disabled; execute mode needs FRIDAY_HOMELAB_EXECUTOR_URL and _TOKEN (every playbook a container action) or an https FRIDAY_REMEDIATION_EXECUTOR_URL and token'); remediation = null }
   }
 }
 

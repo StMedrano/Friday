@@ -15,6 +15,8 @@ import { dirname } from 'node:path'
 // records what would have run and executes nothing.
 
 export const MODES = Object.freeze(['dry-run', 'execute'])
+/** Playbook actions the homelab Docker executor (executor/) can carry out, and its operation for each. */
+export const DOCKER_ACTIONS = Object.freeze({ 'restart-container': 'restart', 'start-container': 'start', 'stop-container': 'stop' })
 const ID = /^[a-z0-9][a-z0-9-]{0,62}$/
 const ACTION = /^[a-z][a-z0-9-]{1,40}$/
 const TARGET = /^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$/
@@ -35,8 +37,12 @@ export function parsePlaybooks(value) {
     || !Array.isArray(value.playbooks) || value.playbooks.length > MAX_PLAYBOOKS) throw Error('invalid-playbooks')
   const ids = new Set()
   return Object.freeze(value.playbooks.map((entry) => {
-    if (!exactKeys(entry, ['id', 'serviceId', 'action', 'target', 'description'], ['incidentTypes'])
-      || !ID.test(entry.id) || ids.has(entry.id) || !SERVICE.test(entry.serviceId)
+    // A playbook names its service by exactly one of serviceId (the monitoring id)
+    // or serviceName (the name Friday shows, for example a container name, which
+    // survives the container being recreated, unlike the VM100 container id).
+    const byName = Object.hasOwn(entry ?? {}, 'serviceName')
+    if (!exactKeys(entry, ['id', byName ? 'serviceName' : 'serviceId', 'action', 'target', 'description'], ['incidentTypes'])
+      || !ID.test(entry.id) || ids.has(entry.id) || !SERVICE.test(byName ? entry.serviceName : entry.serviceId)
       || !ACTION.test(entry.action) || !TARGET.test(entry.target) || !text(entry.description, 200)
       || (entry.incidentTypes !== undefined && (!Array.isArray(entry.incidentTypes) || entry.incidentTypes.length === 0
         || entry.incidentTypes.length > 10 || !entry.incidentTypes.every((type) => ID.test(type))))) throw Error('invalid-playbooks')
@@ -59,8 +65,10 @@ export async function loadPlaybooks(path) {
 
 /** The first playbook for this incident's service (and type, when the playbook lists types). */
 export function playbookFor(playbooks, incident) {
-  if (!Array.isArray(playbooks) || !incident || typeof incident.serviceId !== 'string') return null
-  return playbooks.find((entry) => entry.serviceId === incident.serviceId
+  if (!Array.isArray(playbooks) || !incident) return null
+  return playbooks.find((entry) => (entry.serviceId !== undefined
+    ? typeof incident.serviceId === 'string' && entry.serviceId === incident.serviceId
+    : typeof incident.serviceName === 'string' && entry.serviceName === incident.serviceName)
     && (!entry.incidentTypes || entry.incidentTypes.includes(incident.type))) || null
 }
 
@@ -80,7 +88,7 @@ function cleanRun(entry) {
 }
 
 export async function createRemediationRunner({
-  enabled = false, mode = 'dry-run', playbooks = [], executor = {}, automationGate = null,
+  enabled = false, mode = 'dry-run', playbooks = [], executor = {}, dockerExecutor = null, automationGate = null,
   path, fetchImpl = globalThis.fetch, timeoutMs = 10000, now = Date.now,
 } = {}) {
   const executeMode = mode === 'execute'
@@ -90,9 +98,17 @@ export async function createRemediationRunner({
       return url.protocol === 'https:' && !url.username && !url.password && !url.hash ? url.href : null
     } catch { return null }
   })()
+  // Execute mode sends a run either to an owner-run https fix executor
+  // (FRIDAY_REMEDIATION_EXECUTOR_URL) or, when that is not set, to the homelab
+  // Docker executor (executor/), whose own allowlist is a second lock. The
+  // Docker executor only knows container start/stop/restart, so every playbook
+  // must use one of DOCKER_ACTIONS.
+  const useDocker = executeMode && !executor.url && dockerExecutor?.ready === true && typeof dockerExecutor.act === 'function'
+  const sender = useDocker
+    ? Array.isArray(playbooks) && playbooks.every((entry) => Object.hasOwn(DOCKER_ACTIONS, entry.action))
+    : executorUrl !== null && text(executor.token, 4096) && typeof fetchImpl === 'function'
   const ready = enabled === true && MODES.includes(mode) && Array.isArray(playbooks) && typeof path === 'string' && path.length > 0
-    && (!executeMode || (executorUrl !== null && text(executor.token, 4096) && typeof automationGate?.isAllowed === 'function'
-      && typeof fetchImpl === 'function'))
+    && (!executeMode || (sender && typeof automationGate?.isAllowed === 'function'))
   let runs = []
   if (ready) {
     try {
@@ -110,6 +126,14 @@ export async function createRemediationRunner({
   }
 
   async function callExecutor(body) {
+    if (useDocker) {
+      try {
+        await dockerExecutor.act({ container: body.target }, DOCKER_ACTIONS[body.action])
+        return { ok: true }
+      } catch (error) {
+        return { ok: false, detail: /^executor-(http-\d{3}|refused)$/.test(error?.message) ? error.message : 'executor-unavailable' }
+      }
+    }
     try {
       const response = await fetchImpl(executorUrl, {
         method: 'POST', redirect: 'error',
@@ -129,6 +153,8 @@ export async function createRemediationRunner({
   return Object.freeze({
     enabled: ready,
     mode: ready ? mode : null,
+    /** Where execute mode sends a run: 'docker-executor', 'fix-executor', or null in dry-run. */
+    executor: ready && executeMode ? (useDocker ? 'docker-executor' : 'fix-executor') : null,
     /** What "Run fix" would do for this incident, and whether it already ran for this approval. */
     describe(incident, approvalId) {
       if (!ready) return null
