@@ -156,3 +156,57 @@ test('a dry run does not use up the real execution for the same approval', async
   assert.equal((await live.run({incidents: [incident], incidentId: 'inc-1', approval})).status, 200)
   assert.equal(calls, 1)
 })
+
+test('a playbook may name its service by serviceName, which survives a recreated container', () => {
+  const byName = {id: 'restart-plex-name', serviceName: 'plex', action: 'restart-container', target: 'plex', description: 'Restart plex'}
+  const [parsed] = parsePlaybooks({schemaVersion: 1, playbooks: [byName]})
+  assert.equal(playbookFor([parsed], {serviceId: 'vm100-observer-aaaaaaaaaaaa', serviceName: 'plex'})?.id, 'restart-plex-name')
+  assert.equal(playbookFor([parsed], {serviceId: 'vm100-observer-bbbbbbbbbbbb', serviceName: 'plex'})?.id, 'restart-plex-name')
+  assert.equal(playbookFor([parsed], {serviceId: 'docker:plex', serviceName: 'other'}), null)
+  assert.equal(playbookFor([parsed], {serviceId: 'docker:plex'}), null)
+  // Exactly one of serviceId and serviceName.
+  assert.throws(() => parsePlaybooks({schemaVersion: 1, playbooks: [{...byName, serviceId: 'docker:plex'}]}))
+  const {serviceName, ...neither} = byName
+  assert.throws(() => parsePlaybooks({schemaVersion: 1, playbooks: [neither]}))
+  assert.throws(() => parsePlaybooks({schemaVersion: 1, playbooks: [{...byName, serviceName: ''}]}))
+})
+
+test('without a fix executor URL, execute mode restarts the container through the homelab Docker executor', async t => {
+  const root = await tempDir(t)
+  const acts = []
+  let fail = null
+  const dockerExecutor = {ready: true, act: async (entry, operation) => { acts.push([entry.container, operation]); if (fail) throw Error(fail); return {upid: null} }}
+  const base = {enabled: true, mode: 'execute', path: join(root, 'runs.json'), executor: {url: '', token: ''}, automationGate: {isAllowed: () => true}}
+  // Not ready: executor missing, not ready, or a playbook action it cannot carry out.
+  assert.equal((await createRemediationRunner({...base, playbooks: [playbook]})).enabled, false)
+  assert.equal((await createRemediationRunner({...base, playbooks: [playbook], dockerExecutor: {...dockerExecutor, ready: false}})).enabled, false)
+  assert.equal((await createRemediationRunner({...base, playbooks: [{...playbook, action: 'reboot-host'}], dockerExecutor})).enabled, false)
+  assert.equal((await createRemediationRunner({...base, playbooks: [playbook], dockerExecutor, automationGate: null})).enabled, false)
+
+  const runner = await createRemediationRunner({...base, playbooks: [playbook], dockerExecutor})
+  assert.equal(runner.enabled, true)
+  assert.equal(runner.executor, 'docker-executor')
+  fail = 'executor-http-403'
+  const refused = await runner.run({incidents: [incident], incidentId: 'inc-1', approval})
+  assert.equal(refused.status, 502)
+  assert.equal(refused.body.execution.reason, 'executor-http-403')
+  fail = 'ECONNREFUSED 10.0.0.1'
+  assert.equal((await runner.run({incidents: [incident], incidentId: 'inc-1', approval})).body.execution.reason, 'executor-unavailable')
+  fail = null
+  const ok = await runner.run({incidents: [incident], incidentId: 'inc-1', approval})
+  assert.equal(ok.status, 200)
+  assert.deepEqual(ok.body.execution, {performed: true, succeeded: true})
+  assert.deepEqual(acts, [['plex', 'restart'], ['plex', 'restart'], ['plex', 'restart']])
+  assert.equal((await runner.run({incidents: [incident], incidentId: 'inc-1', approval})).body.error, 'fix-already-run')
+
+  // A closed gate stops it before the executor is called.
+  const gated = await createRemediationRunner({...base, path: join(root, 'gated.json'), playbooks: [playbook], dockerExecutor, automationGate: {isAllowed: () => false}})
+  assert.equal((await gated.run({incidents: [incident], incidentId: 'inc-1', approval})).status, 423)
+  assert.equal(acts.length, 3)
+
+  // A fix executor URL, when set, wins over the Docker executor.
+  const viaUrl = await createRemediationRunner({...base, path: join(root, 'url.json'), playbooks: [playbook], dockerExecutor,
+    executor: {url: 'https://executor.test/fix', token: 't'}, fetchImpl: async () => new Response('{"ok":true}')})
+  assert.equal(viaUrl.executor, 'fix-executor')
+  assert.equal((await createRemediationRunner({enabled: true, playbooks: [playbook], path: join(root, 'dry.json'), dockerExecutor})).executor, null)
+})

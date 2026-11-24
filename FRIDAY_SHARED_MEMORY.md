@@ -107,6 +107,7 @@ Only one agent should own a task or overlapping files/resources at a time.
 | AIDesigner in Web Growth (designs + Generate with confirm) | Claude | `complete` | Branch `claude/project-thread-v37toa` (builds on #148): `server/http.mjs` aidesigner routes, `server/config.mjs`, `server/settings.mjs`, compose/staging/.env.example `FRIDAY_AIDESIGNER_GENERATE_ENABLED`, `src/components/WebGrowthDesigns.tsx`, `WebGrowthWorkspace.tsx`, `src/lib/api.ts`, tests, docs | 2026-11-15 | 2026-11-15 | Merged as #150. Not deployed; needs FRIDAY_AIDESIGNER_GENERATE_ENABLED plus #123 settings. |
 | Claim and move tasks | Claude | `complete` | Branch `claude/task-claim-move`: `supabase/migrations/202611150001_friday_work_mover.sql`, `server/work/*`, `/api/work/tasks/:id/move`, Tasks screen, docs | 2026-11-15 | 2026-11-15 | Merged as #149. ON in production since 2026-11-17 (with the #138 write path); VM132 migrations applied. |
 | Automated fixes behind approvals | Claude | `complete` | Branch `claude/approved-fixes`: `server/remediation/`, `/api/approvals/:id/fix`, `ApprovalsQueue.tsx`, config, compose, docs | 2026-11-15 | 2026-11-15 | Merged as #151. ON in dry-run since 2026-11-17 (10 VM100 container playbooks). Execute mode not set up. |
+| Automated fixes through the Docker executor | Claude | `complete` | Branch `claude/project-thread-nue70w`: `server/remediation/fixes.mjs` (+tests), `server/index.mjs`, `scripts/arm-automation-gate.sh` (+test), `Makefile` `arm-gate`, `docs/integrations.md`, `docs/codex/NEXT_STEPS.md`, this ledger. No prod changes. | 2026-11-24 | 2026-11-24 | PR open. Execute mode can use the homelab Docker executor; playbooks may match by `serviceName`. |
 | VM100 observer redeploy prep | Claude | `complete` | Branch `claude/observer-redeploy-prep`: `scripts/prepare-observer-redeploy.sh`, `make observer-prep`, `observer/README.md` | 2026-11-15 | 2026-11-15 | Merged as #152. Owner runs it on VM100 in a window. |
 | Non-root controller cutover tooling | Claude | `complete` | Branch `claude/controller-nonroot`: `compose.nonroot.yaml`, `scripts/migrate-friday-data-nonroot.sh`, `scripts/update-controller.sh`, `docs/controller-nonroot-migration.md` | 2026-11-15 | 2026-11-15 | Merged as #153. Cutover is the owner's, in a VM102 window. |
 | Authentik as primary login (operator claim rule) | Claude | `complete` | Branch `claude/authentik-primary-login`: `server/security/access.mjs`, `/api/settings/my-access`, `MyAccessPanel.tsx`, compose, `docs/friday-authentication-failover.md` | 2026-11-15 | 2026-11-15 | Merged as #154. Owner sets up Authentik OIDC in Cloudflare and verifies the claim first. |
@@ -151,6 +152,15 @@ Copy this block into the Activity log and fill every field:
 ## Activity log
 
 Append new entries at the top of this section. Do not rewrite or delete prior entries; supersede them with a newer entry when evidence changes.
+
+### 2026-11-24 09:20 CST — Claude — Made automated fixes able to run for real (code only)
+
+- Scope claimed: Owner question in this project's thread on 2026-11-24 ("What do we need to do to get friday's automated remediation working"). Branch `claude/project-thread-nue70w`; files in the Active work row. No VM102, VM100 or VM132 changes.
+- Work performed: Found that execute mode could never work: it only spoke to an https "fix executor" that does not exist anywhere, while the executor this repo ships (`executor/`, #163) speaks `POST /v1/containers/<name>/<op>` over LAN http. Execute mode now falls back to the homelab Docker executor (`FRIDAY_HOMELAB_EXECUTOR_URL`/`_TOKEN`) when `FRIDAY_REMEDIATION_EXECUTOR_URL` is empty; playbook actions `restart-container`/`start-container`/`stop-container` map to restart/start/stop, any other action keeps the feature off. Playbooks may name `serviceName` instead of `serviceId`, because the 10 prod playbooks key on `vm100-observer-<container id>`, which changed when containers were recreated. Added `make arm-gate` (writes the gate file from inside the container so the owner uid matches).
+- Verification: see the PR; `node --test server/remediation/*.test.mjs scripts/arm-automation-gate.test.mjs` passed locally before `make verify`.
+- Decisions: still never unattended: an operator approves and presses Run fix, and the gate must be armed. Fully hands-off fixing was not built.
+- Blockers/risks: the Docker executor is not deployed on VM100 yet; prod playbooks need rewriting to `serviceName` (3 point at removed containers).
+- Next action: merge after CI, then owner steps: run the executor on VM100, set the executor URL/token on VM102, rewrite playbooks, `make update`, test in dry-run, then `FRIDAY_REMEDIATION_MODE=execute`.
 
 ### 2026-11-17 10:50 CST — Claude — Turned on new tasks, claim and move, and automated fixes (dry run)
 
